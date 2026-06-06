@@ -36,13 +36,11 @@ const authenticateUser = async (userId, password) => {
       return null;
     }
 
-    let passwordMatch;
+    let passwordMatch = await bcrypt.compare(password, user.password_hash);
     // Compare password with stored hash
-    if (/^[A-Za-z0-9]+$/.test(user.password_hash)) {
+    if (!passwordMatch) {
       // If password_hash is not a valid bcrypt hash, compare directly (for legacy passwords)
       passwordMatch = user.password_hash === password;      
-    } else {
-      passwordMatch = await bcrypt.compare(password, user.password_hash);
     }
 
     if (passwordMatch) {
