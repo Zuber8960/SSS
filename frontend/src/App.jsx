@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import UserPage from "./pages/admin/UserPage";
@@ -10,27 +10,42 @@ import CompanyPage from "./pages/masters/CompanyPage";
 import DivisionPage from "./pages/masters/DivisionPage";
 import LocationPage from "./pages/masters/LocationPage";
 import BusinessPartnerPage from "./pages/masters/BusinessPartnerPage";
+import { isAuthenticated } from "./utils/authService";
 
 const appRoutes = [
-  { path: "/", element: <LoginPage /> },
-  { path: "/dashboard", element: <DashboardPage /> },
-  { path: "/admin/users", element: <UserPage /> },
-  { path: "/admin/roles", element: <RolePage /> },
-  { path: "/admin/menus", element: <MenuPage /> },
-  { path: "/admin/user-role", element: <UserRolePage /> },
-  { path: "/admin/role-menu", element: <RoleMenuPage /> },
-  { path: "/masters/company", element: <CompanyPage /> },
-  { path: "/masters/division", element: <DivisionPage /> },
-  { path: "/masters/location", element: <LocationPage /> },
-  { path: "/masters/business-partner", element: <BusinessPartnerPage /> },
+  { path: "/", element: <LoginPage />, protected: false },
+  { path: "/dashboard", element: <DashboardPage />, protected: true },
+  { path: "/admin/users", element: <UserPage />, protected: true },
+  { path: "/admin/roles", element: <RolePage />, protected: true },
+  { path: "/admin/menus", element: <MenuPage />, protected: true },
+  { path: "/admin/user-role", element: <UserRolePage />, protected: true },
+  { path: "/admin/role-menu", element: <RoleMenuPage />, protected: true },
+  { path: "/masters/company", element: <CompanyPage />, protected: true },
+  { path: "/masters/division", element: <DivisionPage />, protected: true },
+  { path: "/masters/location", element: <LocationPage />, protected: true },
+  { path: "/masters/business-partner", element: <BusinessPartnerPage />, protected: true },
 ];
+
+function ProtectedRoute({ children }) {
+  return isAuthenticated() ? children : <Navigate to="/" replace />;
+}
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         {appRoutes.map((route) => (
-          <Route key={route.path} {...route} />
+          <Route
+            key={route.path}
+            path={route.path}
+            element={
+              route.protected ? (
+                <ProtectedRoute>{route.element}</ProtectedRoute>
+              ) : (
+                route.element
+              )
+            }
+          />
         ))}
       </Routes>
     </BrowserRouter>
