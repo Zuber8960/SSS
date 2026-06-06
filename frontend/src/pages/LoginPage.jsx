@@ -38,19 +38,30 @@ function Field({ value, onChange, placeholder, type = "text" }) {
     />
   );
 }
+import { loginUser } from "../utils/authService";
 
 export default function LoginPage() {
   const navigate = useNavigate();
 
   const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleLogin = () => {
-    if (userId === "ADMIN" && password === "ADMIN") {
+  const handleLogin = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await loginUser(userId, password);
       navigate("/dashboard");
-    } else {
-      alert("Invalid User");
+    } catch (err) {
+      setError(err.message || "Invalid credentials");
+      alert(err.message || "Invalid credentials");
+    } finally {
+      setLoading(false);
     }
+
   };
 
   return (
