@@ -38,7 +38,7 @@ function Field({ value, onChange, placeholder, type = "text" }) {
     />
   );
 }
-import { loginUser } from "../utils/authService";
+import { loginUser, resetPassword } from "../utils/authService";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -47,6 +47,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [showForgot, setShowForgot] = useState(false);
+  const [email, setEmail] = useState("");
+  const [mobileNo, setMobileNo] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [resetUserId, setResetUserId] = useState("");
 
   const handleLogin = async () => {
     setLoading(true);
@@ -62,6 +69,38 @@ export default function LoginPage() {
       setLoading(false);
     }
 
+  };
+
+  const handleResetPassword = async () => {
+    try {
+      if (!email || !mobileNo) {
+        alert("Email and Mobile Number are required");
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        alert("Passwords do not match");
+        return;
+      }
+      console.log('Resetting password for:', { resetUserId, email, mobileNo, newPassword });
+      const response = await resetPassword(resetUserId, email, mobileNo, newPassword);
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message);
+      }
+
+      alert("Password reset successful");
+
+      setShowForgot(false);
+      setEmail("");
+      setMobileNo("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   return (
@@ -89,7 +128,7 @@ export default function LoginPage() {
         <div style={{ width: "100%", maxWidth: 560 }}>
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
             <div >
-              <img src={logoImg} alt="Cargo Yaan" style={{ height: 126,width:300 }} />
+              <img src={logoImg} alt="Cargo Yaan" style={{ height: 126, width: 300 }} />
             </div>
           </div>
 
@@ -123,7 +162,7 @@ export default function LoginPage() {
           justifyContent: "center",
           alignItems: "center",
           padding: "10px 36px",
-          
+
         }}
       >
         <div
@@ -165,7 +204,20 @@ export default function LoginPage() {
               <label style={{ display: "flex", alignItems: "center", gap: 8, color: "#556" }}>
                 <input type="checkbox" style={{ width: 16, height: 16 }} /> Remember me
               </label>
-              <a href="#" style={{ color: "#0ea5a4", textDecoration: "none" }}>Forgot password?</a>
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setResetUserId(userId);
+                  setShowForgot(true);
+                }}
+                style={{
+                  color: "#0ea5a4",
+                  textDecoration: "none"
+                }}
+              >
+                Forgot password?
+              </a>
             </div>
 
             <button
@@ -186,6 +238,95 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      {showForgot && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 999
+          }}
+        >
+          <div
+            style={{
+              width: 420,
+              background: "#fff",
+              padding: 25,
+              borderRadius: 12
+            }}
+          >
+            <h3>Reset Password</h3>
+
+            <div style={{ display: "grid", gap: 12 }}>
+              <Field
+                placeholder="User ID"
+                value={resetUserId}
+                onChange={(e) => setResetUserId(e.target.value)}
+              />
+              <Field
+                placeholder="Email Address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+
+              <Field
+                placeholder="Mobile Number"
+                value={mobileNo}
+                onChange={(e) => setMobileNo(e.target.value)}
+              />
+
+              <Field
+                type="password"
+                placeholder="New Password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+
+              <Field
+                type="password"
+                placeholder="Confirm Password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  onClick={() => setShowForgot(false)}
+                  style={{
+                    flex: 1,
+                    padding: 10,
+                    borderRadius: 6,
+                    border: "1px solid #ccc"
+                  }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={handleResetPassword}
+                  style={{
+                    flex: 1,
+                    padding: 10,
+                    background: "#0052cc",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 6
+                  }}
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

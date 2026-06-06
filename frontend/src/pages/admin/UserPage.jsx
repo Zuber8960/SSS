@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MainLayout from "../../layouts/MainLayout";
+import { fetchAllUsers, createUser, updateUser, deleteUser } from "../../utils/userAPI";
 import {
   DataTable,
   FormField,
@@ -11,75 +12,160 @@ import {
 
 const statusOptions = ["Active", "Inactive"];
 const userFields = [
-  { label: "User ID", name: "userId" },
-  { label: "User Name", name: "userName" },
-  { label: "Email", name: "email" },
-  { label: "Mobile", name: "mobile" },
-  { label: "Status", name: "status", options: statusOptions },
+  { label: "User ID", name: "user_id" },
+  { label: "User Name", name: "user_name" },
+  { label: "Email", name: "email_id" },
+  { label: "Mobile", name: "mobile_no" },
+  { label: "Status", name: "user_status", options: statusOptions },
 ];
 const userColumns = [
-  { key: "userId", label: "User ID" },
-  { key: "userName", label: "User Name" },
-  { key: "email", label: "Email" },
-  { key: "mobile", label: "Mobile" },
-  { key: "status", label: "Status" },
+  { key: "user_id", label: "User ID" },
+  { key: "user_name", label: "User Name" },
+  { key: "email_id", label: "Email" },
+  { key: "mobile_no", label: "Mobile" },
+  { key: "user_status", label: "Status" },
 ];
 
 export default function UserPage() {
   const [searchText, setSearchText] = useState("");
-
-  const [users, setUsers] = useState([
-    {
-      userId: "ADMIN",
-      userName: "Administrator",
-      email: "admin@erp.com",
-      mobile: "9999999999",
-      status: "Active",
-    },
-  ]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
 
   const [form, setForm] = useState({
-    userId: "",
-    userName: "",
-    email: "",
-    mobile: "",
-    status: "Active",
+    rec_id: "",
+    user_id: "",
+    user_name: "",
+    email_id: "",
+    mobile_no: "",
+    user_status: "A",
+    password_hash: ""
   });
+
+  // Load users on component mount
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await fetchAllUsers();
+      setUsers(data);
+    } catch (err) {
+      setError(err.message || "Failed to load users");
+      console.error("Error loading users:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const clearForm = () => {
     setForm({
-      userId: "",
-      userName: "",
-      email: "",
-      mobile: "",
-      status: "Active",
+      rec_id: "",
+      user_id: "",
+      user_name: "",
+      email_id: "",
+      mobile_no: "",
+      user_status: "A",
+      password_hash: ""
     });
+    setIsEditing(false);
   };
 
-  const saveUser = () => {
-    if (!form.userId || !form.userName) {
+  const saveUser = async () => {
+    if (!form.user_id || !form.user_name) {
       alert("User ID and User Name are mandatory");
       return;
     }
 
-    setUsers([...users, form]);
-    clearForm();
+    if (!isEditing && !form.password_hash) {
+      alert("Password is required for new users");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      if (isEditing) {
+        // Update existing user
+        await updateUser(form.rec_id, {
+          user_name: form.user_name,
+          email_id: form.email_id,
+          mobile_no: form.mobile_no,
+          user_status: form.user_status
+        });
+        
+        // Reload users
+        await loadUsers();
+        alert("User updated successfully");
+      } else {
+        // Create new user
+        await createUser({
+          user_id: form.user_id,
+          user_name: form.user_name,
+          email_id: form.email_id,
+          mobile_no: form.mobile_no,
+          user_status: form.user_status,
+          password_hash: form.password_hash,
+          company_code: 1 // Default company code
+        });
+        
+        // Reload users
+        await loadUsers();
+        alert("User created successfully");
+      }
+      clearForm();
+    } catch (err) {
+      setError(err.message || "Failed to save user");
+      alert(err.message || "Failed to save user");
+      console.error("Error saving user:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const editUser = (row) => {
-    setForm(row);
+    setForm({
+      rec_id: row.rec_id,
+      user_id: row.user_id,
+      user_name: row.user_name,
+      email_id: row.email_id || "",
+      mobile_no: row.mobile_no || "",
+      user_status: row.user_status,
+      password_hash: ""
+    });
+    setIsEditing(true);
   };
 
-  const deleteUser = (userId) => {
-    if (!window.confirm("Delete User ?")) return;
+  const handleDeleteUser = async (row) => {
+    if (!window.confirm(`Delete user ${row.user_id}?`)) return;
 
-    setUsers(users.filter((x) => x.userId !== userId));
+    setLoading(true);
+    setError("");
+
+    try {
+      await deleteUser(row.rec_id);
+      
+      // Reload users
+      await loadUsers();
+      alert("User deleted successfully");
+    } catch (err) {
+      setError(err.message || "Failed to delete user");
+      alert(err.message || "Failed to delete user");
+      console.error("Error deleting user:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredUsers = users.filter(
     (x) =>
-      x.userId.toLowerCase().includes(searchText.toLowerCase()) ||
-      x.userName.toLowerCase().includes(searchText.toLowerCase())
+      x.user_id.toLowerCase().includes(searchText.toLowerCase()) ||
+      x.user_name.toLowerCase().includes(searchText.toLowerCase())
   );
 
   return (
@@ -89,22 +175,59 @@ export default function UserPage() {
           actions={[
             { label: "New", onClick: clearForm },
             { label: "Save", onClick: saveUser },
-            { label: "Export" },
+            { label: "Refresh", onClick: loadUsers },
           ]}
         />
+
+        {error && (
+          <div style={{
+            padding: "10px",
+            marginBottom: "10px",
+            background: "#ffebee",
+            color: "#c62828",
+            borderRadius: "4px",
+            border: "1px solid #ef5350"
+          }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        {loading && (
+          <div style={{
+            padding: "10px",
+            marginBottom: "10px",
+            background: "#e3f2fd",
+            color: "#1565c0",
+            borderRadius: "4px"
+          }}>
+            ⏳ Loading...
+          </div>
+        )}
+
         <SearchBox placeholder="Search User..." value={searchText} onChange={setSearchText} />
+        
         <FormPanel>
           {userFields.map((field) => (
             <FormField key={field.name} {...field} form={form} setForm={setForm} />
           ))}
+          {!isEditing && (
+            <FormField
+              label="Password"
+              name="password_hash"
+              type="password"
+              form={form}
+              setForm={setForm}
+            />
+          )}
         </FormPanel>
+
         <DataTable
           columns={userColumns}
           rows={filteredUsers}
-          getKey={(row) => row.userId}
+          getKey={(row) => row.rec_id}
           actions={[
             { label: "Edit", onClick: editUser },
-            { label: "Delete", onClick: (row) => deleteUser(row.userId) },
+            { label: "Delete", onClick: handleDeleteUser },
           ]}
         />
       </PageBody>

@@ -40,6 +40,34 @@ export const loginUser = async (userId, password) => {
     }
 };
 
+
+export const resetPassword = async (userId, email, mobileNo, newPassword) => {
+    try {
+        console.log('Resetting password for:', { userId, email, mobileNo });
+        const response = await fetch(`${API_URL}/auth/reset-password`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                email_id: email,
+                mobile_no: mobileNo,
+                new_password: newPassword
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Password reset failed');
+        }
+
+        return await response.json();
+    } catch (error) {
+        throw error;
+    }
+};
+
 /**
  * Get stored authentication token
  * @returns {string|null} - JWT token or null
