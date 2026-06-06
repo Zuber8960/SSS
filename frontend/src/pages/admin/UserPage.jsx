@@ -1,5 +1,29 @@
 import { useState } from "react";
 import MainLayout from "../../layouts/MainLayout";
+import {
+  DataTable,
+  FormField,
+  FormPanel,
+  PageBody,
+  PageToolbar,
+  SearchBox,
+} from "../../components/common/MasterPage";
+
+const statusOptions = ["Active", "Inactive"];
+const userFields = [
+  { label: "User ID", name: "userId" },
+  { label: "User Name", name: "userName" },
+  { label: "Email", name: "email" },
+  { label: "Mobile", name: "mobile" },
+  { label: "Status", name: "status", options: statusOptions },
+];
+const userColumns = [
+  { key: "userId", label: "User ID" },
+  { key: "userName", label: "User Name" },
+  { key: "email", label: "Email" },
+  { key: "mobile", label: "Mobile" },
+  { key: "status", label: "Status" },
+];
 
 export default function UserPage() {
   const [searchText, setSearchText] = useState("");
@@ -60,154 +84,30 @@ export default function UserPage() {
 
   return (
     <MainLayout>
-      <div style={{ padding: "10px" }}>
-
-        <h2>User Master</h2>
-
-        {/* Toolbar */}
-
-        <div
-          style={{
-            display: "flex",
-            gap: "10px",
-            marginBottom: "15px",
-          }}
-        >
-          <button onClick={clearForm}>New</button>
-          <button onClick={saveUser}>Save</button>
-          <button>Export</button>
-        </div>
-
-        {/* Search */}
-
-        <div
-          style={{
-            marginBottom: "15px",
-          }}
-        >
-          <input
-            placeholder="Search User..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            style={{
-              width: "300px",
-              padding: "8px",
-            }}
-          />
-        </div>
-
-        {/* Entry Form */}
-
-        <div
-          style={{
-            border: "1px solid #ddd",
-            padding: "15px",
-            borderRadius: "5px",
-            marginBottom: "20px",
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "150px 300px 150px 300px",
-              gap: "10px",
-            }}
-          >
-            <label>User ID</label>
-            <input
-              value={form.userId}
-              onChange={(e) =>
-                setForm({ ...form, userId: e.target.value })
-              }
-            />
-
-            <label>User Name</label>
-            <input
-              value={form.userName}
-              onChange={(e) =>
-                setForm({ ...form, userName: e.target.value })
-              }
-            />
-
-            <label>Email</label>
-            <input
-              value={form.email}
-              onChange={(e) =>
-                setForm({ ...form, email: e.target.value })
-              }
-            />
-
-            <label>Mobile</label>
-            <input
-              value={form.mobile}
-              onChange={(e) =>
-                setForm({ ...form, mobile: e.target.value })
-              }
-            />
-
-            <label>Status</label>
-            <select
-              value={form.status}
-              onChange={(e) =>
-                setForm({ ...form, status: e.target.value })
-              }
-            >
-              <option>Active</option>
-              <option>Inactive</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Grid */}
-
-        <table
-          width="100%"
-          border="1"
-          cellPadding="8"
-          style={{
-            borderCollapse: "collapse",
-          }}
-        >
-          <thead>
-            <tr>
-              <th>User ID</th>
-              <th>User Name</th>
-              <th>Email</th>
-              <th>Mobile</th>
-              <th>Status</th>
-              <th width="150">Action</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {filteredUsers.map((row) => (
-              <tr key={row.userId}>
-                <td>{row.userId}</td>
-                <td>{row.userName}</td>
-                <td>{row.email}</td>
-                <td>{row.mobile}</td>
-                <td>{row.status}</td>
-
-                <td>
-                  <button
-                    onClick={() => editUser(row)}
-                    style={{ marginRight: "5px" }}
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    onClick={() => deleteUser(row.userId)}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-      </div>
+      <PageBody title="User Master">
+        <PageToolbar
+          actions={[
+            { label: "New", onClick: clearForm },
+            { label: "Save", onClick: saveUser },
+            { label: "Export" },
+          ]}
+        />
+        <SearchBox placeholder="Search User..." value={searchText} onChange={setSearchText} />
+        <FormPanel>
+          {userFields.map((field) => (
+            <FormField key={field.name} {...field} form={form} setForm={setForm} />
+          ))}
+        </FormPanel>
+        <DataTable
+          columns={userColumns}
+          rows={filteredUsers}
+          getKey={(row) => row.userId}
+          actions={[
+            { label: "Edit", onClick: editUser },
+            { label: "Delete", onClick: (row) => deleteUser(row.userId) },
+          ]}
+        />
+      </PageBody>
     </MainLayout>
   );
 }

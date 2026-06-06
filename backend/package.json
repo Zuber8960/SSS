@@ -1,1 +1,13 @@
-{ "name":"backend" }
+{
+  "name": "backend",
+  "main": "server.js",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "knex": "^3.2.10",
+    "pg": "^8.21.0"
+  },
+  "scripts": {
+    "start": "nodemon server.js"
+  }
+}

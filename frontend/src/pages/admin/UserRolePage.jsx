@@ -1,5 +1,17 @@
 import { useState } from "react";
 import MainLayout from "../../layouts/MainLayout";
+import {
+  DataTable,
+  FormField,
+  FormPanel,
+  PageBody,
+  PageToolbar,
+} from "../../components/common/MasterPage";
+
+const mappingColumns = [
+  { key: "userId", label: "User ID" },
+  { key: "roleCode", label: "Role Code" },
+];
 
 export default function UserRolePage() {
 
@@ -68,169 +80,42 @@ export default function UserRolePage() {
 
   return (
     <MainLayout>
-
-      <div style={{ padding: "10px" }}>
-
-        <h2>User Role Mapping</h2>
-
-        {/* Toolbar */}
-
-        <div
-          style={{
-            display: "flex",
-            gap: "10px",
-            marginBottom: "15px"
-          }}
-        >
-          <button onClick={clearForm}>
-            New
-          </button>
-
-          <button onClick={saveMapping}>
-            Save
-          </button>
-        </div>
-
-        {/* Entry Form */}
-
-        <div
-          style={{
-            border: "1px solid #ddd",
-            padding: "15px",
-            borderRadius: "5px",
-            marginBottom: "20px"
-          }}
-        >
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "150px 300px",
-              gap: "10px"
-            }}
-          >
-
-            <label>User</label>
-
-            <select
-              value={form.userId}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  userId: e.target.value
-                })
-              }
-            >
-              <option value="">
-                Select User
-              </option>
-
-              {users.map(user => (
-                <option
-                  key={user}
-                  value={user}
-                >
-                  {user}
-                </option>
-              ))}
-            </select>
-
-            <label>Role</label>
-
-            <select
-              value={form.roleCode}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  roleCode: e.target.value
-                })
-              }
-            >
-              <option value="">
-                Select Role
-              </option>
-
-              {roles.map(role => (
-                <option
-                  key={role}
-                  value={role}
-                >
-                  {role}
-                </option>
-              ))}
-            </select>
-
-          </div>
-
-        </div>
-
-        {/* Grid */}
-
-        <table
-          width="100%"
-          border="1"
-          cellPadding="8"
-          style={{
-            borderCollapse: "collapse"
-          }}
-        >
-
-          <thead>
-            <tr>
-              <th>User ID</th>
-              <th>Role Code</th>
-              <th width="150">
-                Action
-              </th>
-            </tr>
-          </thead>
-
-          <tbody>
-
-            {mappings.map((row, index) => (
-
-              <tr key={index}>
-
-                <td>{row.userId}</td>
-
-                <td>{row.roleCode}</td>
-
-                <td>
-
-                  <button
-                    onClick={() =>
-                      editMapping(row)
-                    }
-                    style={{
-                      marginRight: "5px"
-                    }}
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      deleteMapping(
-                        row.userId,
-                        row.roleCode
-                      )
-                    }
-                  >
-                    Delete
-                  </button>
-
-                </td>
-
-              </tr>
-
-            ))}
-
-          </tbody>
-
-        </table>
-
-      </div>
-
+      <PageBody title="User Role Mapping">
+        <PageToolbar
+          actions={[
+            { label: "New", onClick: clearForm },
+            { label: "Save", onClick: saveMapping },
+          ]}
+        />
+        <FormPanel columns="150px 300px">
+          <FormField
+            label="User"
+            name="userId"
+            form={form}
+            setForm={setForm}
+            options={[{ label: "Select User", value: "" }, ...users]}
+          />
+          <FormField
+            label="Role"
+            name="roleCode"
+            form={form}
+            setForm={setForm}
+            options={[{ label: "Select Role", value: "" }, ...roles]}
+          />
+        </FormPanel>
+        <DataTable
+          columns={mappingColumns}
+          rows={mappings}
+          getKey={(_, index) => index}
+          actions={[
+            { label: "Edit", onClick: editMapping },
+            {
+              label: "Delete",
+              onClick: (row) => deleteMapping(row.userId, row.roleCode),
+            },
+          ]}
+        />
+      </PageBody>
     </MainLayout>
   );
 }

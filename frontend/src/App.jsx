@@ -11,21 +11,27 @@ import DivisionPage from "./pages/masters/DivisionPage";
 import LocationPage from "./pages/masters/LocationPage";
 import BusinessPartnerPage from "./pages/masters/BusinessPartnerPage";
 
+const appRoutes = [
+  { path: "/", element: <LoginPage /> },
+  { path: "/dashboard", element: <DashboardPage /> },
+  { path: "/admin/users", element: <UserPage /> },
+  { path: "/admin/roles", element: <RolePage /> },
+  { path: "/admin/menus", element: <MenuPage /> },
+  { path: "/admin/user-role", element: <UserRolePage /> },
+  { path: "/admin/role-menu", element: <RoleMenuPage /> },
+  { path: "/masters/company", element: <CompanyPage /> },
+  { path: "/masters/division", element: <DivisionPage /> },
+  { path: "/masters/location", element: <LocationPage /> },
+  { path: "/masters/business-partner", element: <BusinessPartnerPage /> },
+];
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<LoginPage />} />
-        <Route path="/admin/users" element={<UserPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/admin/roles" element={<RolePage />} />
-        <Route path="/admin/menus" element={<MenuPage />} />
-	<Route  path="/admin/user-role"  element={<UserRolePage />}/>
-	<Route  path="/admin/role-menu"  element={<RoleMenuPage />}/>
-	<Route  path="/masters/company"  element={<CompanyPage />}/>
-	<Route  path="/masters/division" element={<DivisionPage />}/>
-	<Route  path="/masters/location" element={<LocationPage />}/>
-	<Route  path="/masters/business-partner" element={<BusinessPartnerPage />}/>
+        {appRoutes.map((route) => (
+          <Route key={route.path} {...route} />
+        ))}
       </Routes>
     </BrowserRouter>
   );

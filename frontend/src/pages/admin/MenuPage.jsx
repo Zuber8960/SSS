@@ -1,5 +1,31 @@
 import { useState } from "react";
 import MainLayout from "../../layouts/MainLayout";
+import {
+  DataTable,
+  FormField,
+  FormPanel,
+  PageBody,
+  PageToolbar,
+  SearchBox,
+} from "../../components/common/MasterPage";
+
+const statusOptions = ["Active", "Inactive"];
+const menuFields = [
+  { label: "Menu ID", name: "menuId" },
+  { label: "Parent Menu ID", name: "parentMenuId" },
+  { label: "Menu Name", name: "menuName" },
+  { label: "Menu Path", name: "menuPath" },
+  { label: "Display Sequence", name: "sequence" },
+  { label: "Status", name: "status", options: statusOptions },
+];
+const menuColumns = [
+  { key: "menuId", label: "Menu ID" },
+  { key: "parentMenuId", label: "Parent ID" },
+  { key: "menuName", label: "Menu Name" },
+  { key: "menuPath", label: "Menu Path" },
+  { key: "sequence", label: "Sequence" },
+  { key: "status", label: "Status" },
+];
 
 export default function MenuPage() {
   const [menus, setMenus] = useState([
@@ -71,160 +97,30 @@ export default function MenuPage() {
 
   return (
     <MainLayout>
-      <div style={{ padding: "10px" }}>
-
-        <h2>Menu Master</h2>
-
-        {/* Toolbar */}
-
-        <div
-          style={{
-            display: "flex",
-            gap: "10px",
-            marginBottom: "15px",
-          }}
-        >
-          <button onClick={clearForm}>New</button>
-          <button onClick={saveMenu}>Save</button>
-          <button>Export</button>
-        </div>
-
-        {/* Search */}
-
-        <div style={{ marginBottom: "15px" }}>
-          <input
-            placeholder="Search Menu..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            style={{
-              width: "300px",
-              padding: "8px",
-            }}
-          />
-        </div>
-
-        {/* Entry Form */}
-
-        <div
-          style={{
-            border: "1px solid #ddd",
-            padding: "15px",
-            marginBottom: "20px",
-            borderRadius: "5px",
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "150px 300px 150px 300px",
-              gap: "10px",
-            }}
-          >
-            <label>Menu ID</label>
-            <input
-              value={form.menuId}
-              onChange={(e) =>
-                setForm({ ...form, menuId: e.target.value })
-              }
-            />
-
-            <label>Parent Menu ID</label>
-            <input
-              value={form.parentMenuId}
-              onChange={(e) =>
-                setForm({ ...form, parentMenuId: e.target.value })
-              }
-            />
-
-            <label>Menu Name</label>
-            <input
-              value={form.menuName}
-              onChange={(e) =>
-                setForm({ ...form, menuName: e.target.value })
-              }
-            />
-
-            <label>Menu Path</label>
-            <input
-              value={form.menuPath}
-              onChange={(e) =>
-                setForm({ ...form, menuPath: e.target.value })
-              }
-            />
-
-            <label>Display Sequence</label>
-            <input
-              value={form.sequence}
-              onChange={(e) =>
-                setForm({ ...form, sequence: e.target.value })
-              }
-            />
-
-            <label>Status</label>
-            <select
-              value={form.status}
-              onChange={(e) =>
-                setForm({ ...form, status: e.target.value })
-              }
-            >
-              <option>Active</option>
-              <option>Inactive</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Grid */}
-
-        <table
-          width="100%"
-          border="1"
-          cellPadding="8"
-          style={{
-            borderCollapse: "collapse",
-          }}
-        >
-          <thead>
-            <tr>
-              <th>Menu ID</th>
-              <th>Parent ID</th>
-              <th>Menu Name</th>
-              <th>Menu Path</th>
-              <th>Sequence</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {filteredMenus.map((row) => (
-              <tr key={row.menuId}>
-                <td>{row.menuId}</td>
-                <td>{row.parentMenuId}</td>
-                <td>{row.menuName}</td>
-                <td>{row.menuPath}</td>
-                <td>{row.sequence}</td>
-                <td>{row.status}</td>
-
-                <td>
-                  <button
-                    onClick={() => editMenu(row)}
-                    style={{ marginRight: "5px" }}
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    onClick={() => deleteMenu(row.menuId)}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-      </div>
+      <PageBody title="Menu Master">
+        <PageToolbar
+          actions={[
+            { label: "New", onClick: clearForm },
+            { label: "Save", onClick: saveMenu },
+            { label: "Export" },
+          ]}
+        />
+        <SearchBox placeholder="Search Menu..." value={searchText} onChange={setSearchText} />
+        <FormPanel>
+          {menuFields.map((field) => (
+            <FormField key={field.name} {...field} form={form} setForm={setForm} />
+          ))}
+        </FormPanel>
+        <DataTable
+          columns={menuColumns}
+          rows={filteredMenus}
+          getKey={(row) => row.menuId}
+          actions={[
+            { label: "Edit", onClick: editMenu },
+            { label: "Delete", onClick: (row) => deleteMenu(row.menuId) },
+          ]}
+        />
+      </PageBody>
     </MainLayout>
   );
 }

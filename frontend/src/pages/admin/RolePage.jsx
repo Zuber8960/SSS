@@ -1,5 +1,25 @@
 import { useState } from "react";
 import MainLayout from "../../layouts/MainLayout";
+import {
+  DataTable,
+  FormField,
+  FormPanel,
+  PageBody,
+  PageToolbar,
+  SearchBox,
+} from "../../components/common/MasterPage";
+
+const statusOptions = ["Active", "Inactive"];
+const roleFields = [
+  { label: "Role Code", name: "roleCode" },
+  { label: "Role Name", name: "roleName" },
+  { label: "Status", name: "status", options: statusOptions },
+];
+const roleColumns = [
+  { key: "roleCode", label: "Role Code" },
+  { key: "roleName", label: "Role Name" },
+  { key: "status", label: "Status" },
+];
 
 export default function RolePage() {
   const [searchText, setSearchText] = useState("");
@@ -59,133 +79,30 @@ export default function RolePage() {
 
   return (
     <MainLayout>
-      <div style={{ padding: "10px" }}>
-
-        <h2>Role Master</h2>
-
-        {/* Toolbar */}
-
-        <div
-          style={{
-            display: "flex",
-            gap: "10px",
-            marginBottom: "15px",
-          }}
-        >
-          <button onClick={clearForm}>New</button>
-          <button onClick={saveRole}>Save</button>
-          <button>Export</button>
-        </div>
-
-        {/* Search */}
-
-        <div style={{ marginBottom: "15px" }}>
-          <input
-            placeholder="Search Role..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            style={{
-              width: "300px",
-              padding: "8px",
-            }}
-          />
-        </div>
-
-        {/* Entry Form */}
-
-        <div
-          style={{
-            border: "1px solid #ddd",
-            padding: "15px",
-            borderRadius: "5px",
-            marginBottom: "20px",
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "150px 300px",
-              gap: "10px",
-            }}
-          >
-            <label>Role Code</label>
-
-            <input
-              value={form.roleCode}
-              onChange={(e) =>
-                setForm({ ...form, roleCode: e.target.value })
-              }
-            />
-
-            <label>Role Name</label>
-
-            <input
-              value={form.roleName}
-              onChange={(e) =>
-                setForm({ ...form, roleName: e.target.value })
-              }
-            />
-
-            <label>Status</label>
-
-            <select
-              value={form.status}
-              onChange={(e) =>
-                setForm({ ...form, status: e.target.value })
-              }
-            >
-              <option>Active</option>
-              <option>Inactive</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Grid */}
-
-        <table
-          width="100%"
-          border="1"
-          cellPadding="8"
-          style={{
-            borderCollapse: "collapse",
-          }}
-        >
-          <thead>
-            <tr>
-              <th>Role Code</th>
-              <th>Role Name</th>
-              <th>Status</th>
-              <th width="150">Action</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {filteredRoles.map((row) => (
-              <tr key={row.roleCode}>
-                <td>{row.roleCode}</td>
-                <td>{row.roleName}</td>
-                <td>{row.status}</td>
-
-                <td>
-                  <button
-                    onClick={() => editRole(row)}
-                    style={{ marginRight: "5px" }}
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    onClick={() => deleteRole(row.roleCode)}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-      </div>
+      <PageBody title="Role Master">
+        <PageToolbar
+          actions={[
+            { label: "New", onClick: clearForm },
+            { label: "Save", onClick: saveRole },
+            { label: "Export" },
+          ]}
+        />
+        <SearchBox placeholder="Search Role..." value={searchText} onChange={setSearchText} />
+        <FormPanel columns="150px 300px">
+          {roleFields.map((field) => (
+            <FormField key={field.name} {...field} form={form} setForm={setForm} />
+          ))}
+        </FormPanel>
+        <DataTable
+          columns={roleColumns}
+          rows={filteredRoles}
+          getKey={(row) => row.roleCode}
+          actions={[
+            { label: "Edit", onClick: editRole },
+            { label: "Delete", onClick: (row) => deleteRole(row.roleCode) },
+          ]}
+        />
+      </PageBody>
     </MainLayout>
   );
 }
