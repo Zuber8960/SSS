@@ -113,7 +113,7 @@ export default function LoginPage() {
         width: "90vw",
         display: "flex",
         alignItems: "stretch",
-        padding: 0,
+        padding: "1vh 0",
         margin: "0 auto",
         background: "#f4f6f8"
       }}

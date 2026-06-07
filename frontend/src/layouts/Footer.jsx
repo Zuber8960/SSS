@@ -11,12 +11,12 @@ export default function Footer() {
       style={{
         background: "#f8f9fa",
         borderTop: "1px solid #e5e7eb",
-        padding: "5px",
+        padding: "0px 5px",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
         flexShrink: 0,
-        zIndex: 100
+        zIndex: 1
       }}
     >
       <div style={{

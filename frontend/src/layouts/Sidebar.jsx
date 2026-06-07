@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -21,15 +21,27 @@ import ExpandMore from "@mui/icons-material/ExpandMore";
 import "./Sidebar.css";
 
 export default function Sidebar() {
-  const [openAdmin, setOpenAdmin] = useState(true);
-  const [openMasters, setOpenMasters] = useState(false);
-  const [openTransaction, setOpenTransaction] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
   const { pathname } = useLocation();
+  const [openAdmin, setOpenAdmin] = useState(() => pathname.startsWith("/admin"));
+  const [openMasters, setOpenMasters] = useState(() => pathname.startsWith("/masters"));
+  const [openTransaction, setOpenTransaction] = useState(() => pathname.startsWith("/transaction"));
+  const [collapsed, setCollapsed] = useState(false);
 
   const isActive = (path) => pathname === path;
   const isSectionActive = (paths) => paths.some((path) => pathname.startsWith(path));
   const textVisible = !collapsed;
+
+  useEffect(() => {
+    if (pathname.startsWith("/admin")) {
+      setOpenAdmin(true);
+    }
+    if (pathname.startsWith("/masters")) {
+      setOpenMasters(true);
+    }
+    if (pathname.startsWith("/transaction")) {
+      setOpenTransaction(true);
+    }
+  }, [pathname]);
 
   return (
     <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
