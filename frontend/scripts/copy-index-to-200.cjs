@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+const fs = require('fs');
+const path = require('path');
 
 const distDir = path.resolve(process.cwd(), 'dist');
 const indexFile = path.join(distDir, 'index.html');
