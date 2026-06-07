@@ -36,7 +36,7 @@ export default function Sidebar() {
       <div className="sidebarHeader">
         <div className="sidebarAvatar">SS</div>
         <div className="sidebarBrand">
-          <h2 className="sidebarTitle">SARAL SAMADHAN</h2>
+          <h2 className="sidebarTitle">SSS-ERP</h2>
           <p className="sidebarSubtitle">Smart Transport ERP</p>
         </div>
         <button

@@ -9,6 +9,7 @@ import {
   PageToolbar,
   SearchBox,
 } from "../../components/common/MasterPage";
+import "../../styles/MasterPage.css";
 
 const statusOptions = ["Active", "Inactive"];
 const userFields = [
@@ -180,27 +181,16 @@ export default function UserPage() {
         />
 
         {error && (
-          <div style={{
-            padding: "10px",
-            marginBottom: "10px",
-            background: "#ffebee",
-            color: "#c62828",
-            borderRadius: "4px",
-            border: "1px solid #ef5350"
-          }}>
-            ⚠️ {error}
+          <div className="alertBox error">
+            <span>⚠️</span>
+            <span>{error}</span>
           </div>
         )}
 
         {loading && (
-          <div style={{
-            padding: "10px",
-            marginBottom: "10px",
-            background: "#e3f2fd",
-            color: "#1565c0",
-            borderRadius: "4px"
-          }}>
-            ⏳ Loading...
+          <div className="alertBox info">
+            <span>⏳</span>
+            <span>Loading...</span>
           </div>
         )}
 

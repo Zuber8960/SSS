@@ -1,3 +1,5 @@
+import "../../styles/MasterPage.css";
+
 const pageStyle = { padding: "10px" };
 const toolbarStyle = { display: "flex", gap: "10px", marginBottom: "15px" };
 const searchStyle = { width: "300px", padding: "8px", marginBottom: "15px" };
@@ -11,7 +13,7 @@ const tableStyle = { borderCollapse: "collapse" };
 
 export function PageBody({ title, children }) {
   return (
-    <div style={pageStyle}>
+    <div className="pageBody">
       <h2>{title}</h2>
       {children}
     </div>
@@ -20,7 +22,7 @@ export function PageBody({ title, children }) {
 
 export function PageToolbar({ actions }) {
   return (
-    <div style={toolbarStyle}>
+    <div className="pageToolbar">
       {actions.map((action) => (
         <button key={action.label} onClick={action.onClick}>
           {action.label}
@@ -37,15 +39,15 @@ export function SearchBox({ placeholder, value, onChange }) {
       placeholder={placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      style={searchStyle}
+      className="searchBox"
     />
   );
 }
 
 export function FormPanel({ children, columns = "150px 300px 150px 300px" }) {
   return (
-    <div style={panelStyle}>
-      <div style={{ display: "grid", gridTemplateColumns: columns, gap: "10px" }}>
+    <div className="formPanel">
+      <div className="formGrid">
         {children}
       </div>
     </div>
@@ -56,10 +58,11 @@ export function FormField({ label, name, form, setForm, type = "text", options }
   const updateField = (value) => setForm({ ...form, [name]: value });
 
   return (
-    <>
+    <div className="formFieldGroup">
       <label>{label}</label>
       {options ? (
         <select value={form[name]} onChange={(e) => updateField(e.target.value)}>
+          <option value="">Select {label}</option>
           {options.map((option) => (
             <option key={option.value ?? option} value={option.value ?? option}>
               {option.label ?? option}
@@ -71,47 +74,58 @@ export function FormField({ label, name, form, setForm, type = "text", options }
           type={type}
           value={form[name]}
           onChange={(e) => updateField(e.target.value)}
+          placeholder={`Enter ${label}`}
         />
       )}
-    </>
+    </div>
   );
 }
 
 export function DataTable({ columns, rows, getKey, actions }) {
   return (
-    <table width="100%" border="1" cellPadding="8" style={tableStyle}>
-      <thead>
-        <tr>
-          {columns.map((column) => (
-            <th key={column.key} width={column.width}>
-              {column.label}
-            </th>
-          ))}
-          {actions?.length ? <th width="150">Action</th> : null}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, index) => (
-          <tr key={getKey(row, index)}>
+    <div className="dataTableWrapper">
+      <table className="dataTable">
+        <thead>
+          <tr>
             {columns.map((column) => (
-              <td key={column.key}>{column.render ? column.render(row) : row[column.key]}</td>
+              <th key={column.key}>{column.label}</th>
             ))}
-            {actions?.length ? (
-              <td>
-                {actions.map((action, actionIndex) => (
-                  <button
-                    key={action.label}
-                    onClick={() => action.onClick(row, index)}
-                    style={actionIndex ? { marginLeft: "5px" } : undefined}
-                  >
-                    {action.label}
-                  </button>
-                ))}
-              </td>
-            ) : null}
+            {actions?.length ? <th>Actions</th> : null}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={columns.length + (actions?.length ? 1 : 0)} style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                No records found
+              </td>
+            </tr>
+          ) : (
+            rows.map((row, index) => (
+              <tr key={getKey(row, index)}>
+                {columns.map((column) => (
+                  <td key={column.key}>{column.render ? column.render(row) : row[column.key]}</td>
+                ))}
+                {actions?.length ? (
+                  <td>
+                    <div className="tableActions">
+                      {actions.map((action) => (
+                        <button
+                          key={action.label}
+                          onClick={() => action.onClick(row, index)}
+                          className={action.label.toLowerCase() === "delete" ? "deleteBtn" : "editBtn"}
+                        >
+                          {action.label}
+                        </button>
+                      ))}
+                    </div>
+                  </td>
+                ) : null}
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
   );
 }
