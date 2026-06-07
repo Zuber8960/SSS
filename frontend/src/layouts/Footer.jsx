@@ -43,7 +43,7 @@ export default function Footer() {
           />
         </div>
         <p style={{ margin: "8px 0 0", fontSize: 12, color: "#6b7280" }}>
-          © 2024 Saral Samadhan. All rights reserved.
+          © 2026 Saral Samadhan. All rights reserved.
         </p>
       </div>
     </div>
