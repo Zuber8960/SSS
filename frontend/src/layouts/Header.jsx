@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { logout as logoutUser } from "../utils/authService";
+import logoImg from "../images/logo.png";
 
 export default function Header() {
 
@@ -23,8 +24,24 @@ export default function Header() {
         boxShadow: "0 2px 4px rgba(0,0,0,0.04)"
       }}
     >
-      <div>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#111" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <img
+          src={logoImg}
+          alt="Logo"
+          style={{
+            width: 150,
+            height: 156,
+            objectFit: "contain"
+          }}
+        />
+        <h2
+          style={{
+            margin: 0,
+            fontSize: 22,
+            fontWeight: 700,
+            color: "#111"
+          }}
+        >
           Logistics ERP
         </h2>
       </div>
@@ -42,7 +59,15 @@ export default function Header() {
           fontWeight: 600,
           fontSize: 14
         }}>
-          AD
+          {
+            JSON.parse(localStorage.getItem("current_user"))
+            ?.user_name
+            ?.trim()
+            .split(/\s+/)
+            .map(word => word[0]?.toUpperCase())
+            .slice(0, 2)
+            .join("")
+            .toUpperCase() || "AD"}
         </div>
 
         <button

@@ -63,6 +63,7 @@ export default function LoginPage() {
     try {
       const response = await loginUser(userId, password);
       navigate("/dashboard");
+      localStorage.setItem("current_user", JSON.stringify(response.user));
     } catch (err) {
       setError(err.message || "Invalid credentials");
       alert(err.message || "Invalid credentials");
