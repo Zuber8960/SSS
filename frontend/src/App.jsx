@@ -7,7 +7,7 @@ import MenuPage from "./pages/admin/MenuPage";
 import UserRolePage from "./pages/admin/UserRolePage";
 import RoleMenuPage from "./pages/admin/RoleMenuPage";
 import CompanyPage from "./pages/masters/CompanyPage";
-import DivisionPage from "./pages/masters/DivisionPage";
+import DivisionPage from "./pages/masters/Divisionpage";
 import LocationPage from "./pages/masters/LocationPage";
 import BusinessPartnerPage from "./pages/masters/BusinessPartnerPage";
 import Docket from "./pages/transaction/Docket";
