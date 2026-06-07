@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logoImg from "../images/Cargo Yaan Logo.jpeg";
+import Footer from "../layouts/Footer";
 
 function Logo({ className, style }) {
   return (
@@ -104,12 +105,15 @@ export default function LoginPage() {
   };
 
   return (
+    <>
     <div
       style={{
-        minHeight: "100vh",
+        minHeight: "70vh",
+        width: "90vw",
         display: "flex",
         alignItems: "stretch",
         padding: 0,
+        margin: "0 auto",
         background: "#f4f6f8"
       }}
     >
@@ -120,9 +124,10 @@ export default function LoginPage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg,#0ea5a4,#065f49)",
+          // background: "linear-gradient(135deg,#0ea5a4,#065f49)",
+          background: "linear-gradient(180deg, #8e2de2, #c850c0, #a4508b)",
           color: "#ffffff",
-          padding: 40
+          padding: 20
         }}
       >
         <div style={{ width: "100%", maxWidth: 560 }}>
@@ -328,5 +333,7 @@ export default function LoginPage() {
         </div>
       )}
     </div>
+      <Footer/>
+      </>
   );
 }

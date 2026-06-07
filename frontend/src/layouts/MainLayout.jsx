@@ -1,5 +1,6 @@
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import Footer from "./Footer";
 
 export default function MainLayout({ children }) {
   return (
@@ -12,6 +13,8 @@ export default function MainLayout({ children }) {
         <div style={{ flex: 1, padding: "20px", overflowY: "auto" }}>
           {children}
         </div>
+
+        <Footer />
       </div>
     </div>
   );
