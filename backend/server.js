@@ -28,6 +28,6 @@ app.use('/api/auth', authRoutes);
 const PORT = process.env.PORT;
 
 app.listen(PORT, () => {
-  console.log(JSON.stringify(process.env));
+  // console.log(JSON.stringify(process.env));
   console.log(`Server running on port ${PORT}`);
 });
