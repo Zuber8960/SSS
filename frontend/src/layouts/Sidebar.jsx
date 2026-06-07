@@ -68,7 +68,11 @@ export default function Sidebar() {
 
         <ListItem disablePadding>
           <ListItemButton
-            onClick={() => setOpenAdmin(!openAdmin)}
+            onClick={() => {
+              setOpenAdmin(!openAdmin)
+              setOpenMasters(false)
+              setOpenTransaction(false)
+            }}
             className={`sidebarItem sidebarCollapseButton${isSectionActive(["/admin"]) ? " sidebarItemActive" : ""}`}
           >
             <ListItemIcon className="sidebarIcon">
@@ -169,7 +173,11 @@ export default function Sidebar() {
 
         <ListItem disablePadding>
           <ListItemButton
-            onClick={() => setOpenMasters(!openMasters)}
+            onClick={() => {
+              setOpenMasters(!openMasters);
+              setOpenAdmin(false);
+              setOpenTransaction(false);
+            }}
             className={`sidebarItem sidebarCollapseButton${isSectionActive(["/masters"]) ? " sidebarItemActive" : ""}`}
           >
             <ListItemIcon className="sidebarIcon">
@@ -254,7 +262,11 @@ export default function Sidebar() {
 
         <ListItem disablePadding>
           <ListItemButton
-            onClick={() => setOpenTransaction(!openTransaction)}
+            onClick={() => {
+              setOpenTransaction(!openTransaction);
+              setOpenAdmin(false);
+              setOpenMasters(false);
+            }}
             className={`sidebarItem sidebarCollapseButton${isSectionActive(["/transaction"]) ? " sidebarItemActive" : ""}`}
           >
             <ListItemIcon className="sidebarIcon">
