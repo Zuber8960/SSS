@@ -44,12 +44,7 @@ export default function UserPage() {
     password_hash: ""
   });
 
-  // Load users on component mount
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  const loadUsers = async () => {
+   const loadUsers = async () => {
     setLoading(true);
     setError("");
     try {
@@ -63,6 +58,26 @@ export default function UserPage() {
     }
   };
 
+
+  // Load users on component mount
+  useEffect(() => {
+    const loadUsersAtMount = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const data = await fetchAllUsers();
+        setUsers(data);
+      } catch (err) {
+        setError(err.message || "Failed to load users");
+        console.error("Error loading users:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUsersAtMount();
+  }, []);
+ 
   const clearForm = () => {
     setForm({
       rec_id: "",
