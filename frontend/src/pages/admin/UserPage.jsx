@@ -11,13 +11,13 @@ import {
 } from "../../components/common/MasterPage";
 import "../../styles/MasterPage.css";
 
-const statusOptions = ["Active", "Inactive"];
+// const statusOptions = ["Active", "Inactive"];
 const userFields = [
   { label: "User ID", name: "user_id" },
   { label: "User Name", name: "user_name" },
   { label: "Email", name: "email_id" },
   { label: "Mobile", name: "mobile_no" },
-  { label: "Status", name: "user_status", options: statusOptions },
+  { label: "Status", name: "user_status" },
 ];
 const userColumns = [
   { key: "user_id", label: "User ID" },
@@ -136,7 +136,7 @@ export default function UserPage() {
       user_name: row.user_name,
       email_id: row.email_id || "",
       mobile_no: row.mobile_no || "",
-      user_status: row.user_status,
+      user_status: row.user_status || "A",
       password_hash: ""
     });
     setIsEditing(true);

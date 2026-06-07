@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 const getAllUsers = async () => {
   return db('sss.ssm_user')
     .where({ user_status: 'A' })
-    .select('rec_id', 'user_id', 'user_name', 'email_id', 'mobile_no', 'company_code', 'is_admin', 'last_login_on', 'created_on');
+    .select('rec_id', 'user_id', 'user_name', 'email_id', 'mobile_no', 'company_code', 'is_admin', 'last_login_on', 'created_on', 'user_status');
 };
 
 const getUserById = async (recId) => {
