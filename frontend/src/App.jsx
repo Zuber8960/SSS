@@ -10,6 +10,8 @@ import CompanyPage from "./pages/masters/CompanyPage";
 import DivisionPage from "./pages/masters/DivisionPage";
 import LocationPage from "./pages/masters/LocationPage";
 import BusinessPartnerPage from "./pages/masters/BusinessPartnerPage";
+import Docket from "./pages/transaction/Docket";
+import TripSheet from "./pages/transaction/TripSheet";
 import { isAuthenticated } from "./utils/authService";
 
 const appRoutes = [
@@ -24,6 +26,8 @@ const appRoutes = [
   { path: "/masters/division", element: <DivisionPage />, protected: true },
   { path: "/masters/location", element: <LocationPage />, protected: true },
   { path: "/masters/business-partner", element: <BusinessPartnerPage />, protected: true },
+  { path: "/transaction/docket", element: <Docket />, protected: true },
+  { path: "/transaction/trip-sheet", element: <TripSheet />, protected: true },
 ];
 
 function ProtectedRoute({ children }) {
