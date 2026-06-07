@@ -9,7 +9,7 @@ require('./config/db');
 
 // CORS configuration
 const corsOptions = {
-  origin: 'http://localhost:5173', // Vite frontend port
+  origin: process.env.FRONTEND_URL, // Vite frontend port
   credentials: true,
   optionsSuccessStatus: 200
 };
