@@ -3,7 +3,7 @@ const bcrypt = require('bcrypt');
 
 const getAllUsers = async () => {
   return db('sss.ssm_user')
-    .where({ user_status: 'A' })
+    .where({ 'record_status': 0 })
     .select('rec_id', 'user_id', 'user_name', 'email_id', 'mobile_no', 'company_code', 'is_admin', 'last_login_on', 'created_on', 'user_status');
 };
 
@@ -87,7 +87,7 @@ const deleteUser = async (recId) => {
   return db('sss.ssm_user')
     .where({ rec_id: recId })
     .update({
-      user_status: 'I',
+      record_status: 1,
       modified_on: new Date()
     });
 };
@@ -102,7 +102,7 @@ const authenticateUser = async (userId, password) => {
   try {
     // Query user by user_id and active status
     const user = await db('sss.ssm_user')
-      .where({ user_id: userId, user_status: 'A' })
+      .where({ user_id: userId, record_status: 0 })
       .first();
 
     // Check if user exists
@@ -111,7 +111,7 @@ const authenticateUser = async (userId, password) => {
     }
 
     // Check if account is locked
-    if (user.user_status === 'L') {
+    if (user.user_status === 'I') {
       return null;
     }
 
