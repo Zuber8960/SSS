@@ -22,7 +22,7 @@ app.get('/', (req, res) => {
 });
 
 
-const authRoutes = require('./Routes/userRoutes');
+const authRoutes = require('./routes/userRoutes');
 app.use('/api/auth', authRoutes);
 
 const PORT = process.env.PORT || 5000;
