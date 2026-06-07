@@ -8,6 +8,7 @@
     "start": "vite",
     "dev": "vite",
     "build": "vite build",
+    "postbuild": "node scripts/copy-index-to-200.cjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },

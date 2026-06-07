@@ -18,6 +18,9 @@ import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
+import Tooltip from "@mui/material/Tooltip";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import "./Sidebar.css";
 
 export default function Sidebar() {
@@ -46,18 +49,21 @@ export default function Sidebar() {
   return (
     <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
       <div className="sidebarHeader">
-        <div className="sidebarAvatar">SS</div>
+        {!collapsed ? <div className="sidebarAvatar">SS</div> : null}
         <div className="sidebarBrand">
           <h2 className="sidebarTitle">SSS-ERP</h2>
           <p className="sidebarSubtitle">Smart Transport ERP</p>
         </div>
-        <button
-          type="button"
-          className="sidebarToggle"
-          onClick={() => setCollapsed(!collapsed)}
-        >
-          {collapsed ? "›" : "‹"}
-        </button>
+        <Tooltip title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"} placement="right">
+          <button
+            type="button"
+            className="sidebarToggle"
+            onClick={() => setCollapsed(!collapsed)}
+            aria-label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          >
+            {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+          </button>
+        </Tooltip>
       </div>
 
       <List className="sidebarList">
