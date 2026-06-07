@@ -1,5 +1,12 @@
 import { useState } from "react";
 import MainLayout from "../../layouts/MainLayout";
+import {
+  PageBody,
+  PageToolbar,
+  FormPanel,
+  FormField,
+  DataTable,
+} from "../../components/common/MasterPage";
 
 export default function RoleMenuPage() {
 
@@ -24,31 +31,30 @@ export default function RoleMenuPage() {
     { menuId: 401, menuName: "Docket Entry" }
   ];
 
-  const [roleCode, setRoleCode] = useState("");
-
   const [mappings, setMappings] = useState([]);
 
   const [form, setForm] = useState({
+    roleCode: "",
     menuId: "",
     viewYn: true,
     addYn: false,
     editYn: false,
-    deleteYn: false
+    deleteYn: false,
   });
 
   const clearForm = () => {
     setForm({
+      roleCode: "",
       menuId: "",
       viewYn: true,
       addYn: false,
       editYn: false,
-      deleteYn: false
+      deleteYn: false,
     });
   };
 
   const saveMapping = () => {
-
-    if (!roleCode) {
+    if (!form.roleCode) {
       alert("Select Role");
       return;
     }
@@ -61,246 +67,96 @@ export default function RoleMenuPage() {
     setMappings([
       ...mappings,
       {
-        roleCode,
-        ...form
-      }
+        roleCode: form.roleCode,
+        ...form,
+      },
     ]);
 
     clearForm();
   };
 
   const deleteMapping = (index) => {
-
-    if (!window.confirm("Delete Mapping ?"))
-      return;
-
-    setMappings(
-      mappings.filter((_, i) => i !== index)
-    );
+    if (!window.confirm("Delete Mapping ?")) return;
+    setMappings(mappings.filter((_, i) => i !== index));
   };
+
+  const roleColumns = [
+    { key: "roleCode", label: "Role" },
+    {
+      key: "menuName",
+      label: "Menu",
+      render: (row) =>
+        menus.find((x) => String(x.menuId) === String(row.menuId))?.menuName || "",
+    },
+    { key: "viewYn", label: "View", render: (row) => (row.viewYn ? "Y" : "N") },
+    { key: "addYn", label: "Add", render: (row) => (row.addYn ? "Y" : "N") },
+    { key: "editYn", label: "Edit", render: (row) => (row.editYn ? "Y" : "N") },
+    { key: "deleteYn", label: "Delete", render: (row) => (row.deleteYn ? "Y" : "N") },
+  ];
+
+  const roleActions = [{ label: "Delete", onClick: (_, index) => deleteMapping(index) }];
 
   return (
     <MainLayout>
+      <PageBody title="Role Menu Mapping">
+        <PageToolbar
+          actions={[
+            { label: "New", onClick: clearForm },
+            { label: "Save", onClick: saveMapping },
+          ]}
+        />
 
-      <div style={{ padding: "10px" }}>
+        <FormPanel>
+          <FormField label="Role" name="roleCode" form={form} setForm={setForm} options={roles} />
+          <FormField
+            label="Menu"
+            name="menuId"
+            form={form}
+            setForm={setForm}
+            options={menus.map((menu) => ({ value: menu.menuId, label: menu.menuName }))}
+          />
+        </FormPanel>
 
-        <h2>Role Menu Mapping</h2>
-
-        {/* Toolbar */}
-
-        <div
-          style={{
-            display: "flex",
-            gap: "10px",
-            marginBottom: "15px"
-          }}
-        >
-          <button onClick={clearForm}>
-            New
-          </button>
-
-          <button onClick={saveMapping}>
-            Save
-          </button>
-        </div>
-
-        {/* Entry Form */}
-
-        <div
-          style={{
-            border: "1px solid #ddd",
-            padding: "15px",
-            borderRadius: "5px",
-            marginBottom: "20px"
-          }}
-        >
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "150px 300px",
-              gap: "10px"
-            }}
-          >
-
-            <label>Role</label>
-
-            <select
-              value={roleCode}
-              onChange={(e) =>
-                setRoleCode(e.target.value)
-              }
-            >
-              <option value="">
-                Select Role
-              </option>
-
-              {roles.map(role => (
-                <option
-                  key={role}
-                  value={role}
-                >
-                  {role}
-                </option>
-              ))}
-            </select>
-
-            <label>Menu</label>
-
-            <select
-              value={form.menuId}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  menuId: e.target.value
-                })
-              }
-            >
-              <option value="">
-                Select Menu
-              </option>
-
-              {menus.map(menu => (
-                <option
-                  key={menu.menuId}
-                  value={menu.menuId}
-                >
-                  {menu.menuName}
-                </option>
-              ))}
-            </select>
-
-          </div>
-
-          <br />
-
-          <div
-            style={{
-              display: "flex",
-              gap: "25px"
-            }}
-          >
-
-            <label>
+        <div className="formPanel">
+          <div className="permissionGrid">
+            <label className="permissionItem">
               <input
                 type="checkbox"
                 checked={form.viewYn}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    viewYn: e.target.checked
-                  })
-                }
+                onChange={(e) => setForm({ ...form, viewYn: e.target.checked })}
               />
               View
             </label>
-
-            <label>
+            <label className="permissionItem">
               <input
                 type="checkbox"
                 checked={form.addYn}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    addYn: e.target.checked
-                  })
-                }
+                onChange={(e) => setForm({ ...form, addYn: e.target.checked })}
               />
               Add
             </label>
-
-            <label>
+            <label className="permissionItem">
               <input
                 type="checkbox"
                 checked={form.editYn}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    editYn: e.target.checked
-                  })
-                }
+                onChange={(e) => setForm({ ...form, editYn: e.target.checked })}
               />
               Edit
             </label>
-
-            <label>
+            <label className="permissionItem">
               <input
                 type="checkbox"
                 checked={form.deleteYn}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    deleteYn: e.target.checked
-                  })
-                }
+                onChange={(e) => setForm({ ...form, deleteYn: e.target.checked })}
               />
               Delete
             </label>
-
           </div>
-
         </div>
 
-        {/* Grid */}
+        <DataTable columns={roleColumns} rows={mappings} getKey={(_, index) => index} actions={roleActions} />
 
-        <table
-          width="100%"
-          border="1"
-          cellPadding="8"
-          style={{
-            borderCollapse: "collapse"
-          }}
-        >
-          <thead>
-            <tr>
-              <th>Role</th>
-              <th>Menu</th>
-              <th>View</th>
-              <th>Add</th>
-              <th>Edit</th>
-              <th>Delete</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-
-          <tbody>
-
-            {mappings.map((row, index) => {
-
-              const menuName =
-                menus.find(
-                  x =>
-                    String(x.menuId) === String(row.menuId)
-                )?.menuName || "";
-
-              return (
-                <tr key={index}>
-                  <td>{row.roleCode}</td>
-                  <td>{menuName}</td>
-                  <td>{row.viewYn ? "Y" : "N"}</td>
-                  <td>{row.addYn ? "Y" : "N"}</td>
-                  <td>{row.editYn ? "Y" : "N"}</td>
-                  <td>{row.deleteYn ? "Y" : "N"}</td>
-
-                  <td>
-                    <button
-                      onClick={() =>
-                        deleteMapping(index)
-                      }
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              );
-
-            })}
-
-          </tbody>
-        </table>
-
-      </div>
-
+      </PageBody>
     </MainLayout>
   );
 }

@@ -1,5 +1,13 @@
 import { useState } from "react";
 import MainLayout from "../../layouts/MainLayout";
+import {
+  PageBody,
+  PageToolbar,
+  SearchBox,
+  FormPanel,
+  FormField,
+  DataTable,
+} from "../../components/common/MasterPage";
 
 export default function DivisionPage() {
 
@@ -76,238 +84,58 @@ export default function DivisionPage() {
   };
 
   const filteredDivisions = divisions.filter(
-    x =>
-      x.divisionCode
-        .toLowerCase()
-        .includes(searchText.toLowerCase()) ||
-      x.divisionName
-        .toLowerCase()
-        .includes(searchText.toLowerCase())
+    (x) =>
+      x.divisionCode.toLowerCase().includes(searchText.toLowerCase()) ||
+      x.divisionName.toLowerCase().includes(searchText.toLowerCase())
   );
+
+  const divisionColumns = [
+    { key: "companyCode", label: "Company Code" },
+    { key: "companyName", label: "Company Name" },
+    { key: "divisionCode", label: "Division Code" },
+    { key: "divisionName", label: "Division Name" },
+    { key: "status", label: "Status" },
+  ];
+
+  const divisionActions = [
+    { label: "Edit", onClick: editDivision },
+    { label: "Delete", onClick: (row) => deleteDivision(row.divisionCode) },
+  ];
 
   return (
     <MainLayout>
-
-      <div style={{ padding: "10px" }}>
-
-        <h2>Division Master</h2>
-
-        {/* Toolbar */}
-
-        <div
-          style={{
-            display: "flex",
-            gap: "10px",
-            marginBottom: "15px"
-          }}
-        >
-          <button onClick={clearForm}>
-            New
-          </button>
-
-          <button onClick={saveDivision}>
-            Save
-          </button>
-
-          <button>
-            Export
-          </button>
-        </div>
-
-        {/* Search */}
-
-        <input
-          type="text"
-          placeholder="Search Division..."
-          value={searchText}
-          onChange={(e) =>
-            setSearchText(e.target.value)
-          }
-          style={{
-            width: "300px",
-            padding: "8px",
-            marginBottom: "15px"
-          }}
+      <PageBody title="Division Master">
+        <PageToolbar
+          actions={[
+            { label: "New", onClick: clearForm },
+            { label: "Save", onClick: saveDivision },
+            { label: "Export", onClick: () => alert("Export not implemented yet") },
+          ]}
         />
 
-        {/* Form */}
+        <SearchBox
+          placeholder="Search Division..."
+          value={searchText}
+          onChange={setSearchText}
+        />
 
-        <div
-          style={{
-            border: "1px solid #ddd",
-            padding: "15px",
-            borderRadius: "5px",
-            marginBottom: "20px"
-          }}
-        >
+        <FormPanel>
+          <FormField label="Company Code" name="companyCode" form={form} setForm={setForm} />
+          <FormField label="Company Name" name="companyName" form={form} setForm={setForm} />
+          <FormField label="Division Code" name="divisionCode" form={form} setForm={setForm} />
+          <FormField label="Division Name" name="divisionName" form={form} setForm={setForm} />
+          <FormField label="Opened On" name="openedOn" form={form} setForm={setForm} type="date" />
+          <FormField label="Closed On" name="closedOn" form={form} setForm={setForm} type="date" />
+          <FormField label="Status" name="status" form={form} setForm={setForm} options={["Active", "Inactive"]} />
+        </FormPanel>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "150px 300px 150px 300px",
-              gap: "10px"
-            }}
-          >
-
-            <label>Company Code</label>
-            <input
-              value={form.companyCode}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  companyCode: e.target.value
-                })
-              }
-            />
-
-            <label>Company Name</label>
-            <input
-              value={form.companyName}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  companyName: e.target.value
-                })
-              }
-            />
-
-            <label>Division Code</label>
-            <input
-              value={form.divisionCode}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  divisionCode: e.target.value
-                })
-              }
-            />
-
-            <label>Division Name</label>
-            <input
-              value={form.divisionName}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  divisionName: e.target.value
-                })
-              }
-            />
-
-            <label>Opened On</label>
-            <input
-              type="date"
-              value={form.openedOn}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  openedOn: e.target.value
-                })
-              }
-            />
-
-            <label>Closed On</label>
-            <input
-              type="date"
-              value={form.closedOn}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  closedOn: e.target.value
-                })
-              }
-            />
-
-            <label>Status</label>
-
-            <select
-              value={form.status}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  status: e.target.value
-                })
-              }
-            >
-              <option>Active</option>
-              <option>Inactive</option>
-            </select>
-
-          </div>
-
-        </div>
-
-        {/* Grid */}
-
-        <table
-          width="100%"
-          border="1"
-          cellPadding="8"
-          style={{
-            borderCollapse: "collapse"
-          }}
-        >
-
-          <thead>
-            <tr>
-              <th>Company Code</th>
-              <th>Company Name</th>
-              <th>Division Code</th>
-              <th>Division Name</th>
-              <th>Status</th>
-              <th width="150">
-                Action
-              </th>
-            </tr>
-          </thead>
-
-          <tbody>
-
-            {filteredDivisions.map((row) => (
-
-              <tr key={row.divisionCode}>
-
-                <td>{row.companyCode}</td>
-                <td>{row.companyName}</td>
-                <td>{row.divisionCode}</td>
-                <td>{row.divisionName}</td>
-                <td>{row.status}</td>
-
-                <td>
-
-                  <button
-                    onClick={() =>
-                      editDivision(row)
-                    }
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    style={{
-                      marginLeft: "5px"
-                    }}
-                    onClick={() =>
-                      deleteDivision(
-                        row.divisionCode
-                      )
-                    }
-                  >
-                    Delete
-                  </button>
-
-                </td>
-
-              </tr>
-
-            ))}
-
-          </tbody>
-
-        </table>
-
-      </div>
-
+        <DataTable
+          columns={divisionColumns}
+          rows={filteredDivisions}
+          getKey={(row) => row.divisionCode}
+          actions={divisionActions}
+        />
+      </PageBody>
     </MainLayout>
   );
 }

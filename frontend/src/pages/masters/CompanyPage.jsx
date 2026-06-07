@@ -1,5 +1,13 @@
 import { useState } from "react";
 import MainLayout from "../../layouts/MainLayout";
+import {
+  PageBody,
+  PageToolbar,
+  SearchBox,
+  FormPanel,
+  FormField,
+  DataTable,
+} from "../../components/common/MasterPage";
 
 export default function CompanyPage() {
 
@@ -83,306 +91,66 @@ export default function CompanyPage() {
   };
 
   const filteredCompanies = companies.filter(
-    x =>
-      x.companyCode
-        .toLowerCase()
-        .includes(searchText.toLowerCase()) ||
-      x.companyName
-        .toLowerCase()
-        .includes(searchText.toLowerCase())
+    (x) =>
+      x.companyCode.toLowerCase().includes(searchText.toLowerCase()) ||
+      x.companyName.toLowerCase().includes(searchText.toLowerCase())
   );
+
+  const companyColumns = [
+    { key: "companyCode", label: "Code" },
+    { key: "companyName", label: "Company" },
+    { key: "state", label: "State" },
+    { key: "city", label: "City" },
+    { key: "status", label: "Status" },
+  ];
+
+  const companyActions = [
+    { label: "Edit", onClick: editCompany },
+    { label: "Delete", onClick: (row) => deleteCompany(row.companyCode) },
+  ];
 
   return (
     <MainLayout>
-
-      <div style={{ padding: "10px" }}>
-
-        <h2>Company Master</h2>
-
-        {/* Toolbar */}
-
-        <div
-          style={{
-            display: "flex",
-            gap: "10px",
-            marginBottom: "15px"
-          }}
-        >
-          <button onClick={clearForm}>New</button>
-          <button onClick={saveCompany}>Save</button>
-          <button>Export</button>
-        </div>
-
-        {/* Search */}
-
-        <input
-          type="text"
-          placeholder="Search Company..."
-          value={searchText}
-          onChange={(e) =>
-            setSearchText(e.target.value)
-          }
-          style={{
-            width: "300px",
-            padding: "8px",
-            marginBottom: "15px"
-          }}
+      <PageBody title="Company Master">
+        <PageToolbar
+          actions={[
+            { label: "New", onClick: clearForm },
+            { label: "Save", onClick: saveCompany },
+            { label: "Export", onClick: () => alert("Export not implemented yet") },
+          ]}
         />
 
-        {/* Form */}
+        <SearchBox
+          placeholder="Search Company..."
+          value={searchText}
+          onChange={setSearchText}
+        />
 
-        <div
-          style={{
-            border: "1px solid #ddd",
-            padding: "15px",
-            marginBottom: "20px",
-            borderRadius: "5px"
-          }}
-        >
+        <FormPanel>
+          <FormField label="Company Code" name="companyCode" form={form} setForm={setForm} />
+          <FormField label="Company Name" name="companyName" form={form} setForm={setForm} />
+          <FormField label="Address" name="regAddress" form={form} setForm={setForm} />
+          <FormField label="State" name="state" form={form} setForm={setForm} />
+          <FormField label="City" name="city" form={form} setForm={setForm} />
+          <FormField label="Pincode" name="pincode" form={form} setForm={setForm} />
+          <FormField label="Phone" name="phone" form={form} setForm={setForm} />
+          <FormField label="Email" name="email" form={form} setForm={setForm} />
+          <FormField label="Website" name="website" form={form} setForm={setForm} />
+          <FormField label="PAN No" name="panNo" form={form} setForm={setForm} />
+          <FormField label="GST No" name="gstNo" form={form} setForm={setForm} />
+          <FormField label="TAN No" name="tanNo" form={form} setForm={setForm} />
+          <FormField label="Opened On" name="openedOn" form={form} setForm={setForm} type="date" />
+          <FormField label="Closed On" name="closedOn" form={form} setForm={setForm} type="date" />
+          <FormField label="Status" name="status" form={form} setForm={setForm} options={["Active", "Inactive"]} />
+        </FormPanel>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "150px 300px 150px 300px",
-              gap: "10px"
-            }}
-          >
-
-            <label>Company Code</label>
-            <input
-              value={form.companyCode}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  companyCode: e.target.value
-                })
-              }
-            />
-
-            <label>Company Name</label>
-            <input
-              value={form.companyName}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  companyName: e.target.value
-                })
-              }
-            />
-
-            <label>Address</label>
-            <input
-              value={form.regAddress}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  regAddress: e.target.value
-                })
-              }
-            />
-
-            <label>State</label>
-            <input
-              value={form.state}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  state: e.target.value
-                })
-              }
-            />
-
-            <label>City</label>
-            <input
-              value={form.city}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  city: e.target.value
-                })
-              }
-            />
-
-            <label>Pincode</label>
-            <input
-              value={form.pincode}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  pincode: e.target.value
-                })
-              }
-            />
-
-            <label>Phone</label>
-            <input
-              value={form.phone}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  phone: e.target.value
-                })
-              }
-            />
-
-            <label>Email</label>
-            <input
-              value={form.email}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  email: e.target.value
-                })
-              }
-            />
-
-            <label>Website</label>
-            <input
-              value={form.website}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  website: e.target.value
-                })
-              }
-            />
-
-            <label>PAN No</label>
-            <input
-              value={form.panNo}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  panNo: e.target.value
-                })
-              }
-            />
-
-            <label>GST No</label>
-            <input
-              value={form.gstNo}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  gstNo: e.target.value
-                })
-              }
-            />
-
-            <label>TAN No</label>
-            <input
-              value={form.tanNo}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  tanNo: e.target.value
-                })
-              }
-            />
-
-            <label>Opened On</label>
-            <input
-              type="date"
-              value={form.openedOn}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  openedOn: e.target.value
-                })
-              }
-            />
-
-            <label>Closed On</label>
-            <input
-              type="date"
-              value={form.closedOn}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  closedOn: e.target.value
-                })
-              }
-            />
-
-            <label>Status</label>
-            <select
-              value={form.status}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  status: e.target.value
-                })
-              }
-            >
-              <option>Active</option>
-              <option>Inactive</option>
-            </select>
-
-          </div>
-
-        </div>
-
-        {/* Grid */}
-
-        <table
-          width="100%"
-          border="1"
-          cellPadding="8"
-          style={{ borderCollapse: "collapse" }}
-        >
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Company Name</th>
-              <th>State</th>
-              <th>City</th>
-              <th>PAN</th>
-              <th>GST</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {filteredCompanies.map((row) => (
-              <tr key={row.companyCode}>
-                <td>{row.companyCode}</td>
-                <td>{row.companyName}</td>
-                <td>{row.state}</td>
-                <td>{row.city}</td>
-                <td>{row.panNo}</td>
-                <td>{row.gstNo}</td>
-                <td>{row.status}</td>
-
-                <td>
-                  <button
-                    onClick={() =>
-                      editCompany(row)
-                    }
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    style={{ marginLeft: "5px" }}
-                    onClick={() =>
-                      deleteCompany(
-                        row.companyCode
-                      )
-                    }
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-
-        </table>
-
-      </div>
-
+        <DataTable
+          columns={companyColumns}
+          rows={filteredCompanies}
+          getKey={(row) => row.companyCode}
+          actions={companyActions}
+        />
+      </PageBody>
     </MainLayout>
   );
 }
