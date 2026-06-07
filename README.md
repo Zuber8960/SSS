@@ -14,6 +14,7 @@
 The application features a clean, modern login interface:
 
 ![Cargo Yaan Login Page](./docs/login.png)
+![Dashboard Page](./docs/Dashboard.png)
 
 *Sign in to access your Cargo Yaan account with secure JWT authentication*
 
