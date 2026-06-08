@@ -42,8 +42,9 @@ export default function UserPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+  const [originalUser, setOriginalUser] = useState(null);
 
-  const { dialog, closeAlert, showSuccess, showError } = useAlert();
+  const { dialog, closeAlert, showSuccess, showError, showInfo } = useAlert();
 
   const [form, setForm] = useState({
     rec_id: "",
@@ -86,6 +87,18 @@ export default function UserPage() {
     loadUsersAtMount();
   }, []);
 
+  const hasChanges = () => {
+    if (!originalUser) return true;
+
+    return (
+      form.user_name !== originalUser.user_name ||
+      form.email_id !== originalUser.email_id ||
+      form.mobile_no !== originalUser.mobile_no ||
+      form.user_status !== originalUser.user_status
+    );
+  };
+
+
   const clearForm = () => {
     setForm({
       rec_id: "",
@@ -125,19 +138,23 @@ export default function UserPage() {
 
     try {
       if (isEditing) {
+        // ✅ Check for changes BEFORE API call
+        if (!hasChanges()) {
+          showInfo("No changes detected");
+          return;
+        }
+
         await updateUser(form.rec_id, {
           user_name: form.user_name,
           email_id: form.email_id,
           mobile_no: form.mobile_no,
-          user_status: form.user_status,
+          user_status: form.user_status
         });
 
-        // ✅ Update locally (NO API REFETCH)
+        // ✅ Update state locally
         setUsers((prev) =>
           prev.map((u) =>
-            u.rec_id === form.rec_id
-              ? { ...u, ...form }
-              : u
+            u.rec_id === form.rec_id ? { ...u, ...form } : u
           )
         );
 
@@ -163,15 +180,18 @@ export default function UserPage() {
   };
 
   const editUser = (row) => {
-    setForm({
+    const formatted = {
       rec_id: row.rec_id,
       user_id: row.user_id,
       user_name: row.user_name,
       email_id: row.email_id || "",
       mobile_no: row.mobile_no || "",
       user_status: row.user_status || "A",
-      password_hash: "",
-    });
+      password_hash: ""
+    };
+
+    setForm(formatted);
+    setOriginalUser(formatted); // ✅ store original snapshot
     setIsEditing(true);
   };
 
