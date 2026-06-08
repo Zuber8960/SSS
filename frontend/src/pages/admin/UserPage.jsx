@@ -10,8 +10,10 @@ import {
   SearchBox,
 } from "../../components/common/MasterPage";
 import "../../styles/MasterPage.css";
+import CommonAlertDialog from "../../components/common/CommonAlertDialog";
+import useAlert from "../../components/common/useAlert";
 
-// const statusOptions = ["Active", "Inactive"];
+
 const userFields = [
   { label: "User ID", name: "user_id" },
   { label: "User Name", name: "user_name" },
@@ -37,6 +39,14 @@ export default function UserPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+  
+const {
+  dialog,
+  closeAlert,
+  showSuccess,
+  showError,
+  showWarning,
+} = useAlert();
 
   const [form, setForm] = useState({
     rec_id: "",
@@ -111,6 +121,10 @@ export default function UserPage() {
 
     try {
       if (isEditing) {
+        if (form.user_status !== "A" && form.user_status !== "I") {
+          showError("Please select a valid status value");
+          return;
+        }
         // Update existing user
         await updateUser(form.rec_id, {
           user_name: form.user_name,
@@ -121,7 +135,7 @@ export default function UserPage() {
         
         // Reload users
         await loadUsers();
-        alert("User updated successfully");
+        showSuccess("User updated successfully.");
       } else {
         // Create new user
         await createUser({
@@ -136,12 +150,11 @@ export default function UserPage() {
         
         // Reload users
         await loadUsers();
-        alert("User created successfully");
+        showSuccess("User created successfully.");
       }
       clearForm();
     } catch (err) {
       setError(err.message || "Failed to save user");
-      alert(err.message || "Failed to save user");
       console.error("Error saving user:", err);
     } finally {
       setLoading(false);
@@ -172,7 +185,7 @@ export default function UserPage() {
       
       // Reload users
       await loadUsers();
-      alert("User deleted successfully");
+      showSuccess("User deleted successfully");
     } catch (err) {
       setError(err.message || "Failed to delete user");
       alert(err.message || "Failed to delete user");
@@ -238,6 +251,10 @@ export default function UserPage() {
             { label: "Edit", onClick: editUser },
             { label: "Delete", onClick: handleDeleteUser },
           ]}
+        />
+        <CommonAlertDialog
+          dialog={dialog}
+          onClose={closeAlert}
         />
       </PageBody>
     </MainLayout>
