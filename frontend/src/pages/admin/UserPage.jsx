@@ -11,7 +11,7 @@ import {
 } from "../../components/common/MasterPage";
 import "../../styles/MasterPage.css";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
-import useAlert from "../../components/common/useAlert";
+import useAlert from "../../components/common/UseAlert";
 
 const userFields = [
   { label: "User ID", name: "user_id" },
