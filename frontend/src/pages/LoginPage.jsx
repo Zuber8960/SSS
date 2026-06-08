@@ -3,6 +3,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logoImg from "../images/Cargo Yaan Logo.jpeg";
 import Footer from "../layouts/Footer";
+import CommonAlertDialog from "../components/common/CommonAlertDialog";
+import useAlert from "../components/common/UseAlert";
 
 function Logo({ className, style }) {
   return (
@@ -55,53 +57,76 @@ export default function LoginPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [resetUserId, setResetUserId] = useState("");
+  const { dialog, closeAlert, showSuccess, showError, showInfo } = useAlert();
 
-  const handleLogin = async () => {
-    setLoading(true);
-    setError("");
+  
+const handleLogin = async () => {
+  if (!userId || !password) {
+    showError("Username and Password are required");
+    return;
+  }
+  setLoading(true);
+  try {
+    const response = await loginUser(userId, password);
+    localStorage.setItem("current_user", JSON.stringify(response.user));
+    await showSuccess("Login successful");
 
-    try {
-      const response = await loginUser(userId, password);
-      navigate("/dashboard");
-      localStorage.setItem("current_user", JSON.stringify(response.user));
-    } catch (err) {
-      setError(err.message || "Invalid credentials");
-      alert(err.message || "Invalid credentials");
-    } finally {
-      setLoading(false);
-    }
+    navigate("/dashboard");
+  } catch (err) {
+    showError(err.message || "Invalid credentials");
+  } finally {
+    setLoading(false);
+  }
+};
 
-  };
 
   const handleResetPassword = async () => {
     try {
-      if (!email || !mobileNo) {
-        alert("Email and Mobile Number are required");
-        return;
-      }
+        if (!resetUserId) {
+          showError("User ID is required");
+          return;
+        }
 
-      if (newPassword !== confirmPassword) {
-        alert("Passwords do not match");
-        return;
-      }
-      console.log('Resetting password for:', { resetUserId, email, mobileNo, newPassword });
-      const response = await resetPassword(resetUserId, email, mobileNo, newPassword);
+        if (!email || !mobileNo) {
+          showError("Email and Mobile Number are required");
+          return;
+        }
 
-      const data = await response.json();
+        if (!newPassword || !confirmPassword) {
+          showError("Please enter new password");
+          return;
+        }
 
-      if (!response.ok) {
-        throw new Error(data.message);
-      }
+        if (newPassword !== confirmPassword) {
+          showError("Passwords do not match");
+          return;
+        }
 
-      alert("Password reset successful");
+        const response = await resetPassword(
+          resetUserId,
+          email,
+          mobileNo,
+          newPassword
+        );
 
-      setShowForgot(false);
-      setEmail("");
-      setMobileNo("");
-      setNewPassword("");
-      setConfirmPassword("");
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message);
+        }
+
+        showSuccess("Password reset successful");
+
+        // ✅ Reset form cleanly
+        setShowForgot(false);
+        setEmail("");
+        setMobileNo("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setResetUserId("");
+
     } catch (err) {
-      alert(err.message);
+      showError(err.message || "Failed to reset password");
     }
   };
 
@@ -335,6 +360,11 @@ export default function LoginPage() {
       )}
     </div>
       <Footer/>
+      <CommonAlertDialog
+        dialog={dialog}
+        onClose={closeAlert}
+      />
+
       </>
   );
 }
