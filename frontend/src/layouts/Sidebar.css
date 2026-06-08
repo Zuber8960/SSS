@@ -9,7 +9,7 @@
   flex-direction: column;
   overflow-y: auto;
   box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
-  transition: width 0.2s ease;
+  transition: width 0.8s ease;
 }
 
 .sidebar.collapsed {
@@ -88,12 +88,14 @@
   font-size: 18px;
   font-weight: 700;
   line-height: 1.15;
+  color: #151617;
 }
 
 .sidebarSubtitle {
   margin: 6px 0 0;
   font-size: 12px;
   opacity: 0.9;
+  line-height: 16px;
 }
 
 .sidebarList {

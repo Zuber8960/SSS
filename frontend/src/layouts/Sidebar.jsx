@@ -22,6 +22,7 @@ import Tooltip from "@mui/material/Tooltip";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import "./Sidebar.css";
+import Logo from "../images/loogo.PNG";
 
 export default function Sidebar() {
   const { pathname } = useLocation();
@@ -49,10 +50,19 @@ export default function Sidebar() {
   return (
     <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
       <div className="sidebarHeader">
-        {!collapsed ? <div className="sidebarAvatar">SS</div> : null}
+        {!collapsed ? <div><img
+          src={Logo}
+          alt="Saral Samadhan"
+          style={{
+            maxHeight: "80px",
+            width: "70px",
+            borderRadius: "50%",
+            boxShadow: "0px 0px 15px 5px rgba(248, 249, 250, 0.6)"
+          }}s
+        /></div> : null}
         <div className="sidebarBrand">
           <h2 className="sidebarTitle">SSS-ERP</h2>
-          <p className="sidebarSubtitle">Smart Transport ERP</p>
+          <h5 className="sidebarSubtitle">Smart Transport ERP</h5>
         </div>
         <Tooltip title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"} placement="right">
           <button
