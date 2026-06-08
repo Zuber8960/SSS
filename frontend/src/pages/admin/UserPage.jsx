@@ -17,7 +17,11 @@ const userFields = [
   { label: "User Name", name: "user_name" },
   { label: "Email", name: "email_id" },
   { label: "Mobile", name: "mobile_no" },
-  { label: "Status", name: "user_status" },
+  { label: "Status", name: "user_status", options: [
+      { label: "Active", value: "A" },
+      { label: "Inactive", value: "I" }
+    ]
+  }
 ];
 const userColumns = [
   { key: "user_id", label: "User ID" },
