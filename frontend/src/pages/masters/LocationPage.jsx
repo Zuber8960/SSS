@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
@@ -8,6 +8,7 @@ import {
   FormField,
   DataTable,
 } from "../../components/common/MasterPage";
+import { fetchAllLocations } from "../../utils/locationMaster";
 
 export default function LocationPage() {
 
@@ -141,6 +142,12 @@ export default function LocationPage() {
     { label: "Edit", onClick: editLocation },
     { label: "Delete", onClick: (row) => deleteLocation(row.locCode) },
   ];
+  useEffect(async () => {
+    let data = await fetchAllLocations();
+    console.log("Fetched locations:", data);
+    setLocations(data)
+
+  }, [])
 
   return (
     <MainLayout>
