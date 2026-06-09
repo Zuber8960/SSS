@@ -166,7 +166,7 @@ export default function UserPage() {
         });
 
         // ✅ Add locally
-        setUsers((prev) => [...prev, newUser]);
+        setUsers((prev) => [...prev, newUser[0]]);
 
         showSuccess("User created successfully");
       }
