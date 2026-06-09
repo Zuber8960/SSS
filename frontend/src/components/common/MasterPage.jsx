@@ -1,15 +1,7 @@
 import "../../styles/MasterPage.css";
 
-const pageStyle = { padding: "10px" };
-const toolbarStyle = { display: "flex", gap: "10px", marginBottom: "15px" };
-const searchStyle = { width: "300px", padding: "8px", marginBottom: "15px" };
-const panelStyle = {
-  border: "1px solid #ddd",
-  padding: "15px",
-  borderRadius: "5px",
-  marginBottom: "20px",
-};
-const tableStyle = { borderCollapse: "collapse" };
+import { DataGrid } from "@mui/x-data-grid";
+import { Box, Button } from "@mui/material";
 
 export function PageBody({ title, children }) {
   return (
@@ -82,50 +74,102 @@ export function FormField({ label, name, form, setForm, type = "text", options }
 }
 
 export function DataTable({ columns, rows, getKey, actions }) {
-  return (
-    <div className="dataTableWrapper">
-      <table className="dataTable">
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th key={column.key}>{column.label}</th>
-            ))}
-            {actions?.length ? <th>Actions</th> : null}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={columns.length + (actions?.length ? 1 : 0)} style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
-                No records found
-              </td>
-            </tr>
-          ) : (
-            rows.map((row, index) => (
-              <tr key={getKey(row, index)}>
-                {columns.map((column) => (
-                  <td key={column.key}>{column.render ? column.render(row) : row[column.key]}</td>
+
+  // ✅ Convert your columns → MUI format
+  const muiColumns = [
+    ...columns.map((col) => ({
+      field: col.key,
+      headerName: col.label,
+      flex: 1,
+      sortable: true,
+      headerAlign: "center",
+      align: "center",
+
+      renderCell: (params) =>
+        col.render ? col.render(params.row) : params.value,
+    })),
+
+    // ✅ Actions column
+    ...(actions?.length
+      ? [
+          {
+            field: "actions",
+            headerName: "Actions",
+            headerAlign: "center",
+            align: "center",
+            sortable: false,
+            flex: 1,
+            color: "primary",
+            renderCell: (params) => (
+              <Box style={{
+                display: "flex",
+                gap: 5,
+                justifyContent: "center",   // ✅ horizontal center
+                alignItems: "center",        // ✅ vertical center
+                height: "100%",              // ✅ fill full row height
+                width: "100%",
+               }}>
+                {actions.map((action) => (
+                  <Button
+                    key={action.label}
+                    variant="contained"
+                    // size="small"
+                    
+                  sx={{
+                      minWidth: "60px",     // ✅ reduce width
+                      padding: "8px",   // ✅ reduce height
+                      fontSize: "11px",     // ✅ smaller text
+                      lineHeight: 1.2,
+                      fontWeight: "bold"
+                    }}
+
+                    color={
+                      action.label.toLowerCase() === "delete"
+                        ? "error"
+                        : "primary"
+                    }
+                    onClick={() =>
+                      action.onClick(params.row)
+                    }
+                  >
+                    {action.label}
+                  </Button>
                 ))}
-                {actions?.length ? (
-                  <td>
-                    <div className="tableActions">
-                      {actions.map((action) => (
-                        <button
-                          key={action.label}
-                          onClick={() => action.onClick(row, index)}
-                          className={action.label.toLowerCase() === "delete" ? "deleteBtn" : "editBtn"}
-                        >
-                          {action.label}
-                        </button>
-                      ))}
-                    </div>
-                  </td>
-                ) : null}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+              </Box>
+            ),
+          },
+        ]
+      : []),
+  ];
+
+  // ✅ Add id (required for DataGrid)
+  const muiRows = rows.map((row, index) => ({
+    id: getKey ? getKey(row, index) : index,
+    ...row,
+  }));
+
+  return (
+    <div style={{ height: 400, width: "100%" }}>
+      <DataGrid
+        rows={muiRows}
+        columns={muiColumns}
+        pageSize={5}
+        rowsPerPageOptions={[5, 10, 20]}
+        disableSelectionOnClick
+        autoHeight
+
+    sx={{
+        "& .MuiDataGrid-columnHeaders": {
+          backgroundColor: "#f5f5f5",
+        },
+        "& .MuiDataGrid-columnHeaderTitle": {
+          fontWeight: "bold",
+          fontSize: "14px",
+        },
+      }}
+
+
+      />
     </div>
   );
 }
