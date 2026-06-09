@@ -3,9 +3,9 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const app = express();
-
-// Initialize DB connection
-require('./config/db');
+const path = require('path');
+const fs = require('fs');
+app.use(express.json());
 
 // CORS configuration
 const corsOptions = {
@@ -15,15 +15,31 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json());
 
-app.get('/', (req, res) => {
+// Initialize DB connection
+require('./config/db');
+
+
+// ✅ ROOT using process.cwd()
+const ROOT_DIR = process.cwd();
+
+// ✅ Load all routes dynamically
+const normalizedPath = path.join(__dirname, "routes");
+
+fs.readdirSync(normalizedPath).forEach((file) => {
+  if (file.endsWith("routes.js")) {
+    const route = require(path.join(normalizedPath, file));
+    app.use('/app',route);
+  }
+});
+
+// const routes = require('./routes/routes');
+// app.use('/app', routes);
+
+app.use('/', (req, res) => {
   res.send('Backend API is running');
 });
 
-
-const authRoutes = require('./routes/userRoutes');
-app.use('/api/auth', authRoutes);
 
 const PORT = process.env.PORT;
 

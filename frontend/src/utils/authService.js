@@ -10,7 +10,7 @@ const TOKEN_KEY = 'authToken';
  */
 export const loginUser = async (userId, password) => {
     try {
-        const response = await fetch(`${API_URL}/auth/login`, {
+        const response = await fetch(`${API_URL}/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -44,7 +44,7 @@ export const loginUser = async (userId, password) => {
 export const resetPassword = async (userId, email, mobileNo, newPassword) => {
     try {
         console.log('Resetting password for:', { userId, email, mobileNo });
-        const response = await fetch(`${API_URL}/auth/reset-password`, {
+        const response = await fetch(`${API_URL}/reset-password`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

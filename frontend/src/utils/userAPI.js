@@ -6,7 +6,7 @@ import { getAuthHeader } from './authService';
  */
 export const fetchAllUsers = async () => {
   try {
-    const response = await fetch(`${API_URL}/auth/users`, {
+    const response = await fetch(`${API_URL}/user`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -32,7 +32,7 @@ export const fetchAllUsers = async () => {
  */
 export const fetchUserById = async (recId) => {
   try {
-    const response = await fetch(`${API_URL}/auth/users/${recId}`, {
+    const response = await fetch(`${API_URL}/user/${recId}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -58,7 +58,7 @@ export const fetchUserById = async (recId) => {
  */
 export const createUser = async (userData) => {
   try {
-    const response = await fetch(`${API_URL}/auth/users`, {
+    const response = await fetch(`${API_URL}/user`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -85,7 +85,7 @@ export const createUser = async (userData) => {
  */
 export const updateUser = async (recId, userData) => {
   try {
-    const response = await fetch(`${API_URL}/auth/users/${recId}`, {
+    const response = await fetch(`${API_URL}/user/${recId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -112,7 +112,7 @@ export const updateUser = async (recId, userData) => {
  */
 export const deleteUser = async (recId) => {
   try {
-    const response = await fetch(`${API_URL}/auth/users/${recId}`, {
+    const response = await fetch(`${API_URL}/user/${recId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
