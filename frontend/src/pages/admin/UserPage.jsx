@@ -44,7 +44,7 @@ export default function UserPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [originalUser, setOriginalUser] = useState(null);
 
-  const { dialog, closeAlert, showSuccess, showError, showInfo } = useAlert();
+  const { dialog, closeAlert, showSuccess, showError, showInfo, showWarning } = useAlert();
 
   const [form, setForm] = useState({
     rec_id: "",
@@ -59,6 +59,7 @@ export default function UserPage() {
   // ✅ Single API call
   const loadUsers = async () => {
     try {
+      setError("");
       setLoading(true);
       const data = await fetchAllUsers();
       setUsers(data);
@@ -196,21 +197,28 @@ export default function UserPage() {
   };
 
   const handleDeleteUser = async (row) => {
-    if (!window.confirm(`Delete user ${row.user_id}?`)) return;
+    showWarning(
+        "Confirm Delete",
+        `Delete user ${row.user_id}?`,
+        async () => {
+          try {
+            setLoading(true);
 
-    try {
-      setLoading(true);
-      await deleteUser(row.rec_id);
+            await deleteUser(row.rec_id);
 
-      // ✅ Remove locally (NO API REFETCH)
-      setUsers((prev) => prev.filter((u) => u.rec_id !== row.rec_id));
+            setUsers((prev) =>
+              prev.filter((u) => u.rec_id !== row.rec_id)
+            );
 
-      showSuccess("User deleted successfully");
-    } catch (err) {
-      setError(err.message || "Failed to delete user");
-    } finally {
-      setLoading(false);
-    }
+            showSuccess("User deleted successfully");
+          } catch (err) {
+            setError(err.message || "Failed to delete user");
+          } finally {
+            setLoading(false);
+          }
+        }
+      );
+
   };
 
   const filteredUsers = users.filter(

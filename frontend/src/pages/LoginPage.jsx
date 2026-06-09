@@ -69,9 +69,12 @@ const handleLogin = async () => {
   try {
     const response = await loginUser(userId, password);
     localStorage.setItem("current_user", JSON.stringify(response.user));
-    await showSuccess("Login successful");
+    showSuccess("Login successful");
 
-    navigate("/dashboard");
+    setTimeout(() => {
+      navigate("/dashboard");
+    }, 1000);
+
   } catch (err) {
     showError(err.message || "Invalid credentials");
   } finally {

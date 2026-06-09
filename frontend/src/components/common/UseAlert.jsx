@@ -41,12 +41,19 @@ export default function useAlert() {
   };
 
  
+
 const showSuccess = (message, title = "Success") => {
   showAlert({
     title,
     message,
-    severity: "success"
+    severity: "success",
+    showCancel: false,
+    onConfirm: null   // ✅ ensures no button
   });
+  
+  setTimeout(() => {
+    closeAlert();
+  }, 2000);
 };
 
 

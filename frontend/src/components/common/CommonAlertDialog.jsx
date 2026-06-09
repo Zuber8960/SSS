@@ -36,19 +36,24 @@ export default function CommonAlertDialog({
       </DialogContent>
 
       <DialogActions>
+        {/* ✅ Show buttons ONLY if needed */}
         {dialog.showCancel && (
           <Button onClick={onClose}>
             {dialog.cancelText}
           </Button>
         )}
 
-        <Button
-          variant="contained"
-          onClick={handleConfirm}
-        >
-          {dialog.confirmText}
-        </Button>
+        {/* ✅ Show confirm ONLY for confirm dialogs */}
+        {dialog.onConfirm && (
+          <Button
+            variant="contained"
+            onClick={handleConfirm}
+          >
+            {dialog.confirmText}
+          </Button>
+        )}
       </DialogActions>
+
     </Dialog>
   );
 }
