@@ -42,15 +42,10 @@ export default function useAlert() {
 
  
 const showSuccess = (message, title = "Success") => {
-  return new Promise((resolve) => {
-    showAlert({
-      title,
-      message,
-      severity: "success",
-      onConfirm: () => {
-        resolve(); // ✅ resolves when OK clicked
-      },
-    });
+  showAlert({
+    title,
+    message,
+    severity: "success"
   });
 };
 
