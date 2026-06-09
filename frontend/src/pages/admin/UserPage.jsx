@@ -16,8 +16,8 @@ import useAlert from "../../components/common/UseAlert";
 const userFields = [
   { label: "User ID", name: "user_id" },
   { label: "User Name", name: "user_name" },
-  { label: "Email", name: "email_id" },
-  { label: "Mobile", name: "mobile_no" },
+  { label: "Email", name: "email_id"},
+  { label: "Mobile", name: "mobile_no", type: "number" },
   {
     label: "Status",
     name: "user_status",
