@@ -8,23 +8,15 @@ router.get('/', async (req, res) => {
     try {
         const recId = req.user.recId;
 
-        const user = await LocationMasterController.getAllLocationData(recId);
+        const data = await LocationMasterController.getAllLocationData(recId);
 
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
-        }
-
-        return res.status(200).json({
+        res.status(200).json({
             success: true,
-            message: 'Profile retrieved successfully',
-            data: user
+            data
         });
     } catch (error) {
         console.error('Profile error:', error);
-        return res.status(500).json({
+        res.status(500).json({
             success: false,
             message: 'Error retrieving profile'
         });
