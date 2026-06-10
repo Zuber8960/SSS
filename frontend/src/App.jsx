@@ -12,6 +12,7 @@ import LocationPage from "./pages/masters/LocationPage";
 import BusinessPartnerPage from "./pages/masters/BusinessPartnerPage";
 import Docket from "./pages/transaction/Docket";
 import TripSheet from "./pages/transaction/TripSheet";
+import ManifestEntry from "./pages/transaction/ManifestEntry";
 import { isAuthenticated } from "./utils/authService";
 
 const appRoutes = [
@@ -28,6 +29,7 @@ const appRoutes = [
   { path: "/masters/business-partner", element: <BusinessPartnerPage />, protected: true },
   { path: "/transaction/docket", element: <Docket />, protected: true },
   { path: "/transaction/trip-sheet", element: <TripSheet />, protected: true },
+  { path: "/transaction/manifest-entry", element: <ManifestEntry />, protected: true },
 ];
 
 function ProtectedRoute({ children }) {
@@ -43,11 +45,11 @@ function App() {
             key={route.path}
             path={route.path}
             element={
-              route.protected ? (
-                <ProtectedRoute>{route.element}</ProtectedRoute>
-              ) : (
+              // route.protected ? (
+              //   <ProtectedRoute>{route.element}</ProtectedRoute>
+              // ) : (
                 route.element
-              )
+              // )
             }
           />
         ))}

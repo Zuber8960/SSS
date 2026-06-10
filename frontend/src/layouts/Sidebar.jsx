@@ -342,6 +342,22 @@ export default function Sidebar() {
                 />
               </ListItemButton>
             </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton
+                component={Link}
+                to="/transaction/manifest-entry"
+                className={`sidebarNestedItem${isActive("/transaction/manifest-entry") ? " sidebarItemActive" : ""}`}
+              >
+                <ListItemIcon className="sidebarIcon">
+                  <AssignmentIcon />
+                </ListItemIcon>
+                <ListItemText
+                  secondary="Manifest Entry"
+                  style={{ display: textVisible ? "block" : "none" }}
+                  secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
+                />
+              </ListItemButton>
+            </ListItem>
           </List>
         </Collapse>
       </List>
