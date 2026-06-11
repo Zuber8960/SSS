@@ -89,7 +89,7 @@ router.post('/reset-password', async (req, res) => {
     }
 
     // Update user's password
-    await UserContoller.updateUserPassword(user.rec_id, new_password);
+    await UserController.updateUserPassword(user.rec_id, new_password);
 
     res.status(200).json({
       success: true,
