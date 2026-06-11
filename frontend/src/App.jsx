@@ -45,11 +45,11 @@ function App() {
             key={route.path}
             path={route.path}
             element={
-              // route.protected ? (
-              //   <ProtectedRoute>{route.element}</ProtectedRoute>
-              // ) : (
+              route.protected ? (
+                <ProtectedRoute>{route.element}</ProtectedRoute>
+              ) : (
                 route.element
-              // )
+              )
             }
           />
         ))}
