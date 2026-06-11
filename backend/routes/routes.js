@@ -80,11 +80,11 @@ router.post('/reset-password', async (req, res) => {
     }
 
     // Find user by user_id, email_id, and mobile_no
-    const user = await UserController.getUserByCredentials(user_id, email_id, mobile_no);
-    if (!user) {
-      return res.status(404).json({
+    const { err, user } = await UserController.getUserByCredentials(user_id, email_id, mobile_no);
+    if (err.msg) {
+      return res.status(400).json({
         success: false,
-        message: 'User not found'
+        message: err.msg
       });
     }
 

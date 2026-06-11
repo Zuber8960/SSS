@@ -57,13 +57,21 @@ const updateUserPassword = async (recId, newPassword) => {
 
 
 const getUserByCredentials = async (userId, email, mobile_no) => {
+  const err = {msg: null};
   const user = await db('sss.ssm_user')
-    .where({ user_id: userId, email_id: email, mobile_no: mobile_no, user_status : 'A' })
+    .where({ user_id: userId, user_status : 'A', record_status: 0 })
     .first();
-  if (!user) {
-    return null;
+
+  if (user && (user.email_id !== email || user.mobile_no !== mobile_no)) {
+    err.msg = "Provided Email or Mobile Number does not match for the User ID";
+    return {err, user: null};
   }
-  return user;
+  
+  if (!user) {
+    err.msg = "User not found or inactive";
+    return {err, user: null};
+  }
+  return {err, user};
 }
 
 /**

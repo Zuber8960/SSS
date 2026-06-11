@@ -111,14 +111,14 @@ const handleLogin = async () => {
           mobileNo,
           newPassword
         );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message);
+        
+        if (!response.success) {
+          throw new Error(response.message);
         }
+        // const data = await response.json();
 
-        showSuccess("Password reset successful");
+
+        showSuccess(response.message || "Password reset successful");
 
         // ✅ Reset form cleanly
         setShowForgot(false);
