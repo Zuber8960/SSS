@@ -10,6 +10,7 @@ import {
 } from "../../components/common/MasterPage";
 import { fetchAllLocations, saveLocations, updateLocation as updateLocationApi, deleteLocation as deleteLocationApi } from "../../utils/locationMaster";
 import useAlert from "../../components/common/UseAlert";
+import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 
 export default function LocationPage() {
   const [locations, setLocations] = useState([]);
@@ -121,7 +122,7 @@ export default function LocationPage() {
     }
   };
 
-  const filteredLocations =searchText ? locations.filter(
+  const filteredLocations = searchText ? locations.filter(
     (x) =>
       x.loc_code?.toLowerCase().includes(searchText.toLowerCase()) ||
       x.loc_name?.toLowerCase().includes(searchText.toLowerCase())
@@ -163,7 +164,7 @@ export default function LocationPage() {
     };
 
     loadLocationAtMount();
-  }, []);
+  }, [locations]);
 
   return (
     <MainLayout>
@@ -236,6 +237,10 @@ export default function LocationPage() {
           actions={locationActions}
         />
       </PageBody>
+      <CommonAlertDialog
+        dialog={dialog}
+        onClose={closeAlert}
+      />
     </MainLayout>
   );
 }
