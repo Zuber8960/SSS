@@ -203,6 +203,8 @@ export default function DocketPage() {
 
         {/* ✅ Header Form */}
         {showForm && (
+          <>
+          <h3>FORM</h3>
           <FormPanel>
             {headerFields.map((field) => (
               <FormField
@@ -214,6 +216,7 @@ export default function DocketPage() {
               />
             ))}
           </FormPanel>
+          </>
         )}
 
        
