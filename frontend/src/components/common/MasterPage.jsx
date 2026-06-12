@@ -16,7 +16,11 @@ export function PageToolbar({ actions }) {
   return (
     <div className="pageToolbar">
       {actions.map((action) => (
-        <button key={action.label} onClick={action.onClick}>
+        <button
+          key={action.label}
+          className={action.active ? "active" : ""}
+          onClick={action.onClick}
+        >
           {action.label}
         </button>
       ))}
@@ -46,14 +50,26 @@ export function FormPanel({ children, columns = "150px 300px 150px 300px" }) {
   );
 }
 
-export function FormField({ label, name, form, setForm, type = "text", options }) {
+export function FormField({
+  label,
+  name,
+  form,
+  setForm,
+  type = "text",
+  options,
+  disabled = false,
+}) {
   const updateField = (value) => setForm({ ...form, [name]: value });
 
   return (
     <div className="formFieldGroup">
       <label>{label}</label>
       {options ? (
-        <select value={form[name]} onChange={(e) => updateField(e.target.value)}>
+        <select
+          value={form[name]}
+          disabled={disabled}
+          onChange={(e) => updateField(e.target.value)}
+        >
           <option value="">Select {label}</option>
           {options.map((option) => (
             <option key={option.value ?? option} value={option.value ?? option}>
@@ -65,6 +81,7 @@ export function FormField({ label, name, form, setForm, type = "text", options }
         <input
           type={type}
           value={form[name]}
+          disabled={disabled}
           onChange={(e) => updateField(e.target.value)}
           placeholder={`Enter ${label}`}
         />
@@ -73,7 +90,14 @@ export function FormField({ label, name, form, setForm, type = "text", options }
   );
 }
 
-export function DataTable({ columns, rows, getKey, actions }) {
+export function DataTable({
+  columns,
+  rows,
+  getKey,
+  actions,
+  editable = false,
+  onCellChange,
+}) {
 
   // ✅ Convert your columns → MUI format
   const muiColumns = [
@@ -82,6 +106,7 @@ export function DataTable({ columns, rows, getKey, actions }) {
       headerName: col.label,
       flex: 1,
       sortable: true,
+      editable,
       headerAlign: "center",
       align: "center",
 
@@ -157,6 +182,20 @@ export function DataTable({ columns, rows, getKey, actions }) {
         rowsPerPageOptions={[5, 10, 20]}
         disableSelectionOnClick
         autoHeight
+        processRowUpdate={(newRow, oldRow) => {
+          if (!editable || !onCellChange) return newRow;
+
+          columns.forEach((col) => {
+            if (newRow[col.key] !== oldRow[col.key]) {
+              onCellChange(newRow.id, col.key, newRow[col.key]);
+            }
+          });
+
+          return newRow;
+        }}
+        onProcessRowUpdateError={(error) => {
+          console.error("DataTable edit error:", error);
+        }}
 
     sx={{
         "& .MuiDataGrid-columnHeaders": {

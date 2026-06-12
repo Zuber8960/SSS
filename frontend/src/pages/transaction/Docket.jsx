@@ -103,6 +103,10 @@ export default function DocketPage() {
 
   const [ewbList, setEwbList] = useState([]);
   const [chargeList, setChargeList] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [showEwayBill, setShowEwayBill] = useState(true);
+  const [showCharges, setShowCharges] = useState(false);
+  const [isDocketNoEnabled, setIsDocketNoEnabled] = useState(false);
 
   // ✅ Add rows
   const addEwbRow = () => {
@@ -118,11 +122,11 @@ export default function DocketPage() {
 
   // ✅ Delete rows
   const deleteEwb = (row) => {
-    setEwbList((prev) => prev.filter((r) => r !== row));
+    setEwbList((prev) => prev.filter((_, index) => index !== row.id));
   };
 
   const deleteCharge = (row) => {
-    setChargeList((prev) => prev.filter((r) => r !== row));
+    setChargeList((prev) => prev.filter((_, index) => index !== row.id));
   };
 
   // ✅ Edit handlers
@@ -150,52 +154,88 @@ export default function DocketPage() {
         <PageToolbar
           actions={[
             { label: "Save", onClick: handleSave },
-            { label: "Add EWB", onClick: addEwbRow },
-            { label: "Add Charge", onClick: addChargeRow },
+            {
+              label: showForm ? "Hide Form" : "Show Form",
+              active: showForm,
+              onClick: () => setShowForm((prev) => !prev),
+            },
+            {
+              label: isDocketNoEnabled ? "Disable Docket No" : "Enable Docket No",
+              active: isDocketNoEnabled,
+              onClick: () => setIsDocketNoEnabled((prev) => !prev),
+            },
+            {
+              label: showEwayBill ? "Hide E-Waybill" : "Show E-Waybill",
+              active: showEwayBill,
+              onClick: () => setShowEwayBill((prev) => !prev),
+            },
+            ...(showEwayBill
+              ? [{ label: "Add EWB", onClick: addEwbRow }]
+              : []),
+            {
+              label: showCharges ? "Hide Charges" : "Show Charges",
+              active: showCharges,
+              onClick: () => setShowCharges((prev) => !prev),
+            },
+            ...(showCharges
+              ? [{ label: "Add Charge", onClick: addChargeRow }]
+              : []),
           ]}
         />
+         {/* ✅ EWB Table */}
+        {showEwayBill && (
+          <>
+            <h3>EWB Details</h3>
+            <DataTable
+              columns={ewbColumns}
+              rows={ewbList}
+              getKey={(row, idx) => idx}
+              actions={[
+                { label: "Delete", onClick: deleteEwb },
+              ]}
+              editable
+              onCellChange={(rowIndex, key, value) =>
+                updateRow(setEwbList, ewbList, rowIndex, key, value)
+              }
+            />
+          </>
+        )}
 
         {/* ✅ Header Form */}
-        <FormPanel>
-          {headerFields.map((field) => (
-            <FormField
-              key={field.name}
-              {...field}
-              form={form}
-              setForm={setForm}
-            />
-          ))}
-        </FormPanel>
+        {showForm && (
+          <FormPanel>
+            {headerFields.map((field) => (
+              <FormField
+                key={field.name}
+                {...field}
+                form={form}
+                setForm={setForm}
+                disabled={field.name === "docket_no" && !isDocketNoEnabled}
+              />
+            ))}
+          </FormPanel>
+        )}
 
-        {/* ✅ EWB Table */}
-        <h3>EWB Details</h3>
-        <DataTable
-          columns={ewbColumns}
-          rows={ewbList}
-          getKey={(row, idx) => idx}
-          actions={[
-            { label: "Delete", onClick: deleteEwb },
-          ]}
-          editable
-          onCellChange={(rowIndex, key, value) =>
-            updateRow(setEwbList, ewbList, rowIndex, key, value)
-          }
-        />
+       
 
         {/* ✅ Charges Table */}
-        <h3>Charges</h3>
-        <DataTable
-          columns={chargeColumns}
-          rows={chargeList}
-          getKey={(row, idx) => idx}
-          actions={[
-            { label: "Delete", onClick: deleteCharge },
-          ]}
-          editable
-          onCellChange={(rowIndex, key, value) =>
-            updateRow(setChargeList, chargeList, rowIndex, key, value)
-          }
-        />
+        {showCharges && (
+          <>
+            <h3>Charges</h3>
+            <DataTable
+              columns={chargeColumns}
+              rows={chargeList}
+              getKey={(row, idx) => idx}
+              actions={[
+                { label: "Delete", onClick: deleteCharge },
+              ]}
+              editable
+              onCellChange={(rowIndex, key, value) =>
+                updateRow(setChargeList, chargeList, rowIndex, key, value)
+              }
+            />
+          </>
+        )}
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
       </PageBody>
