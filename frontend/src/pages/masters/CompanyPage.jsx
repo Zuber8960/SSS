@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
@@ -8,26 +8,28 @@ import {
   FormField,
   DataTable,
 } from "../../components/common/MasterPage";
+import useAlert from "../../components/common/UseAlert";
+import {
+  fetchAllCompanies,
+  createCompany,
+  updateCompany,
+  deleteCompany,
+} from "../../utils/companyMaster";
 
 export default function CompanyPage() {
 
-  const [companies, setCompanies] = useState([
-    {
-      companyCode: "1001",
-      companyName: "ABC Logistics Pvt Ltd",
-      state: "Uttar Pradesh",
-      city: "Noida",
-      panNo: "ABCDE1234F",
-      gstNo: "09ABCDE1234F1Z5",
-      status: "Active"
-    }
-  ]);
-
+  const [companies, setCompanies] = useState([]);
   const [searchText, setSearchText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [originalCompany, setOriginalCompany] = useState(null);
+
+  const { dialog, closeAlert, showSuccess, showError, showInfo, showWarning } = useAlert();
 
   const [form, setForm] = useState({
-    companyCode: "",
-    companyName: "",
+    company_code: "",
+    company_name: "",
     regAddress: "",
     state: "",
     city: "",
@@ -45,8 +47,8 @@ export default function CompanyPage() {
 
   const clearForm = () => {
     setForm({
-      companyCode: "",
-      companyName: "",
+      company_code: "",
+      company_name: "",
       regAddress: "",
       state: "",
       city: "",
@@ -61,44 +63,87 @@ export default function CompanyPage() {
       closedOn: "",
       status: "Active"
     });
+    setIsEditing(false);
+    setOriginalCompany(null);
   };
 
-  const saveCompany = () => {
+  const loadCompanies = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const data = await fetchAllCompanies();
+      setCompanies(data);
+    } catch (err) {
+      setError(err.message || "Failed to load companies");
+      console.error("Load companies error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    if (!form.companyCode || !form.companyName) {
-      alert("Company Code and Company Name are required");
+  const saveCompany = async () => {
+    if (!form.company_code || !form.company_name) {
+      showError("Company Code and Company Name are required");
       return;
     }
 
-    setCompanies([...companies, form]);
-    clearForm();
+    const payload = {
+      ...form,
+      pincode: form.pincode ? Number(form.pincode) : null,
+      phone: form.phone ? Number(form.phone) : null,
+    };
+
+    try {
+      if (isEditing && originalCompany?.company_code) {
+        await updateCompany(originalCompany.company_code, payload);
+        setCompanies((prev) =>
+          prev.map((company) =>
+            company.company_code === originalCompany.company_code ? payload : company
+          )
+        );
+        showSuccess("Company updated successfully");
+      } else {
+        const created = await createCompany(payload);
+        setCompanies((prev) => [...prev, ...(Array.isArray(created) ? created : [created])]);
+        showSuccess("Company created successfully");
+      }
+      clearForm();
+    } catch (err) {
+      setError(err.message || "Failed to save company");
+      showError(err.message || "Failed to save company");
+      console.error("Save company error:", err);
+    }
   };
 
   const editCompany = (row) => {
     setForm(row);
+    setOriginalCompany(row);
+    setIsEditing(true);
   };
 
-  const deleteCompany = (companyCode) => {
+  const deleteCompany = async (company_code) => {
+    if (!window.confirm("Delete Company ?")) return;
 
-    if (!window.confirm("Delete Company ?"))
-      return;
-
-    setCompanies(
-      companies.filter(
-        x => x.companyCode !== companyCode
-      )
-    );
+    try {
+      await deleteCompany(company_code);
+      setCompanies((prev) => prev.filter((x) => x.company_code !== company_code));
+      showSuccess("Company deleted successfully");
+    } catch (err) {
+      setError(err.message || "Failed to delete company");
+      showError(err.message || "Failed to delete company");
+      console.error("Delete company error:", err);
+    }
   };
 
   const filteredCompanies = companies.filter(
     (x) =>
-      x.companyCode.toLowerCase().includes(searchText.toLowerCase()) ||
-      x.companyName.toLowerCase().includes(searchText.toLowerCase())
+      x.company_code.toLowerCase().includes(searchText.toLowerCase()) ||
+      x.company_name.toLowerCase().includes(searchText.toLowerCase())
   );
 
   const companyColumns = [
-    { key: "companyCode", label: "Code" },
-    { key: "companyName", label: "Company" },
+    { key: "company_code", label: "Code" },
+    { key: "company_name", label: "Company" },
     { key: "state", label: "State" },
     { key: "city", label: "City" },
     { key: "status", label: "Status" },
@@ -106,8 +151,12 @@ export default function CompanyPage() {
 
   const companyActions = [
     { label: "Edit", onClick: editCompany },
-    { label: "Delete", onClick: (row) => deleteCompany(row.companyCode) },
+    { label: "Delete", onClick: (row) => deleteCompany(row.company_code) },
   ];
+
+  useEffect(() => {
+    loadCompanies();
+  }, []);
 
   return (
     <MainLayout>
@@ -127,8 +176,8 @@ export default function CompanyPage() {
         />
 
         <FormPanel>
-          <FormField label="Company Code" name="companyCode" form={form} setForm={setForm} />
-          <FormField label="Company Name" name="companyName" form={form} setForm={setForm} />
+          <FormField label="Company Code" name="company_code" form={form} setForm={setForm} />
+          <FormField label="Company Name" name="company_name" form={form} setForm={setForm} />
           <FormField label="Address" name="regAddress" form={form} setForm={setForm} />
           <FormField label="State" name="state" form={form} setForm={setForm} />
           <FormField label="City" name="city" form={form} setForm={setForm} />
@@ -147,7 +196,7 @@ export default function CompanyPage() {
         <DataTable
           columns={companyColumns}
           rows={filteredCompanies}
-          getKey={(row) => row.companyCode}
+          getKey={(row) => row.company_code}
           actions={companyActions}
         />
       </PageBody>

@@ -5,6 +5,7 @@ const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const userRoutes = require("../modules/userMaster/user.routes");
 const locationMasterRoutes = require("../modules/locationMaster/locationMaster.routes");
+const companyMasterRoutes = require("../modules/companyMaster/companyMaster.routes");
 const docketRoutes = require("../modules/docket/dcoket.routes");
 const UserController = require('../modules/userMaster/user.controller');
 
@@ -106,6 +107,7 @@ router.post('/reset-password', async (req, res) => {
 
 router.use('/user', authMiddleware, userRoutes);
 router.use('/locationMaster', authMiddleware, locationMasterRoutes);
+router.use('/companyMaster', authMiddleware, companyMasterRoutes);
 router.use('/docket', authMiddleware, docketRoutes);
 
 module.exports = router;

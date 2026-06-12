@@ -8,45 +8,38 @@ import {
   FormField,
   DataTable,
 } from "../../components/common/MasterPage";
-import { fetchAllLocations } from "../../utils/locationMaster";
+import { fetchAllLocations, saveLocations, updateLocation as updateLocationApi, deleteLocation as deleteLocationApi } from "../../utils/locationMaster";
+import useAlert from "../../components/common/UseAlert";
 
 export default function LocationPage() {
-  const [locations, setLocations] = useState([
-    {
-      loc_code: "HO01",
-      loc_name: "Corporate Head Office",
-      loc_type: "HO",
-      loc_state: "UTTAR PRADESH",
-      loc_town: "",
-      loc_status: "A",
-    },
-  ]);
-
+  const [locations, setLocations] = useState([]);
+  const { dialog, closeAlert, showSuccess, showError, showInfo } = useAlert();
   const [searchText, setSearchText] = useState("");
 
   const [form, setForm] = useState({
-    loc_id: "",
-    record_id: "",
-    loc_code: "",
+    loc_id: null,
+    loc_code: null,
     loc_name: "",
     loc_type: "HO",
     loc_country: "INDIA",
     loc_state: "",
     loc_town: "",
-    loc_postal_code: "",
-    loc_opened_on: "",
-    loc_closed_on: "",
+    loc_postal_code: null,
+    loc_opened_on: null,
+    loc_closed_on: null,
     loc_status: "A",
-    parent_loc_code: "",
+    parent_loc_code: null,
     longitude: "",
-    mobile_no: "",
-    telephone_no: "",
+    mobile_no: null,
+    telephone_no: null,
   });
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [originalLocation, setOriginalLocation] = useState(null);
 
   const clearForm = () => {
     setForm({
       loc_id: "",
-      record_id: "",
       loc_code: "",
       loc_name: "",
       loc_type: "HO",
@@ -62,37 +55,77 @@ export default function LocationPage() {
       mobile_no: "",
       telephone_no: ""
     });
+    setIsEditing(false);
+    setOriginalLocation(null);
   };
 
-  const saveLocation = () => {
+  const saveLocation = async () => {
     if (!form.loc_code) {
-      alert("Location Code is required");
+      showError("Location Code is required");
       return;
     }
     if (!form.loc_name) {
-      alert("Location Name is required");
+      showError("Location Name is required");
       return;
     }
 
-    setLocations([...locations, form]);
-    clearForm();
+    // Convert numeric fields to numbers
+    const payload = {
+      ...form,
+      loc_postal_code: form.loc_postal_code ? Number(form.loc_postal_code) : null,
+      parent_loc_code: form.parent_loc_code ? Number(form.parent_loc_code) : null,
+      mobile_no: form.mobile_no ? Number(form.mobile_no) : null,
+      telephone_no: form.telephone_no ? Number(form.telephone_no) : null,
+      longitude: form.longitude ? Number(form.longitude) : null,
+      loc_code: form.loc_code ? Number(form.loc_code) : null,
+    };
+
+    try {
+      if (isEditing && originalLocation?.loc_code) {
+        await updateLocationApi(originalLocation.loc_code, payload);
+        setLocations((prev) =>
+          prev.map((loc) =>
+            loc.loc_code === originalLocation.loc_code ? payload : loc
+          )
+        );
+        showSuccess("Location updated successfully");
+      } else {
+        await saveLocations(payload);
+        setLocations((prev) => [...prev, payload]);
+        showSuccess("Location saved successfully");
+      }
+
+      clearForm();
+    } catch (error) {
+      showError(error.message || "Failed to save location");
+      console.error("Save location error:", error);
+    }
   };
 
   const editLocation = (row) => {
     setForm(row);
+    setOriginalLocation(row);
+    setIsEditing(true);
   };
 
-  const deleteLocation = (locCode) => {
+  const deleteLocation = async (locCode) => {
     if (!window.confirm("Delete Location ?")) return;
 
-    setLocations(locations.filter((x) => x.loc_code !== locCode));
+    try {
+      await deleteLocationApi(locCode);
+      setLocations((prev) => prev.filter((x) => x.loc_code !== locCode));
+      showSuccess("Location deleted successfully");
+    } catch (error) {
+      showError(error.message || "Failed to delete location");
+      console.error("Delete location error:", error);
+    }
   };
 
-  const filteredLocations = locations.filter(
+  const filteredLocations =searchText ? locations.filter(
     (x) =>
       x.loc_code?.toLowerCase().includes(searchText.toLowerCase()) ||
       x.loc_name?.toLowerCase().includes(searchText.toLowerCase())
-  );
+  ) : locations;
 
   const locationColumns = [
     { key: "loc_code", label: "Location Code" },

@@ -137,7 +137,7 @@ const handleLogin = async () => {
     <>
     <div
       style={{
-        minHeight: "70vh",
+        minHeight: "85vh",
         width: "90vw",
         display: "flex",
         alignItems: "stretch",
