@@ -14,7 +14,7 @@ import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 
 export default function LocationPage() {
   const [locations, setLocations] = useState([]);
-  const { dialog, closeAlert, showSuccess, showError, showInfo } = useAlert();
+  const { dialog, closeAlert, showSuccess, showError, showInfo, showWarning } = useAlert();
   const [searchText, setSearchText] = useState("");
 
   const [form, setForm] = useState({
@@ -110,16 +110,21 @@ export default function LocationPage() {
   };
 
   const deleteLocation = async (locCode) => {
-    if (!window.confirm("Delete Location ?")) return;
-
-    try {
-      await deleteLocationApi(locCode);
-      setLocations((prev) => prev.filter((x) => x.loc_code !== locCode));
-      showSuccess("Location deleted successfully");
-    } catch (error) {
-      showError(error.message || "Failed to delete location");
-      console.error("Delete location error:", error);
-    }
+    showWarning("Confirm Delete","Delete Location ?",
+        async () => {
+          try {
+            setLoading(true);
+            await deleteLocationApi(locCode);
+            setLocations((prev) => prev.filter((x) => x.loc_code !== locCode));
+            showSuccess("Location deleted successfully");
+          } catch (error) {
+            showError(error.message || "Failed to delete location");
+          console.error("Delete location error:", error);
+          } finally {
+            setLoading(false);
+          }
+        }
+      );
   };
 
   const filteredLocations = searchText ? locations.filter(
