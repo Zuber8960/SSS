@@ -7,14 +7,22 @@ const path = require('path');
 const fs = require('fs');
 app.use(express.json());
 
-// CORS configuration
-const corsOptions = {
-  origin: process.env.FRONTEND_URL, // Vite frontend port
-  credentials: true,
-  optionsSuccessStatus: 200
-};
 
-app.use(cors(corsOptions));
+console.log('FRONTEND_URL =', process.env.FRONTEND_URL);
+
+// CORS configuration
+app.use(cors({
+  origin: [
+    'http://198.38.86.85:4000',
+    'http://localhost:4000',
+    process.env.FRONTEND_URL
+  ],
+  credentials: true
+}));
+
+
+//app.use(cors(corsOptions));
+// app.use(cors('*'));
 
 // Initialize DB connection
 require('./config/db');
@@ -42,7 +50,7 @@ fs.readdirSync(normalizedPath).forEach((file) => {
 
 
 app.use('/', (req, res) => {
-  res.send('Backend API is running');
+  res.send('Backend API is running !');
 });
 
 
