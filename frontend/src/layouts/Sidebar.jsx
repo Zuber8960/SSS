@@ -16,6 +16,8 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import HandshakeIcon from "@mui/icons-material/Handshake";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import AssignmentIcon from "@mui/icons-material/Assignment";
+import AccountTreeSharp from "@mui/icons-material/TireRepair";
+import AccessTime from "@mui/icons-material/ManageHistory";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import Tooltip from "@mui/material/Tooltip";
@@ -333,7 +335,7 @@ export default function Sidebar() {
                 className={`sidebarNestedItem${isActive("/transaction/trip-sheet") ? " sidebarItemActive" : ""}`}
               >
                 <ListItemIcon className="sidebarIcon">
-                  <AssignmentIcon />
+                  <AccountTreeSharp />
                 </ListItemIcon>
                 <ListItemText
                   secondary="Trip Sheet"
@@ -349,7 +351,7 @@ export default function Sidebar() {
                 className={`sidebarNestedItem${isActive("/transaction/manifest-entry") ? " sidebarItemActive" : ""}`}
               >
                 <ListItemIcon className="sidebarIcon">
-                  <AssignmentIcon />
+                  <AccessTime />
                 </ListItemIcon>
                 <ListItemText
                   secondary="Manifest Entry"
