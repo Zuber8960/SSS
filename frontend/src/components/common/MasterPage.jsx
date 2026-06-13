@@ -1,5 +1,6 @@
 import "../../styles/MasterPage.css";
 
+import { useEffect, useState } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 import { Box, Button } from "@mui/material";
 
@@ -98,8 +99,19 @@ export function DataTable({
   editable = false,
   onCellChange,
 }) {
+  const [paginationModel, setPaginationModel] = useState({
+    page: 0,
+    pageSize: 5,
+  });
 
-  // ✅ Convert your columns → MUI format
+  useEffect(() => {
+    setPaginationModel((model) => {
+      const lastPage = Math.max(Math.ceil(rows.length / model.pageSize) - 1, 0);
+
+      return model.page > lastPage ? { ...model, page: lastPage } : model;
+    });
+  }, [rows.length]);
+
   const muiColumns = [
     ...columns.map((col) => ({
       field: col.key,
@@ -114,60 +126,55 @@ export function DataTable({
         col.render ? col.render(params.row) : params.value,
     })),
 
-    // ✅ Actions column
     ...(actions?.length
       ? [
-          {
-            field: "actions",
-            headerName: "Actions",
-            headerAlign: "center",
-            align: "center",
-            sortable: false,
-            flex: 1,
-            color: "primary",
-            renderCell: (params) => (
-              <Box style={{
-                display: "flex",
-                gap: 5,
-                justifyContent: "center",   // ✅ horizontal center
-                alignItems: "center",        // ✅ vertical center
-                height: "100%",              // ✅ fill full row height
-                width: "100%",
-               }}>
-                {actions.map((action) => (
-                  <Button
-                    key={action.label}
-                    variant="contained"
-                    // size="small"
-                    
+        {
+          field: "actions",
+          headerName: "Actions",
+          headerAlign: "center",
+          align: "center",
+          sortable: false,
+          flex: 1,
+          color: "primary",
+          renderCell: (params) => (
+            <Box style={{
+              display: "flex",
+              gap: 5,
+              justifyContent: "center",
+              alignItems: "center",
+              height: "100%",
+              width: "100%",
+            }}>
+              {actions.map((action) => (
+                <Button
+                  key={action.label}
+                  variant="contained"
                   sx={{
-                      minWidth: "60px",     // ✅ reduce width
-                      padding: "8px",   // ✅ reduce height
-                      fontSize: "11px",     // ✅ smaller text
-                      lineHeight: 1.2,
-                      fontWeight: "bold"
-                    }}
-
-                    color={
-                      action.label.toLowerCase() === "delete"
-                        ? "error"
-                        : "primary"
-                    }
-                    onClick={() =>
-                      action.onClick(params.row)
-                    }
-                  >
-                    {action.label}
-                  </Button>
-                ))}
-              </Box>
-            ),
-          },
-        ]
+                    minWidth: "60px",
+                    padding: "8px",
+                    fontSize: "11px",
+                    lineHeight: 1.2,
+                    fontWeight: "bold"
+                  }}
+                  color={
+                    action.label.toLowerCase() === "delete"
+                      ? "error"
+                      : "primary"
+                  }
+                  onClick={() =>
+                    action.onClick(params.row)
+                  }
+                >
+                  {action.label}
+                </Button>
+              ))}
+            </Box>
+          ),
+        },
+      ]
       : []),
   ];
 
-  // ✅ Add id (required for DataGrid)
   const muiRows = rows.map((row, index) => ({
     id: getKey ? getKey(row, index) : index,
     ...row,
@@ -178,9 +185,11 @@ export function DataTable({
       <DataGrid
         rows={muiRows}
         columns={muiColumns}
-        pageSize={5}
-        rowsPerPageOptions={[5, 10, 20]}
+        paginationModel={paginationModel}
+        onPaginationModelChange={setPaginationModel}
+        pageSizeOptions={[5]}
         disableSelectionOnClick
+        pagination
         autoHeight
         processRowUpdate={(newRow, oldRow) => {
           if (!editable || !onCellChange) return newRow;
@@ -197,15 +206,15 @@ export function DataTable({
           console.error("DataTable edit error:", error);
         }}
 
-    sx={{
-        "& .MuiDataGrid-columnHeaders": {
-          backgroundColor: "#f5f5f5",
-        },
-        "& .MuiDataGrid-columnHeaderTitle": {
-          fontWeight: "bold",
-          fontSize: "14px",
-        },
-      }}
+        sx={{
+          "& .MuiDataGrid-columnHeaders": {
+            backgroundColor: "#f5f5f5",
+          },
+          "& .MuiDataGrid-columnHeaderTitle": {
+            fontWeight: "bold",
+            fontSize: "14px",
+          },
+        }}
 
 
       />
