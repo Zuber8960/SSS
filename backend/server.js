@@ -33,8 +33,13 @@ fs.readdirSync(normalizedPath).forEach((file) => {
   }
 });
 
-// const routes = require('./routes/routes');
-// app.use('/app', routes);
+fs.readdirSync(normalizedPath).forEach((file) => {
+  if (file.endsWith("api.route.js")) {
+    const route = require(path.join(normalizedPath, file));
+    app.use('/api',route);
+  }
+});
+
 
 app.use('/', (req, res) => {
   res.send('Backend API is running');
