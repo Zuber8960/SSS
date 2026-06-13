@@ -28,13 +28,13 @@ router.post('/', async (req, res) => {
         const recId = req.user.recId;
         const payload = req.body;
 
-        const existing = await CompanyMasterController.getCompanyDataByRecId(recId);
-        if (existing) {
-            return res.status(409).json({
-                success: false,
-                message: 'Company data already exists for this user'
-            });
-        }
+        // const existing = await CompanyMasterController.getCompanyDataByRecId(recId);
+        // if (existing) {
+        //     return res.status(409).json({
+        //         success: false,
+        //         message: 'Company data already exists for this user'
+        //     });
+        // }
 
         const data = await CompanyMasterController.saveCompanyData(recId, payload);
 

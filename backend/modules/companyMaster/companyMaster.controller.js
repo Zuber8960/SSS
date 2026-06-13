@@ -16,7 +16,7 @@ module.exports = {
     async saveCompanyData(recId, payload) {
         const record = {
             ...payload,
-            rec_id: recId,
+            created_by: recId,
             created_on: new Date()
         };
 

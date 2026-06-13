@@ -15,6 +15,7 @@ import {
   updateCompany,
   deleteCompany,
 } from "../../utils/companyMaster";
+import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 
 export default function CompanyPage() {
 
@@ -30,18 +31,18 @@ export default function CompanyPage() {
   const [form, setForm] = useState({
     company_code: "",
     company_name: "",
-    regAddress: "",
-    state: "",
-    city: "",
-    pincode: "",
-    phone: "",
-    email: "",
+    regoff_address: "",
+    regoff_state_code: "",
+    regoff_city_code: "",
+    regoff_pincode_code: "",
+    mobile_no: "",
+    email_id: "",
     website: "",
-    panNo: "",
-    gstNo: "",
-    tanNo: "",
-    openedOn: "",
-    closedOn: "",
+    pan_no: "",
+    gstin_no: "",
+    tan_no: "",
+    opened_on: "",
+    closed_on: "",
     status: "Active"
   });
 
@@ -49,18 +50,18 @@ export default function CompanyPage() {
     setForm({
       company_code: "",
       company_name: "",
-      regAddress: "",
-      state: "",
-      city: "",
-      pincode: "",
-      phone: "",
-      email: "",
+      regoff_address: "",
+      regoff_state_code: "",
+      regoff_city_code: "",
+      regoff_pincode_code: "",
+      mobile_no: "",
+      email_id: "",
       website: "",
-      panNo: "",
-      gstNo: "",
-      tanNo: "",
-      openedOn: "",
-      closedOn: "",
+      pan_no: "",
+      gstin_no: "",
+      tan_no: "",
+      opened_on: "",
+      closed_on: "",
       status: "Active"
     });
     setIsEditing(false);
@@ -178,18 +179,18 @@ export default function CompanyPage() {
         <FormPanel>
           <FormField label="Company Code" name="company_code" form={form} setForm={setForm} />
           <FormField label="Company Name" name="company_name" form={form} setForm={setForm} />
-          <FormField label="Address" name="regAddress" form={form} setForm={setForm} />
-          <FormField label="State" name="state" form={form} setForm={setForm} />
-          <FormField label="City" name="city" form={form} setForm={setForm} />
-          <FormField label="Pincode" name="pincode" form={form} setForm={setForm} />
-          <FormField label="Phone" name="phone" form={form} setForm={setForm} />
-          <FormField label="Email" name="email" form={form} setForm={setForm} />
+          <FormField label="Address" name="regoff_address" form={form} setForm={setForm} />
+          <FormField label="State" name="regoff_state_code" form={form} setForm={setForm} />
+          <FormField label="City" name="regoff_city_code" form={form} setForm={setForm} />
+          <FormField label="Pincode" name="regoff_pincode_code" form={form} setForm={setForm} />
+          <FormField label="Phone" name="mobile_no" form={form} setForm={setForm} />
+          <FormField label="Email" name="email_id" form={form} setForm={setForm} />
           <FormField label="Website" name="website" form={form} setForm={setForm} />
-          <FormField label="PAN No" name="panNo" form={form} setForm={setForm} />
-          <FormField label="GST No" name="gstNo" form={form} setForm={setForm} />
-          <FormField label="TAN No" name="tanNo" form={form} setForm={setForm} />
-          <FormField label="Opened On" name="openedOn" form={form} setForm={setForm} type="date" />
-          <FormField label="Closed On" name="closedOn" form={form} setForm={setForm} type="date" />
+          <FormField label="PAN No" name="pan_no" form={form} setForm={setForm} />
+          <FormField label="GST No" name="gstin_no" form={form} setForm={setForm} />
+          <FormField label="TAN No" name="tan_no" form={form} setForm={setForm} />
+          <FormField label="Opened On" name="opened_on" form={form} setForm={setForm} type="date" />
+          <FormField label="Closed On" name="closed_on" form={form} setForm={setForm} type="date" />
           <FormField label="Status" name="status" form={form} setForm={setForm} options={["Active", "Inactive"]} />
         </FormPanel>
 
@@ -200,6 +201,10 @@ export default function CompanyPage() {
           actions={companyActions}
         />
       </PageBody>
+      <CommonAlertDialog
+        dialog={dialog}
+        onClose={closeAlert}
+      />
     </MainLayout>
   );
 }
