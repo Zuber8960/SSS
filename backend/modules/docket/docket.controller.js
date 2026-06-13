@@ -1,21 +1,89 @@
 const db = require('../../config/db');
+const axios = require('axios');
+
 
 /* ================= GET ================= */
 
+const getEwaybillDetails = async (ewbNo=process.env.ewbNo) => {
+  try {
+    // email=connectwithlogipod%40gmail.com&username=cargoyaan1_API_HAR&password=CYsss%40221274
+    const authGet = await axios.get(
+      'https://api.whitebooks.in/ewaybillapi/v1.03/ewayapi/getewaybill',
+      {
+        params: {
+          email: process.env.email,
+          username: process.env.username,
+          password: process.env.password,
+        },
+        headers: {
+          accept: '*/*',
+          ip_address: process.env.IP_ADDRESS,
+          client_id: process.env.client_id,
+          client_secret: process.env.client_secret,
+          gstin: process.env.GSTIN,
+        },
+      }
+    );
+
+    console.log(authGet);
+
+    const response = await axios.get(
+      'https://api.whitebooks.in/ewaybillapi/v1.03/ewayapi/getewaybill',
+      {
+        params: {
+          email: process.env.email,
+          ewbNo: ewbNo,
+        },
+        headers: {
+          accept: '*/*',
+          ip_address: process.env.IP_ADDRESS,
+          client_id: process.env.client_id,
+          client_secret: process.env.client_secret,
+          gstin: process.env.GSTIN, // 06AADCT6685Q1ZG
+        },
+      }
+    );
+
+  //    const response = await axios.get(
+  //   `https://api.whitebooks.in/ewayapi/GetEwayBill`,
+  //   {
+  //     params: { ewbNo },
+  //     headers: {
+  //       'client-id': 'EWBP42c05bd4-f7a7-456d-b5b2-b043c79d7b74' || process.env.CLIENT_ID,
+  //       'client-secret': 'EWBPba531f90-bae9-420e-9a5b-7f4a87e73f03' || process.env.CLIENT_SECRET,
+  //       'gstin': '06AADCT6685Q1ZG' || process.env.GSTIN,
+  //       'authtoken': process.env.AUTH_TOKEN
+  //     }
+  //   }
+  // );
+
+   console.log(response);
+
+    return response.data;
+  } catch (error) {
+    console.error(
+      'E-Way Bill Fetch Error:',
+      error.response?.data || error.message
+    );
+    throw error;
+  }
+};
+
 const getAllDockets = async () => {
   return db('sss.sst_docket')
-    .select('*');
+    .select('*')
+    .where({record_status : 0});
 };
 
 const getDocketById = async ({ docket_no, docket_loc, docket_date }) => {
   return db('sss.sst_docket')
-    .where({ docket_no, docket_loc, docket_date })
+    .where({ docket_no, docket_loc, docket_date, record_status: 0 })
     .first();
 };
 
 const getDocketDetails = async ({ docket_no, docket_loc, docket_date }) => {
   return db('sss.sst_docket_dtl')
-    .where({ docket_no, docket_loc, docket_date });
+    .where({ docket_no, docket_loc, docket_date, record_status: 0 });
 };
 
 /* ================= CREATE ================= */
@@ -56,7 +124,7 @@ const deleteDocket = async (keys, trx = db) => {
 
   return trx('sss.sst_docket')
     .where(keys)
-    .del();
+    .update({record_status: 1})
 };
 
 module.exports = {
@@ -67,5 +135,6 @@ module.exports = {
   createDocketDetails,
   updateDocket,
   deleteDocket,
-  deleteDocketDetails
+  deleteDocketDetails,
+  getEwaybillDetails
 };

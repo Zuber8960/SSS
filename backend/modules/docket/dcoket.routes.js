@@ -4,6 +4,18 @@ const router = express.Router();
 const DocketController = require('./docket.controller');
 const db = require('../../config/db');
 
+
+
+router.get('/ewayBill', async (req, res) => {
+  try {
+    const { ewbNo } = req.params;
+    const data = await DocketController.getEwaybillDetails(ewbNo);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.get('/', async (req, res) => {
   try {
     const data = await DocketController.getAllDockets();

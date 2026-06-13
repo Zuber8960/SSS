@@ -1,5 +1,6 @@
 import { useState } from "react";
 import MainLayout from "../../layouts/MainLayout";
+import moment from "moment";
 import {
   DataTable,
   FormField,
@@ -9,6 +10,8 @@ import {
 } from "../../components/common/MasterPage";
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
+import { useEffect } from "react";
+import { fetchEwayBill } from "../../utils/docket";
 
 const headerFields = [
   { label: "Docket No", name: "docket_no" },
@@ -107,6 +110,8 @@ export default function DocketPage() {
   const [showEwayBill, setShowEwayBill] = useState(true);
   const [showCharges, setShowCharges] = useState(false);
   const [isDocketNoEnabled, setIsDocketNoEnabled] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   // ✅ Add rows
   const addEwbRow = () => {
@@ -135,6 +140,33 @@ export default function DocketPage() {
     updated[index][field] = value;
     listSetter(updated);
   };
+  useEffect(() => {
+    const loadEwayBill = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const {data} = await fetchEwayBill();
+        console.log(data);
+        setEwbList([
+          ...ewbList,
+          {
+            ewb_no: data.ewbNo,
+            ewb_date: moment(data.ewayBillDate, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
+            ewb_valid: moment(data.validUpto, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
+            inv_no: "",
+            inv_date: ""
+          }
+        ]);
+      } catch (err) {
+        setError(err.message || "Failed to load locations");
+        console.error("Error loading locations:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadEwayBill();
+  }, []);
 
   // ✅ Save
   const handleSave = () => {
