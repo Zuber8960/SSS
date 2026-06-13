@@ -75,13 +75,6 @@ router.delete('/:recId', async (req, res) => {
         const { recId } = req.params;
         const userRecId = req.user.recId;
 
-        if (String(userRecId) !== String(recId)) {
-            return res.status(403).json({
-                success: false,
-                message: 'Unauthorized to delete this location data'
-            });
-        }
-
         const deletedCount = await LocationMasterController.deleteLocationData(recId);
 
         if (!deletedCount) {

@@ -147,7 +147,7 @@ export default function LocationPage() {
 
   const locationActions = [
     { label: "Edit", onClick: editLocation },
-    { label: "Delete", onClick: (row) => deleteLocation(row.loc_code) },
+    { label: "Delete", onClick: (row) => deleteLocation(row.record_id) },
   ];
 
   const [error, setError] = useState("");

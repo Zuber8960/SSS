@@ -47,7 +47,7 @@ module.exports = {
 
     async deleteLocationData(recId) {
         return db('sss.ssm_location')
-            .where({ rec_id: recId })
+            .where({ record_id: recId })
             .del();
     }
 };
