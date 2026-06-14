@@ -181,7 +181,7 @@ export function DataTable({
   }));
 
   return (
-    <div style={{ height: 400, width: "100%" }}>
+    <div className="dataTableWrapper" style={{ width: "100%", marginBottom: 24 }}>
       <DataGrid
         rows={muiRows}
         columns={muiColumns}
