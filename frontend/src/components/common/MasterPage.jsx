@@ -118,7 +118,9 @@ export function DataTable({
       headerName: col.label,
       flex: 1,
       sortable: true,
-      editable,
+      editable: col.editable ?? editable,
+      type: col.options ? "singleSelect" : col.type,
+      valueOptions: col.options,
       headerAlign: "center",
       align: "center",
 
@@ -194,13 +196,19 @@ export function DataTable({
         processRowUpdate={(newRow, oldRow) => {
           if (!editable || !onCellChange) return newRow;
 
+          let updatedRow = newRow;
+
           columns.forEach((col) => {
             if (newRow[col.key] !== oldRow[col.key]) {
-              onCellChange(newRow.id, col.key, newRow[col.key]);
+              const changedRow = onCellChange(newRow.id, col.key, newRow[col.key]);
+
+              if (changedRow) {
+                updatedRow = { ...updatedRow, ...changedRow };
+              }
             }
           });
 
-          return newRow;
+          return updatedRow;
         }}
         onProcessRowUpdateError={(error) => {
           console.error("DataTable edit error:", error);

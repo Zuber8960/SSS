@@ -30,8 +30,7 @@ const headerFields = [
   { label: "No of Others", name: "no_others", type: "number" },
   { label: "Total Packages", name: "tot_pkgs", type: "number" },
 
-  { label: "Rate", name: "rate", type: "number" },
-  { label: "Total Amount", name: "tot_amt", type: "number" },
+  { label: "Rate", name: "rate", type: "number" }, 
 
   { label: "PO Number", name: "po_no" },
   { label: "PO Date", name: "po_date", type: "date" },
@@ -68,11 +67,25 @@ const ewbColumns = [
   { key: "inv_date", label: "Invoice Date" },
 ];
 
-const chargeColumns = [
-  { key: "charge_code", label: "Charge Desc" },
-  { key: "user_code", label: "User Desc" },
-  { key: "charge_amt", label: "Amount" },
+const chargeDescOptions = [
+  "Freight",
+  "Ser charge",
+  "COF",
+  "Freight On Value",
 ];
+
+const chargeColumns = [
+  { key: "charge_code", label: "Charge Desc", options: chargeDescOptions },
+  { key: "user_code", label: "User Desc", type: "number" },
+  { key: "charge_amt", label: "Charge Amount", editable: false },
+];
+
+const chargeDefaults = {
+  Freight: { user_code: 100 },
+  "Ser charge": { user_code: "" },
+  COF: { user_code: 0.003 },
+  "Freight On Value": { user_code: "" },
+};
 
 export default function DocketPage() {
   const { dialog, closeAlert, showSuccess, showError, showInfo, showWarning } = useAlert();
@@ -112,11 +125,37 @@ export default function DocketPage() {
   const [showCharges, setShowCharges] = useState(false);
   const [sectionOrder, setSectionOrder] = useState(["ewayBill", "charges"]);
   const [isDocketNoEnabled, setIsDocketNoEnabled] = useState(false);
+  const [docketNumberInput, setDocketNumberInput] = useState("");
+  const [isFormEditMode, setIsFormEditMode] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
   const moveSectionToTop = (section) => {
     setSectionOrder((prev) => [section, ...prev.filter((item) => item !== section)]);
+  };
+
+  const sectionButtonStyle = {
+    padding: "10px 18px",
+    border: "none",
+    borderRadius: 6,
+    background: "#7e22ce",
+    color: "#ffffff",
+    fontWeight: 600,
+    cursor: "pointer",
+  };
+
+  const sectionHeaderStyle = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
+  };
+
+  const sectionActionsStyle = {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
   };
 
   // ✅ Add rows
@@ -128,7 +167,13 @@ export default function DocketPage() {
   };
 
   const addChargeRow = () => {
-    setChargeList([...chargeList, { charge_code: "", charge_amt: "" }]);
+    setChargeList((prev) => [
+      ...prev,
+      calculateChargeRow(
+        { charge_code: "Freight", ...chargeDefaults.Freight },
+        [...prev, { charge_code: "Freight", ...chargeDefaults.Freight }]
+      ),
+    ]);
   };
 
   // ✅ Delete rows
@@ -137,7 +182,13 @@ export default function DocketPage() {
   };
 
   const deleteCharge = (row) => {
-    setChargeList((prev) => prev.filter((_, index) => index !== row.id));
+    setChargeList((prev) =>
+      recalculateChargeList(prev.filter((_, index) => index !== row.id))
+    );
+  };
+
+  const editCharge = () => {
+    showInfo("Double click a charge cell to edit it.");
   };
 
   // ✅ Edit handlers
@@ -147,76 +198,148 @@ export default function DocketPage() {
     listSetter(updated);
   };
 
+  const toNumber = (value) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
+  };
+
+  const formatAmount = (value) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? Number(number.toFixed(2)) : 0;
+  };
+
+  const calculateFreightAmount = (row) => {
+    return toNumber(row.user_code);
+  };
+
+  const getFreightAmount = (rows) => {
+    const freightRow = rows.find((row) => row.charge_code === "Freight");
+    return freightRow ? calculateFreightAmount(freightRow) : 0;
+  };
+
+  const calculateChargeRow = (row, rows) => {
+    const chargeCode = row.charge_code;
+    const userValue = toNumber(row.user_code);
+    const invoiceValue = toNumber(form.invoice_value);
+    let chargeAmount = 0;
+
+    if (chargeCode === "Freight") {
+      chargeAmount = calculateFreightAmount(row);
+    } else if (chargeCode === "Ser charge") {
+      chargeAmount = (getFreightAmount(rows) * userValue) / 100;
+    } else if (chargeCode === "COF") {
+      chargeAmount = invoiceValue * userValue;
+    } else if (chargeCode === "Freight On Value") {
+      chargeAmount = (invoiceValue * userValue) / 100;
+    }
+
+    return {
+      ...row,
+      charge_amt: formatAmount(chargeAmount),
+    };
+  };
+
+  const recalculateChargeList = (rows) =>
+    rows.map((row) => calculateChargeRow(row, rows));
+
+  const updateChargeRow = (index, field, value) => {
+    const updated = [...chargeList];
+    const existingRow = updated[index] || {};
+    const defaults =
+      field === "charge_code" ? chargeDefaults[value] || {} : {};
+
+    updated[index] = {
+      ...existingRow,
+      ...defaults,
+      [field]: value,
+    };
+
+    const recalculated = recalculateChargeList(updated);
+
+    setChargeList(recalculated);
+
+    return recalculated[index];
+  };
+
   const fetchData = async (ewbLists) => {
     try {
-        setLoading(true);
-        setError("");
-        const {data} = await fetchEwayBill(ewbLists);
-        const ewRecords = data
-          .filter(obj => obj.data)
-          .map(obj => {
-            const f = obj.data;
-            const m = moment(f.docDate, "DD/MM/YYYY", true);
+      setLoading(true);
+      setError("");
+      const { data } = await fetchEwayBill(ewbLists);
+      const ewRecords = data
+        .filter(obj => obj.data)
+        .map(obj => {
+          const f = obj.data;
+          const m = moment(f.docDate, "DD/MM/YYYY", true);
 
-            return {
-              docket_no: f.docNo || "",
-              docket_date: m.isValid() ? m.format("YYYY-MM-DD") : "",
-              docket_loc: f.fromPlace || "",
-              docket_to_loc: f.toPlace || "",
-              remark: f.status_desc || "Shipment is about to complete",
-            };
-          });
-
-        const ewdata = {
-          docket_no: ewRecords.map(x => x.docket_no).filter(Boolean).join(", "),
-          docket_date: ewRecords
-            .map(x => x.docket_date)
-            .filter(Boolean)
-            .sort()
-            .pop() || "", // max date
-          docket_loc: [...new Set(ewRecords.map(x => x.docket_loc).filter(Boolean))].join(", "),
-          docket_to_loc: [...new Set(ewRecords.map(x => x.docket_to_loc).filter(Boolean))].join(", "),
-          act_wt: "",
-          chrg_wt: "",
-          no_cb: 0,
-          no_w_crate: 0,
-          no_w_cbox: 0,
-          no_loose: 0,
-          no_others: 0,
-          tot_pkgs: 0,
-          rate: "",
-          tot_amt: "",
-          po_no: "",
-          po_date: "",
-          invoice_no: "",
-          invoice_date: "",
-          invoice_value: "",
-          goods_grp: "",
-          goods_subgrp: "",
-          goods_desc: "",
-          remark: [...new Set(ewRecords.map(x => x.remark).filter(Boolean))].join(", ")
-        };
-        ewdata && setForm(ewdata);
-        setEwbList(data.map(obj => {
           return {
-            ewb_no: obj.data.ewbNo,
-            ewb_date: moment(obj.data.ewayBillDate, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
-            ewb_valid: moment(obj.data.validUpto, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
-            inv_no: "",
-            inv_date: ""
-          }
-        }));
-      } catch (err) {
-        setError(err.message || "Failed to load locations");
-          showError(err.message || "Failed to load locations");
-        console.error("Error loading locations:", err);
-      } finally {
-        setLoading(false);
-      }
+            docket_no: f.docNo || "",
+            docket_date: m.isValid() ? m.format("YYYY-MM-DD") : "",
+            docket_loc: f.fromPlace || "",
+            docket_to_loc: f.toPlace || "",
+            remark: f.status_desc || "Shipment is about to complete",
+          };
+        });
+
+      const ewdata = {
+        docket_no: ewRecords.map(x => x.docket_no).filter(Boolean).join(", "),
+        docket_date: ewRecords
+          .map(x => x.docket_date)
+          .filter(Boolean)
+          .sort()
+          .pop() || "", // max date
+        docket_loc: [...new Set(ewRecords.map(x => x.docket_loc).filter(Boolean))].join(", "),
+        docket_to_loc: [...new Set(ewRecords.map(x => x.docket_to_loc).filter(Boolean))].join(", "),
+        act_wt: "",
+        chrg_wt: "",
+        no_cb: 0,
+        no_w_crate: 0,
+        no_w_cbox: 0,
+        no_loose: 0,
+        no_others: 0,
+        tot_pkgs: 0,
+        rate: "",
+        tot_amt: "",
+        po_no: "",
+        po_date: "",
+        invoice_no: "",
+        invoice_date: "",
+        invoice_value: "",
+        goods_grp: "",
+        goods_subgrp: "",
+        goods_desc: "",
+        remark: [...new Set(ewRecords.map(x => x.remark).filter(Boolean))].join(", ")
+      };
+      ewdata && setForm(ewdata);
+      setEwbList(data.map(obj => {
+        return {
+          ewb_no: obj.data.ewbNo,
+          ewb_date: moment(obj.data.ewayBillDate, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
+          ewb_valid: moment(obj.data.validUpto, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
+          inv_no: "",
+          inv_date: ""
+        }
+      }));
+    } catch (err) {
+      setError(err.message || "Failed to load locations");
+      showError(err.message || "Failed to load locations");
+      console.error("Error loading locations:", err);
+    } finally {
+      setLoading(false);
+    }
   }
   useEffect(() => {
     // fetchData();
   }, []);
+
+  useEffect(() => {
+    setChargeList((prev) => {
+      const recalculated = recalculateChargeList(prev);
+      return JSON.stringify(recalculated) === JSON.stringify(prev)
+        ? prev
+        : recalculated;
+    });
+  }, [form.rate, form.chrg_wt, form.tot_pkgs, form.invoice_value]);
 
   // ✅ Save
   const handleSave = () => {
@@ -240,21 +363,26 @@ export default function DocketPage() {
     setShowForm((prev) => !prev);
   };
 
+  const handleEditView = () => {
+    const docketNo = docketNumberInput.trim();
+
+    setIsFormEditMode(Boolean(docketNo));
+    setShowForm(true);
+
+    if (docketNo) {
+      setForm((prev) => ({ ...prev, docket_no: docketNo }));
+    }
+  };
+
   return (
     <MainLayout>
       <PageBody title="Docket Entry">
         <PageToolbar
           actions={[
-            { label: "Save", onClick: handleSave },
             {
               label: showForm ? "Hide Form" : "Show Form",
               active: showForm,
               onClick: showFormOnClick,
-            },
-            {
-              label: isDocketNoEnabled ? "Disable Docket No" : "Enable Docket No",
-              active: isDocketNoEnabled,
-              onClick: () => setIsDocketNoEnabled((prev) => !prev),
             },
             {
               label: showEwayBill ? "Hide E-Waybill" : "Show E-Waybill",
@@ -266,9 +394,6 @@ export default function DocketPage() {
                 setShowEwayBill((prev) => !prev);
               },
             },
-            ...(showEwayBill
-              ? [{ label: "Add EWB", onClick: addEwbRow }]
-              : []),
             {
               label: showCharges ? "Hide Charges" : "Show Charges",
               active: showCharges,
@@ -279,9 +404,6 @@ export default function DocketPage() {
                 setShowCharges((prev) => !prev);
               },
             },
-            ...(showCharges
-              ? [{ label: "Add Charge", onClick: addChargeRow }]
-              : []),
           ]}
         />
         {/* ✅ Detail Tables */}
@@ -289,7 +411,25 @@ export default function DocketPage() {
           if (section === "ewayBill" && showEwayBill) {
             return (
               <div key="ewayBill">
-                <h3>EWB Details</h3>
+                <div style={sectionHeaderStyle}>
+                  <h3>EWB Details</h3>
+                  <div style={sectionActionsStyle}>
+                    <button
+                      type="button"
+                      onClick={addEwbRow}
+                      style={sectionButtonStyle}
+                    >
+                      Add EWB
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSave}
+                      style={sectionButtonStyle}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
                 <DataTable
                   columns={ewbColumns}
                   rows={ewbList}
@@ -309,17 +449,36 @@ export default function DocketPage() {
           if (section === "charges" && showCharges) {
             return (
               <div key="charges">
-                <h3>Charges</h3>
+                <div style={sectionHeaderStyle}>
+                  <h3>Charges</h3>
+                  <div style={sectionActionsStyle}>
+                    <button
+                      type="button"
+                      onClick={addChargeRow}
+                      style={sectionButtonStyle}
+                    >
+                      Add Charge
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSave}
+                      style={sectionButtonStyle}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
                 <DataTable
                   columns={chargeColumns}
                   rows={chargeList}
                   getKey={(row, idx) => idx}
                   actions={[
+                    { label: "Edit", onClick: editCharge },
                     { label: "Delete", onClick: deleteCharge },
                   ]}
                   editable
                   onCellChange={(rowIndex, key, value) =>
-                    updateRow(setChargeList, chargeList, rowIndex, key, value)
+                    updateChargeRow(rowIndex, key, value)
                   }
                 />
               </div>
@@ -332,18 +491,64 @@ export default function DocketPage() {
         {/* ✅ Header Form */}
         {showForm && (
           <>
-          <h3>FORM</h3>
-          <FormPanel>
-            {headerFields.map((field) => (
-              <FormField
-                key={field.name}
-                {...field}
-                form={form}
-                setForm={setForm}
-                disabled={field.name === "docket_no" && !isDocketNoEnabled}
-              />
-            ))}
-          </FormPanel>
+            <div style={sectionHeaderStyle}>
+              <h3>FORM</h3>
+              <div style={sectionActionsStyle}>
+                <div className="formFieldGroup" style={{ minWidth: 260 }}>
+                  <input
+                    type="number"
+                    value={form.tot_amt}
+                    onChange={(e) => setForm({ ...form, tot_amt: parseFloat(e.target.value) || 0 })}
+                    placeholder="Total Amount"
+                    disabled={true}
+                  />
+                </div>
+                
+                <div className="formFieldGroup" style={{ minWidth: 260 }}>
+                  <input
+                    type="text"
+                    value={docketNumberInput}
+                    onChange={(e) => setDocketNumberInput(e.target.value)}
+                    placeholder="Enter Docket Num"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleEditView}
+                  style={sectionButtonStyle}
+                >
+                  Edit/View
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsDocketNoEnabled((prev) => !prev)}
+                  style={sectionButtonStyle}
+                >
+                  {isDocketNoEnabled ? "Disable Docket No" : "Enable Docket No"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  style={sectionButtonStyle}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+            <FormPanel>
+              {headerFields.map((field) => (
+                <FormField
+                  key={field.name}
+                  {...field}
+                  form={form}
+                  setForm={setForm}
+                  disabled={
+                    !isFormEditMode ||
+                    (field.name === "docket_no" && !isDocketNoEnabled)
+                  }
+                />
+              ))}
+            </FormPanel>
           </>
         )}
 
