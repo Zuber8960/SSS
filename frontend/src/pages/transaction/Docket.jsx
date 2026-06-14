@@ -4,7 +4,6 @@ import moment from "moment";
 import {
   DataTable,
   FormField,
-  FormPanel,
   PageBody,
   PageToolbar,
 } from "../../components/common/MasterPage";
@@ -30,7 +29,18 @@ const headerFields = [
   { label: "No of Others", name: "no_others", type: "number" },
   { label: "Total Packages", name: "tot_pkgs", type: "number" },
 
-  { label: "Rate", name: "rate", type: "number" }, 
+  { label: "Rate", name: "rate", type: "number" },
+  {
+    label: "Rate UOM",
+    name: "rate_uom",
+    options: [
+      { label: "Fixed", value: "Fixed" },
+      { label: "Per Trip", value: "Per Trip" },
+      { label: "Per KG", value: "Per KG" },
+      { label: "Per Unit", value: "Per Unit" },
+      { label: "Per Tone", value: "Per Tone" },
+    ],
+  },
 
   { label: "PO Number", name: "po_no" },
   { label: "PO Date", name: "po_date", type: "date" },
@@ -38,6 +48,22 @@ const headerFields = [
   { label: "Invoice No", name: "invoice_no" },
   { label: "Invoice Date", name: "invoice_date", type: "date" },
   { label: "Invoice Value", name: "invoice_value", type: "number" },
+
+  {
+    label: "RISK",
+    name: "risk",
+    options: [
+      { label: "Insured by Transporter", value: "Insured by Transporter" },
+      { label: "Insured by Customer", value: "Insured by Customer" },
+      { label: "Not Insured", value: "Not Insured" },
+    ],
+  },
+
+  { label: "Insurance Company", name: "insurance_company" },
+  { label: "Insurance Policy No.", name: "insurance_policy_no" },
+  { label: "Ins. Certificate No.", name: "insurance_cert_no" },
+  { label: "Sum Insured", name: "sum_insured", type: "number" },
+  { label: "Valid Upto", name: "valid_upto", type: "date" },
 
   {
     label: "Goods Group",
@@ -57,6 +83,61 @@ const headerFields = [
   },
   { label: "Goods Description", name: "goods_desc" },
   { label: "Remarks", name: "remark", type: "textarea" },
+];
+
+// Group fields into logical sections
+const formSections = [
+  {
+    title: "Docket Information",
+    icon: "📋",
+    fields: ["docket_no", "docket_date", "docket_loc", "docket_to_loc"],
+  },
+  {
+    title: "Package Details",
+    icon: "📦",
+    fields: [
+      "act_wt",
+      "chrg_wt",
+      "no_cb",
+      "no_w_crate",
+      "no_w_cbox",
+      "no_loose",
+      "no_others",
+      "tot_pkgs",
+    ],
+  },
+  {
+    title: "Rate & Charges",
+    icon: "💰",
+    fields: ["rate", "rate_uom"],
+  },
+  {
+    title: "PO & Invoice",
+    icon: "📄",
+    fields: ["po_no", "po_date", "invoice_no", "invoice_date", "invoice_value"],
+  },
+  {
+    title: "Insurance Details",
+    icon: "🛡️",
+    fields: [
+      "risk",
+      "insurance_company",
+      "insurance_policy_no",
+      "insurance_cert_no",
+      "sum_insured",
+      "valid_upto",
+    ],
+  },
+  {
+    title: "Goods Details",
+    icon: "🏷️",
+    fields: ["goods_grp", "goods_subgrp", "goods_desc"],
+  },
+  {
+    title: "Remarks",
+    icon: "💬",
+    fields: ["remark"],
+  },
 ];
 
 const ewbColumns = [
@@ -106,12 +187,19 @@ export default function DocketPage() {
     no_others: 0,
     tot_pkgs: 0,
     rate: "",
+    rate_uom: "",
     tot_amt: "",
     po_no: "",
     po_date: "",
     invoice_no: "",
     invoice_date: "",
     invoice_value: "",
+    risk: "",
+    insurance_company: "",
+    insurance_policy_no: "",
+    insurance_cert_no: "",
+    sum_insured: "",
+    valid_upto: "",
     goods_grp: "",
     goods_subgrp: "",
     goods_desc: "",
@@ -135,7 +223,7 @@ export default function DocketPage() {
   };
 
   const sectionButtonStyle = {
-    padding: "10px 18px",
+    padding: "8px 18px",
     border: "none",
     borderRadius: 6,
     background: "#7e22ce",
@@ -299,6 +387,7 @@ export default function DocketPage() {
         no_others: 0,
         tot_pkgs: 0,
         rate: "",
+        rate_uom: "",
         tot_amt: "",
         po_no: "",
         po_date: "",
@@ -372,6 +461,114 @@ export default function DocketPage() {
     if (docketNo) {
       setForm((prev) => ({ ...prev, docket_no: docketNo }));
     }
+  };
+
+  // Build a lookup map from field name to field config
+  const fieldMap = {};
+  headerFields.forEach((f) => {
+    fieldMap[f.name] = f;
+  });
+
+  // Section card styles
+  const sectionCardStyles = {
+    sectionCard: {
+      background: "#fffefe",
+      borderRadius: 12,
+      border: "1px solid #e9e5f0",
+      boxShadow: "0 2px 12px rgba(126, 34, 206, 0.06)",
+      overflow: "hidden",
+      marginBottom: 0,
+      transition: "box-shadow 0.2s ease",
+    },
+    sectionHeader: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "14px 20px",
+      background: "linear-gradient(135deg, #f6f3ff 0%, #f0ecf9 100%)",
+      borderBottom: "1px solid #e9e5f0",
+    },
+    sectionIcon: {
+      fontSize: 18,
+      lineHeight: 1,
+    },
+    sectionTitle: {
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#4a3466",
+      textTransform: "uppercase",
+      letterSpacing: 0.1,
+      margin: 0,
+    },
+    sectionFields: {
+      padding: "18px 20px",
+      display: "grid",
+      gap: 16,
+      gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+    },
+    fullWidthField: {
+      gridColumn: "1 / -1",
+    },
+  };
+
+  // Render a single form section card
+  const renderFormSection = (section) => {
+    const sectionFieldConfigs = section.fields
+      .map((name) => fieldMap[name])
+      .filter(Boolean);
+
+    if (sectionFieldConfigs.length === 0) return null;
+
+    const insuranceFields = [
+      "insurance_company",
+      "insurance_policy_no",
+      "insurance_cert_no",
+      "sum_insured",
+      "valid_upto",
+    ];
+
+    // For insurance section, filter out fields that depend on risk === "Insured by Customer"
+    const filteredFields =
+      section.title === "Insurance Details"
+        ? sectionFieldConfigs.filter((f) => {
+            if (insuranceFields.includes(f.name)) {
+              return form.risk === "Insured by Customer";
+            }
+            return true;
+          })
+        : sectionFieldConfigs;
+
+    if (filteredFields.length === 0) return null;
+
+    return (
+      <div key={section.title} style={sectionCardStyles.sectionCard}>
+        <div style={sectionCardStyles.sectionHeader}>
+          <span style={sectionCardStyles.sectionIcon}>{section.icon}</span>
+          <h4 style={sectionCardStyles.sectionTitle}>{section.title}</h4>
+        </div>
+        <div style={sectionCardStyles.sectionFields}>
+          {filteredFields.map((field) => {
+            const isTextarea = field.type === "textarea";
+            return (
+              <div
+                key={field.name}
+                style={isTextarea ? sectionCardStyles.fullWidthField : undefined}
+              >
+                <FormField
+                  {...field}
+                  form={form}
+                  setForm={setForm}
+                  disabled={
+                    !isFormEditMode ||
+                    (field.name === "docket_no" && !isDocketNoEnabled)
+                  }
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -494,22 +691,24 @@ export default function DocketPage() {
             <div style={sectionHeaderStyle}>
               <h3>FORM</h3>
               <div style={sectionActionsStyle}>
-                <div className="formFieldGroup" style={{ minWidth: 260 }}>
+                <div className="formFieldGroup" style={{ minWidth: 150 }}>
                   <input
                     type="number"
                     value={form.tot_amt}
                     onChange={(e) => setForm({ ...form, tot_amt: parseFloat(e.target.value) || 0 })}
                     placeholder="Total Amount"
                     disabled={true}
+                    style={{ padding: "9px 14px", fontSize: 14 }}
                   />
                 </div>
                 
-                <div className="formFieldGroup" style={{ minWidth: 260 }}>
+                <div className="formFieldGroup" style={{ minWidth: 150 }}>
                   <input
                     type="text"
                     value={docketNumberInput}
                     onChange={(e) => setDocketNumberInput(e.target.value)}
                     placeholder="Enter Docket Num"
+                    style={{ padding: "9px 14px", fontSize: 14 }}
                   />
                 </div>
                 <button
@@ -535,20 +734,17 @@ export default function DocketPage() {
                 </button>
               </div>
             </div>
-            <FormPanel>
-              {headerFields.map((field) => (
-                <FormField
-                  key={field.name}
-                  {...field}
-                  form={form}
-                  setForm={setForm}
-                  disabled={
-                    !isFormEditMode ||
-                    (field.name === "docket_no" && !isDocketNoEnabled)
-                  }
-                />
-              ))}
-            </FormPanel>
+            <div
+              style={{
+                background: "#f8f6ff",
+                borderRadius: 14,
+                border: "1px solid #e9e5f0",
+                padding: "0 1px",
+                boxShadow: "0 2px 12px rgba(126, 34, 206, 0.06)",
+              }}
+            >
+              {formSections.map((section) => renderFormSection(section))}
+            </div>
           </>
         )}
 
