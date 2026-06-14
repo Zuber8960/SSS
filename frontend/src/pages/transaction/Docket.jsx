@@ -18,8 +18,8 @@ const headerFields = [
   { label: "Docket Date", name: "docket_date", type: "date" },
   { label: "From Location", name: "docket_loc" },
   { label: "To Location", name: "docket_to_loc" },
-  { label: "Consignor", name: "cnor" },
-  { label: "Consignee", name: "cnee" },
+  // { label: "Consignor", name: "cnor" },
+  // { label: "Consignee", name: "cnee" },
   { label: "Actual Weight", name: "act_wt", type: "number" },
   { label: "Charge Weight", name: "chrg_wt", type: "number" },
 
@@ -74,15 +74,15 @@ const chargeColumns = [
 ];
 
 export default function DocketPage() {
-  const { dialog, closeAlert, showSuccess } = useAlert();
+  const { dialog, closeAlert, showSuccess, showError, showInfo, showWarning } = useAlert();
 
   const [form, setForm] = useState({
     docket_no: "",
     docket_date: "",
     docket_loc: "",
     docket_to_loc: "",
-    cnor: "",
-    cnee: "",
+    // cnor: "",
+    // cnee: "",
     act_wt: "",
     chrg_wt: "",
     no_cb: 0,
@@ -140,32 +140,76 @@ export default function DocketPage() {
     updated[index][field] = value;
     listSetter(updated);
   };
-  useEffect(() => {
-    const loadEwayBill = async () => {
-      try {
+
+  const fetchData = async (ewbLists) => {
+    try {
         setLoading(true);
         setError("");
-        const {data} = await fetchEwayBill();
-        console.log(data);
-        setEwbList([
-          ...ewbList,
-          {
-            ewb_no: data.ewbNo,
-            ewb_date: moment(data.ewayBillDate, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
-            ewb_valid: moment(data.validUpto, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
+        const {data} = await fetchEwayBill(ewbLists);
+        const ewRecords = data
+          .filter(obj => obj.data)
+          .map(obj => {
+            const f = obj.data;
+            const m = moment(f.docDate, "DD/MM/YYYY", true);
+
+            return {
+              docket_no: f.docNo || "",
+              docket_date: m.isValid() ? m.format("YYYY-MM-DD") : "",
+              docket_loc: f.fromPlace || "",
+              docket_to_loc: f.toPlace || "",
+              remark: f.status_desc || "Shipment is about to complete",
+            };
+          });
+
+        const ewdata = {
+          docket_no: ewRecords.map(x => x.docket_no).filter(Boolean).join(", "),
+          docket_date: ewRecords
+            .map(x => x.docket_date)
+            .filter(Boolean)
+            .sort()
+            .pop() || "", // max date
+          docket_loc: [...new Set(ewRecords.map(x => x.docket_loc).filter(Boolean))].join(", "),
+          docket_to_loc: [...new Set(ewRecords.map(x => x.docket_to_loc).filter(Boolean))].join(", "),
+          act_wt: "",
+          chrg_wt: "",
+          no_cb: 0,
+          no_w_crate: 0,
+          no_w_cbox: 0,
+          no_loose: 0,
+          no_others: 0,
+          tot_pkgs: 0,
+          rate: "",
+          tot_amt: "",
+          po_no: "",
+          po_date: "",
+          invoice_no: "",
+          invoice_date: "",
+          invoice_value: "",
+          goods_grp: "",
+          goods_subgrp: "",
+          goods_desc: "",
+          remark: [...new Set(ewRecords.map(x => x.remark).filter(Boolean))].join(", ")
+        };
+        ewdata && setForm(ewdata);
+        setEwbList(data.map(obj => {
+          return {
+            ewb_no: obj.data.ewbNo,
+            ewb_date: moment(obj.data.ewayBillDate, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
+            ewb_valid: moment(obj.data.validUpto, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
             inv_no: "",
             inv_date: ""
           }
-        ]);
+        }));
       } catch (err) {
         setError(err.message || "Failed to load locations");
+          showError(err.message || "Failed to load locations");
         console.error("Error loading locations:", err);
       } finally {
         setLoading(false);
       }
-    };
-
-    loadEwayBill();
+  }
+  useEffect(() => {
+    // fetchData();
   }, []);
 
   // ✅ Save
@@ -180,6 +224,16 @@ export default function DocketPage() {
     showSuccess("Docket saved successfully (console log)");
   };
 
+
+  const showFormOnClick = async (e) => {
+    if (e.target.classList.contains('active') === false) {
+      console.log(ewbList);
+      const ewbLists = [...new Set(ewbList.filter(obj => obj.ewb_no).map(obj => obj.ewb_no))].map(Number);
+      await fetchData(ewbLists);
+    }
+    setShowForm((prev) => !prev);
+  };
+
   return (
     <MainLayout>
       <PageBody title="Docket Entry">
@@ -189,7 +243,7 @@ export default function DocketPage() {
             {
               label: showForm ? "Hide Form" : "Show Form",
               active: showForm,
-              onClick: () => setShowForm((prev) => !prev),
+              onClick: showFormOnClick,
             },
             {
               label: isDocketNoEnabled ? "Disable Docket No" : "Enable Docket No",

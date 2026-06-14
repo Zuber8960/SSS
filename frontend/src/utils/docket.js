@@ -4,9 +4,9 @@ import { getAuthHeader } from './authService';
 /**
  * Get all users
  */
-export const fetchEwayBill = async () => {
+export const fetchEwayBill = async (ewbLists) => {
   try {
-    const response = await fetch(`${API_URL}/docket/ewayBill`, {
+    const response = await fetch(`${API_URL}/docket/ewbDetails/${encodeURIComponent(ewbLists)}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -16,11 +16,11 @@ export const fetchEwayBill = async () => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to fetch users');
+      throw new Error(errorData.message || 'Failed to fetch Docket');
     }
 
     const data = await response.json();
-    return data.data || [];
+    return data?.length ? data.data : data ||  [];
   } catch (error) {
     console.error('Fetch users error:', error);
     throw error;

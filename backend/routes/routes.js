@@ -8,6 +8,7 @@ const locationMasterRoutes = require("../modules/locationMaster/locationMaster.r
 const companyMasterRoutes = require("../modules/companyMaster/companyMaster.routes");
 const docketRoutes = require("../modules/docket/dcoket.routes");
 const UserController = require('../modules/userMaster/user.controller');
+const axios = require('axios');
 
 router.post('/login', async (req, res) => {
   try {
@@ -37,6 +38,27 @@ router.post('/login', async (req, res) => {
         secret,
         { expiresIn: '24h' }
       );
+
+      
+    const authGet = await axios.get(
+      'https://api.whitebooks.in/ewaybillapi/v1.03/ewayapi/getewaybill',
+      {
+        params: {
+          email: process.env.email,
+          username: process.env.username,
+          password: process.env.password,
+        },
+        headers: {
+          accept: '*/*',
+          ip_address: process.env.IP_ADDRESS,
+          client_id: process.env.client_id,
+          client_secret: process.env.client_secret,
+          gstin: process.env.GSTIN,
+        },
+      }
+    );
+
+    console.log(authGet);
 
       return res.status(200).json({
         success: true,

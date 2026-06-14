@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const DocketController = require('./docket.controller');
 const db = require('../../config/db');
-
+const ewb = require('../../config/ewb');
 
 
 router.get('/ewayBill', async (req, res) => {
@@ -11,6 +11,25 @@ router.get('/ewayBill', async (req, res) => {
     const { ewbNo } = req.params;
     const data = await DocketController.getEwaybillDetails(ewbNo);
     res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/ewbDetails/:ewbLists', async (req, res) => {
+  try {
+    const ewbLists = req.params.ewbLists?.split(',').map(Number);
+    let data = await DocketController.getListEwayDetails(ewbLists); 
+    if (data.find(d => d.data)) {
+      return res.status(200).json({
+        success: true,
+        data: data
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      data: ewb.ewb_dummy_data
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
