@@ -69,7 +69,8 @@ const ewbColumns = [
 ];
 
 const chargeColumns = [
-  { key: "charge_code", label: "Charge Code" },
+  { key: "charge_code", label: "Charge Desc" },
+  { key: "user_code", label: "User Desc" },
   { key: "charge_amt", label: "Amount" },
 ];
 
@@ -109,9 +110,14 @@ export default function DocketPage() {
   const [showForm, setShowForm] = useState(false);
   const [showEwayBill, setShowEwayBill] = useState(true);
   const [showCharges, setShowCharges] = useState(false);
+  const [sectionOrder, setSectionOrder] = useState(["ewayBill", "charges"]);
   const [isDocketNoEnabled, setIsDocketNoEnabled] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+
+  const moveSectionToTop = (section) => {
+    setSectionOrder((prev) => [section, ...prev.filter((item) => item !== section)]);
+  };
 
   // ✅ Add rows
   const addEwbRow = () => {
@@ -253,7 +259,12 @@ export default function DocketPage() {
             {
               label: showEwayBill ? "Hide E-Waybill" : "Show E-Waybill",
               active: showEwayBill,
-              onClick: () => setShowEwayBill((prev) => !prev),
+              onClick: () => {
+                if (!showEwayBill) {
+                  moveSectionToTop("ewayBill");
+                }
+                setShowEwayBill((prev) => !prev);
+              },
             },
             ...(showEwayBill
               ? [{ label: "Add EWB", onClick: addEwbRow }]
@@ -261,31 +272,62 @@ export default function DocketPage() {
             {
               label: showCharges ? "Hide Charges" : "Show Charges",
               active: showCharges,
-              onClick: () => setShowCharges((prev) => !prev),
+              onClick: () => {
+                if (!showCharges) {
+                  moveSectionToTop("charges");
+                }
+                setShowCharges((prev) => !prev);
+              },
             },
             ...(showCharges
               ? [{ label: "Add Charge", onClick: addChargeRow }]
               : []),
           ]}
         />
-         {/* ✅ EWB Table */}
-        {showEwayBill && (
-          <>
-            <h3>EWB Details</h3>
-            <DataTable
-              columns={ewbColumns}
-              rows={ewbList}
-              getKey={(row, idx) => idx}
-              actions={[
-                { label: "Delete", onClick: deleteEwb },
-              ]}
-              editable
-              onCellChange={(rowIndex, key, value) =>
-                updateRow(setEwbList, ewbList, rowIndex, key, value)
-              }
-            />
-          </>
-        )}
+        {/* ✅ Detail Tables */}
+        {sectionOrder.map((section) => {
+          if (section === "ewayBill" && showEwayBill) {
+            return (
+              <div key="ewayBill">
+                <h3>EWB Details</h3>
+                <DataTable
+                  columns={ewbColumns}
+                  rows={ewbList}
+                  getKey={(row, idx) => idx}
+                  actions={[
+                    { label: "Delete", onClick: deleteEwb },
+                  ]}
+                  editable
+                  onCellChange={(rowIndex, key, value) =>
+                    updateRow(setEwbList, ewbList, rowIndex, key, value)
+                  }
+                />
+              </div>
+            );
+          }
+
+          if (section === "charges" && showCharges) {
+            return (
+              <div key="charges">
+                <h3>Charges</h3>
+                <DataTable
+                  columns={chargeColumns}
+                  rows={chargeList}
+                  getKey={(row, idx) => idx}
+                  actions={[
+                    { label: "Delete", onClick: deleteCharge },
+                  ]}
+                  editable
+                  onCellChange={(rowIndex, key, value) =>
+                    updateRow(setChargeList, chargeList, rowIndex, key, value)
+                  }
+                />
+              </div>
+            );
+          }
+
+          return null;
+        })}
 
         {/* ✅ Header Form */}
         {showForm && (
@@ -302,27 +344,6 @@ export default function DocketPage() {
               />
             ))}
           </FormPanel>
-          </>
-        )}
-
-       
-
-        {/* ✅ Charges Table */}
-        {showCharges && (
-          <>
-            <h3>Charges</h3>
-            <DataTable
-              columns={chargeColumns}
-              rows={chargeList}
-              getKey={(row, idx) => idx}
-              actions={[
-                { label: "Delete", onClick: deleteCharge },
-              ]}
-              editable
-              onCellChange={(rowIndex, key, value) =>
-                updateRow(setChargeList, chargeList, rowIndex, key, value)
-              }
-            />
           </>
         )}
 
