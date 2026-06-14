@@ -69,6 +69,78 @@ const getEwaybillDetails = async (ewbNo=process.env.ewbNo) => {
   }
 };
 
+
+
+const getListEwayDetails = async (ewbLists) => {
+  try {
+    // const authGet = await axios.get(
+    //   'https://api.whitebooks.in/ewaybillapi/v1.03/ewayapi/getewaybill',
+    //   {
+    //     params: {
+    //       email: process.env.email,
+    //       username: process.env.username,
+    //       password: process.env.password,
+    //     },
+    //     headers: {
+    //       accept: '*/*',
+    //       ip_address: process.env.IP_ADDRESS,
+    //       client_id: process.env.client_id,
+    //       client_secret: process.env.client_secret,
+    //       gstin: process.env.GSTIN,
+    //     },
+    //   }
+    // );
+
+    // console.log(authGet);
+    console.log(ewbLists);
+    const responses = await Promise.all(
+      ewbLists.map((ewbNo) =>
+        axios.get(
+          'https://api.whitebooks.in/ewaybillapi/v1.03/ewayapi/getewaybill',
+          {
+            params: {
+              email: process.env.email,
+              ewbNo,
+            },
+            headers: {
+              accept: '*/*',
+              ip_address: process.env.IP_ADDRESS,
+              client_id: process.env.client_id,
+              client_secret: process.env.client_secret,
+              gstin: process.env.GSTIN,
+            },
+          }
+        )
+      )
+    );
+
+    const result = responses.map(obj => obj.data);
+
+    return result;
+
+
+  //    const response = await axios.get(
+  //   `https://api.whitebooks.in/ewayapi/GetEwayBill`,
+  //   {
+  //     params: { ewbNo },
+  //     headers: {
+  //       'client-id': 'EWBP42c05bd4-f7a7-456d-b5b2-b043c79d7b74' || process.env.CLIENT_ID,
+  //       'client-secret': 'EWBPba531f90-bae9-420e-9a5b-7f4a87e73f03' || process.env.CLIENT_SECRET,
+  //       'gstin': '06AADCT6685Q1ZG' || process.env.GSTIN,
+  //       'authtoken': process.env.AUTH_TOKEN
+  //     }
+  //   }
+  // );
+
+  } catch (error) {
+    console.error(
+      'E-Way Bill Fetch Error:',
+      error.response?.data || error.message
+    );
+    throw error;
+  }
+};
+
 const getAllDockets = async () => {
   return db('sss.sst_docket')
     .select('*')
@@ -136,5 +208,6 @@ module.exports = {
   updateDocket,
   deleteDocket,
   deleteDocketDetails,
-  getEwaybillDetails
+  getEwaybillDetails,
+  getListEwayDetails
 };
