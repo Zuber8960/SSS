@@ -2,7 +2,6 @@ import { useState } from "react";
 import MainLayout from "../../layouts/MainLayout";
 import moment from "moment";
 import {
-  DataTable,
   FormField,
   PageBody,
   PageToolbar,
@@ -11,6 +10,8 @@ import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import { useEffect } from "react";
 import { fetchEwayBill } from "../../utils/docket";
+import ChargesSection from "./docket/ChargesSection";
+import EwayBillSection from "./docket/EwayBillSection";
 
 const headerFields = [
   { label: "Docket No", name: "docket_no" },
@@ -140,34 +141,6 @@ const formSections = [
   },
 ];
 
-const ewbColumns = [
-  { key: "ewb_no", label: "EWB No" },
-  { key: "ewb_date", label: "EWB Date" },
-  { key: "ewb_valid", label: "Valid Upto" },
-  { key: "inv_no", label: "Invoice No" },
-  { key: "inv_date", label: "Invoice Date" },
-];
-
-const chargeDescOptions = [
-  "Freight",
-  "Ser charge",
-  "COF",
-  "Freight On Value",
-];
-
-const chargeColumns = [
-  { key: "charge_code", label: "Charge Desc", options: chargeDescOptions },
-  { key: "user_code", label: "User Desc", type: "number" },
-  { key: "charge_amt", label: "Charge Amount", editable: false },
-];
-
-const chargeDefaults = {
-  Freight: { user_code: 100 },
-  "Ser charge": { user_code: "" },
-  COF: { user_code: 0.003 },
-  "Freight On Value": { user_code: "" },
-};
-
 export default function DocketPage() {
   const { dialog, closeAlert, showSuccess, showError, showInfo, showWarning } = useAlert();
 
@@ -217,6 +190,7 @@ export default function DocketPage() {
   const [isFormEditMode, setIsFormEditMode] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [docketId, setDocketId] = useState(null);
 
   const moveSectionToTop = (section) => {
     setSectionOrder((prev) => [section, ...prev.filter((item) => item !== section)]);
@@ -254,29 +228,9 @@ export default function DocketPage() {
     ]);
   };
 
-  const addChargeRow = () => {
-    setChargeList((prev) => [
-      ...prev,
-      calculateChargeRow(
-        { charge_code: "Freight", ...chargeDefaults.Freight },
-        [...prev, { charge_code: "Freight", ...chargeDefaults.Freight }]
-      ),
-    ]);
-  };
-
   // ✅ Delete rows
   const deleteEwb = (row) => {
     setEwbList((prev) => prev.filter((_, index) => index !== row.id));
-  };
-
-  const deleteCharge = (row) => {
-    setChargeList((prev) =>
-      recalculateChargeList(prev.filter((_, index) => index !== row.id))
-    );
-  };
-
-  const editCharge = () => {
-    showInfo("Double click a charge cell to edit it.");
   };
 
   // ✅ Edit handlers
@@ -284,69 +238,6 @@ export default function DocketPage() {
     const updated = [...list];
     updated[index][field] = value;
     listSetter(updated);
-  };
-
-  const toNumber = (value) => {
-    const number = Number(value);
-    return Number.isFinite(number) ? number : 0;
-  };
-
-  const formatAmount = (value) => {
-    const number = Number(value);
-    return Number.isFinite(number) ? Number(number.toFixed(2)) : 0;
-  };
-
-  const calculateFreightAmount = (row) => {
-    return toNumber(row.user_code);
-  };
-
-  const getFreightAmount = (rows) => {
-    const freightRow = rows.find((row) => row.charge_code === "Freight");
-    return freightRow ? calculateFreightAmount(freightRow) : 0;
-  };
-
-  const calculateChargeRow = (row, rows) => {
-    const chargeCode = row.charge_code;
-    const userValue = toNumber(row.user_code);
-    const invoiceValue = toNumber(form.invoice_value);
-    let chargeAmount = 0;
-
-    if (chargeCode === "Freight") {
-      chargeAmount = calculateFreightAmount(row);
-    } else if (chargeCode === "Ser charge") {
-      chargeAmount = (getFreightAmount(rows) * userValue) / 100;
-    } else if (chargeCode === "COF") {
-      chargeAmount = invoiceValue * userValue;
-    } else if (chargeCode === "Freight On Value") {
-      chargeAmount = (invoiceValue * userValue) / 100;
-    }
-
-    return {
-      ...row,
-      charge_amt: formatAmount(chargeAmount),
-    };
-  };
-
-  const recalculateChargeList = (rows) =>
-    rows.map((row) => calculateChargeRow(row, rows));
-
-  const updateChargeRow = (index, field, value) => {
-    const updated = [...chargeList];
-    const existingRow = updated[index] || {};
-    const defaults =
-      field === "charge_code" ? chargeDefaults[value] || {} : {};
-
-    updated[index] = {
-      ...existingRow,
-      ...defaults,
-      [field]: value,
-    };
-
-    const recalculated = recalculateChargeList(updated);
-
-    setChargeList(recalculated);
-
-    return recalculated[index];
   };
 
   const fetchData = async (ewbLists) => {
@@ -375,7 +266,7 @@ export default function DocketPage() {
           .map(x => x.docket_date)
           .filter(Boolean)
           .sort()
-          .pop() || "", // max date
+          .pop() || "",
         docket_loc: [...new Set(ewRecords.map(x => x.docket_loc).filter(Boolean))].join(", "),
         docket_to_loc: [...new Set(ewRecords.map(x => x.docket_to_loc).filter(Boolean))].join(", "),
         act_wt: "",
@@ -417,31 +308,10 @@ export default function DocketPage() {
       setLoading(false);
     }
   }
+
   useEffect(() => {
     // fetchData();
   }, []);
-
-  useEffect(() => {
-    setChargeList((prev) => {
-      const recalculated = recalculateChargeList(prev);
-      return JSON.stringify(recalculated) === JSON.stringify(prev)
-        ? prev
-        : recalculated;
-    });
-  }, [form.rate, form.chrg_wt, form.tot_pkgs, form.invoice_value]);
-
-  // ✅ Save
-  const handleSave = () => {
-    const payload = {
-      header: form,
-      ewbDetails: ewbList,
-      charges: chargeList,
-    };
-
-    console.log("SAVE DATA:", payload);
-    showSuccess("Docket saved successfully (console log)");
-  };
-
 
   const showFormOnClick = async (e) => {
     if (e.target.classList.contains('active') === false) {
@@ -452,7 +322,13 @@ export default function DocketPage() {
     setShowForm((prev) => !prev);
   };
 
-  const handleEditView = () => {
+  // Placeholder save for Form section
+  const handleFormSave = () => {
+    console.log("Save Form Data:", { form, ewbList, chargeList });
+    showSuccess("Form saved successfully (console log)");
+  };
+
+  const handleEditView = async () => {
     const docketNo = docketNumberInput.trim();
 
     setIsFormEditMode(Boolean(docketNo));
@@ -460,7 +336,13 @@ export default function DocketPage() {
 
     if (docketNo) {
       setForm((prev) => ({ ...prev, docket_no: docketNo }));
+      setDocketId(docketNo);
+      // setShowCharges(true);
     }
+  };
+
+  const handleChargesChange = (charges) => {
+    setChargeList(charges);
   };
 
   // Build a lookup map from field name to field config
@@ -527,7 +409,6 @@ export default function DocketPage() {
       "valid_upto",
     ];
 
-    // For insurance section, filter out fields that depend on risk === "Insured by Customer"
     const filteredFields =
       section.title === "Insurance Details"
         ? sectionFieldConfigs.filter((f) => {
@@ -607,78 +488,32 @@ export default function DocketPage() {
         {sectionOrder.map((section) => {
           if (section === "ewayBill" && showEwayBill) {
             return (
-              <div key="ewayBill">
-                <div style={sectionHeaderStyle}>
-                  <h3>EWB Details</h3>
-                  <div style={sectionActionsStyle}>
-                    <button
-                      type="button"
-                      onClick={addEwbRow}
-                      style={sectionButtonStyle}
-                    >
-                      Add EWB
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSave}
-                      style={sectionButtonStyle}
-                    >
-                      Save
-                    </button>
-                  </div>
-                </div>
-                <DataTable
-                  columns={ewbColumns}
-                  rows={ewbList}
-                  getKey={(row, idx) => idx}
-                  actions={[
-                    { label: "Delete", onClick: deleteEwb },
-                  ]}
-                  editable
-                  onCellChange={(rowIndex, key, value) =>
-                    updateRow(setEwbList, ewbList, rowIndex, key, value)
-                  }
-                />
-              </div>
+              <EwayBillSection
+                key="ewayBill"
+                ewbList={ewbList}
+                onAdd={addEwbRow}
+                onDelete={deleteEwb}
+                onCellChange={(rowIndex, key, value) =>
+                  updateRow(setEwbList, ewbList, rowIndex, key, value)
+                }
+                buttonStyle={sectionButtonStyle}
+                sectionHeaderStyle={sectionHeaderStyle}
+                sectionActionsStyle={sectionActionsStyle}
+              />
             );
           }
 
           if (section === "charges" && showCharges) {
             return (
-              <div key="charges">
-                <div style={sectionHeaderStyle}>
-                  <h3>Charges</h3>
-                  <div style={sectionActionsStyle}>
-                    <button
-                      type="button"
-                      onClick={addChargeRow}
-                      style={sectionButtonStyle}
-                    >
-                      Add Charge
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSave}
-                      style={sectionButtonStyle}
-                    >
-                      Save
-                    </button>
-                  </div>
-                </div>
-                <DataTable
-                  columns={chargeColumns}
-                  rows={chargeList}
-                  getKey={(row, idx) => idx}
-                  actions={[
-                    { label: "Edit", onClick: editCharge },
-                    { label: "Delete", onClick: deleteCharge },
-                  ]}
-                  editable
-                  onCellChange={(rowIndex, key, value) =>
-                    updateChargeRow(rowIndex, key, value)
-                  }
-                />
-              </div>
+              <ChargesSection
+                key="charges"
+                docketId={docketId}
+                invoiceValue={form.invoice_value}
+                onChargesChange={handleChargesChange}
+                buttonStyle={sectionButtonStyle}
+                sectionHeaderStyle={sectionHeaderStyle}
+                sectionActionsStyle={sectionActionsStyle}
+              />
             );
           }
 
@@ -701,7 +536,7 @@ export default function DocketPage() {
                     style={{ padding: "9px 14px", fontSize: 14 }}
                   />
                 </div>
-                
+
                 <div className="formFieldGroup" style={{ minWidth: 150 }}>
                   <input
                     type="text"
@@ -727,7 +562,7 @@ export default function DocketPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleSave}
+                  onClick={handleFormSave}
                   style={sectionButtonStyle}
                 >
                   Save

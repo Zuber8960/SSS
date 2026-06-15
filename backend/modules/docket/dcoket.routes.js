@@ -166,4 +166,48 @@ router.delete('/:no/:loc/:date', async (req, res) => {
   }
 });
 
+/* ================= CHARGES ================= */
+
+router.get('/:docketId/charges', async (req, res) => {
+  try {
+    const { docketId } = req.params;
+    const data = await DocketController.getChargesByDocketId(docketId);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.post('/:docketId/charges', async (req, res) => {
+  try {
+    const { docketId } = req.params;
+    const chargeData = req.body;
+    const data = await DocketController.createCharge(docketId, chargeData);
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.put('/charges/:chargeId', async (req, res) => {
+  try {
+    const { chargeId } = req.params;
+    const chargeData = req.body;
+    const data = await DocketController.updateCharge(chargeId, chargeData);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.delete('/charges/:chargeId', async (req, res) => {
+  try {
+    const { chargeId } = req.params;
+    const data = await DocketController.deleteCharge(chargeId);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

@@ -10,11 +10,12 @@ export default function MainLayout({ children }) {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <Header />
 
-        <div style={{ flex: 1, padding: "20px", overflowY: "auto" }}>
-          {children}
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+          <div style={{ padding: "0px" }}>
+            {children}
+          </div>
+          <Footer />
         </div>
-
-        <Footer />
       </div>
     </div>
   );

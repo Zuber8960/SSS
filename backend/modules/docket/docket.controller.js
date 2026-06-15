@@ -199,6 +199,44 @@ const deleteDocket = async (keys, trx = db) => {
     .update({record_status: 1})
 };
 
+/* ================= CHARGES ================= */
+
+const getChargesByDocketId = async (docketNo) => {
+  return db('sss.sst_docket_charges')
+    .where({ docket_no: docketNo, record_status: 0 })
+    .select('*');
+};
+
+const createCharge = async (docketNo, chargeData, trx = db) => {
+  return trx('sss.sst_docket_charges')
+    .insert({
+      docket_no: docketNo,
+      charge_code: chargeData.charge_code,
+      user_code: chargeData.user_code,
+      charge_amt: chargeData.charge_amt,
+      aud_date: new Date()
+    })
+    .returning('*');
+};
+
+const updateCharge = async (chargeId, chargeData, trx = db) => {
+  return trx('sss.sst_docket_charges')
+    .where({ id: chargeId })
+    .update({
+      charge_code: chargeData.charge_code,
+      user_code: chargeData.user_code,
+      charge_amt: chargeData.charge_amt,
+      aud_date: new Date()
+    })
+    .returning('*');
+};
+
+const deleteCharge = async (chargeId, trx = db) => {
+  return trx('sss.sst_docket_charges')
+    .where({ id: chargeId })
+    .update({ record_status: 1 });
+};
+
 module.exports = {
   getAllDockets,
   getDocketById,
@@ -209,5 +247,9 @@ module.exports = {
   deleteDocket,
   deleteDocketDetails,
   getEwaybillDetails,
-  getListEwayDetails
+  getListEwayDetails,
+  getChargesByDocketId,
+  createCharge,
+  updateCharge,
+  deleteCharge
 };
