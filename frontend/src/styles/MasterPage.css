@@ -175,6 +175,7 @@
   font-family: inherit;
   background: #ffffff;
   transition: all 0.2s ease;
+color: #1e293b;
 }
 
 .formFieldGroup input:focus,
