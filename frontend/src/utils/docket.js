@@ -20,7 +20,7 @@ export const fetchEwayBill = async (ewbLists) => {
     }
 
     const data = await response.json();
-    return data?.length ? data.data : data ||  [];
+    return data?.length ? data.data : data || [];
   } catch (error) {
     console.error('Fetch users error:', error);
     throw error;
@@ -145,6 +145,135 @@ export const deleteCharge = async (chargeId) => {
     return data;
   } catch (error) {
     console.error('Delete charge error:', error);
+    throw error;
+  }
+};
+
+// Fetch docket by docket number (GET)
+export const fetchDocketByDocketNo = async (docketNo) => {
+  try {
+    const response = await fetch(`${API_URL}/docket/${encodeURIComponent(docketNo)}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader()
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch docket');
+    }
+
+    const data = await response.json();
+    return data.data || data;
+  } catch (error) {
+    console.error('Fetch docket error:', error);
+    throw error;
+  }
+};
+// Create a new docket (POST)
+export const createDocket = async (docketData) => {
+  try {
+    const response = await fetch(`${API_URL}/docket`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader()
+      },
+      body: JSON.stringify(docketData)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to create docket');
+    }
+
+    const data = await response.json();
+    return data.data || data;
+  } catch (error) {
+    console.error('Create docket error:', error);
+    throw error;
+  }
+};
+
+
+// Update an existing docket by docket number (PUT)
+
+export const updateDocket = async (docketNo, docketData) => {
+  try {
+    const response = await fetch(`${API_URL}/docket/${encodeURIComponent(docketNo)}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader()
+      },
+      body: JSON.stringify(docketData)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to update docket');
+    }
+
+    const data = await response.json();
+    return data.data || data;
+  } catch (error) {
+    console.error('Update docket error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Check if eway bill records already exist in the database (GET)
+ */
+export const fetchEwayBillFromDB = async (ewbNumbers) => {
+  try {
+    const queryParam = ewbNumbers.join(',');
+    const response = await fetch(`${API_URL}/docket/ewayfile/db/${encodeURIComponent(queryParam)}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader()
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch ewaybill from DB');
+    }
+
+    const data = await response.json();
+    return data.data || data || [];
+  } catch (error) {
+    console.error('Fetch ewaybill from DB error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Save eway bill data (from government portal) into the database (POST)
+ */
+export const saveEwayBillToDB = async (ewbData) => {
+  try {
+    const response = await fetch(`${API_URL}/docket/ewayfile/db`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader()
+      },
+      body: JSON.stringify(ewbData)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to save ewaybill to DB');
+    }
+
+    const data = await response.json();
+    return data.data || data || [];
+  } catch (error) {
+    console.error('Save ewaybill to DB error:', error);
     throw error;
   }
 };

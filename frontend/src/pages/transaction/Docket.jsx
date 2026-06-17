@@ -9,7 +9,14 @@ import {
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import { useEffect } from "react";
-import { fetchEwayBill } from "../../utils/docket";
+import {
+  fetchEwayBill,
+  fetchDocketByDocketNo,
+  createDocket,
+  updateDocket,
+  fetchEwayBillFromDB,
+  saveEwayBillToDB,
+} from "../../utils/docket";
 import ChargesSection from "./docket/ChargesSection";
 import EwayBillSection from "./docket/EwayBillSection";
 
@@ -244,21 +251,65 @@ export default function DocketPage() {
     try {
       setLoading(true);
       setError("");
-      const { data } = await fetchEwayBill(ewbLists);
-      const ewRecords = data
-        .filter(obj => obj.data)
-        .map(obj => {
-          const f = obj.data;
-          const m = moment(f.docDate, "DD/MM/YYYY", true);
 
-          return {
-            docket_no: f.docNo || "",
-            docket_date: m.isValid() ? m.format("YYYY-MM-DD") : "",
-            docket_loc: f.fromPlace || "",
-            docket_to_loc: f.toPlace || "",
-            remark: f.status_desc || "Shipment is about to complete",
-          };
-        });
+      // 1. Check which ewb numbers already exist in the database
+      let existingEwbNos = [];
+      try {
+        const dbRecords = await fetchEwayBillFromDB(ewbLists);
+        existingEwbNos = (dbRecords || []).map(r => Number(r.ewb_no));
+      } catch (dbErr) {
+        console.warn("DB check failed, proceeding to fetch all from govt portal:", dbErr);
+      }
+
+      // 2. Determine which ewb numbers need to be fetched from government portal
+      const missingEwbNos = ewbLists.filter(no => !existingEwbNos.includes(no));
+
+      // 3. Fetch missing records from government portal and save to DB
+      let govtData = [];
+      if (missingEwbNos.length > 0) {
+        try {
+          const response = await fetchEwayBill(missingEwbNos);
+          govtData = response?.data || response || [];
+
+          // Save government portal data to DB
+          if (govtData.length > 0) {
+            try {
+              await saveEwayBillToDB(govtData);
+              showInfo(`${govtData.length} e-way bill(s) saved to database`);
+            } catch (saveErr) {
+              console.warn("Failed to save ewaybill to DB:", saveErr);
+            }
+          }
+        } catch (govtErr) {
+          console.warn("Failed to fetch from govt portal:", govtErr);
+          showWarning("Could not fetch from government portal");
+        }
+      } else {
+        showInfo("All e-way bills already exist in database");
+      }
+
+      // 4. Build combined records from both DB and govt data
+      const allRecords = [
+        ...(dbRecords || []),
+        ...(govtData.filter(obj => obj.data).map(obj => obj.data) || [])
+      ];
+
+      if (allRecords.length === 0) {
+        showWarning("No e-way bill records found");
+        setEwbList([]);
+        return;
+      }
+
+      const ewRecords = allRecords.map(f => {
+        const m = moment(f.docDate, "DD/MM/YYYY", true);
+        return {
+          docket_no: f.docNo || "",
+          docket_date: m.isValid() ? m.format("YYYY-MM-DD") : "",
+          docket_loc: f.fromPlace || "",
+          docket_to_loc: f.toPlace || "",
+          remark: f.status_desc || "Shipment is about to complete",
+        };
+      });
 
       const ewdata = {
         docket_no: ewRecords.map(x => x.docket_no).filter(Boolean).join(", "),
@@ -291,19 +342,34 @@ export default function DocketPage() {
         remark: [...new Set(ewRecords.map(x => x.remark).filter(Boolean))].join(", ")
       };
       ewdata && setForm(ewdata);
-      setEwbList(data.map(obj => {
-        return {
+
+      // 5. Build ewb list from govt data (which includes ewbNo/ewayBillDate/validUpto)
+      const govtEwbRecords = govtData
+        .filter(obj => obj.data)
+        .map(obj => ({
           ewb_no: obj.data.ewbNo,
           ewb_date: moment(obj.data.ewayBillDate, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
           ewb_valid: moment(obj.data.validUpto, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
           inv_no: "",
           inv_date: ""
-        }
-      }));
+        }));
+
+      // For DB records without portal details, add basic entry
+      const dbEwbRecords = (dbRecords || [])
+        .filter(r => !govtEwbRecords.some(g => String(g.ewb_no) === String(r.ewb_no)))
+        .map(r => ({
+          ewb_no: r.ewb_no || "",
+          ewb_date: r.ewb_date ? moment(r.ewb_date).format("MM/DD/YYYY") : "",
+          ewb_valid: r.valid_upto ? moment(r.valid_upto).format("MM/DD/YYYY") : "",
+          inv_no: "",
+          inv_date: ""
+        }));
+
+      setEwbList([...govtEwbRecords, ...dbEwbRecords]);
     } catch (err) {
-      setError(err.message || "Failed to load locations");
-      showError(err.message || "Failed to load locations");
-      console.error("Error loading locations:", err);
+      setError(err.message || "Failed to load e-way bill data");
+      showError(err.message || "Failed to load e-way bill data");
+      console.error("Error loading e-way bill data:", err);
     } finally {
       setLoading(false);
     }
@@ -322,10 +388,35 @@ export default function DocketPage() {
     setShowForm((prev) => !prev);
   };
 
-  // Placeholder save for Form section
-  const handleFormSave = () => {
-    console.log("Save Form Data:", { form, ewbList, chargeList });
-    showSuccess("Form saved successfully (console log)");
+  // Save Form - POST for new, PUT for existing docket
+  const handleFormSave = async () => {
+    try {
+      const docketNo = form.docket_no.trim();
+      if (!docketNo) {
+        showError("Docket number is required");
+        return;
+      }
+
+      // Build payload - exclude tot_amt as it's computed
+      const payload = { ...form };
+      delete payload.tot_amt;
+
+      let result;
+      if (isFormEditMode) {
+        // Update existing docket (PUT)
+        result = await updateDocket(docketNo, payload);
+        showSuccess("Docket updated successfully");
+      } else {
+        // Create new docket (POST)
+        result = await createDocket(payload);
+        showSuccess("Docket created successfully");
+      }
+
+      console.log("Save result:", result);
+    } catch (err) {
+      showError(err.message || "Failed to save docket");
+      console.error("Save docket error:", err);
+    }
   };
 
   const handleEditView = async () => {
@@ -335,9 +426,24 @@ export default function DocketPage() {
     setShowForm(true);
 
     if (docketNo) {
-      setForm((prev) => ({ ...prev, docket_no: docketNo }));
       setDocketId(docketNo);
-      // setShowCharges(true);
+      try {
+        const docketData = await fetchDocketByDocketNo(docketNo);
+        if (docketData) {
+          // Map the response fields to the form state
+          const mapped = {};
+          Object.keys(form).forEach((key) => {
+            mapped[key] = docketData[key] !== undefined ? docketData[key] : form[key];
+          });
+          setForm(mapped);
+          showInfo("Docket data loaded successfully");
+        }
+      } catch (err) {
+        showError(err.message || "Failed to fetch docket");
+        console.error("Fetch docket error:", err);
+        // Even if fetch fails, keep the docket number in the form
+        setForm((prev) => ({ ...prev, docket_no: docketNo }));
+      }
     }
   };
 

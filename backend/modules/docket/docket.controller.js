@@ -237,6 +237,49 @@ const deleteCharge = async (chargeId, trx = db) => {
     .update({ record_status: 1 });
 };
 
+/* ================= EWAY BILL DB OPERATIONS ================= */
+
+const getEwayBillFromDB = async (ewbNumbers) => {
+  return db('sss.sst_docket_ewb')
+    .whereIn('ewb_no', ewbNumbers)
+    .select('*');
+};
+
+const saveEwayBillToDB = async (ewbDataArray) => {
+  const rows = ewbDataArray.map(item => {
+    const data = item.data || item;
+    return {
+      ewb_no: String(data.ewbNo || ''),
+      ewb_date: data.ewayBillDate ? data.ewayBillDate.split(' ')[0] : null,
+      ewb_valid_upto: data.validUpto ? data.validUpto.split(' ')[0] : null,
+      invoice_no: data.docNo || '',
+      invoice_date: data.docDate || null,
+      cnor_name: data.fromTrdName || '',
+      cnor_address: (data.fromAddr1 || '') + ' ' + (data.fromAddr2 || ''),
+      cnor_gstin: data.fromGstin || '',
+      cnor_pincode: data.fromPincode || null,
+      cnee_name: data.toTrdName || '',
+      cnee_address: (data.toAddr1 || '') + ' ' + (data.toAddr2 || ''),
+      cnee_gstin: data.toGstin || '',
+      cnee_pincode: data.toPincode || null,
+      taxble_value: data.taxableAmount || data.totalValue || 0,
+      cgst: data.cgstValue || 0,
+      sgst: data.sgstValue || 0,
+      igst: data.igstValue || 0,
+      cess: data.cessValue || 0,
+      invoice_total: data.totInvValue || 0,
+      product_name: data.itemList?.map(i => i.productName || i.productDesc).filter(Boolean).join(', ') || '',
+      hsn_code: data.itemList?.map(i => i.hsnCode).filter(Boolean).join(', ') || '',
+      quantity: data.itemList?.reduce((sum, i) => sum + (i.quantity || 0), 0) || 0,
+      aud_date: new Date()
+    };
+  });
+
+  return db('sss.sst_docket_ewb')
+    .insert(rows)
+    .returning('*');
+};
+
 module.exports = {
   getAllDockets,
   getDocketById,
@@ -251,5 +294,7 @@ module.exports = {
   getChargesByDocketId,
   createCharge,
   updateCharge,
-  deleteCharge
+  deleteCharge,
+  getEwayBillFromDB,
+  saveEwayBillToDB
 };
