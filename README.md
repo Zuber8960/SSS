@@ -90,7 +90,7 @@ The backend uses **nodemon** for automatic restart on file changes during develo
 cd frontend
 npm start
 ```
-The frontend development server will start on `http://localhost:5173` (Vite default port)
+The frontend development server will start on `http://localhost:4000` (Vite default port)
 
 ### Option 2: Build Frontend and Serve Together
 
