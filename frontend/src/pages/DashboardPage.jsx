@@ -208,6 +208,7 @@ export default function DashboardPage() {
               gap: 24,
               marginBottom: 20
             }}
+            className="dashboardCharts"
           >
             {/* Left: Line Chart */}
             <div

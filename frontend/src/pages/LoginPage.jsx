@@ -175,14 +175,15 @@ const handleLogin = async () => {
   return (
     <>
     <div
+      className="loginContainer"
       style={{
         minHeight: "85vh",
         width: "90vw",
-        display: "flex",
-        alignItems: "stretch",
+        maxWidth: "1200px",
         padding: "1vh 0",
         margin: "0 auto",
-        background: "#f4f6f8"
+        background: "#f4f6f8",
+        borderRadius: 12
       }}
     >
       {/* Left: Promo column (gradient) */}
@@ -192,11 +193,11 @@ const handleLogin = async () => {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          // background: "linear-gradient(135deg,#0ea5a4,#065f49)",
           background: "linear-gradient(180deg, #8e2de2, #c850c0, #a4508b)",
           color: "#ffffff",
           padding: 20
         }}
+        className="loginPromoColumn"
       >
         <div style={{ width: "100%", maxWidth: 560 }}>
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
@@ -315,6 +316,7 @@ const handleLogin = async () => {
         </div>
       </div>
 
+    </div>
       {showForgot && (
         <div
           style={{
@@ -327,15 +329,20 @@ const handleLogin = async () => {
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            zIndex: 999
+            zIndex: 999,
+            padding: 16,
+            boxSizing: "border-box"
           }}
         >
           <div
             style={{
-              width: 420,
+              width: "100%",
+              maxWidth: 420,
               background: "#fff",
               padding: 25,
-              borderRadius: 12
+              borderRadius: 12,
+              maxHeight: "90vh",
+              overflowY: "auto"
             }}
           >
             <h3>Reset Password</h3>
@@ -409,7 +416,6 @@ const handleLogin = async () => {
           </div>
         </div>
       )}
-    </div>
       <Footer/>
       <CommonAlertDialog
         dialog={dialog}

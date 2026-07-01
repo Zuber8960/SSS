@@ -629,7 +629,14 @@ export default function DocketPage() {
         {/* ✅ Header Form */}
         {showForm && (
           <>
-            <div style={sectionHeaderStyle}>
+            <div
+              style={{
+                ...sectionHeaderStyle,
+                flexWrap: "wrap",
+                marginTop: 16,
+              }}
+              className="docketFormHeader"
+            >
               <h3>FORM</h3>
               <div style={sectionActionsStyle}>
                 <div className="formFieldGroup" style={{ minWidth: 150 }}>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
@@ -8,109 +8,142 @@ import {
   FormField,
   DataTable,
 } from "../../components/common/MasterPage";
+import { fetchAllBusinessPartners, saveBusinessPartner as saveBusinessPartnerApi, updateBusinessPartner as updateBusinessPartnerApi, deleteBusinessPartner as deleteBusinessPartnerApi } from "../../utils/businessPartner";
+import useAlert from "../../components/common/UseAlert";
+import CommonAlertDialog from "../../components/common/CommonAlertDialog";
+
+const emptyPartnerForm = {
+  record_id: "",
+  company_code: "",
+  division_code: "",
+  bp_type: "1",
+  bp_registration_no: "",
+  bp_tan_no: "",
+  bp_status: "1",
+};
+
+const mapPartnerToForm = (row) => ({
+  record_id: row.record_id ?? "",
+  company_code: row.company_code ?? "",
+  division_code: row.division_code ?? "",
+  bp_type: row.bp_type ?? "1",
+  bp_registration_no: row.bp_registration_no ?? "",
+  bp_tan_no: row.bp_tan_no ?? "",
+  bp_status: row.bp_status ?? "1",
+});
 
 export default function BusinessPartnerPage() {
-  const [partners, setPartners] = useState([
-    {
-      bpCode: "C0001",
-      bpName: "ABC Industries Ltd",
-      bpType: "CUSTOMER",
-      contactPerson: "Rohit Sharma",
-      mobile: "9876543210",
-      phone: "011-23456789",
-      email: "contact@abcind.com",
-      gstNo: "09ABCDE1234F1Z5",
-      panNo: "ABCDE1234F",
-      address: "Plot 7, Sector 10, New Delhi",
-      state: "Delhi",
-      city: "New Delhi",
-      pincode: "110001",
-      creditDays: "30",
-      status: "Active",
-    },
-  ]);
-
+  const [partners, setPartners] = useState([]);
+  const { dialog, closeAlert, showSuccess, showError, showWarning } = useAlert();
   const [searchText, setSearchText] = useState("");
-  const [form, setForm] = useState({
-    bpCode: "",
-    bpName: "",
-    bpType: "CUSTOMER",
-    contactPerson: "",
-    mobile: "",
-    phone: "",
-    email: "",
-    gstNo: "",
-    panNo: "",
-    address: "",
-    state: "",
-    city: "",
-    pincode: "",
-    creditDays: "",
-    status: "Active",
-  });
+
+  const [form, setForm] = useState(emptyPartnerForm);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [originalPartner, setOriginalPartner] = useState(null);
 
   const clearForm = () => {
-    setForm({
-      bpCode: "",
-      bpName: "",
-      bpType: "CUSTOMER",
-      contactPerson: "",
-      mobile: "",
-      phone: "",
-      email: "",
-      gstNo: "",
-      panNo: "",
-      address: "",
-      state: "",
-      city: "",
-      pincode: "",
-      creditDays: "",
-      status: "Active",
-    });
+    setForm(emptyPartnerForm);
+    setIsEditing(false);
+    setOriginalPartner(null);
   };
 
-  const savePartner = () => {
-    if (!form.bpCode) {
-      alert("Partner Code Required");
+  const savePartner = async () => {
+    if (!form.bp_registration_no) {
+      showError("Registration No Required");
       return;
     }
-    if (!form.bpName) {
-      alert("Partner Name Required");
+    if (!form.bp_type) {
+      showError("Partner Type Required");
       return;
     }
 
-    setPartners([...partners, form]);
-    clearForm();
+    try {
+      if (isEditing && originalPartner?.record_id) {
+        await updateBusinessPartnerApi(originalPartner.record_id, form);
+        setPartners((prev) =>
+          prev.map((p) =>
+            p.record_id === originalPartner.record_id ? form : p
+          )
+        );
+        showSuccess("Business Partner updated successfully");
+      } else {
+        await saveBusinessPartnerApi(form);
+        setPartners((prev) => [...prev, form]);
+        showSuccess("Business Partner saved successfully");
+      }
+
+      clearForm();
+    } catch (error) {
+      showError(error.message || "Failed to save business partner");
+      console.error("Save business partner error:", error);
+    }
   };
 
   const editPartner = (row) => {
-    setForm(row);
+    setForm(mapPartnerToForm(row));
+    setOriginalPartner(row);
+    setIsEditing(true);
   };
 
-  const deletePartner = (bpCode) => {
-    if (!window.confirm("Delete Business Partner ?")) return;
-    setPartners(partners.filter((x) => x.bpCode !== bpCode));
+  const deletePartner = async (recordId) => {
+    showWarning("Confirm Delete", "Delete Business Partner ?",
+      async () => {
+        try {
+          await deleteBusinessPartnerApi(recordId);
+          setPartners((prev) => prev.filter((x) => x.record_id !== recordId));
+          showSuccess("Business Partner deleted successfully");
+        } catch (error) {
+          showError(error.message || "Failed to delete business partner");
+          console.error("Delete business partner error:", error);
+        }
+      }
+    );
   };
 
-  const filteredPartners = partners.filter(
+  const filteredPartners = searchText ? partners.filter(
     (x) =>
-      x.bpCode.toLowerCase().includes(searchText.toLowerCase()) ||
-      x.bpName.toLowerCase().includes(searchText.toLowerCase())
-  );
+      String(x.record_id ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
+      String(x.bp_registration_no ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
+      String(x.bp_tan_no ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
+      String(x.bp_type ?? "").toLowerCase().includes(searchText.toLowerCase())
+  ) : partners;
 
   const partnerColumns = [
-    { key: "bpCode", label: "Code" },
-    { key: "bpName", label: "Name" },
-    { key: "bpType", label: "Type" },
-    { key: "state", label: "State" },
-    { key: "city", label: "City" },
-    { key: "status", label: "Status" },
+    { key: "record_id", label: "Record ID" },
+    { key: "company_code", label: "Company Code" },
+    { key: "division_code", label: "Division Code" },
+    { key: "bp_type", label: "Type" },
+    { key: "bp_registration_no", label: "Registration No" },
+    { key: "bp_tan_no", label: "TAN No" },
+    { key: "bp_status", label: "Status" },
   ];
 
   const partnerActions = [
     { label: "Edit", onClick: editPartner },
-    { label: "Delete", onClick: (row) => deletePartner(row.bpCode) },
+    { label: "Delete", onClick: (row) => deletePartner(row.record_id) },
   ];
+
+  const [, setError] = useState("");
+  const [, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadPartnersAtMount = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const data = await fetchAllBusinessPartners();
+        setPartners(data);
+      } catch (err) {
+        setError(err.message || "Failed to load business partners");
+        console.error("Error loading business partners:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPartnersAtMount();
+  }, []);
 
   return (
     <MainLayout>
@@ -130,68 +163,25 @@ export default function BusinessPartnerPage() {
         />
 
         <FormPanel>
-          <FormField label="Partner Code" name="bpCode" form={form} setForm={setForm} />
-          <FormField label="Partner Name" name="bpName" form={form} setForm={setForm} />
-          <FormField label="Partner Type" name="bpType" form={form} setForm={setForm} options={["CUSTOMER", "CONSIGNOR", "CONSIGNEE", "VENDOR", "TRANSPORTER", "BROKER", "FLEET_OWNER", "SUPPLIER"]} />
-          <FormField label="Contact Person" name="contactPerson" form={form} setForm={setForm} />
-          <FormField label="Mobile" name="mobile" form={form} setForm={setForm} />
-          <FormField label="Phone" name="phone" form={form} setForm={setForm} />
-          <FormField label="Email" name="email" form={form} setForm={setForm} />
-          <FormField label="GST No" name="gstNo" form={form} setForm={setForm} />
-          <FormField label="PAN No" name="panNo" form={form} setForm={setForm} />
-          <FormField label="Address" name="address" form={form} setForm={setForm} />
-          <FormField label="State" name="state" form={form} setForm={setForm} />
-          <FormField label="City" name="city" form={form} setForm={setForm} />
-          <FormField label="Pincode" name="pincode" form={form} setForm={setForm} />
-          <FormField label="Credit Days" name="creditDays" form={form} setForm={setForm} />
-          <FormField label="Status" name="status" form={form} setForm={setForm} options={["Active", "Inactive"]} />
+          <FormField label="Company Code" name="company_code" form={form} setForm={setForm} />
+          <FormField label="Division Code" name="division_code" form={form} setForm={setForm} />
+          <FormField label="Partner Type" name="bp_type" form={form} setForm={setForm} />
+          <FormField label="Registration No" name="bp_registration_no" form={form} setForm={setForm} />
+          <FormField label="TAN No" name="bp_tan_no" form={form} setForm={setForm} />
+          <FormField label="Status" name="bp_status" form={form} setForm={setForm} />
         </FormPanel>
 
         <DataTable
           columns={partnerColumns}
           rows={filteredPartners}
-          getKey={(row) => row.bpCode}
+          getKey={(row) => row.record_id}
           actions={partnerActions}
         />
       </PageBody>
+      <CommonAlertDialog
+        dialog={dialog}
+        onClose={closeAlert}
+      />
     </MainLayout>
   );
 }
-
-
-//                 <td>{row.bpName}</td>
-//                 <td>{row.bpType}</td>
-//                 <td>{row.state}</td>
-//                 <td>{row.city}</td>
-//                 <td>{row.mobile}</td>
-//                 <td>{row.status}</td>
-
-//                 <td>
-//                   <button
-//                     onClick={() =>
-//                       editPartner(row)
-//                     }
-//                   >
-//                     Edit
-//                   </button>
-
-//                   <button
-//                     style={{ marginLeft: "5px" }}
-//                     onClick={() =>
-//                       deletePartner(row.bpCode)
-//                     }
-//                   >
-//                     Delete
-//                   </button>
-//                 </td>
-//               </tr>
-//             ))}
-
-//           </tbody>
-//         </table>
-
-//       </div>
-
-//     </MainLayout>
-//   );
-// }

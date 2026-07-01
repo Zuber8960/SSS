@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useState, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -23,10 +23,12 @@ import ExpandMore from "@mui/icons-material/ExpandMore";
 import Tooltip from "@mui/material/Tooltip";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import MenuIcon from "@mui/icons-material/Menu";
+import CloseIcon from "@mui/icons-material/Close";
 import "./Sidebar.css";
 import Logo from "../images/loogo.PNG";
 
-export default function Sidebar() {
+export default function Sidebar({ isMobileOpen, onToggleMobile }) {
   const { pathname } = useLocation();
   const [openAdmin, setOpenAdmin] = useState(() => pathname.startsWith("/admin"));
   const [openMasters, setOpenMasters] = useState(() => pathname.startsWith("/masters"));
@@ -49,8 +51,16 @@ export default function Sidebar() {
     }
   }, [pathname]);
 
+  // Close mobile sidebar when clicking outside or on a menu item
+  const handleNavClick = useCallback(() => {
+    if (onToggleMobile) {
+      onToggleMobile();
+    }
+  }, [onToggleMobile]);
+
   return (
-    <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
+    <>
+      <aside className={`sidebar${collapsed ? " collapsed" : ""}${isMobileOpen ? " mobileOpen" : ""}`}>
       <div className="sidebarHeader">
         {!collapsed ? <div><img
           src={Logo}
@@ -364,5 +374,10 @@ export default function Sidebar() {
         </Collapse>
       </List>
     </aside>
+      <div
+        className={`sidebarOverlay${isMobileOpen ? " open" : ""}`}
+        onClick={handleNavClick}
+      />
+    </>
   );
 }

@@ -1,10 +1,10 @@
 import { useLocation } from "react-router-dom";
 import footerLogo from "../images/footer-log.png";
-import footerLogo2 from "../images/aaa.png";
 
 export default function Footer() {
   const { pathname } = useLocation();
-  const imageWidth = pathname === "/" ? "90vw" : "83vw";
+  const isLoginPage = pathname === "/";
+  const imageWidth = isLoginPage ? "90vw" : "83vw";
 
   return (
     <div
@@ -21,30 +21,30 @@ export default function Footer() {
     >
       <div style={{
         textAlign: "center",
+        width: "100%",
+        maxWidth: "100%",
+        overflow: "hidden"
       }}>
         <div style={{
-           display: "flex", flexDirection: "row", alignItems: "center"
+           display: "flex",
+           flexDirection: "row",
+           alignItems: "center",
+           justifyContent: "center",
+           padding: "0 8px"
         }}>
           <img
             src={footerLogo}
             alt="Saral Samadhan"
             style={{
-              maxHeight: "60px",
-              width: imageWidth,
+              maxHeight: isLoginPage ? "50px" : "60px",
+              width: isLoginPage ? "85vw" : imageWidth,
+              maxWidth: isLoginPage ? "90vw" : "calc(100vw - 80px)",
               borderRadius: "2%",
               boxShadow: "0px 0px 15px 5px rgba(248, 249, 250, 0.6)"
             }}
           />
-          {/* <img
-            src={footerLogo2}
-            alt="Saral Samadhan"
-            style={{
-              maxHeight: "40px",
-              width: imageWidth
-            }}
-          /> */}
         </div>
-        <p style={{ fontSize: 12, color: "#6b7280" }}>
+        <p style={{ fontSize: 12, color: "#6b7280", padding: "4px 8px" }}>
           © 2026 Saral Samadhan. All rights reserved.
         </p>
       </div>

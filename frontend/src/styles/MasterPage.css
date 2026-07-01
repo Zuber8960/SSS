@@ -348,9 +348,19 @@ color: #1e293b;
 }
 
 /* Responsive Design */
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
+  .pageBody h2 {
+    font-size: 26px;
+  }
+
+  .formGrid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 1024px) {
   .pageBody {
-    padding: 16px;
+    padding: 20px;
   }
 
   .pageBody h2 {
@@ -358,15 +368,67 @@ color: #1e293b;
   }
 
   .formGrid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+  }
+
+  .searchBox {
+    max-width: 100%;
+  }
+
+  .permissionGrid {
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .pageBody {
+    padding: 14px;
+  }
+
+  .pageBody h2 {
+    font-size: 20px;
+    margin-bottom: 16px;
+  }
+
+  .formGrid {
     grid-template-columns: 1fr;
+    gap: 14px;
   }
 
   .pageToolbar {
     flex-direction: column;
+    gap: 8px;
   }
 
   .pageToolbar button {
     width: 100%;
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+
+  .formPanel {
+    padding: 16px;
+  }
+
+  .formFieldGroup label {
+    font-size: 12px;
+  }
+
+  .formFieldGroup input,
+  .formFieldGroup select {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .searchBox {
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+
+  .dataTableWrapper {
+    overflow-x: auto;
   }
 
   .dataTable thead {
@@ -381,17 +443,21 @@ color: #1e293b;
   }
 
   .dataTable tr {
-    margin-bottom: 12px;
+    margin-bottom: 10px;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
+    padding: 4px 0;
   }
 
   .dataTable td {
     text-align: right;
-    padding-left: 50%;
+    padding: 8px 16px 8px 50%;
     position: relative;
     border: none;
     border-bottom: 1px solid #e2e8f0;
+    font-size: 13px;
+    min-height: 20px;
+    box-sizing: border-box;
   }
 
   .dataTable td:last-child {
@@ -401,10 +467,106 @@ color: #1e293b;
   .dataTable td::before {
     content: attr(data-label);
     position: absolute;
-    left: 16px;
+    left: 12px;
     font-weight: 600;
     color: #475569;
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+
+  .tableActions {
+    justify-content: flex-end;
+  }
+
+  .tableActions button {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+
+  .permissionGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .permissionItem {
+    padding: 10px 12px;
     font-size: 13px;
+  }
+
+  .emptyState {
+    padding: 40px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pageBody {
+    padding: 10px;
+  }
+
+  .pageBody h2 {
+    font-size: 18px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+  }
+
+  .formPanel {
+    padding: 12px;
+    border-radius: 8px;
+  }
+
+  .formGrid {
+    gap: 10px;
+  }
+
+  .formFieldGroup input,
+  .formFieldGroup select {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .pageToolbar button {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+
+  .searchBox {
+    padding: 8px 12px;
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+
+  .dataTable td {
+    padding: 6px 12px 6px 45%;
+    font-size: 12px;
+  }
+
+  .dataTable td::before {
+    font-size: 11px;
+    left: 8px;
+  }
+
+  .dataTable tr {
+    margin-bottom: 8px;
+  }
+
+  .permissionGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .permissionItem {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .tableActions button {
+    padding: 5px 10px;
+    font-size: 10px;
+  }
+
+  .alertBox {
+    padding: 10px 12px;
+    font-size: 12px;
   }
 }
 
