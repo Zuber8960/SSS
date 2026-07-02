@@ -174,18 +174,7 @@ const handleLogin = async () => {
 
   return (
     <>
-    <div
-      className="loginContainer"
-      style={{
-        minHeight: "85vh",
-        width: "90vw",
-        maxWidth: "1200px",
-        padding: "1vh 0",
-        margin: "0 auto",
-        background: "#f4f6f8",
-        borderRadius: 12
-      }}
-    >
+    <div className="loginContainer">
       {/* Left: Promo column (gradient) */}
       <div
         style={{
@@ -425,3 +414,4 @@ const handleLogin = async () => {
       </>
   );
 }
+

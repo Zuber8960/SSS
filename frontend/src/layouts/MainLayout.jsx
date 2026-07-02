@@ -30,7 +30,10 @@ export default function MainLayout({ children }) {
           width: "100%",
         }}
       >
-        <Header onToggleSidebar={toggleMobileSidebar} />
+        <Header
+          onToggleSidebar={toggleMobileSidebar}
+          isMobileSidebarOpen={mobileSidebarOpen}
+        />
 
         <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
           <div style={{ padding: "0px" }}>
@@ -42,3 +45,4 @@ export default function MainLayout({ children }) {
     </div>
   );
 }
+

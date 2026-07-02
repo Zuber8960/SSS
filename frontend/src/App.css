@@ -213,19 +213,35 @@
   }
 }
 
-/* ── Login Container (Desktop default) ── */
+/* ── Login Container ── */
 .loginContainer {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: stretch;
+  min-height: 85vh;
+  width: 90vw;
+  max-width: 1200px;
+  padding: 1vh 0;
+  margin: 0 auto;
+  background: #f4f6f8;
+  border-radius: 12px;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
-/* ── Login Page Responsive ── */
-@media (max-width: 1024px) {
+@media (min-width: 769px) {
   .loginContainer {
+    flex-direction: row !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .loginContainer {
+    width: 100vw !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    min-height: 100vh !important;
     flex-direction: column !important;
-    width: 95vw !important;
-    min-height: auto !important;
   }
 
   .loginPromoColumn {
@@ -243,15 +259,14 @@
     max-width: 200px !important;
   }
 }
-
 @media (max-width: 768px) {
-  .loginContainer {
+  /* .loginContainer {
     width: 100vw !important;
     border-radius: 0 !important;
     padding: 0 !important;
     min-height: 100vh !important;
     flex-direction: column !important;
-  }
+  } */
 
   .loginPromoColumn {
     padding: 20px 12px !important;
@@ -318,13 +333,13 @@
 }
 
 @media (max-width: 480px) {
-  .loginContainer {
+  /* .loginContainer {
     flex-direction: column !important;
     width: 100vw !important;
     border-radius: 0 !important;
     padding: 0 !important;
     min-height: 100vh !important;
-  }
+  } */
 
   .loginPromoColumn {
     padding: 16px 10px !important;
