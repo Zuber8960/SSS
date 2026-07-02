@@ -212,9 +212,14 @@ color: #1e293b;
   background: #ffffff;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   transition: all 0.2s ease;
+}
+
+.dataTableWrapper .MuiDataGrid-root {
+  min-width: 760px;
 }
 
 .dataTableWrapper:hover {
@@ -417,8 +422,8 @@ color: #1e293b;
 
   .formFieldGroup input,
   .formFieldGroup select {
-    padding: 10px 12px;
-    font-size: 13px;
+    padding: 12px 14px;
+    font-size: 14px;
   }
 
   .searchBox {
@@ -429,6 +434,11 @@ color: #1e293b;
 
   .dataTableWrapper {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dataTableWrapper .MuiDataGrid-root {
+    min-width: 820px;
   }
 
   .dataTable thead {
@@ -489,8 +499,8 @@ color: #1e293b;
   }
 
   .permissionItem {
-    padding: 10px 12px;
-    font-size: 13px;
+    padding: 12px 14px;
+    font-size: 14px;
   }
 
   .emptyState {
@@ -520,8 +530,8 @@ color: #1e293b;
 
   .formFieldGroup input,
   .formFieldGroup select {
-    padding: 8px 10px;
-    font-size: 12px;
+    padding: 12px 14px;
+    font-size: 14px;
   }
 
   .pageToolbar button {
@@ -555,8 +565,8 @@ color: #1e293b;
   }
 
   .permissionItem {
-    padding: 8px 10px;
-    font-size: 12px;
+    padding: 12px 14px;
+    font-size: 14px;
   }
 
   .tableActions button {
@@ -586,3 +596,4 @@ color: #1e293b;
   font-size: 16px;
   margin: 8px 0;
 }
+

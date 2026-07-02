@@ -117,6 +117,7 @@ export function DataTable({
       field: col.key,
       headerName: col.label,
       flex: 1,
+      minWidth: col.minWidth ?? 160,
       sortable: true,
       editable: col.editable ?? editable,
       type: col.options ? "singleSelect" : col.type,
@@ -137,6 +138,7 @@ export function DataTable({
           align: "center",
           sortable: false,
           flex: 1,
+          minWidth: 170,
           color: "primary",
           renderCell: (params) => (
             <Box style={{
@@ -229,3 +231,4 @@ export function DataTable({
     </div>
   );
 }
+
