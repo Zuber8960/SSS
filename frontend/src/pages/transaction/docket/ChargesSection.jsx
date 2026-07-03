@@ -1,13 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { DataTable } from "../../../components/common/MasterPage";
 import { fetchCharges, createCharge, updateCharge, deleteCharge as deleteChargeApi } from "../../../utils/docket";
+import useAlert from "../../../components/common/UseAlert";
+import CommonAlertDialog from "../../../components/common/CommonAlertDialog";
 
-const chargeDescOptions = [
-  "Freight",
-  "Ser charge",
-  "COF",
-  "Freight On Value",
-];
+const chargeDescOptions = ["Freight", "Ser charge", "COF", "Freight On Value"];
 
 const chargeDefaults = {
   Freight: { user_code: 100 },
@@ -67,8 +64,12 @@ export default function ChargesSection({
   onChargesChange,
   singleClick = false,
 }) {
+  const { dialog, closeAlert, showSuccess, showError, showInfo } = useAlert();
   const [chargeList, setChargeList] = useState([]);
-  const [dirtyChargeIndexes, setDirtyChargeIndexes] = useState(new Set());
+  // Tracks rec_ids of existing rows that were edited — negative rec_ids are new rows
+  const [dirtyRecIds, setDirtyRecIds] = useState(new Set());
+  // Counter for assigning temp negative rec_ids to new rows
+  const tempIdCounter = useRef(-1);
 
   // Fetch charges when docketId changes, clear dirty state
   useEffect(() => {
@@ -76,7 +77,8 @@ export default function ChargesSection({
       fetchCharges(docketId)
         .then((charges) => {
           setChargeList(charges);
-          setDirtyChargeIndexes(new Set());
+          setDirtyRecIds(new Set());
+          tempIdCounter.current = -1;
         })
         .catch(console.error);
     }
@@ -89,8 +91,7 @@ export default function ChargesSection({
     }
   }, [chargeList, onChargesChange]);
 
-
-  // Recalculate derived charge amounts when invoiceValue changes — no useEffect needed
+  // Recalculate derived amounts when invoiceValue changes — no useEffect needed
   const displayChargeList = useMemo(
     () => recalculateChargeList(chargeList, invoiceValue),
     [chargeList, invoiceValue]
@@ -99,39 +100,42 @@ export default function ChargesSection({
   // --- Handlers ---
 
   const addChargeRow = () => {
-    const newRow = { charge_code: "Freight", ...chargeDefaults.Freight };
-    setChargeList((prev) => {
-      const next = [...prev, newRow];
-      return recalculateChargeList(next, invoiceValue);
-    });
-    // New rows have no index-based id yet; mark by new length - 1 after update
-    setDirtyChargeIndexes((prev) => {
-      const next = new Set(prev);
-      next.add("new");
-      return next;
-    });
+    const newRow = {
+      rec_id: tempIdCounter.current--,   // negative = new, not yet saved
+      charge_code: "Freight",
+      ...chargeDefaults.Freight,
+    };
+    setChargeList((prev) =>
+      recalculateChargeList([...prev, newRow], invoiceValue)
+    );
   };
 
   const deleteCharge = async (row) => {
-    const chargeToDelete = chargeList[row.id];
-    if (!chargeToDelete || !chargeToDelete.id) {
+    const chargeToDelete = chargeList.find((c) => c.rec_id === row.rec_id);
+    if (!chargeToDelete) return;
+
+    if (chargeToDelete.rec_id < 0) {
       setChargeList((prev) =>
-        recalculateChargeList(prev.filter((_, i) => i !== row.id), invoiceValue)
+        recalculateChargeList(prev.filter((c) => c.rec_id !== row.rec_id), invoiceValue)
       );
+      showSuccess("Charge removed");
       return;
     }
+
     try {
-      await deleteChargeApi(chargeToDelete.id);
+      await deleteChargeApi(chargeToDelete.rec_id);
       setChargeList((prev) =>
-        recalculateChargeList(prev.filter((_, i) => i !== row.id), invoiceValue)
+        recalculateChargeList(prev.filter((c) => c.rec_id !== row.rec_id), invoiceValue)
       );
-      setDirtyChargeIndexes((prev) => {
+      setDirtyRecIds((prev) => {
         const next = new Set(prev);
-        next.delete(row.id);
+        next.delete(chargeToDelete.rec_id);
         return next;
       });
+      showSuccess("Charge deleted successfully");
     } catch (err) {
       console.error("Failed to delete charge:", err);
+      showError(err.message || "Failed to delete charge");
     }
   };
 
@@ -142,45 +146,56 @@ export default function ChargesSection({
     }
 
     try {
-      for (let i = 0; i < chargeList.length; i++) {
-        const charge = chargeList[i];
-        const isDirty = dirtyChargeIndexes.has(i) || dirtyChargeIndexes.has("new");
+      let added = 0;
+      let updated = 0;
 
-        if (charge.id) {
-          // Existing row — only PUT if it was actually edited
-          if (isDirty) {
-            await updateCharge(charge.id, {
-              charge_code: charge.charge_code,
-              user_code: charge.user_code,
-              charge_amt: charge.charge_amt,
-            });
-          }
-        } else {
-          // New row — always POST
+      for (const charge of chargeList) {
+        if (charge.rec_id < 0) {
           await createCharge(docketId, {
             charge_code: charge.charge_code,
             user_code: charge.user_code,
             charge_amt: charge.charge_amt,
           });
+          added++;
+        } else if (dirtyRecIds.has(charge.rec_id)) {
+          await updateCharge(charge.rec_id, {
+            charge_code: charge.charge_code,
+            user_code: charge.user_code,
+            charge_amt: charge.charge_amt,
+          });
+          updated++;
         }
       }
 
-      // Reload from server to get updated IDs and clear dirty state
       const updatedCharges = await fetchCharges(docketId);
       setChargeList(updatedCharges);
-      setDirtyChargeIndexes(new Set());
+      setDirtyRecIds(new Set());
+      tempIdCounter.current = -1;
+
+      if (added > 0) showSuccess(`${added} charge${added > 1 ? "s" : ""} added successfully`);
+      if (updated > 0) showSuccess(`${updated} charge${updated > 1 ? "s" : ""} updated successfully`);
+      if (added === 0 && updated === 0) showSuccess("No changes to save");
     } catch (err) {
       console.error("Failed to save charges:", err);
+      showError(err.message || "Failed to save charges");
     }
   };
 
-  const updateChargeRow = (index, field, value) => {
-    setDirtyChargeIndexes((prev) => new Set(prev).add(index));
+  const updateChargeRow = (recId, field, value) => {
     setChargeList((prev) => {
+      const idx = prev.findIndex((r) => r.rec_id === recId);
+      if (idx === -1) return prev;
+
       const updated = [...prev];
-      const existingRow = updated[index] || {};
+      const existingRow = updated[idx];
       const defaults = field === "charge_code" ? chargeDefaults[value] || {} : {};
-      updated[index] = { ...existingRow, ...defaults, [field]: value };
+      updated[idx] = { ...existingRow, ...defaults, [field]: value };
+
+      // Mark dirty only for existing DB rows (positive rec_id)
+      if (existingRow.rec_id > 0) {
+        setDirtyRecIds((d) => new Set(d).add(existingRow.rec_id));
+      }
+
       return recalculateChargeList(updated, invoiceValue);
     });
   };
@@ -201,7 +216,7 @@ export default function ChargesSection({
       <DataTable
         columns={chargeColumns}
         rows={displayChargeList}
-        getKey={(row, idx) => idx}
+        getKey={(row) => row.rec_id}
         actions={[
           { label: "Delete", onClick: (row) => deleteCharge(row) },
         ]}
@@ -211,7 +226,10 @@ export default function ChargesSection({
           updateChargeRow(rowIndex, key, value)
         }
       />
+      <CommonAlertDialog
+              dialog={dialog}
+              onClose={closeAlert}
+            />
     </div>
   );
 }
-  

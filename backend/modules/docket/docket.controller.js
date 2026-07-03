@@ -252,7 +252,7 @@ const createCharge = async (docketNo, chargeData, trx = db) => {
 
 const updateCharge = async (chargeId, chargeData, trx = db) => {
   const query = trx('sss.sst_docket_charges')
-    .where({ id: chargeId })
+    .where({ rec_id: chargeId })
     .update({
       charge_code: chargeData.charge_code,
       user_code: chargeData.user_code,
@@ -265,7 +265,7 @@ const updateCharge = async (chargeId, chargeData, trx = db) => {
 
 const deleteCharge = async (chargeId, trx = db) => {
   const query = trx('sss.sst_docket_charges')
-    .where({ id: chargeId })
+    .where({ rec_id: chargeId })
     .update({ record_status: 1 });
   return query;
 };
