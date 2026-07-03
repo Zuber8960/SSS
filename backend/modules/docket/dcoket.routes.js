@@ -27,10 +27,10 @@ router.get('/ewbDetails/:ewbLists', async (req, res) => {
         data: data
       });
     }
-    return res.status(200).json({
-      success: true,
-      data: ewb.ewb_dummy_data
-    });
+    // return res.status(200).json({
+    //   success: true,
+    //   data: ewb.ewb_dummy_data
+    // });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -38,9 +38,18 @@ router.get('/ewbDetails/:ewbLists', async (req, res) => {
 
 /* ================= EWAYBILL DB ROUTES ================= */
 
+router.get('/ewayfile/db', async (req, res) => {
+  try {
+    const data = await db('sss.sst_docket_ewb').select('*').orderBy('aud_date', 'desc');
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.get('/ewayfile/db/:ewbNumbers', async (req, res) => {
   try {
-    const ewbNumbers = req.params.ewbNumbers?.split(',').map(s => s.trim()).filter(Boolean);
+    const ewbNumbers = req.params.ewbNumbers?.split(',').map(s => s.trim()).filter(Boolean).map(Number);
     if (!ewbNumbers?.length) {
       return res.json({ success: true, data: [] });
     }

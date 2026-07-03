@@ -1,3 +1,4 @@
+const moment = require('moment');
 const db = require('../../config/db');
 const axios = require('axios');
 
@@ -248,12 +249,16 @@ const getEwayBillFromDB = async (ewbNumbers) => {
 const saveEwayBillToDB = async (ewbDataArray) => {
   const rows = ewbDataArray.map(item => {
     const data = item.data || item;
+    const ewb_date = moment(data.ewayBillDate, 'DD/MM/YYYY').format('YYYY-MM-DD') || null;
+    const ewb_valid_upto = data.validUpto ? moment(data.validUpto, 'DD/MM/YYYY').format('YYYY-MM-DD') : null;
+    const invoice_date = data.docDate ? moment(data.docDate, 'DD/MM/YYYY').format('YYYY-MM-DD') : null;
     return {
       ewb_no: String(data.ewbNo || ''),
-      ewb_date: data.ewayBillDate ? data.ewayBillDate.split(' ')[0] : null,
-      ewb_valid_upto: data.validUpto ? data.validUpto.split(' ')[0] : null,
+      ewb_date,
+      ewb_valid_upto,
       invoice_no: data.docNo || '',
-      invoice_date: data.docDate || null,
+      docket_no: data.docNo || '',
+      invoice_date,
       cnor_name: data.fromTrdName || '',
       cnor_address: (data.fromAddr1 || '') + ' ' + (data.fromAddr2 || ''),
       cnor_gstin: data.fromGstin || '',
@@ -262,7 +267,7 @@ const saveEwayBillToDB = async (ewbDataArray) => {
       cnee_address: (data.toAddr1 || '') + ' ' + (data.toAddr2 || ''),
       cnee_gstin: data.toGstin || '',
       cnee_pincode: data.toPincode || null,
-      taxble_value: data.taxableAmount || data.totalValue || 0,
+      // taxble_value: data.taxableAmount || data.totalValue || 0,
       cgst: data.cgstValue || 0,
       sgst: data.sgstValue || 0,
       igst: data.igstValue || 0,
@@ -275,9 +280,10 @@ const saveEwayBillToDB = async (ewbDataArray) => {
     };
   });
 
-  return db('sss.sst_docket_ewb')
+  const query = db('sss.sst_docket_ewb')
     .insert(rows)
     .returning('*');
+  return query;
 };
 
 module.exports = {

@@ -11,5 +11,6 @@ export const createCharge           = (docketId, data)    => Api.post(`/docket/$
 export const updateCharge           = (chargeId, data)    => Api.put(`/docket/charges/${chargeId}`, data).then(r => r.data.data || r.data);
 export const deleteCharge           = (chargeId)          => Api.delete(`/docket/charges/${chargeId}`).then(r => r.data);
 
-export const fetchEwayBillFromDB    = (ewbNumbers)        => Api.get(`/docket/ewayfile/db/${encodeURIComponent(ewbNumbers.join(','))}`).then(r => r.data.data || r.data || []);
+export const fetchEwayBillFromDB    = (ewbNumbers)        => Api.get(`/docket/ewayfile/db/${encodeURIComponent(ewbNumbers?.join(','))}`).then(r => r.data.data || r.data || []);
 export const saveEwayBillToDB       = (ewbData)           => Api.post('/docket/ewayfile/db', ewbData).then(r => r.data.data || r.data || []);
+export const fetchAllEwayBillsFromDB = ()                 => Api.get('/docket/ewayfile/db').then(r => r.data.data || r.data || []);

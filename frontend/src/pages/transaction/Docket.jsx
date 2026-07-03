@@ -16,6 +16,7 @@ import {
   updateDocket,
   fetchEwayBillFromDB,
   saveEwayBillToDB,
+  fetchAllEwayBillsFromDB,
 } from "../../utils/docket";
 import ChargesSection from "./docket/ChargesSection";
 import EwayBillSection from "./docket/EwayBillSection";
@@ -196,7 +197,7 @@ export default function DocketPage() {
   const [docketNumberInput, setDocketNumberInput] = useState("");
   const [isFormEditMode, setIsFormEditMode] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [docketId, setDocketId] = useState(null);
 
   const moveSectionToTop = (section) => {
@@ -254,8 +255,9 @@ export default function DocketPage() {
 
       // 1. Check which ewb numbers already exist in the database
       let existingEwbNos = [];
+      let dbRecords = [];
       try {
-        const dbRecords = await fetchEwayBillFromDB(ewbLists);
+        dbRecords = await fetchEwayBillFromDB(ewbLists);
         existingEwbNos = (dbRecords || []).map(r => Number(r.ewb_no));
       } catch (dbErr) {
         console.warn("DB check failed, proceeding to fetch all from govt portal:", dbErr);
@@ -301,12 +303,15 @@ export default function DocketPage() {
       }
 
       const ewRecords = allRecords.map(f => {
-        const m = moment(f.docDate, "DD/MM/YYYY", true);
+        // f may be a govt API object (docDate, docNo, fromPlace, toPlace)
+        // or a DB row (invoice_date, invoice_no, cnor_address, cnee_address)
+        const dateStr = f.docDate || f.invoice_date;
+        const m = moment(dateStr, ["DD/MM/YYYY", "YYYY-MM-DD"], true);
         return {
-          docket_no: f.docNo || "",
+          docket_no: f.docNo || f.invoice_no || "",
           docket_date: m.isValid() ? m.format("YYYY-MM-DD") : "",
-          docket_loc: f.fromPlace || "",
-          docket_to_loc: f.toPlace || "",
+          docket_loc: f.fromPlace || f.cnor_address || "",
+          docket_to_loc: f.toPlace || f.cnee_address || "",
           remark: f.status_desc || "Shipment is about to complete",
         };
       });
@@ -360,9 +365,9 @@ export default function DocketPage() {
         .map(r => ({
           ewb_no: r.ewb_no || "",
           ewb_date: r.ewb_date ? moment(r.ewb_date).format("MM/DD/YYYY") : "",
-          ewb_valid: r.valid_upto ? moment(r.valid_upto).format("MM/DD/YYYY") : "",
-          inv_no: "",
-          inv_date: ""
+          ewb_valid: r.ewb_valid_upto ? moment(r.ewb_valid_upto).format("MM/DD/YYYY") : "",
+          inv_no: r.invoice_no || "",
+          inv_date: r.invoice_date ? moment(r.invoice_date).format("MM/DD/YYYY") : "",
         }));
 
       setEwbList([...govtEwbRecords, ...dbEwbRecords]);
@@ -376,7 +381,23 @@ export default function DocketPage() {
   }
 
   useEffect(() => {
-    // fetchData();
+    const loadEwayBills = async () => {
+      try {
+        const data = await fetchAllEwayBillsFromDB();
+        const records = Array.isArray(data) ? data : [];
+        if (records.length === 0) return;
+        setEwbList(records.map(r => ({
+          ewb_no: r.ewb_no || "",
+          ewb_date: r.ewb_date ? moment(r.ewb_date).format("MM/DD/YYYY") : "",
+          ewb_valid: r.ewb_valid_upto ? moment(r.ewb_valid_upto).format("MM/DD/YYYY") : "",
+          inv_no: r.invoice_no || "",
+          inv_date: r.invoice_date ? moment(r.invoice_date).format("MM/DD/YYYY") : "",
+        })));
+      } catch (err) {
+        showError(err.message || "Failed to load e-way bills");
+      }
+    };
+    loadEwayBills();
   }, []);
 
   const showFormOnClick = async (e) => {
