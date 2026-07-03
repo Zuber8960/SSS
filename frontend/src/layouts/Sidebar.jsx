@@ -38,7 +38,6 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
   const isActive = (path) => pathname === path;
   const isSectionActive = (paths) => paths.some((path) => pathname.startsWith(path));
   const textVisible = !collapsed;
-
   useEffect(() => {
     if (pathname.startsWith("/admin")) {
       setOpenAdmin(true);

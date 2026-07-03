@@ -9,7 +9,7 @@
   flex-direction: column;
   overflow-y: auto;
   box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
-  transition: width 0.8s ease;
+  transition: width 0.3s ease;
 }
 
 .sidebar.collapsed {
@@ -257,6 +257,10 @@
 
   .sidebar.collapsed .sidebarToggle {
     margin-left: 0;
+  }
+
+  .sidebarToggle {
+    display: none;
   }
 
   .sidebarOverlay {

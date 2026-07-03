@@ -1,6 +1,6 @@
 import "../../styles/MasterPage.css";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 import { Box, Button } from "@mui/material";
 
@@ -85,6 +85,10 @@ export function FormField({
           disabled={disabled}
           onChange={(e) => updateField(e.target.value)}
           placeholder={`Enter ${label}`}
+          {...(type === "number" ? {
+            min: 0,
+            onKeyDown: (e) => ["-", "+", "e", "E"].includes(e.key) && e.preventDefault(),
+          } : {})}
         />
       )}
     </div>
@@ -97,6 +101,7 @@ export function DataTable({
   getKey,
   actions,
   editable = false,
+  singleClick = false,
   onCellChange,
 }) {
   const [paginationModel, setPaginationModel] = useState({
@@ -104,13 +109,11 @@ export function DataTable({
     pageSize: 5,
   });
 
-  useEffect(() => {
-    setPaginationModel((model) => {
-      const lastPage = Math.max(Math.ceil(rows.length / model.pageSize) - 1, 0);
-
-      return model.page > lastPage ? { ...model, page: lastPage } : model;
-    });
-  }, [rows.length]);
+  const lastPage = Math.max(Math.ceil(rows.length / paginationModel.pageSize) - 1, 0);
+  const effectivePaginationModel = {
+    ...paginationModel,
+    page: paginationModel.page > lastPage ? lastPage : paginationModel.page,
+  };
 
   const muiColumns = [
     ...columns.map((col) => ({
@@ -189,12 +192,13 @@ export function DataTable({
       <DataGrid
         rows={muiRows}
         columns={muiColumns}
-        paginationModel={paginationModel}
+        paginationModel={effectivePaginationModel}
         onPaginationModelChange={setPaginationModel}
         pageSizeOptions={[5]}
-        disableSelectionOnClick
+        disableRowSelectionOnClick
         pagination
         autoHeight
+        {...(singleClick ? { singleClickEdit: true } : {})}
         processRowUpdate={(newRow, oldRow) => {
           if (!editable || !onCellChange) return newRow;
 

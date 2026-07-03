@@ -44,6 +44,7 @@ export default function EwayBillSection({
         getKey={(row, idx) => idx}
         actions={[{ label: "Delete", onClick: onDelete }]}
         editable
+        singleClick
         onCellChange={onCellChange}
       />
     </div>

@@ -222,8 +222,7 @@ router.put('/:no', async (req, res) => {
 
     const keys = {
       docket_no: existing.docket_no,
-      docket_loc: existing.docket_loc,
-      docket_date: existing.docket_date
+      docket_loc: existing.docket_loc
     };
 
     await DocketController.updateDocket(keys, payload, trx);

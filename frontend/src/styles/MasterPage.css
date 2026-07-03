@@ -216,10 +216,27 @@ color: #1e293b;
   overflow-y: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   transition: all 0.2s ease;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.dataTableWrapper::-webkit-scrollbar {
+  display: none;
 }
 
 .dataTableWrapper .MuiDataGrid-root {
   min-width: 760px;
+}
+
+/* Hide MUI DataGrid's internal horizontal scrollbar on laptop/desktop */
+.dataTableWrapper .MuiDataGrid-scrollbar--horizontal,
+.dataTableWrapper .MuiDataGrid-virtualScroller::-webkit-scrollbar {
+  display: none;
+}
+
+.dataTableWrapper .MuiDataGrid-virtualScroller {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .dataTableWrapper:hover {
@@ -432,9 +449,40 @@ color: #1e293b;
     margin-bottom: 16px;
   }
 
+  /* Outer wrapper: keep scrollable but hide its own scrollbar — MUI inner one is enough */
   .dataTableWrapper {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .dataTableWrapper::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Re-enable only MUI DataGrid's internal scrollbar on mobile */
+  .dataTableWrapper .MuiDataGrid-scrollbar--horizontal {
+    display: block;
+  }
+
+  .dataTableWrapper .MuiDataGrid-virtualScroller::-webkit-scrollbar {
+    display: block;
+    height: 6px;
+  }
+
+  .dataTableWrapper .MuiDataGrid-virtualScroller::-webkit-scrollbar-thumb {
+    background: #a855f7;
+    border-radius: 3px;
+  }
+
+  .dataTableWrapper .MuiDataGrid-virtualScroller::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+
+  .dataTableWrapper .MuiDataGrid-virtualScroller {
+    scrollbar-width: thin;
+    -ms-overflow-style: auto;
   }
 
   .dataTableWrapper .MuiDataGrid-root {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { DataTable } from "../../../components/common/MasterPage";
 import { fetchCharges, createCharge, updateCharge, deleteCharge as deleteChargeApi } from "../../../utils/docket";
 
@@ -22,6 +22,42 @@ const chargeColumns = [
   { key: "charge_amt", label: "Charge Amount", editable: false },
 ];
 
+const toNumber = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const formatAmount = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Number(n.toFixed(2)) : 0;
+};
+
+const getFreightAmount = (rows) => {
+  const row = rows.find((r) => r.charge_code === "Freight");
+  return row ? toNumber(row.user_code) : 0;
+};
+
+const calculateChargeRow = (row, rows, invValue) => {
+  const userValue = toNumber(row.user_code);
+  const inv = toNumber(invValue);
+  let chargeAmount = 0;
+
+  if (row.charge_code === "Freight") {
+    chargeAmount = userValue;
+  } else if (row.charge_code === "Ser charge") {
+    chargeAmount = (getFreightAmount(rows) * userValue) / 100;
+  } else if (row.charge_code === "COF") {
+    chargeAmount = inv * userValue;
+  } else if (row.charge_code === "Freight On Value") {
+    chargeAmount = (inv * userValue) / 100;
+  }
+
+  return { ...row, charge_amt: formatAmount(chargeAmount) };
+};
+
+const recalculateChargeList = (rows, invValue) =>
+  rows.map((row) => calculateChargeRow(row, rows, invValue));
+
 export default function ChargesSection({
   docketId,
   invoiceValue,
@@ -29,27 +65,22 @@ export default function ChargesSection({
   sectionHeaderStyle,
   sectionActionsStyle,
   onChargesChange,
+  singleClick = false,
 }) {
   const [chargeList, setChargeList] = useState([]);
+  const [dirtyChargeIndexes, setDirtyChargeIndexes] = useState(new Set());
 
-  // Fetch charges when docketId changes
+  // Fetch charges when docketId changes, clear dirty state
   useEffect(() => {
     if (docketId) {
       fetchCharges(docketId)
-        .then(setChargeList)
+        .then((charges) => {
+          setChargeList(charges);
+          setDirtyChargeIndexes(new Set());
+        })
         .catch(console.error);
     }
   }, [docketId]);
-
-  // Recalculate charges when invoiceValue changes
-  useEffect(() => {
-    setChargeList((prev) => {
-      const recalculated = recalculateChargeList(prev);
-      return JSON.stringify(recalculated) === JSON.stringify(prev)
-        ? prev
-        : recalculated;
-    });
-  }, [invoiceValue]);
 
   // Notify parent of chargeList changes
   useEffect(() => {
@@ -58,86 +89,50 @@ export default function ChargesSection({
     }
   }, [chargeList, onChargesChange]);
 
-  // --- Calculation helpers (moved from Docket.jsx) ---
 
-  const toNumber = (value) => {
-    const number = Number(value);
-    return Number.isFinite(number) ? number : 0;
-  };
-
-  const formatAmount = (value) => {
-    const number = Number(value);
-    return Number.isFinite(number) ? Number(number.toFixed(2)) : 0;
-  };
-
-  const calculateFreightAmount = (row) => {
-    return toNumber(row.user_code);
-  };
-
-  const getFreightAmount = (rows) => {
-    const freightRow = rows.find((row) => row.charge_code === "Freight");
-    return freightRow ? calculateFreightAmount(freightRow) : 0;
-  };
-
-  const calculateChargeRow = (row, rows) => {
-    const chargeCode = row.charge_code;
-    const userValue = toNumber(row.user_code);
-    const invValue = toNumber(invoiceValue);
-    let chargeAmount = 0;
-
-    if (chargeCode === "Freight") {
-      chargeAmount = calculateFreightAmount(row);
-    } else if (chargeCode === "Ser charge") {
-      chargeAmount = (getFreightAmount(rows) * userValue) / 100;
-    } else if (chargeCode === "COF") {
-      chargeAmount = invValue * userValue;
-    } else if (chargeCode === "Freight On Value") {
-      chargeAmount = (invValue * userValue) / 100;
-    }
-
-    return {
-      ...row,
-      charge_amt: formatAmount(chargeAmount),
-    };
-  };
-
-  const recalculateChargeList = (rows) =>
-    rows.map((row) => calculateChargeRow(row, rows));
+  // Recalculate derived charge amounts when invoiceValue changes — no useEffect needed
+  const displayChargeList = useMemo(
+    () => recalculateChargeList(chargeList, invoiceValue),
+    [chargeList, invoiceValue]
+  );
 
   // --- Handlers ---
 
   const addChargeRow = () => {
-    setChargeList((prev) => [
-      ...prev,
-      calculateChargeRow(
-        { charge_code: "Freight", ...chargeDefaults.Freight },
-        [...prev, { charge_code: "Freight", ...chargeDefaults.Freight }]
-      ),
-    ]);
+    const newRow = { charge_code: "Freight", ...chargeDefaults.Freight };
+    setChargeList((prev) => {
+      const next = [...prev, newRow];
+      return recalculateChargeList(next, invoiceValue);
+    });
+    // New rows have no index-based id yet; mark by new length - 1 after update
+    setDirtyChargeIndexes((prev) => {
+      const next = new Set(prev);
+      next.add("new");
+      return next;
+    });
   };
 
   const deleteCharge = async (row) => {
     const chargeToDelete = chargeList[row.id];
     if (!chargeToDelete || !chargeToDelete.id) {
-      // If no server ID, just remove from local state
       setChargeList((prev) =>
-        recalculateChargeList(prev.filter((_, index) => index !== row.id))
+        recalculateChargeList(prev.filter((_, i) => i !== row.id), invoiceValue)
       );
       return;
     }
-
     try {
       await deleteChargeApi(chargeToDelete.id);
       setChargeList((prev) =>
-        recalculateChargeList(prev.filter((_, index) => index !== row.id))
+        recalculateChargeList(prev.filter((_, i) => i !== row.id), invoiceValue)
       );
+      setDirtyChargeIndexes((prev) => {
+        const next = new Set(prev);
+        next.delete(row.id);
+        return next;
+      });
     } catch (err) {
       console.error("Failed to delete charge:", err);
     }
-  };
-
-  const editCharge = () => {
-    // Placeholder: could show info or open a modal
   };
 
   const handleSave = async () => {
@@ -147,16 +142,21 @@ export default function ChargesSection({
     }
 
     try {
-      for (const charge of chargeList) {
+      for (let i = 0; i < chargeList.length; i++) {
+        const charge = chargeList[i];
+        const isDirty = dirtyChargeIndexes.has(i) || dirtyChargeIndexes.has("new");
+
         if (charge.id) {
-          // Existing charge - update via PUT
-          await updateCharge(charge.id, {
-            charge_code: charge.charge_code,
-            user_code: charge.user_code,
-            charge_amt: charge.charge_amt,
-          });
+          // Existing row — only PUT if it was actually edited
+          if (isDirty) {
+            await updateCharge(charge.id, {
+              charge_code: charge.charge_code,
+              user_code: charge.user_code,
+              charge_amt: charge.charge_amt,
+            });
+          }
         } else {
-          // New charge - create via POST
+          // New row — always POST
           await createCharge(docketId, {
             charge_code: charge.charge_code,
             user_code: charge.user_code,
@@ -165,28 +165,23 @@ export default function ChargesSection({
         }
       }
 
-      // Reload charges from server to get updated IDs
+      // Reload from server to get updated IDs and clear dirty state
       const updatedCharges = await fetchCharges(docketId);
       setChargeList(updatedCharges);
+      setDirtyChargeIndexes(new Set());
     } catch (err) {
       console.error("Failed to save charges:", err);
     }
   };
 
   const updateChargeRow = (index, field, value) => {
+    setDirtyChargeIndexes((prev) => new Set(prev).add(index));
     setChargeList((prev) => {
       const updated = [...prev];
       const existingRow = updated[index] || {};
-      const defaults =
-        field === "charge_code" ? chargeDefaults[value] || {} : {};
-
-      updated[index] = {
-        ...existingRow,
-        ...defaults,
-        [field]: value,
-      };
-
-      return recalculateChargeList(updated);
+      const defaults = field === "charge_code" ? chargeDefaults[value] || {} : {};
+      updated[index] = { ...existingRow, ...defaults, [field]: value };
+      return recalculateChargeList(updated, invoiceValue);
     });
   };
 
@@ -205,13 +200,13 @@ export default function ChargesSection({
       </div>
       <DataTable
         columns={chargeColumns}
-        rows={chargeList}
+        rows={displayChargeList}
         getKey={(row, idx) => idx}
         actions={[
-          { label: "Edit", onClick: editCharge },
           { label: "Delete", onClick: (row) => deleteCharge(row) },
         ]}
         editable
+        singleClick={singleClick}
         onCellChange={(rowIndex, key, value) =>
           updateChargeRow(rowIndex, key, value)
         }
@@ -219,3 +214,4 @@ export default function ChargesSection({
     </div>
   );
 }
+  

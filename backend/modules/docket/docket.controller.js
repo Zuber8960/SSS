@@ -159,11 +159,39 @@ const getDocketDetails = async ({ docket_no, docket_loc, docket_date }) => {
     .where({ docket_no, docket_loc, docket_date, record_status: 0 });
 };
 
+/* ================= HELPERS ================= */
+
+const NUMERIC_DOCKET_FIELDS = [
+  'docket_act_wt', 'docket_chrg_wt', 'docket_pay_type',
+  'docket_rate', 'docket_tot_amt', 'docket_inv_value',
+  'docket_insurance_amt', 'docket_po_amt', 'docket_transit_days',
+  'docket_crtns', 'docket_bndls', 'docket_bags',
+  'docket_loose', 'docket_other', 'docket_tot_pkgs'
+];
+
+const sanitizeDocketData = (data) => {
+  const sanitized = { ...data };
+  for (const field of NUMERIC_DOCKET_FIELDS) {
+    if (field in sanitized) {
+      const val = sanitized[field];
+      if (val === '' || val === undefined || val === null) {
+        sanitized[field] = null;
+      } else {
+        const num = Number(val);
+        sanitized[field] = isNaN(num) ? null : num;
+      }
+    }
+  }
+  if ('docket_act_wt' in sanitized && sanitized.docket_act_wt === null) sanitized.docket_act_wt = 0;
+  if ('docket_chrg_wt' in sanitized && sanitized.docket_chrg_wt === null) sanitized.docket_chrg_wt = 0;
+  return sanitized;
+};
+
 /* ================= CREATE ================= */
 
 const createDocket = async (header, trx = db) => {
   return trx('sss.sst_docket').insert({
-    ...header,
+    ...sanitizeDocketData(header),
     aud_date: new Date()
   });
 };
@@ -175,12 +203,13 @@ const createDocketDetails = async (details, trx = db) => {
 /* ================= UPDATE ================= */
 
 const updateDocket = async (keys, data, trx = db) => {
-  return trx('sss.sst_docket')
+  const query = trx('sss.sst_docket')
     .where(keys)
     .update({
-      ...data,
+      ...sanitizeDocketData(data),
       aud_date: new Date()
     });
+  return query;
 };
 
 const deleteDocketDetails = async (keys, trx = db) => {
@@ -209,7 +238,7 @@ const getChargesByDocketId = async (docketNo) => {
 };
 
 const createCharge = async (docketNo, chargeData, trx = db) => {
-  return trx('sss.sst_docket_charges')
+  const query = trx('sss.sst_docket_charges')
     .insert({
       docket_no: docketNo,
       charge_code: chargeData.charge_code,
@@ -218,10 +247,11 @@ const createCharge = async (docketNo, chargeData, trx = db) => {
       aud_date: new Date()
     })
     .returning('*');
+  return query;
 };
 
 const updateCharge = async (chargeId, chargeData, trx = db) => {
-  return trx('sss.sst_docket_charges')
+  const query = trx('sss.sst_docket_charges')
     .where({ id: chargeId })
     .update({
       charge_code: chargeData.charge_code,
@@ -230,12 +260,14 @@ const updateCharge = async (chargeId, chargeData, trx = db) => {
       aud_date: new Date()
     })
     .returning('*');
+  return query;
 };
 
 const deleteCharge = async (chargeId, trx = db) => {
-  return trx('sss.sst_docket_charges')
+  const query = trx('sss.sst_docket_charges')
     .where({ id: chargeId })
     .update({ record_status: 1 });
+  return query;
 };
 
 /* ================= EWAY BILL DB OPERATIONS ================= */
@@ -280,10 +312,44 @@ const saveEwayBillToDB = async (ewbDataArray) => {
     };
   });
 
-  const query = db('sss.sst_docket_ewb')
+  
+
+  const ewbResult = await db('sss.sst_docket_ewb')
     .insert(rows)
     .returning('*');
-  return query;
+
+  const docketRows = ewbDataArray.map(item => {
+    const data = item.data || item;
+    const docket_date = data.docDate ? moment(data.docDate, 'DD/MM/YYYY').format('YYYY-MM-DD') : null;
+    const totalQty = data.itemList?.reduce((sum, i) => sum + (i.quantity || 0), 0) || 0;
+    const goodsDesc = data.itemList?.map(i => i.productDesc || i.productName).filter(Boolean).join(', ') || '';
+    const hsnCode = data.itemList?.[0]?.hsnCode ? String(data.itemList[0].hsnCode) : '';
+
+    return {
+      docket_loc: (data.fromPlace || '').toUpperCase(),
+      docket_no: data.docNo || '',
+      docket_date,
+      docket_to_loc: (data.toPlace || '').toUpperCase(),
+      docket_cnor_name: data.fromTrdName || '',
+      docket_cnee_name: data.toTrdName || '',
+      docket_dly_town: data.toPlace || '',
+      docket_act_wt: totalQty,
+      docket_chrg_wt: totalQty,
+      docket_inv_value: data.totalValue || 0,
+      docket_tot_amt: data.totInvValue || 0,
+      docket_goods_desc: goodsDesc,
+      hsn_code: hsnCode,
+      aud_date: new Date(),
+      record_status: 0
+    };
+  });
+
+  await db('sss.sst_docket')
+    .insert(docketRows)
+    .onConflict(['docket_no', 'docket_loc', 'docket_date'])
+    .ignore();
+
+  return ewbResult;
 };
 
 module.exports = {

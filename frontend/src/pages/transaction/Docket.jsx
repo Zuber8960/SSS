@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import MainLayout from "../../layouts/MainLayout";
 import moment from "moment";
 import {
@@ -187,6 +187,17 @@ export default function DocketPage() {
     remark: "",
   });
 
+  const tot_amt = useMemo(
+    () =>
+      (parseFloat(form.no_cb) || 0) +
+      (parseFloat(form.no_w_crate) || 0) +
+      (parseFloat(form.no_w_cbox) || 0) +
+      (parseFloat(form.no_loose) || 0) +
+      (parseFloat(form.no_others) || 0),
+    [form.no_cb, form.no_w_crate, form.no_w_cbox, form.no_loose, form.no_others]
+  );
+
+
   const [ewbList, setEwbList] = useState([]);
   const [chargeList, setChargeList] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -199,6 +210,7 @@ export default function DocketPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [docketId, setDocketId] = useState(null);
+  const [dirtyFields, setDirtyFields] = useState(new Set());
 
   const moveSectionToTop = (section) => {
     setSectionOrder((prev) => [section, ...prev.filter((item) => item !== section)]);
@@ -312,7 +324,7 @@ export default function DocketPage() {
           docket_date: m.isValid() ? m.format("YYYY-MM-DD") : "",
           docket_loc: f.fromPlace || f.cnor_address || "",
           docket_to_loc: f.toPlace || f.cnee_address || "",
-          remark: f.status_desc || "Shipment is about to complete",
+          remark: f.status_desc || "",
         };
       });
 
@@ -355,8 +367,8 @@ export default function DocketPage() {
           ewb_no: obj.data.ewbNo,
           ewb_date: moment(obj.data.ewayBillDate, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
           ewb_valid: moment(obj.data.validUpto, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
-          inv_no: "",
-          inv_date: ""
+          inv_no: obj.data.docNo || obj.data.invoice_no || "",
+          inv_date: obj.data.docDate ? moment(obj.data.docDate, "DD/MM/YYYY").format("MM/DD/YYYY") : "",
         }));
 
       // For DB records without portal details, add basic entry
@@ -418,14 +430,52 @@ export default function DocketPage() {
         return;
       }
 
-      // Build payload - exclude tot_amt as it's computed
-      const payload = { ...form };
-      delete payload.tot_amt;
+      // Map form field names → DB column names
+      const formToDb = {
+        docket_to_loc:    "docket_to_loc",
+        act_wt:           "docket_act_wt",
+        chrg_wt:          "docket_chrg_wt",
+        no_cb:            "docket_crtns",
+        no_w_crate:       "docket_bndls",
+        no_w_cbox:        "docket_bags",
+        no_loose:         "docket_loose",
+        no_others:        "docket_other",
+        rate:             "docket_rate",
+        rate_uom:         "docket_rate_uom",
+        po_no:            "docket_po_no",
+        po_date:          "docket_po_date",
+        invoice_value:    "docket_inv_value",
+        risk:             "docket_risk",
+        insurance_company:   "docket_insurance_co",
+        insurance_policy_no: "docket_insurance_no",
+        valid_upto:          "docket_insurance_date",
+        sum_insured:         "docket_insurance_amt",
+        goods_grp:        "docket_goods_grp",
+        goods_subgrp:     "docket_goods_subgrp",
+        goods_desc:       "docket_goods_desc",
+        remark:           "docket_remark",
+      };
+
+      const payload = {};
+      dirtyFields.forEach((formKey) => {
+        if (formToDb[formKey]) {
+          payload[formToDb[formKey]] = form[formKey];
+        }
+      });
+      // tot_pkgs is derived — include if any "no_*" field is dirty
+      const noFields = ["no_cb", "no_w_crate", "no_w_cbox", "no_loose", "no_others"];
+      if (noFields.some((f) => dirtyFields.has(f))) {
+        payload.docket_tot_pkgs = tot_amt;
+      }
 
       let result;
       if (isFormEditMode) {
-        // Update existing docket (PUT)
+        if (Object.keys(payload).length === 0) {
+          showInfo("No changes to save");
+          return;
+        }
         result = await updateDocket(docketNo, payload);
+        setDirtyFields(new Set());
         showSuccess("Docket updated successfully");
       } else {
         // Create new docket (POST)
@@ -451,11 +501,43 @@ export default function DocketPage() {
       try {
         const docketData = await fetchDocketByDocketNo(docketNo);
         if (docketData) {
-          // Map the response fields to the form state
-          const mapped = {};
-          Object.keys(form).forEach((key) => {
-            mapped[key] = docketData[key] !== undefined ? docketData[key] : form[key];
-          });
+          const toDate = (val) => {
+            const m = moment(val);
+            return m.isValid() ? m.format("YYYY-MM-DD") : "";
+          };
+          const mapped = {
+            docket_no:           docketData.docket_no           || "",
+            docket_date:         toDate(docketData.docket_date),
+            docket_loc:          docketData.docket_loc          || "",
+            docket_to_loc:       docketData.docket_to_loc       || "",
+            act_wt:              docketData.docket_act_wt       ?? "",
+            chrg_wt:             docketData.docket_chrg_wt      ?? "",
+            no_cb:               docketData.docket_crtns        ?? 0,
+            no_w_crate:          docketData.docket_bndls        ?? 0,
+            no_w_cbox:           docketData.docket_bags         ?? 0,
+            no_loose:            docketData.docket_loose        ?? 0,
+            no_others:           docketData.docket_other        ?? 0,
+            tot_pkgs:            docketData.docket_tot_pkgs     ?? 0,
+            rate:                docketData.docket_rate         ?? "",
+            rate_uom:            docketData.docket_rate_uom     || "",
+            tot_amt:             docketData.docket_tot_amt      ?? "",
+            po_no:               docketData.docket_po_no        || "",
+            po_date:             toDate(docketData.docket_po_date),
+            invoice_no:          docketData.docket_inv_no       || "",
+            invoice_date:        toDate(docketData.docket_inv_date),
+            invoice_value:       docketData.docket_inv_value    ?? "",
+            risk:                docketData.docket_risk         || "",
+            insurance_company:   docketData.docket_insurance_co || "",
+            insurance_policy_no: docketData.docket_insurance_no || "",
+            insurance_cert_no:   "",
+            sum_insured:         docketData.docket_insurance_amt ?? "",
+            valid_upto:          toDate(docketData.docket_insurance_date),
+            goods_grp:           docketData.docket_goods_grp    || "",
+            goods_subgrp:        docketData.docket_goods_subgrp || "",
+            goods_desc:          docketData.docket_goods_desc   || "",
+            remark:              docketData.docket_remark       || "",
+          };
+          setDirtyFields(new Set());
           setForm(mapped);
           showInfo("Docket data loaded successfully");
         }
@@ -565,10 +647,14 @@ export default function DocketPage() {
                 <FormField
                   {...field}
                   form={form}
-                  setForm={setForm}
+                  setForm={(updated) => {
+                    setDirtyFields((prev) => new Set(prev).add(field.name));
+                    setForm(updated);
+                  }}
                   disabled={
                     !isFormEditMode ||
-                    (field.name === "docket_no" && !isDocketNoEnabled)
+                    (field.name === "docket_no" && !isDocketNoEnabled) ||
+                    field.name === "docket_date"
                   }
                 />
               </div>
@@ -640,6 +726,7 @@ export default function DocketPage() {
                 buttonStyle={sectionButtonStyle}
                 sectionHeaderStyle={sectionHeaderStyle}
                 sectionActionsStyle={sectionActionsStyle}
+                singleClick
               />
             );
           }
@@ -663,8 +750,7 @@ export default function DocketPage() {
                 <div className="formFieldGroup" style={{ minWidth: 150 }}>
                   <input
                     type="number"
-                    value={form.tot_amt}
-                    onChange={(e) => setForm({ ...form, tot_amt: parseFloat(e.target.value) || 0 })}
+                    value={tot_amt}
                     placeholder="Total Amount"
                     disabled={true}
                     style={{ padding: "9px 14px", fontSize: 14 }}
