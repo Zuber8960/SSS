@@ -8,6 +8,8 @@ import {
 } from "../../components/common/MasterPage";
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
+import useLoading from "../../components/common/UseLoading";
+import LoadingOverlay from "../../components/common/LoadingOverlay";
 import { useEffect } from "react";
 import {
   fetchEwayBill,
@@ -199,7 +201,6 @@ export default function DocketPage() {
 
 
   const [ewbList, setEwbList] = useState([]);
-  const [chargeList, setChargeList] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [showEwayBill, setShowEwayBill] = useState(true);
   const [showCharges, setShowCharges] = useState(false);
@@ -208,7 +209,7 @@ export default function DocketPage() {
   const [docketNumberInput, setDocketNumberInput] = useState("");
   const [isFormEditMode, setIsFormEditMode] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const { isLoading, showLoading, hideLoading, withLoading } = useLoading();
   const [docketId, setDocketId] = useState(null);
   const [dirtyFields, setDirtyFields] = useState(new Set());
 
@@ -262,7 +263,7 @@ export default function DocketPage() {
 
   const fetchData = async (ewbLists) => {
     try {
-      setLoading(true);
+      showLoading();
       setError("");
 
       // 1. Check which ewb numbers already exist in the database
@@ -388,7 +389,7 @@ export default function DocketPage() {
       showError(err.message || "Failed to load e-way bill data");
       console.error("Error loading e-way bill data:", err);
     } finally {
-      setLoading(false);
+      hideLoading();
     }
   }
 
@@ -422,7 +423,7 @@ export default function DocketPage() {
   };
 
   // Save Form - POST for new, PUT for existing docket
-  const handleFormSave = async () => {
+  const handleFormSave = () => withLoading(async () => {
     try {
       const docketNo = form.docket_no.trim();
       if (!docketNo) {
@@ -488,7 +489,7 @@ export default function DocketPage() {
       showError(err.message || "Failed to save docket");
       console.error("Save docket error:", err);
     }
-  };
+  });
 
   const handleEditView = async () => {
     const docketNo = docketNumberInput.trim();
@@ -548,10 +549,6 @@ export default function DocketPage() {
         setForm((prev) => ({ ...prev, docket_no: docketNo }));
       }
     }
-  };
-
-  const handleChargesChange = (charges) => {
-    setChargeList(charges);
   };
 
   // Build a lookup map from field name to field config
@@ -720,9 +717,8 @@ export default function DocketPage() {
             return (
               <ChargesSection
                 key="charges"
-                docketId={docketId}
+                docketId={form.docket_no}
                 invoiceValue={form.invoice_value}
-                onChargesChange={handleChargesChange}
                 buttonStyle={sectionButtonStyle}
                 sectionHeaderStyle={sectionHeaderStyle}
                 sectionActionsStyle={sectionActionsStyle}
@@ -804,6 +800,7 @@ export default function DocketPage() {
         )}
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
+        <LoadingOverlay isLoading={isLoading} message="Please wait..." />
       </PageBody>
     </MainLayout>
   );
