@@ -1,3 +1,14 @@
+/* Dashboard Charts */
+.dashboardCharts {
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 768px) {
+  .dashboardCharts {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 /* Master Page Container */
 .pageBody {
   padding: 24px;

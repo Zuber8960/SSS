@@ -1,5 +1,6 @@
 import MainLayout from "../layouts/MainLayout";
 import { PageBody } from "../components/common/MasterPage";
+import "../styles/MasterPage.css";
 
 // StatCard Component
 function StatCard({ label, value, subtext, colorClass, icon }) {
@@ -204,7 +205,6 @@ export default function DashboardPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
               gap: 24,
               marginBottom: 20
             }}
