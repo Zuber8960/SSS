@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -23,8 +23,6 @@ import ExpandMore from "@mui/icons-material/ExpandMore";
 import Tooltip from "@mui/material/Tooltip";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import MenuIcon from "@mui/icons-material/Menu";
-import CloseIcon from "@mui/icons-material/Close";
 import "./Sidebar.css";
 import Logo from "../images/loogo.PNG";
 
@@ -33,346 +31,187 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
   const [openAdmin, setOpenAdmin] = useState(() => pathname.startsWith("/admin"));
   const [openMasters, setOpenMasters] = useState(() => pathname.startsWith("/masters"));
   const [openTransaction, setOpenTransaction] = useState(() => pathname.startsWith("/transaction"));
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem("sidebarCollapsed") === "true"
+  );
 
   const isActive = (path) => pathname === path;
-  const isSectionActive = (paths) => paths.some((path) => pathname.startsWith(path));
+  const isSectionActive = (prefix) => pathname.startsWith(prefix);
   const textVisible = !collapsed;
-  useEffect(() => {
-    if (pathname.startsWith("/admin")) {
-      setOpenAdmin(true);
-    }
-    if (pathname.startsWith("/masters")) {
-      setOpenMasters(true);
-    }
-    if (pathname.startsWith("/transaction")) {
-      setOpenTransaction(true);
-    }
-  }, [pathname]);
 
-  // Close mobile sidebar when clicking outside or on a menu item
   const handleNavClick = useCallback(() => {
-    if (onToggleMobile) {
-      onToggleMobile();
-    }
+    if (onToggleMobile) onToggleMobile();
   }, [onToggleMobile]);
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("sidebarCollapsed", next);
+      return next;
+    });
+  };
+
+  // ── Nav config ──────────────────────────────────────────────────────────────
+  const navSections = [
+    {
+      key: "admin",
+      label: "Administration",
+      icon: <ShieldIcon />,
+      prefix: "/admin",
+      open: openAdmin,
+      onToggle: () => {
+        setOpenAdmin((p) => !p);
+        setOpenMasters(false);
+        setOpenTransaction(false);
+      },
+      children: [
+        { path: "/admin/users",     label: "User Master",        icon: <GroupIcon /> },
+        { path: "/admin/roles",     label: "Role Master",        icon: <ShieldIcon /> },
+        { path: "/admin/menus",     label: "Menu Master",        icon: <MenuBookIcon /> },
+        { path: "/admin/role-menu", label: "Role Menu Mapping",  icon: <AssignmentIcon /> },
+        { path: "/admin/user-role", label: "User Role Mapping",  icon: <PublicIcon /> },
+      ],
+    },
+    {
+      key: "masters",
+      label: "Master Modules",
+      icon: <BusinessIcon />,
+      prefix: "/masters",
+      open: openMasters,
+      onToggle: () => {
+        setOpenMasters((p) => !p);
+        setOpenAdmin(false);
+        setOpenTransaction(false);
+      },
+      children: [
+        { path: "/masters/company",          label: "Company Master",    icon: <BusinessIcon /> },
+        { path: "/masters/division",         label: "Division Master",   icon: <MenuBookIcon /> },
+        { path: "/masters/location",         label: "Location Master",   icon: <LocationOnIcon /> },
+        { path: "/masters/business-partner", label: "Business Partner",  icon: <HandshakeIcon /> },
+      ],
+    },
+    {
+      key: "transaction",
+      label: "Transaction",
+      icon: <AssignmentIcon />,
+      prefix: "/transaction",
+      open: openTransaction,
+      onToggle: () => {
+        setOpenTransaction((p) => !p);
+        setOpenAdmin(false);
+        setOpenMasters(false);
+      },
+      children: [
+        { path: "/transaction/docket",           label: "Docket",          icon: <LocalShippingIcon /> },
+        { path: "/transaction/trip-sheet",       label: "Trip Sheet",      icon: <AccountTreeSharp /> },
+        { path: "/transaction/manifest-entry",   label: "Manifest Entry",  icon: <AccessTime /> },
+      ],
+    },
+  ];
+  // ────────────────────────────────────────────────────────────────────────────
 
   return (
     <>
       <aside className={`sidebar${collapsed ? " collapsed" : ""}${isMobileOpen ? " mobileOpen" : ""}`}>
-      <div className="sidebarHeader">
-        {!collapsed ? <div><img
-          src={Logo}
-          alt="Saral Samadhan"
-          style={{
-            maxHeight: "80px",
-            width: "70px",
-            borderRadius: "50%",
-            boxShadow: "0px 0px 15px 5px rgba(248, 249, 250, 0.6)"
-          }}s
-        /></div> : null}
-        <div className="sidebarBrand">
-          <h2 className="sidebarTitle">SSS-ERP</h2>
-          <h5 className="sidebarSubtitle">Smart Transport ERP</h5>
+        <div className="sidebarHeader">
+          {!collapsed && (
+            <div>
+              <img
+                src={Logo}
+                alt="Saral Samadhan"
+                style={{
+                  maxHeight: "80px",
+                  width: "70px",
+                  borderRadius: "50%",
+                  boxShadow: "0px 0px 15px 5px rgba(248, 249, 250, 0.6)",
+                }}
+              />
+            </div>
+          )}
+          <div className="sidebarBrand">
+            <h2 className="sidebarTitle">SSS-ERP</h2>
+            <h5 className="sidebarSubtitle">Smart Transport ERP</h5>
+          </div>
+          <Tooltip title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"} placement="right">
+            <button
+              type="button"
+              className="sidebarToggle"
+              onClick={toggleCollapsed}
+              aria-label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+              {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+            </button>
+          </Tooltip>
         </div>
-        <Tooltip title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"} placement="right">
-          <button
-            type="button"
-            className="sidebarToggle"
-            onClick={() => setCollapsed(!collapsed)}
-            aria-label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-          >
-            {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
-          </button>
-        </Tooltip>
-      </div>
 
-      <List className="sidebarList">
-        <ListItem disablePadding>
-          <ListItemButton
-            component={Link}
-            to="/dashboard"
-            className={`sidebarItem${isActive("/dashboard") ? " sidebarItemActive" : ""}`}
-          >
-            <ListItemIcon className="sidebarIcon">
-              <HomeIcon />
-            </ListItemIcon>
-            <ListItemText
-              primary="Dashboard"
-              style={{ display: textVisible ? "block" : "none" }}
-              primaryTypographyProps={{ style: { color: "#f8fafc" } }}
-            />
-          </ListItemButton>
-        </ListItem>
+        <List className="sidebarList">
+          {/* Dashboard — top-level single item */}
+          <ListItem disablePadding>
+            <ListItemButton
+              component={Link}
+              to="/dashboard"
+              onClick={handleNavClick}
+              className={`sidebarItem${isActive("/dashboard") ? " sidebarItemActive" : ""}`}
+            >
+              <ListItemIcon className="sidebarIcon">
+                <HomeIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary="Dashboard"
+                style={{ display: textVisible ? "block" : "none" }}
+                primaryTypographyProps={{ style: { color: "#f8fafc" } }}
+              />
+            </ListItemButton>
+          </ListItem>
 
-        <ListItem disablePadding>
-          <ListItemButton
-            onClick={() => {
-              setOpenAdmin(!openAdmin)
-              setOpenMasters(false)
-              setOpenTransaction(false)
-            }}
-            className={`sidebarItem sidebarCollapseButton${isSectionActive(["/admin"]) ? " sidebarItemActive" : ""}`}
-          >
-            <ListItemIcon className="sidebarIcon">
-              <ShieldIcon />
-            </ListItemIcon>
-            <ListItemText
-              primary="Administration"
-              style={{ display: textVisible ? "block" : "none" }}
-              primaryTypographyProps={{ style: { color: "#f8fafc" } }}
-            />
-            {openAdmin ? <ExpandLess /> : <ExpandMore />}
-          </ListItemButton>
-        </ListItem>
-        <Collapse in={openAdmin} timeout="auto" unmountOnExit>
-          <List component="div" disablePadding className="nestedList">
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/users"
-                className={`sidebarNestedItem${isActive("/admin/users") ? " sidebarItemActive" : ""}`}
-              >
-                <ListItemIcon className="sidebarIcon">
-                  <GroupIcon />
-                </ListItemIcon>
-                <ListItemText
-                  secondary="User Master"
-                  style={{ display: textVisible ? "block" : "none" }}
-                  secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
-                />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/roles"
-                className={`sidebarNestedItem${isActive("/admin/roles") ? " sidebarItemActive" : ""}`}
-              >
-                <ListItemIcon className="sidebarIcon">
-                  <ShieldIcon />
-                </ListItemIcon>
-                <ListItemText
-                  secondary="Role Master"
-                  style={{ display: textVisible ? "block" : "none" }}
-                  secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
-                />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/menus"
-                className={`sidebarNestedItem${isActive("/admin/menus") ? " sidebarItemActive" : ""}`}
-              >
-                <ListItemIcon className="sidebarIcon">
-                  <MenuBookIcon />
-                </ListItemIcon>
-                <ListItemText
-                  secondary="Menu Master"
-                  style={{ display: textVisible ? "block" : "none" }}
-                  secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
-                />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/role-menu"
-                className={`sidebarNestedItem${isActive("/admin/role-menu") ? " sidebarItemActive" : ""}`}
-              >
-                <ListItemIcon className="sidebarIcon">
-                  <AssignmentIcon />
-                </ListItemIcon>
-                <ListItemText
-                  secondary="Role Menu Mapping"
-                  style={{ display: textVisible ? "block" : "none" }}
-                  secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
-                />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/admin/user-role"
-                className={`sidebarNestedItem${isActive("/admin/user-role") ? " sidebarItemActive" : ""}`}
-              >
-                <ListItemIcon className="sidebarIcon">
-                  <PublicIcon />
-                </ListItemIcon>
-                <ListItemText
-                  secondary="User Role Mapping"
-                  style={{ display: textVisible ? "block" : "none" }}
-                  secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
-                />
-              </ListItemButton>
-            </ListItem>
-          </List>
-        </Collapse>
+          {/* Collapsible sections */}
+          {navSections.map((section) => (
+            <>
+              <ListItem key={section.key} disablePadding>
+                <ListItemButton
+                  onClick={section.onToggle}
+                  className={`sidebarItem sidebarCollapseButton${isSectionActive(section.prefix) ? " sidebarItemActive" : ""}`}
+                >
+                  <ListItemIcon className="sidebarIcon">
+                    {section.icon}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={section.label}
+                    style={{ display: textVisible ? "block" : "none" }}
+                    primaryTypographyProps={{ style: { color: "#f8fafc" } }}
+                  />
+                  {section.open ? <ExpandLess /> : <ExpandMore />}
+                </ListItemButton>
+              </ListItem>
 
-        <ListItem disablePadding>
-          <ListItemButton
-            onClick={() => {
-              setOpenMasters(!openMasters);
-              setOpenAdmin(false);
-              setOpenTransaction(false);
-            }}
-            className={`sidebarItem sidebarCollapseButton${isSectionActive(["/masters"]) ? " sidebarItemActive" : ""}`}
-          >
-            <ListItemIcon className="sidebarIcon">
-              <BusinessIcon />
-            </ListItemIcon>
-            <ListItemText
-              primary="Master Modules"
-              style={{ display: textVisible ? "block" : "none" }}
-              primaryTypographyProps={{ style: { color: "#f8fafc" } }}
-            />
-            {openMasters ? <ExpandLess /> : <ExpandMore />}
-          </ListItemButton>
-        </ListItem>
-        <Collapse in={openMasters} timeout="auto" unmountOnExit>
-          <List component="div" disablePadding className="nestedList">
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/masters/company"
-                className={`sidebarNestedItem${isActive("/masters/company") ? " sidebarItemActive" : ""}`}
-              >
-                <ListItemIcon className="sidebarIcon">
-                  <BusinessIcon />
-                </ListItemIcon>
-                <ListItemText
-                  secondary="Company Master"
-                  style={{ display: textVisible ? "block" : "none" }}
-                  secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
-                />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/masters/division"
-                className={`sidebarNestedItem${isActive("/masters/division") ? " sidebarItemActive" : ""}`}
-              >
-                <ListItemIcon className="sidebarIcon">
-                  <MenuBookIcon />
-                </ListItemIcon>
-                <ListItemText
-                  secondary="Division Master"
-                  style={{ display: textVisible ? "block" : "none" }}
-                  secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
-                />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/masters/location"
-                className={`sidebarNestedItem${isActive("/masters/location") ? " sidebarItemActive" : ""}`}
-              >
-                <ListItemIcon className="sidebarIcon">
-                  <LocationOnIcon />
-                </ListItemIcon>
-                <ListItemText
-                  secondary="Location Master"
-                  style={{ display: textVisible ? "block" : "none" }}
-                  secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
-                />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/masters/business-partner"
-                className={`sidebarNestedItem${isActive("/masters/business-partner") ? " sidebarItemActive" : ""}`}
-              >
-                <ListItemIcon className="sidebarIcon">
-                  <HandshakeIcon />
-                </ListItemIcon>
-                <ListItemText
-                  secondary="Business Partner"
-                  style={{ display: textVisible ? "block" : "none" }}
-                  secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
-                />
-              </ListItemButton>
-            </ListItem>
-          </List>
-        </Collapse>
+              <Collapse key={`${section.key}-collapse`} in={section.open} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding className="nestedList">
+                  {section.children.map((child) => (
+                    <ListItem key={child.path} disablePadding>
+                      <ListItemButton
+                        component={Link}
+                        to={child.path}
+                        onClick={handleNavClick}
+                        className={`sidebarNestedItem${isActive(child.path) ? " sidebarItemActive" : ""}`}
+                      >
+                        <ListItemIcon className="sidebarIcon">
+                          {child.icon}
+                        </ListItemIcon>
+                        <ListItemText
+                          secondary={child.label}
+                          style={{ display: textVisible ? "block" : "none" }}
+                          secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  ))}
+                </List>
+              </Collapse>
+            </>
+          ))}
+        </List>
+      </aside>
 
-        <ListItem disablePadding>
-          <ListItemButton
-            onClick={() => {
-              setOpenTransaction(!openTransaction);
-              setOpenAdmin(false);
-              setOpenMasters(false);
-            }}
-            className={`sidebarItem sidebarCollapseButton${isSectionActive(["/transaction"]) ? " sidebarItemActive" : ""}`}
-          >
-            <ListItemIcon className="sidebarIcon">
-              <AssignmentIcon />
-            </ListItemIcon>
-            <ListItemText
-              primary="Transaction"
-              style={{ display: textVisible ? "block" : "none" }}
-              primaryTypographyProps={{ style: { color: "#f8fafc" } }}
-            />
-            {openTransaction ? <ExpandLess /> : <ExpandMore />}
-          </ListItemButton>
-        </ListItem>
-        <Collapse in={openTransaction} timeout="auto" unmountOnExit>
-          <List component="div" disablePadding className="nestedList">
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/transaction/docket"
-                className={`sidebarNestedItem${isActive("/transaction/docket") ? " sidebarItemActive" : ""}`}
-              >
-                <ListItemIcon className="sidebarIcon">
-                  <LocalShippingIcon />
-                </ListItemIcon>
-                <ListItemText
-                  secondary="Docket"
-                  style={{ display: textVisible ? "block" : "none" }}
-                  secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
-                />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/transaction/trip-sheet"
-                className={`sidebarNestedItem${isActive("/transaction/trip-sheet") ? " sidebarItemActive" : ""}`}
-              >
-                <ListItemIcon className="sidebarIcon">
-                  <AccountTreeSharp />
-                </ListItemIcon>
-                <ListItemText
-                  secondary="Trip Sheet"
-                  style={{ display: textVisible ? "block" : "none" }}
-                  secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
-                />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to="/transaction/manifest-entry"
-                className={`sidebarNestedItem${isActive("/transaction/manifest-entry") ? " sidebarItemActive" : ""}`}
-              >
-                <ListItemIcon className="sidebarIcon">
-                  <AccessTime />
-                </ListItemIcon>
-                <ListItemText
-                  secondary="Manifest Entry"
-                  style={{ display: textVisible ? "block" : "none" }}
-                  secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
-                />
-              </ListItemButton>
-            </ListItem>
-          </List>
-        </Collapse>
-      </List>
-    </aside>
       <div
         className={`sidebarOverlay${isMobileOpen ? " open" : ""}`}
         onClick={handleNavClick}
