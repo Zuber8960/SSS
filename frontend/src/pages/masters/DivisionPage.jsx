@@ -8,7 +8,7 @@ import {
   FormField,
   DataTable,
 } from "../../components/common/MasterPage";
-import { fetchAllDivisions, saveDivision as saveDivisionApi, updateDivision as updateDivisionApi, deleteDivision as deleteDivisionApi } from "../../utils/divisionMaster";
+import { fetchAllDivisionsApi, saveDivisionApi, updateDivisionApi, deleteDivisionApi } from "../../utils/divisionMaster";
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 
@@ -147,7 +147,7 @@ export default function DivisionPage() {
       try {
         setLoading(true);
         setError("");
-        const data = await fetchAllDivisions();
+        const data = await fetchAllDivisionsApi();
         setDivisions(data);
       } catch (err) {
         setError(err.message || "Failed to load divisions");
