@@ -1,6 +1,13 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
+import { FormControl, InputLabel, Select, MenuItem, Typography, Stack, Box } from "@mui/material";
 import { DataTable } from "../../../components/common/MasterPage";
-import { fetchCharges, createCharge, updateCharge, deleteCharge as deleteChargeApi } from "../../../utils/docket";
+import {
+  fetchAllDockets,
+  fetchCharges,
+  createCharge,
+  updateCharge,
+  deleteCharge as deleteChargeApi,
+} from "../../../utils/docket";
 import useAlert from "../../../components/common/UseAlert";
 import CommonAlertDialog from "../../../components/common/CommonAlertDialog";
 
@@ -60,48 +67,66 @@ export default function ChargesSection({
   invoiceValue,
   buttonStyle,
   sectionHeaderStyle,
-  sectionActionsStyle,
   onChargesChange,
   singleClick = false,
 }) {
-  const { dialog, closeAlert, showSuccess, showError, showInfo } = useAlert();
+  const { dialog, closeAlert, showSuccess, showError, showWarning } = useAlert();
   const [chargeList, setChargeList] = useState([]);
-  // Tracks rec_ids of existing rows that were edited — negative rec_ids are new rows
   const [dirtyRecIds, setDirtyRecIds] = useState(new Set());
-  // Counter for assigning temp negative rec_ids to new rows
   const tempIdCounter = useRef(-1);
+  const chargesLoaded = useRef(false);
 
-  // Fetch charges when docketId changes, clear dirty state
+  // All docket options for the selector dropdown
+  const [docketOptions, setDocketOptions] = useState([]);
+  // null means "user hasn't picked yet" — fall back to the prop in that case
+  const [userPickedDocketId, setUserPickedDocketId] = useState(null);
+  const selectedDocketId = userPickedDocketId ?? docketId ?? "";
+
+  // Load all dockets once for the dropdown
   useEffect(() => {
-    if (docketId) {
-      fetchCharges(docketId)
-        .then((charges) => {
-          setChargeList(charges);
-          setDirtyRecIds(new Set());
-          tempIdCounter.current = -1;
-        })
-        .catch(console.error);
-    }
-  }, [docketId]);
+    fetchAllDockets()
+      .then((dockets) => {
+        setDocketOptions(dockets.map((d) => ({
+          value: d.docket_no,
+          label: d.docket_no,
+        })));
+      })
+      .catch(console.error);
+  }, []);
+
+  // Fetch charges whenever the effective docket selection changes
+  useEffect(() => {
+    if (!selectedDocketId) return;
+    chargesLoaded.current = false;
+    fetchCharges(selectedDocketId)
+      .then((charges) => {
+        chargesLoaded.current = true;
+        setChargeList(charges);
+        setDirtyRecIds(new Set());
+        tempIdCounter.current = -1;
+      })
+      .catch(console.error);
+  }, [selectedDocketId]);
+
+  // When invoiceValue changes after charges are loaded, recalculate all rows
+  useEffect(() => {
+    if (!chargesLoaded.current) return;
+    setChargeList((prev) => {
+      if (prev.length === 0) return prev;
+      return recalculateChargeList(prev, invoiceValue);
+    });
+  }, [invoiceValue]);
 
   // Notify parent of chargeList changes
   useEffect(() => {
-    if (onChargesChange) {
-      onChargesChange(chargeList);
-    }
+    if (onChargesChange) onChargesChange(chargeList);
   }, [chargeList, onChargesChange]);
-
-  // Recalculate derived amounts when invoiceValue changes — no useEffect needed
-  const displayChargeList = useMemo(
-    () => recalculateChargeList(chargeList, invoiceValue),
-    [chargeList, invoiceValue]
-  );
 
   // --- Handlers ---
 
   const addChargeRow = () => {
     const newRow = {
-      rec_id: tempIdCounter.current--,   // negative = new, not yet saved
+      rec_id: tempIdCounter.current--,
       charge_code: "Freight",
       ...chargeDefaults.Freight,
     };
@@ -110,38 +135,40 @@ export default function ChargesSection({
     );
   };
 
-  const deleteCharge = async (row) => {
+  const deleteCharge = (row) => {
     const chargeToDelete = chargeList.find((c) => c.rec_id === row.rec_id);
     if (!chargeToDelete) return;
 
-    if (chargeToDelete.rec_id < 0) {
-      setChargeList((prev) =>
-        recalculateChargeList(prev.filter((c) => c.rec_id !== row.rec_id), invoiceValue)
-      );
-      showSuccess("Charge removed");
-      return;
-    }
+    showWarning("Confirm Delete", "Are you sure you want to delete this Charge?", async () => {
+      if (chargeToDelete.rec_id < 0) {
+        setChargeList((prev) =>
+          recalculateChargeList(prev.filter((c) => c.rec_id !== row.rec_id), invoiceValue)
+        );
+        showSuccess("Charge removed");
+        return;
+      }
 
-    try {
-      await deleteChargeApi(chargeToDelete.rec_id);
-      setChargeList((prev) =>
-        recalculateChargeList(prev.filter((c) => c.rec_id !== row.rec_id), invoiceValue)
-      );
-      setDirtyRecIds((prev) => {
-        const next = new Set(prev);
-        next.delete(chargeToDelete.rec_id);
-        return next;
-      });
-      showSuccess("Charge deleted successfully");
-    } catch (err) {
-      console.error("Failed to delete charge:", err);
-      showError(err.message || "Failed to delete charge");
-    }
+      try {
+        await deleteChargeApi(chargeToDelete.rec_id);
+        setChargeList((prev) =>
+          recalculateChargeList(prev.filter((c) => c.rec_id !== row.rec_id), invoiceValue)
+        );
+        setDirtyRecIds((prev) => {
+          const next = new Set(prev);
+          next.delete(chargeToDelete.rec_id);
+          return next;
+        });
+        showSuccess("Charge deleted successfully");
+      } catch (err) {
+        console.error("Failed to delete charge:", err);
+        showError(err.message || "Failed to delete charge");
+      }
+    });
   };
 
   const handleSave = async () => {
-    if (!docketId) {
-      console.warn("No docket selected to save charges.");
+    if (!selectedDocketId) {
+      showError("Please select a docket first.");
       return;
     }
 
@@ -151,7 +178,7 @@ export default function ChargesSection({
 
       for (const charge of chargeList) {
         if (charge.rec_id < 0) {
-          await createCharge(docketId, {
+          await createCharge(selectedDocketId, {
             charge_code: charge.charge_code,
             user_code: charge.user_code,
             charge_amt: charge.charge_amt,
@@ -167,7 +194,7 @@ export default function ChargesSection({
         }
       }
 
-      const updatedCharges = await fetchCharges(docketId);
+      const updatedCharges = await fetchCharges(selectedDocketId);
       setChargeList(updatedCharges);
       setDirtyRecIds(new Set());
       tempIdCounter.current = -1;
@@ -182,40 +209,73 @@ export default function ChargesSection({
   };
 
   const updateChargeRow = (recId, field, value) => {
-    setChargeList((prev) => {
-      const idx = prev.findIndex((r) => r.rec_id === recId);
-      if (idx === -1) return prev;
+    const idx = chargeList.findIndex((r) => r.rec_id === recId);
+    if (idx === -1) return null;
 
-      const updated = [...prev];
-      const existingRow = updated[idx];
-      const defaults = field === "charge_code" ? chargeDefaults[value] || {} : {};
-      updated[idx] = { ...existingRow, ...defaults, [field]: value };
+    const updated = [...chargeList];
+    const existingRow = updated[idx];
+    const defaults = field === "charge_code" ? chargeDefaults[value] || {} : {};
+    updated[idx] = { ...existingRow, ...defaults, [field]: value };
 
-      // Mark dirty only for existing DB rows (positive rec_id)
-      if (existingRow.rec_id > 0) {
-        setDirtyRecIds((d) => new Set(d).add(existingRow.rec_id));
-      }
+    if (existingRow.rec_id > 0) {
+      setDirtyRecIds((d) => new Set(d).add(existingRow.rec_id));
+    }
 
-      return recalculateChargeList(updated, invoiceValue);
-    });
+    const recalculated = recalculateChargeList(updated, invoiceValue);
+    setChargeList(recalculated);
+
+    return { ...recalculated[idx], id: recId };
   };
 
   return (
     <div>
-      <div style={sectionHeaderStyle}>
-        <h3>Charges</h3>
-        <div style={sectionActionsStyle}>
-          <button type="button" onClick={addChargeRow} style={buttonStyle}>
+      <Box sx={{ ...sectionHeaderStyle, marginBottom: 1.5 }}>
+        <Typography variant="h6" fontWeight={600}>Charges</Typography>
+        <Stack direction="row" alignItems="center" spacing={1.5}>
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>Docket ID</InputLabel>
+            <Select
+              label="Docket ID"
+              value={selectedDocketId}
+              onChange={(e) => {
+                const val = e.target.value;
+                setUserPickedDocketId(val);
+                if (!val) {
+                  chargesLoaded.current = false;
+                  setChargeList([]);
+                  setDirtyRecIds(new Set());
+                  tempIdCounter.current = -1;
+                }
+              }}
+            >
+              <MenuItem value=""><em>-- Select Docket --</em></MenuItem>
+              {docketOptions.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <button
+            type="button"
+            onClick={addChargeRow}
+            style={{ ...buttonStyle, opacity: selectedDocketId ? 1 : 0.45, cursor: selectedDocketId ? "pointer" : "not-allowed" }}
+            disabled={!selectedDocketId}
+          >
             Add Charge
           </button>
-          <button type="button" onClick={handleSave} style={buttonStyle}>
+          <button
+            type="button"
+            onClick={handleSave}
+            style={{ ...buttonStyle, opacity: selectedDocketId ? 1 : 0.45, cursor: selectedDocketId ? "pointer" : "not-allowed" }}
+            disabled={!selectedDocketId}
+          >
             Save
           </button>
-        </div>
-      </div>
+        </Stack>
+      </Box>
+
       <DataTable
         columns={chargeColumns}
-        rows={displayChargeList}
+        rows={chargeList}
         getKey={(row) => row.rec_id}
         actions={[
           { label: "Delete", onClick: (row) => deleteCharge(row) },
@@ -227,9 +287,9 @@ export default function ChargesSection({
         }
       />
       <CommonAlertDialog
-              dialog={dialog}
-              onClose={closeAlert}
-            />
+        dialog={dialog}
+        onClose={closeAlert}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import Api from '../services/Api';
 
+export const fetchAllDockets        = ()                  => Api.get('/docket').then(r => r.data.data || r.data || []);
 export const fetchEwayBill          = (ewbLists)          => Api.get(`/docket/ewbDetails/${encodeURIComponent(ewbLists)}`).then(r => r.data?.length ? r.data.data : r.data || []);
 export const fetchDocketById        = (recId)             => Api.get(`/user/${recId}`).then(r => r.data.data);
 export const fetchDocketByDocketNo  = (docketNo)          => Api.get(`/docket/${encodeURIComponent(docketNo)}`).then(r => r.data.data || r.data);

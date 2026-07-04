@@ -657,8 +657,7 @@ export default function DocketPage() {
                   }}
                   disabled={
                     !isFormEditMode ||
-                    (field.name === "docket_no" && !isDocketNoEnabled) ||
-                    field.name === "docket_date"
+                    (["docket_date", "docket_no"].includes(field.name) && !isDocketNoEnabled)
                   }
                 />
               </div>
@@ -701,6 +700,19 @@ export default function DocketPage() {
             },
           ]}
         />
+        {/* ✅ Charges always renders first when visible */}
+        {showCharges && (
+          <ChargesSection
+            key="charges"
+            docketId={form.docket_no}
+            invoiceValue={form.invoice_value}
+            buttonStyle={sectionButtonStyle}
+            sectionHeaderStyle={sectionHeaderStyle}
+            sectionActionsStyle={sectionActionsStyle}
+            singleClick
+          />
+        )}
+
         {/* ✅ Detail Tables */}
         {sectionOrder.map((section) => {
           if (section === "ewayBill" && showEwayBill) {
@@ -716,20 +728,6 @@ export default function DocketPage() {
                 buttonStyle={sectionButtonStyle}
                 sectionHeaderStyle={sectionHeaderStyle}
                 sectionActionsStyle={sectionActionsStyle}
-              />
-            );
-          }
-
-          if (section === "charges" && showCharges) {
-            return (
-              <ChargesSection
-                key="charges"
-                docketId={form.docket_no}
-                invoiceValue={form.invoice_value}
-                buttonStyle={sectionButtonStyle}
-                sectionHeaderStyle={sectionHeaderStyle}
-                sectionActionsStyle={sectionActionsStyle}
-                singleClick
               />
             );
           }

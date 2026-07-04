@@ -1,8 +1,31 @@
 import "../../styles/MasterPage.css";
 
 import { useState } from "react";
-import { DataGrid } from "@mui/x-data-grid";
-import { Box, Button } from "@mui/material";
+import { DataGrid, useGridApiContext } from "@mui/x-data-grid";
+import { Box, Button, Select, MenuItem } from "@mui/material";
+
+// Dropdown edit cell that commits immediately on selection (no blur required)
+function InstantSelectEditCell({ id, field, value, colDef }) {
+  const apiRef = useGridApiContext();
+  const handleChange = (e) => {
+    apiRef.current.setEditCellValue({ id, field, value: e.target.value });
+    apiRef.current.stopCellEditMode({ id, field });
+  };
+  return (
+    <Select
+      value={value ?? ""}
+      onChange={handleChange}
+      size="small"
+      fullWidth
+      autoFocus
+      open
+    >
+      {colDef.valueOptions?.map((opt) => (
+        <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+      ))}
+    </Select>
+  );
+}
 
 export function PageBody({ title, children }) {
   return (
@@ -80,15 +103,19 @@ export function FormField({
         </select>
       ) : (
         <input
-          type={type}
+          type={type === "number" ? "text" : type}
+          inputMode={type === "number" ? "numeric" : undefined}
           value={form[name]}
           disabled={disabled}
-          onChange={(e) => updateField(e.target.value)}
+          onChange={(e) => {
+            if (type === "number") {
+              const cleaned = e.target.value.replace(/[^0-9]/g, "");
+              updateField(cleaned);
+            } else {
+              updateField(e.target.value);
+            }
+          }}
           placeholder={`Enter ${label}`}
-          {...(type === "number" ? {
-            min: 0,
-            onKeyDown: (e) => ["-", "+", "e", "E"].includes(e.key) && e.preventDefault(),
-          } : {})}
         />
       )}
     </div>
@@ -130,6 +157,11 @@ export function DataTable({
 
       renderCell: (params) =>
         col.render ? col.render(params.row) : params.value,
+
+      // Commit immediately when user picks from a dropdown — no blur required
+      ...(col.options && (col.editable ?? editable)
+        ? { renderEditCell: (params) => <InstantSelectEditCell {...params} /> }
+        : {}),
     })),
 
     ...(actions?.length

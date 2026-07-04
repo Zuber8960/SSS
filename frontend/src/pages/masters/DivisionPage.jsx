@@ -178,8 +178,8 @@ export default function DivisionPage() {
         />
 
         <FormPanel>
-          <FormField label="Company Code" name="company_code" form={form} setForm={setForm} />
-          <FormField label="Division Code" name="division_code" form={form} setForm={setForm} />
+          <FormField label="Company Code" name="company_code" type="number" form={form} setForm={setForm} />
+          <FormField label="Division Code" name="division_code" type="number" form={form} setForm={setForm} />
           <FormField label="Division Name" name="division_name" form={form} setForm={setForm} />
           <FormField label="Short Name" name="division_short_name" form={form} setForm={setForm} />
           <FormField label="Opened On" name="opened_on" form={form} setForm={setForm} type="date" />
