@@ -10,6 +10,8 @@ const divisionMasterRoutes = require("../modules/divisionMaster/divisionMaster.r
 const businessPartnerRoutes = require("../modules/businessPartner/businessPartner.routes");
 const docketRoutes = require("../modules/docket/dcoket.routes");
 const roleRoutes = require("../modules/roleMaster/role.routes");
+const menuRoutes = require("../modules/menuMaster/menu.routes");
+const userRoleRoutes = require("../modules/userRole/userRole.routes");
 const UserController = require('../modules/userMaster/user.controller');
 const axios = require('axios');
 
@@ -137,5 +139,7 @@ router.use('/divisionMaster', authMiddleware, divisionMasterRoutes);
 router.use('/businessPartner', authMiddleware, businessPartnerRoutes);
 router.use('/docket', authMiddleware, docketRoutes);
 router.use('/roleMaster', authMiddleware, roleRoutes);
+router.use('/menuMaster', authMiddleware, menuRoutes);
+router.use('/userRole', authMiddleware, userRoleRoutes);
 
 module.exports = router;

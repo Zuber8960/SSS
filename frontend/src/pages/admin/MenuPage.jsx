@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MainLayout from "../../layouts/MainLayout";
+import { fetchAllMenus, createMenu, updateMenu, deleteMenu } from "../../utils/menuMaster";
 import {
   DataTable,
   FormField,
@@ -8,91 +9,155 @@ import {
   PageToolbar,
   SearchBox,
 } from "../../components/common/MasterPage";
+import CommonAlertDialog from "../../components/common/CommonAlertDialog";
+import useAlert from "../../components/common/UseAlert";
 
-const statusOptions = ["Active", "Inactive"];
+const statusOptions = [
+  { label: "Active", value: "Y" },
+  { label: "Inactive", value: "N" },
+];
+
 const menuFields = [
-  { label: "Menu ID", name: "menuId" },
-  { label: "Parent Menu ID", name: "parentMenuId" },
-  { label: "Menu Name", name: "menuName" },
-  { label: "Menu Path", name: "menuPath" },
-  { label: "Display Sequence", name: "sequence" },
-  { label: "Status", name: "status", options: statusOptions },
+  { label: "Menu ID", name: "menu_id", type: "number" },
+  { label: "Parent Menu ID", name: "parent_menu_id", type: "number" },
+  { label: "Menu Name", name: "menu_name" },
+  { label: "Menu Path", name: "menu_path" },
+  { label: "Menu Icon", name: "menu_icon" },
+  { label: "Display Sequence", name: "display_seq", type: "number" },
+  { label: "Status", name: "active_yn", options: statusOptions },
 ];
+
 const menuColumns = [
-  { key: "menuId", label: "Menu ID" },
-  { key: "parentMenuId", label: "Parent ID" },
-  { key: "menuName", label: "Menu Name" },
-  { key: "menuPath", label: "Menu Path" },
-  { key: "sequence", label: "Sequence" },
-  { key: "status", label: "Status" },
+  { key: "menu_id", label: "Menu ID" },
+  { key: "parent_menu_id", label: "Parent ID" },
+  { key: "menu_name", label: "Menu Name" },
+  { key: "menu_path", label: "Menu Path" },
+  { key: "display_seq", label: "Sequence" },
+  { key: "active_yn", label: "Status" },
 ];
+
+const emptyForm = {
+  rec_id: null,
+  menu_id: "",
+  parent_menu_id: "",
+  menu_name: "",
+  menu_path: "",
+  menu_icon: "",
+  display_seq: "",
+  active_yn: "Y",
+};
 
 export default function MenuPage() {
-  const [menus, setMenus] = useState([
-    {
-      menuId: 1,
-      parentMenuId: "",
-      menuName: "Dashboard",
-      menuPath: "/dashboard",
-      sequence: 1,
-      status: "Active",
-    },
-    {
-      menuId: 100,
-      parentMenuId: "",
-      menuName: "Administration",
-      menuPath: "",
-      sequence: 2,
-      status: "Active",
-    },
-  ]);
-
+  const [menus, setMenus] = useState([]);
   const [searchText, setSearchText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const { dialog, closeAlert, showSuccess, showError, showWarning } = useAlert();
 
-  const [form, setForm] = useState({
-    menuId: "",
-    parentMenuId: "",
-    menuName: "",
-    menuPath: "",
-    sequence: "",
-    status: "Active",
-  });
-
-  const clearForm = () => {
-    setForm({
-      menuId: "",
-      parentMenuId: "",
-      menuName: "",
-      menuPath: "",
-      sequence: "",
-      status: "Active",
-    });
+  const loadMenus = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchAllMenus();
+      setMenus(data);
+    } catch (err) {
+      showError(err.message || "Failed to load menus");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const saveMenu = () => {
-    if (!form.menuId || !form.menuName) {
-      alert("Menu ID and Menu Name are mandatory");
+  useEffect(() => {
+    fetchAllMenus()
+      .then(setMenus)
+      .catch((err) => showError(err.message || "Failed to load menus"));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const clearForm = () => {
+    setForm(emptyForm);
+    setIsEditing(false);
+  };
+
+  const saveMenu = async () => {
+    if (!form.menu_id || !form.menu_name) {
+      showError("Menu ID and Menu Name are required");
       return;
     }
 
-    setMenus([...menus, form]);
-    clearForm();
+    try {
+      setLoading(true);
+      if (isEditing) {
+        await updateMenu(form.rec_id, {
+          parent_menu_id: form.parent_menu_id || null,
+          menu_name:      form.menu_name,
+          menu_path:      form.menu_path || null,
+          menu_icon:      form.menu_icon || null,
+          display_seq:    form.display_seq || null,
+          active_yn:      form.active_yn,
+        });
+        setMenus((prev) =>
+          prev.map((m) => (m.rec_id === form.rec_id ? { ...m, ...form } : m))
+        );
+        showSuccess("Menu updated successfully");
+      } else {
+        const created = await createMenu({
+          menu_id:        form.menu_id,
+          parent_menu_id: form.parent_menu_id || null,
+          menu_name:      form.menu_name,
+          menu_path:      form.menu_path || null,
+          menu_icon:      form.menu_icon || null,
+          display_seq:    form.display_seq || null,
+          active_yn:      form.active_yn,
+        });
+        setMenus((prev) => [...prev, created[0]]);
+        showSuccess("Menu created successfully");
+      }
+      clearForm();
+    } catch (err) {
+      showError(err.message || "Failed to save menu");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const editMenu = (row) => {
-    setForm(row);
+    setForm({
+      rec_id:         row.rec_id,
+      menu_id:        row.menu_id,
+      parent_menu_id: row.parent_menu_id ?? "",
+      menu_name:      row.menu_name ?? "",
+      menu_path:      row.menu_path ?? "",
+      menu_icon:      row.menu_icon ?? "",
+      display_seq:    row.display_seq ?? "",
+      active_yn:      row.active_yn ?? "Y",
+    });
+    setIsEditing(true);
   };
 
-  const deleteMenu = (menuId) => {
-    if (!window.confirm("Delete Menu ?")) return;
-
-    setMenus(menus.filter((x) => x.menuId !== menuId));
+  const handleDelete = (row) => {
+    showWarning(
+      "Confirm Delete",
+      `Delete menu '${row.menu_name}'?`,
+      async () => {
+        try {
+          setLoading(true);
+          await deleteMenu(row.rec_id);
+          setMenus((prev) => prev.filter((m) => m.rec_id !== row.rec_id));
+          showSuccess("Menu deleted successfully");
+        } catch (err) {
+          showError(err.message || "Failed to delete menu");
+        } finally {
+          setLoading(false);
+        }
+      }
+    );
   };
 
   const filteredMenus = menus.filter(
     (x) =>
-      x.menuName.toLowerCase().includes(searchText.toLowerCase()) ||
-      String(x.menuId).includes(searchText)
+      x.menu_name?.toLowerCase().includes(searchText.toLowerCase()) ||
+      String(x.menu_id ?? "").includes(searchText)
   );
 
   return (
@@ -102,24 +167,32 @@ export default function MenuPage() {
           actions={[
             { label: "New", onClick: clearForm },
             { label: "Save", onClick: saveMenu },
-            { label: "Export" },
+            { label: "Refresh", onClick: loadMenus },
           ]}
         />
+        {loading && <div className="alertBox info">Loading...</div>}
         <SearchBox placeholder="Search Menu..." value={searchText} onChange={setSearchText} />
         <FormPanel>
           {menuFields.map((field) => (
-            <FormField key={field.name} {...field} form={form} setForm={setForm} />
+            <FormField
+              key={field.name}
+              {...field}
+              form={form}
+              setForm={setForm}
+              disabled={isEditing && field.name === "menu_id"}
+            />
           ))}
         </FormPanel>
         <DataTable
           columns={menuColumns}
           rows={filteredMenus}
-          getKey={(row) => row.menuId}
+          getKey={(row) => row.rec_id}
           actions={[
             { label: "Edit", onClick: editMenu },
-            { label: "Delete", onClick: (row) => deleteMenu(row.menuId) },
+            { label: "Delete", onClick: handleDelete },
           ]}
         />
+        <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
       </PageBody>
     </MainLayout>
   );

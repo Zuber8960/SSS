@@ -120,7 +120,7 @@ export function DataTable({
       field: col.key,
       headerName: col.label,
       flex: 1,
-      minWidth: col.minWidth ?? 160,
+      minWidth: col.minWidth ?? 100,
       sortable: true,
       editable: col.editable ?? editable,
       type: col.options ? "singleSelect" : col.type,
@@ -188,7 +188,7 @@ export function DataTable({
   }));
 
   return (
-    <div className="dataTableWrapper" style={{ width: "100%", marginBottom: 24 }}>
+    <div className="dataTableWrapper" style={{ width: "100%", marginBottom: 24, overflowX: "auto" }}>
       <DataGrid
         rows={muiRows}
         columns={muiColumns}
