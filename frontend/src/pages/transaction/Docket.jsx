@@ -419,7 +419,13 @@ export default function DocketPage() {
       const ewbLists = [...new Set(ewbList.filter(obj => obj.ewb_no).map(obj => obj.ewb_no))].map(Number);
       await fetchData(ewbLists);
     }
-    setShowForm((prev) => !prev);
+    setShowForm((prev) => {
+      if (prev) {
+        setDocketNumberInput("");
+        setDocketId(null);
+      }
+      return !prev;
+    });
   };
 
   // Save Form - POST for new, PUT for existing docket
@@ -455,6 +461,7 @@ export default function DocketPage() {
         goods_subgrp:     "docket_goods_subgrp",
         goods_desc:       "docket_goods_desc",
         remark:           "docket_remark",
+        tot_pkgs:         "docket_tot_pkgs", //docket_tot_pkgs
       };
 
       const payload = {};
@@ -464,10 +471,10 @@ export default function DocketPage() {
         }
       });
       // tot_pkgs is derived — include if any "no_*" field is dirty
-      const noFields = ["no_cb", "no_w_crate", "no_w_cbox", "no_loose", "no_others"];
-      if (noFields.some((f) => dirtyFields.has(f))) {
-        payload.docket_tot_pkgs = tot_amt;
-      }
+      // const noFields = ["no_cb", "no_w_crate", "no_w_cbox", "no_loose", "no_others"];
+      // if (noFields.some((f) => dirtyFields.has(f))) {
+      //   payload.docket_tot_pkgs = tot_amt;
+      // }
 
       let result;
       if (isFormEditMode) {
