@@ -14,11 +14,12 @@ Api.interceptors.request.use((config) => {
   return config;
 });
 
-// On 401 → clear token and redirect to login
+// On 401 → clear token and redirect to login, unless the 401 came from the login endpoint itself
 Api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isLoginRequest = error.config?.url?.includes('/login');
+    if (error.response?.status === 401 && !isLoginRequest) {
       localStorage.removeItem(TOKEN_KEY);
       window.location.href = '/login';
     }
