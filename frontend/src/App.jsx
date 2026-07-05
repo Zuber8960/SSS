@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
+import MasterPortal from "./pages/MasterPortal";
+import TenantLoginPage from "./pages/TenantLoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import UserPage from "./pages/admin/UserPage";
 import RolePage from "./pages/admin/RolePage";
@@ -16,7 +18,9 @@ import ManifestEntry from "./pages/transaction/ManifestEntry";
 import { isAuthenticated } from "./utils/authService";
 
 const appRoutes = [
-  { path: "/", element: <LoginPage />, protected: false },
+  { path: "/",                   element: <MasterPortal />,    protected: false },
+  { path: "/:tenantSlug/login",  element: <TenantLoginPage />, protected: false },
+  { path: "/login",              element: <LoginPage />,       protected: false },
   { path: "/dashboard", element: <DashboardPage />, protected: true },
   { path: "/admin/users", element: <UserPage />, protected: true },
   { path: "/admin/roles", element: <RolePage />, protected: true },

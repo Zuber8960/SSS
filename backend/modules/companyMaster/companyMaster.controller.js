@@ -26,6 +26,12 @@ module.exports = {
     },
 
     async updateCompanyData(recId, payload) {
+        payload.regoff_pincode = payload.pincode;
+        payload.mobile_no = payload.phone;
+        delete payload.id;
+        delete payload.pincode;
+        delete payload.phone;
+        delete payload.rec_id;
         const updates = {
             ...payload,
             modified_on: new Date()

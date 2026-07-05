@@ -12,6 +12,7 @@ const docketRoutes = require("../modules/docket/dcoket.routes");
 const roleRoutes = require("../modules/roleMaster/role.routes");
 const menuRoutes = require("../modules/menuMaster/menu.routes");
 const userRoleRoutes = require("../modules/userRole/userRole.routes");
+const tenantRoutes = require("../modules/tenantMaster/tenant.routes");
 const UserController = require('../modules/userMaster/user.controller');
 const axios = require('axios');
 
@@ -132,6 +133,7 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
+router.use('/tenant', tenantRoutes);
 router.use('/user', authMiddleware, userRoutes);
 router.use('/locationMaster', authMiddleware, locationMasterRoutes);
 router.use('/companyMaster', authMiddleware, companyMasterRoutes);

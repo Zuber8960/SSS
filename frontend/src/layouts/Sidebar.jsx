@@ -25,9 +25,12 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import "./Sidebar.css";
 import Logo from "../images/loogo.PNG";
+import { getTenantConfig } from "../utils/tenantService";
 
 export default function Sidebar({ isMobileOpen, onToggleMobile }) {
   const { pathname } = useLocation();
+  const tenantBrand = getTenantConfig()?.brand || {};
+  const sidebarGradient = tenantBrand.gradient || "linear-gradient(180deg, #8e2de2, #c850c0, #a4508b)";
   const [openAdmin, setOpenAdmin] = useState(() => pathname.startsWith("/admin"));
   const [openMasters, setOpenMasters] = useState(() => pathname.startsWith("/masters"));
   const [openTransaction, setOpenTransaction] = useState(() => pathname.startsWith("/transaction"));
@@ -112,7 +115,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
 
   return (
     <>
-      <aside className={`sidebar${collapsed ? " collapsed" : ""}${isMobileOpen ? " mobileOpen" : ""}`}>
+      <aside className={`sidebar${collapsed ? " collapsed" : ""}${isMobileOpen ? " mobileOpen" : ""}`} style={{ background: sidebarGradient }}>
         <div className="sidebarHeader">
           {!collapsed && (
             <div>
