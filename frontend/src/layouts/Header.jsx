@@ -1,11 +1,15 @@
 import { useNavigate } from "react-router-dom";
 import { logout as logoutUser } from "../utils/authService";
+import { getTenantConfig } from "../utils/tenantService";
 import logoImg from "../images/logo.png";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
 import "./Header.css";
 
 export default function Header({ onToggleSidebar, isMobileSidebarOpen }) {
+  const tenantConfig = getTenantConfig();
+  const logoSrc = tenantConfig?.logo_url || logoImg;
+  const appTitle = tenantConfig?.tenant_name || "Logistics ERP";
 
   const navigate = useNavigate();
 
@@ -37,9 +41,9 @@ export default function Header({ onToggleSidebar, isMobileSidebarOpen }) {
           {isMobileSidebarOpen ? <CloseIcon /> : <MenuIcon />}
         </button>
 
-        <img src={logoImg} alt="Logo" className="appHeaderLogo" />
+        <img src={logoSrc} alt="Logo" className="appHeaderLogo" />
         <h2 className="appHeaderTitle">
-          Logistics ERP
+          {appTitle} ERP
         </h2>
       </div>
 

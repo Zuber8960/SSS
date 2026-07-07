@@ -20,8 +20,10 @@
 }
 
 .appHeaderLogo {
-  width: 120px;
-  height: 126px;
+  height: 64px;
+  max-height: 64px;
+  width: auto;
+  max-width: 200px;
   object-fit: contain;
   flex: 0 0 auto;
 }
@@ -88,8 +90,10 @@
   }
 
   .appHeaderLogo {
-    width: 70px;
-    height: 58px;
+    height: 42px;
+    max-height: 42px;
+    width: auto;
+    max-width: 120px;
   }
 
   .appHeaderTitle {
@@ -119,7 +123,10 @@
   }
 
   .appHeaderLogo {
-    width: 54px;
+    height: 34px;
+    max-height: 34px;
+    width: auto;
+    max-width: 90px;
   }
 
   .appHeaderTitle {
