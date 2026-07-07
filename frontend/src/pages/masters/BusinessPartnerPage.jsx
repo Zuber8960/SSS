@@ -8,6 +8,11 @@ import {
   FormField,
   DataTable,
 } from "../../components/common/MasterPage";
+import {
+  FormControl,
+  MenuItem,
+  Select,
+} from "@mui/material";
 import { fetchAllBusinessPartners, saveBusinessPartner as saveBusinessPartnerApi, updateBusinessPartner as updateBusinessPartnerApi, deleteBusinessPartner as deleteBusinessPartnerApi } from "../../utils/businessPartner";
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
@@ -16,20 +21,20 @@ const emptyPartnerForm = {
   record_id: "",
   company_code: "",
   division_code: "",
-  bp_type: "1",
+  bp_type: "",
   bp_registration_no: "",
   bp_tan_no: "",
-  bp_status: "1",
+  bp_status: "",
 };
 
 const mapPartnerToForm = (row) => ({
   record_id: row.record_id ?? "",
   company_code: row.company_code ?? "",
   division_code: row.division_code ?? "",
-  bp_type: row.bp_type ?? "1",
+  bp_type: row.bp_type ?? "",
   bp_registration_no: row.bp_registration_no ?? "",
   bp_tan_no: row.bp_tan_no ?? "",
-  bp_status: row.bp_status ?? "1",
+  bp_status: row.bp_status != null ? String(row.bp_status) : "",
 });
 
 export default function BusinessPartnerPage() {
@@ -116,7 +121,7 @@ export default function BusinessPartnerPage() {
     { key: "bp_type", label: "Type" },
     { key: "bp_registration_no", label: "Registration No" },
     { key: "bp_tan_no", label: "TAN No" },
-    { key: "bp_status", label: "Status" },
+    { key: "bp_status", label: "Status", render: (row) => row.bp_status === "1" || row.bp_status === 1 ? "A" : row.bp_status === "0" || row.bp_status === 0 ? "I" : "" },
   ];
 
   const partnerActions = [
@@ -165,10 +170,79 @@ export default function BusinessPartnerPage() {
         <FormPanel>
           <FormField label="Company Code" name="company_code" form={form} setForm={setForm} />
           <FormField label="Division Code" name="division_code" form={form} setForm={setForm} />
-          <FormField label="Partner Type" name="bp_type" form={form} setForm={setForm} />
+          <div className="formFieldGroup">
+            <label>Partner Type</label>
+            <FormControl fullWidth>
+              <Select
+                displayEmpty
+                value={form.bp_type}
+                onChange={(e) => setForm({ ...form, bp_type: e.target.value })}
+                sx={{
+                  fontSize: "14px",
+                  fontFamily: "inherit",
+                  color: form.bp_type ? "#1e293b" : "#cbd5e1",
+                  background: "#ffffff",
+                  borderRadius: "8px",
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    border: "1.5px solid #e2e8f0",
+                    borderRadius: "8px",
+                  },
+                  "&:hover .MuiOutlinedInput-notchedOutline": {
+                    border: "1.5px solid #e2e8f0",
+                  },
+                  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                    border: "1.5px solid #a855f7",
+                    boxShadow: "0 0 0 3px rgba(168, 85, 247, 0.1)",
+                  },
+                  "& .MuiSelect-select": {
+                    padding: "12px 5px",
+                  },
+                }}
+              >
+                <MenuItem value="" disabled sx={{ color: "#cbd5e1" }}>Select Partner Type</MenuItem>
+                <MenuItem value="Customer">Customer</MenuItem>
+                <MenuItem value="Supplier">Supplier</MenuItem>
+                <MenuItem value="Both">Both</MenuItem>
+              </Select>
+            </FormControl>
+          </div>
           <FormField label="Registration No" name="bp_registration_no" form={form} setForm={setForm} />
           <FormField label="TAN No" name="bp_tan_no" form={form} setForm={setForm} />
-          <FormField label="Status" name="bp_status" form={form} setForm={setForm} />
+          <div className="formFieldGroup">
+            <label>Status</label>
+            <FormControl fullWidth>
+              <Select
+                displayEmpty
+                value={form.bp_status}
+                onChange={(e) => setForm({ ...form, bp_status: e.target.value })}
+                sx={{
+                  fontSize: "14px",
+                  fontFamily: "inherit",
+                  color: form.bp_status !== "" ? "#1e293b" : "#cbd5e1",
+                  background: "#ffffff",
+                  borderRadius: "8px",
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    border: "1.5px solid #e2e8f0",
+                    borderRadius: "8px",
+                  },
+                  "&:hover .MuiOutlinedInput-notchedOutline": {
+                    border: "1.5px solid #e2e8f0",
+                  },
+                  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                    border: "1.5px solid #a855f7",
+                    boxShadow: "0 0 0 3px rgba(168, 85, 247, 0.1)",
+                  },
+                  "& .MuiSelect-select": {
+                    padding: "12px 5px",
+                  },
+                }}
+              >
+                <MenuItem value="" disabled sx={{ color: "#cbd5e1" }}>Select Status</MenuItem>
+                <MenuItem value="1">Active</MenuItem>
+                <MenuItem value="0">Inactive</MenuItem>
+              </Select>
+            </FormControl>
+          </div>
         </FormPanel>
 
         <DataTable
