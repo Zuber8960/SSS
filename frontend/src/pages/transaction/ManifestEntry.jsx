@@ -23,8 +23,8 @@ const manifestFields = [
   { label: "Vehicle No", name: "vehicle_no" },
   { label: "Driver Name", name: "driver_name" },
 
-  { label: "Consignor", name: "consignor" },
-  { label: "Consignee", name: "consignee" },
+  // { label: "Consignor", name: "consignor" },
+  // { label: "Consignee", name: "consignee" },
 
   { label: "Total Weight", name: "total_wt", type: "number" },
   { label: "Total Packages", name: "total_pkgs", type: "number" },
@@ -105,18 +105,19 @@ export default function ManifestPage() {
     showSuccess("Manifest saved successfully");
   };
 
+  const sectionHeaderStyle = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
+  };
 
   return (
     <MainLayout>
       <PageBody title="Manifest Entry">
 
-        {/* ✅ Toolbar */}
-        <PageToolbar
-          actions={[
-            { label: "Add Row", onClick: addRow },
-            { label: "Save", onClick: handleSave },
-          ]}
-        />
+
 
         {/* ✅ Header Form */}
         <FormPanel>
@@ -130,10 +131,17 @@ export default function ManifestPage() {
           ))}
         </FormPanel>
 
-
-        {/* ✅ Detail Grid */}
-        <h3>Docket Details</h3>
-
+        <div style={sectionHeaderStyle}>
+          {/* ✅ Detail Grid */}
+          <h3>Docket Details</h3>
+          {/* ✅ Toolbar */}
+          <PageToolbar
+            actions={[
+              { label: "Add Row", onClick: addRow },
+              { label: "Save", onClick: handleSave },
+            ]}
+          />
+        </div>
         <DataTable
           columns={detailColumns}
           rows={details}

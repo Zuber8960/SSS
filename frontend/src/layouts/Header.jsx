@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { logout as logoutUser } from "../utils/authService";
 import { getTenantConfig } from "../utils/tenantService";
-import logoImg from "../images/logo.png";
+import { usePageTitle } from "../contexts/PageTitleContext";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
 import "./Header.css";
@@ -10,13 +10,29 @@ export default function Header({ onToggleSidebar, isMobileSidebarOpen }) {
   const tenantConfig = getTenantConfig();
   const logoSrc = tenantConfig?.logo_url || logoImg;
   const appTitle = tenantConfig?.tenant_name || "Logistics ERP";
-
+  const { pageTitle } = usePageTitle();
   const navigate = useNavigate();
 
   const logout = () => {
     logoutUser();
     navigate("/", { replace: true });
   };
+
+  const currentUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("current_user"));
+    } catch {
+      return null;
+    }
+  })();
+
+  const fullName = currentUser?.user_name?.trim() || "Admin";
+  const initials = fullName
+    .split(/\s+/)
+    .map(word => word[0]?.toUpperCase())
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "AD";
 
   return (
     <header className="appHeader">
@@ -42,28 +58,20 @@ export default function Header({ onToggleSidebar, isMobileSidebarOpen }) {
         </button>
 
         <img src={logoSrc} alt="Logo" className="appHeaderLogo" />
-        <h2 className="appHeaderTitle">
+        {/* <h2 className="appHeaderTitle">
           {appTitle} ERP
-        </h2>
+        </h2> */}
       </div>
 
+      <h2 className="appHeaderPageTitle">{pageTitle}</h2>
+
       <div className="appHeaderActions">
-        <div className="appHeaderAvatar">
-          {
-            JSON.parse(localStorage.getItem("current_user"))
-            ?.user_name
-            ?.trim()
-            .split(/\s+/)
-            .map(word => word[0]?.toUpperCase())
-            .slice(0, 2)
-            .join("")
-            .toUpperCase() || "AD"}
+        <div className="appHeaderUserInfo">
+          <div className="appHeaderAvatar">{initials}</div>
+          <span className="appHeaderUserName">{fullName}</span>
         </div>
 
-        <button
-          onClick={logout}
-          className="appHeaderLogout"
-        >
+        <button onClick={logout} className="appHeaderLogout">
           Logout
         </button>
       </div>

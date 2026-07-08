@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -23,6 +23,7 @@ import ExpandMore from "@mui/icons-material/ExpandMore";
 import Tooltip from "@mui/material/Tooltip";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import SearchIcon from "@mui/icons-material/Search";
 import "./Sidebar.css";
 import Logo from "../images/loogo.PNG";
 import { getTenantConfig } from "../utils/tenantService";
@@ -37,22 +38,12 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem("sidebarCollapsed") === "true"
   );
+  const [searchQuery, setSearchQuery] = useState("");
 
   const isActive = (path) => pathname === path;
   const isSectionActive = (prefix) => pathname.startsWith(prefix);
   const textVisible = !collapsed;
-
-  const handleNavClick = useCallback(() => {
-    if (onToggleMobile) onToggleMobile();
-  }, [onToggleMobile]);
-
-  const toggleCollapsed = () => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("sidebarCollapsed", next);
-      return next;
-    });
-  };
+  const isSearchActive = searchQuery.trim().length > 0;
 
   // ── Nav config ──────────────────────────────────────────────────────────────
   const navSections = [
@@ -113,6 +104,81 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
   ];
   // ────────────────────────────────────────────────────────────────────────────
 
+  // Flatten all nav items with their section info for search
+  const allNavItems = useMemo(() => {
+    const items = [];
+    navSections.forEach((section) => {
+      items.push({
+        type: "section",
+        key: section.key,
+        label: section.label,
+        prefix: section.prefix,
+        path: section.prefix,
+      });
+      section.children.forEach((child) => {
+        items.push({
+          type: "child",
+          key: child.path,
+          label: child.label,
+          path: child.path,
+          sectionKey: section.key,
+        });
+      });
+    });
+    items.push({
+      type: "dashboard",
+      key: "/dashboard",
+      label: "Dashboard",
+      path: "/dashboard",
+    });
+    return items;
+  }, [navSections]);
+
+  // Determine which items match the search query
+  const matchedPaths = useMemo(() => {
+    if (!isSearchActive) return new Set();
+    const q = searchQuery.toLowerCase();
+    const matches = new Set();
+    const items = [...allNavItems]; // defensive copy
+    for (const item of items) {
+      if (item.label.toLowerCase().includes(q)) {
+        matches.add(item.path);
+        if (item.sectionKey) {
+          const section = navSections.find((s) => s.key === item.sectionKey);
+          if (section) matches.add(section.prefix);
+        }
+      }
+    }
+    return matches;
+  }, [searchQuery, isSearchActive, allNavItems, navSections]);
+
+  const isVisible = useCallback((path) => {
+    if (!isSearchActive) return true;
+    return matchedPaths.has(path);
+  }, [isSearchActive, matchedPaths]);
+  const isSectionVisible = useCallback((section) => {
+    if (!isSearchActive) return true;
+    if (matchedPaths.has(section.prefix)) return true;
+    return section.children.some((child) => matchedPaths.has(child.path));
+  }, [isSearchActive, matchedPaths]);
+
+  const handleNavClick = useCallback(() => {
+    if (onToggleMobile) onToggleMobile();
+    setSearchQuery("");
+  }, [onToggleMobile]);
+
+  const handleSearchChange = useCallback((e) => {
+    setSearchQuery(e.target.value);
+  }, []);
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("sidebarCollapsed", next);
+      return next;
+    });
+  };
+
   return (
     <>
       <aside className={`sidebar${collapsed ? " collapsed" : ""}${isMobileOpen ? " mobileOpen" : ""}`} style={{ background: sidebarGradient }}>
@@ -147,71 +213,108 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
           </Tooltip>
         </div>
 
+        {/* ── Search Bar ── */}
+        <div className="sidebarSearchWrapper" style={{ display: textVisible ? "flex" : "none" }}>
+          <div className="sidebarSearchInput">
+            <SearchIcon className="sidebarSearchIcon" />
+            <input
+              type="text"
+              placeholder="Search menu..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              className="sidebarSearchField"
+            />
+            {searchQuery && (
+              <button
+                className="sidebarSearchClear"
+                onClick={() => setSearchQuery("")}
+                aria-label="Clear search"
+              >
+                &times;
+              </button>
+            )}
+          </div>
+        </div>
+
         <List className="sidebarList">
           {/* Dashboard — top-level single item */}
-          <ListItem disablePadding>
-            <ListItemButton
-              component={Link}
-              to="/dashboard"
-              onClick={handleNavClick}
-              className={`sidebarItem${isActive("/dashboard") ? " sidebarItemActive" : ""}`}
-            >
-              <ListItemIcon className="sidebarIcon">
-                <HomeIcon />
-              </ListItemIcon>
-              <ListItemText
-                primary="Dashboard"
-                style={{ display: textVisible ? "block" : "none" }}
-                primaryTypographyProps={{ style: { color: "#f8fafc" } }}
-              />
-            </ListItemButton>
-          </ListItem>
+          {isVisible("/dashboard") && (
+            <ListItem disablePadding>
+              <ListItemButton
+                component={Link}
+                to="/dashboard"
+                onClick={handleNavClick}
+                className={`sidebarItem${isActive("/dashboard") ? " sidebarItemActive" : ""}`}
+              >
+                <ListItemIcon className="sidebarIcon">
+                  <HomeIcon />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Dashboard"
+                  style={{ display: textVisible ? "block" : "none" }}
+                  primaryTypographyProps={{ style: { color: "#f8fafc" } }}
+                />
+              </ListItemButton>
+            </ListItem>
+          )}
 
           {/* Collapsible sections */}
-          {navSections.map((section) => (
-            <>
-              <ListItem key={section.key} disablePadding>
-                <ListItemButton
-                  onClick={section.onToggle}
-                  className={`sidebarItem sidebarCollapseButton${isSectionActive(section.prefix) ? " sidebarItemActive" : ""}`}
-                >
-                  <ListItemIcon className="sidebarIcon">
-                    {section.icon}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={section.label}
-                    style={{ display: textVisible ? "block" : "none" }}
-                    primaryTypographyProps={{ style: { color: "#f8fafc" } }}
-                  />
-                  {section.open ? <ExpandLess /> : <ExpandMore />}
-                </ListItemButton>
-              </ListItem>
+          {navSections.map((section) => {
+            const expanded = isSearchActive
+              ? isSectionVisible(section)
+              : section.open;
 
-              <Collapse key={`${section.key}-collapse`} in={section.open} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding className="nestedList">
-                  {section.children.map((child) => (
-                    <ListItem key={child.path} disablePadding>
+            return (
+              <div key={section.key}>
+                {isSectionVisible(section) && (
+                  <>
+                    <ListItem disablePadding>
                       <ListItemButton
-                        component={Link}
-                        to={child.path}
-                        onClick={handleNavClick}
-                        className={`sidebarNestedItem${isActive(child.path) ? " sidebarItemActive" : ""}`}
+                        onClick={section.onToggle}
+                        className={`sidebarItem sidebarCollapseButton${isSectionActive(section.prefix) ? " sidebarItemActive" : ""}`}
                       >
                         <ListItemIcon className="sidebarIcon">
-                          {child.icon}
+                          {section.icon}
                         </ListItemIcon>
                         <ListItemText
-                          secondary={child.label}
+                          primary={section.label}
                           style={{ display: textVisible ? "block" : "none" }}
-                          secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
+                          primaryTypographyProps={{ style: { color: "#f8fafc" } }}
                         />
+                        {expanded ? <ExpandLess /> : <ExpandMore />}
                       </ListItemButton>
                     </ListItem>
-                  ))}
-                </List>
-              </Collapse>
-            </>
-          ))}
+
+                    <Collapse in={expanded} timeout="auto" unmountOnExit>
+                      <List component="div" disablePadding className="nestedList">
+                        {section.children.map((child) =>
+                          isVisible(child.path) ? (
+                            <ListItem key={child.path} disablePadding>
+                              <ListItemButton
+                                component={Link}
+                                to={child.path}
+                                onClick={handleNavClick}
+                                className={`sidebarNestedItem${isActive(child.path) ? " sidebarItemActive" : ""}`}
+                              >
+                                <ListItemIcon className="sidebarIcon">
+                                  {child.icon}
+                                </ListItemIcon>
+                                <ListItemText
+                                  secondary={child.label}
+                                  style={{ display: textVisible ? "block" : "none" }}
+                                  secondaryTypographyProps={{ style: { color: "#cbd5e1" } }}
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          ) : null
+                        )}
+                      </List>
+                    </Collapse>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </List>
       </aside>
 

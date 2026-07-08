@@ -1,8 +1,8 @@
-import "../../styles/MasterPage.css";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DataGrid, useGridApiContext } from "@mui/x-data-grid";
 import { Box, Button, Select, MenuItem } from "@mui/material";
+import { usePageTitle } from "../../contexts/PageTitleContext";
+import "../../styles/MasterPage.css";
 
 // Dropdown edit cell that commits immediately on selection (no blur required)
 function InstantSelectEditCell({ id, field, value, colDef }) {
@@ -28,9 +28,12 @@ function InstantSelectEditCell({ id, field, value, colDef }) {
 }
 
 export function PageBody({ title, children }) {
+  const { setPageTitle } = usePageTitle();
+  useEffect(() => {
+    if (title) setPageTitle(title);
+  }, [title, setPageTitle]);
   return (
     <div className="pageBody">
-      <h2>{title}</h2>
       {children}
     </div>
   );

@@ -33,9 +33,24 @@
   font-size: 20px;
   font-weight: 700;
   color: #111111;
+  text-align: center;
+  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.appHeaderUserInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.appHeaderUserName {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333333;
+  white-space: nowrap;
 }
 
 .appHeaderActions {
@@ -86,19 +101,15 @@
 
   .appHeaderBrand {
     gap: 6px;
-    flex: 1 1 auto;
   }
 
-  .appHeaderLogo {
-    height: 42px;
-    max-height: 42px;
-    width: auto;
-    max-width: 120px;
-  }
-
-  .appHeaderTitle {
+  .appHeaderPageTitle {
     font-size: 16px;
-    max-width: 42vw;
+    max-width: 36vw;
+  }
+
+  .appHeaderUserName {
+    display: none;
   }
 
   .appHeaderActions {
@@ -122,16 +133,9 @@
     padding: 0 8px;
   }
 
-  .appHeaderLogo {
-    height: 34px;
-    max-height: 34px;
-    width: auto;
-    max-width: 90px;
-  }
-
-  .appHeaderTitle {
+  .appHeaderPageTitle {
     font-size: 14px;
-    max-width: 34vw;
+    max-width: 30vw;
   }
 
   .appHeaderActions {
