@@ -1,6 +1,28 @@
 import { useState, useEffect } from "react";
 import { DataGrid, useGridApiContext } from "@mui/x-data-grid";
 import { Box, Button, Select, MenuItem } from "@mui/material";
+
+export function ToggleSwitch({ checked, onChange, labelOn, labelOff, size = "default" }) {
+  const label = checked ? labelOn : labelOff;
+  const wrapperClass = [
+    "toggleSwitch",
+    checked ? "toggleSwitch--on" : "",
+    size === "small" ? "toggleSwitch--small" : "",
+  ].filter(Boolean).join(" ");
+
+  return (
+    <div className={wrapperClass} onClick={onChange}>
+      <div className={`toggleSwitch__track${checked ? " toggleSwitch__track--on" : ""}`}>
+        <div className="toggleSwitch__thumb" />
+      </div>
+      {label && (
+        <span className={`toggleSwitch__label${checked ? " toggleSwitch__label--on" : ""}`}>
+          {label}
+        </span>
+      )}
+    </div>
+  );
+}
 import { usePageTitle } from "../../contexts/PageTitleContext";
 import "../../styles/MasterPage.css";
 
@@ -133,6 +155,9 @@ export function DataTable({
   editable = false,
   singleClick = false,
   onCellChange,
+  onRowUpdate,
+  checkboxSelection = false,
+  onRowSelectionModelChange,
 }) {
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
@@ -230,25 +255,26 @@ export function DataTable({
         paginationModel={effectivePaginationModel}
         onPaginationModelChange={setPaginationModel}
         pageSizeOptions={[5]}
-        disableRowSelectionOnClick
+        {...(!checkboxSelection ? { disableRowSelectionOnClick: true } : {})}
         pagination
         autoHeight
         {...(singleClick ? { singleClickEdit: true } : {})}
-        processRowUpdate={(newRow, oldRow) => {
-          if (!editable || !onCellChange) return newRow;
+        {...(checkboxSelection ? { checkboxSelection: true } : {})}
+        {...(onRowSelectionModelChange ? { onRowSelectionModelChange } : {})}
+        processRowUpdate={async (newRow, oldRow) => {
+          if (!editable) return newRow;
+
+          if (onRowUpdate) return await onRowUpdate(newRow, oldRow);
+
+          if (!onCellChange) return newRow;
 
           let updatedRow = newRow;
-
           columns.forEach((col) => {
             if (newRow[col.key] !== oldRow[col.key]) {
               const changedRow = onCellChange(newRow.id, col.key, newRow[col.key]);
-
-              if (changedRow) {
-                updatedRow = { ...updatedRow, ...changedRow };
-              }
+              if (changedRow) updatedRow = { ...updatedRow, ...changedRow };
             }
           });
-
           return updatedRow;
         }}
         onProcessRowUpdateError={(error) => {

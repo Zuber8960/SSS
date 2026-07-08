@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
+import { ToggleSwitch } from "../../components/common/MasterPage";
 import MainLayout from "../../layouts/MainLayout";
 import moment from "moment";
 import {
   FormField,
   PageBody,
-  PageToolbar,
 } from "../../components/common/MasterPage";
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
@@ -200,6 +200,7 @@ export default function DocketPage() {
   );
 
 
+  const [withEWB, setWithEWB] = useState(false);
   const [ewbList, setEwbList] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [showEwayBill, setShowEwayBill] = useState(true);
@@ -393,28 +394,29 @@ export default function DocketPage() {
     }
   }
 
-  useEffect(() => {
-    const loadEwayBills = async () => {
-      try {
-        const data = await fetchAllEwayBillsFromDB();
-        const records = Array.isArray(data) ? data : [];
-        if (records.length === 0) return;
-        setEwbList(records.map(r => ({
-          ewb_no: r.ewb_no || "",
-          ewb_date: r.ewb_date ? moment(r.ewb_date).format("MM/DD/YYYY") : "",
-          ewb_valid: r.ewb_valid_upto ? moment(r.ewb_valid_upto).format("MM/DD/YYYY") : "",
-          inv_no: r.invoice_no || "",
-          inv_date: r.invoice_date ? moment(r.invoice_date).format("MM/DD/YYYY") : "",
-        })));
-      } catch (err) {
-        showError(err.message || "Failed to load e-way bills");
-      }
-    };
-    loadEwayBills();
-  }, []);
+  // commented out because don't want default e-way bill fetch when loading firrst time
+  // useEffect(() => {
+  //   const loadEwayBills = async () => {
+  //     try {
+  //       const data = await fetchAllEwayBillsFromDB();
+  //       const records = Array.isArray(data) ? data : [];
+  //       if (records.length === 0) return;
+  //       setEwbList(records.map(r => ({
+  //         ewb_no: r.ewb_no || "",
+  //         ewb_date: r.ewb_date ? moment(r.ewb_date).format("MM/DD/YYYY") : "",
+  //         ewb_valid: r.ewb_valid_upto ? moment(r.ewb_valid_upto).format("MM/DD/YYYY") : "",
+  //         inv_no: r.invoice_no || "",
+  //         inv_date: r.invoice_date ? moment(r.invoice_date).format("MM/DD/YYYY") : "",
+  //       })));
+  //     } catch (err) {
+  //       showError(err.message || "Failed to load e-way bills");
+  //     }
+  //   };
+  //   loadEwayBills();
+  // }, []);
 
-  const showFormOnClick = async (e) => {
-    if (e.target.classList.contains('active') === false) {
+  const showFormOnClick = async () => {
+    if (!showForm) {
       console.log(ewbList);
       const ewbLists = [...new Set(ewbList.filter(obj => obj.ewb_no).map(obj => obj.ewb_no))].map(Number);
       await fetchData(ewbLists);
@@ -671,35 +673,32 @@ export default function DocketPage() {
   return (
     <MainLayout>
       <PageBody title="Docket Entry">
-        <PageToolbar
-          actions={[
-            {
-              label: showForm ? "Hide Form" : "Show Form",
-              active: showForm,
-              onClick: showFormOnClick,
-            },
-            {
-              label: showEwayBill ? "Hide E-Waybill" : "Show E-Waybill",
-              active: showEwayBill,
-              onClick: () => {
-                if (!showEwayBill) {
-                  moveSectionToTop("ewayBill");
-                }
-                setShowEwayBill((prev) => !prev);
-              },
-            },
-            {
-              label: showCharges ? "Hide Charges" : "Show Charges",
-              active: showCharges,
-              onClick: () => {
-                if (!showCharges) {
-                  moveSectionToTop("charges");
-                }
-                setShowCharges((prev) => !prev);
-              },
-            },
-          ]}
-        />
+        {/* Top toolbar — EWB toggle + action buttons all inline */}
+        <div className="pageToolbar" style={{ alignItems: "center" }}>
+          <ToggleSwitch
+            checked={withEWB}
+            onChange={() => setWithEWB((prev) => !prev)}
+            labelOn="With EWB"
+            labelOff="Without EWB"
+          />
+
+          <ToggleSwitch
+            checked={showForm}
+            onChange={showFormOnClick}
+            labelOn="Hide Form"
+            labelOff="Show Form"
+          />
+
+          <ToggleSwitch
+            checked={showCharges}
+            onChange={() => {
+              if (!showCharges) moveSectionToTop("charges");
+              setShowCharges((prev) => !prev);
+            }}
+            labelOn="Hide Charges"
+            labelOff="Show Charges"
+          />
+        </div>
         {/* ✅ Charges always renders first when visible */}
         {showCharges && (
           <ChargesSection
@@ -714,20 +713,29 @@ export default function DocketPage() {
         )}
 
         {/* ✅ Detail Tables */}
-        {sectionOrder.map((section) => {
+        {!withEWB && sectionOrder.map((section) => {
           if (section === "ewayBill" && showEwayBill) {
             return (
               <EwayBillSection
                 key="ewayBill"
                 ewbList={ewbList}
                 onAdd={addEwbRow}
-                onDelete={deleteEwb}
+                onDelete={(ids) => setEwbList((prev) => prev.filter((_, idx) => !ids.includes(idx)))}
+
                 onCellChange={(rowIndex, key, value) =>
                   updateRow(setEwbList, ewbList, rowIndex, key, value)
                 }
-                buttonStyle={sectionButtonStyle}
+                onEwbListUpdate={(rowIndex, populated) =>
+                  setEwbList((prev) => {
+                    const updated = [...prev];
+                    updated[rowIndex] = { ...updated[rowIndex], ...populated };
+                    return updated;
+                  })
+                }
+                showError={showError}
+                showWarning={showWarning}
                 sectionHeaderStyle={sectionHeaderStyle}
-                sectionActionsStyle={sectionActionsStyle}
+                withEWB={withEWB}
               />
             );
           }
