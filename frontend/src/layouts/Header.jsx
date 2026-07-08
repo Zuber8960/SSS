@@ -5,6 +5,7 @@ import { usePageTitle } from "../contexts/PageTitleContext";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
 import "./Header.css";
+import logoImg from "../images/logo.png";
 
 export default function Header({ onToggleSidebar, isMobileSidebarOpen }) {
   const tenantConfig = getTenantConfig();

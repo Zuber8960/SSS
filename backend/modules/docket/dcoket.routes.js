@@ -143,9 +143,7 @@ router.get('/', async (req, res) => {
 router.get('/:no', async (req, res) => {
   try {
     const { no } = req.params;
-    const data = await DocketController.getAllDockets().then(dockets => 
-      dockets.find(d => String(d.docket_no) === String(no))
-    );
+    const data = await DocketController.getDocketByNo(no);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

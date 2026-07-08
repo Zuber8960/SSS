@@ -24,21 +24,31 @@ import ChargesSection from "./docket/ChargesSection";
 import EwayBillSection from "./docket/EwayBillSection";
 
 const headerFields = [
+  { label: "Consignor Name", name: "cnor_name" },
+  { label: "Consignor Address", name: "cnor_address" },
+  { label: "Consignor Pincode", name: "cnor_pincode" },
+  { label: "Consignor GSTIN", name: "cnor_gstin" },
+
+  { label: "Consignee Name", name: "cnee_name" },
+  { label: "Consignee Address", name: "cnee_address" },
+  { label: "Consignee Pincode", name: "cnee_pincode" },
+  { label: "Consignee GSTIN", name: "cnee_gstin" },
+
   { label: "Docket No", name: "docket_no" },
   { label: "Docket Date", name: "docket_date", type: "date" },
   { label: "From Location", name: "docket_loc" },
   { label: "To Location", name: "docket_to_loc" },
   // { label: "Consignor", name: "cnor" },
   // { label: "Consignee", name: "cnee" },
-  { label: "Actual Weight", name: "act_wt", type: "number" },
-  { label: "Charge Weight", name: "chrg_wt", type: "number" },
+  { label: "Actual Wt", name: "act_wt", type: "number" },
+  { label: "Charge Wt", name: "chrg_wt", type: "number" } ,
 
   { label: "No of CB", name: "no_cb", type: "number" },
-  { label: "No of W. Crate", name: "no_w_crate", type: "number" },
+  { label: "NOS W. Crate", name: "no_w_crate", type: "number" },
   { label: "No of W. CBox", name: "no_w_cbox", type: "number" },
   { label: "No of Loose", name: "no_loose", type: "number" },
   { label: "No of Others", name: "no_others", type: "number" },
-  { label: "Total Packages", name: "tot_pkgs", type: "number" },
+  { label: "Total Pkgs", name: "tot_pkgs", type: "number" },
 
   { label: "Rate", name: "rate", type: "number" },
   {
@@ -104,6 +114,18 @@ const formSections = [
     fields: ["docket_no", "docket_date", "docket_loc", "docket_to_loc"],
   },
   {
+    title: "Consignee Details",
+    icon: "🏬",
+    fields: ["cnee_name", "cnee_address", "cnee_pincode", "cnee_gstin"],
+    half: true,
+  },
+  {
+    title: "Consignor Details",
+    icon: "🏢",
+    fields: ["cnor_name", "cnor_address", "cnor_pincode", "cnor_gstin"],
+    half: true,
+  },
+  {
     title: "Package Details",
     icon: "📦",
     fields: [
@@ -116,16 +138,15 @@ const formSections = [
       "no_others",
       "tot_pkgs",
     ],
-  },
-  {
-    title: "Rate & Charges",
-    icon: "💰",
-    fields: ["rate", "rate_uom"],
+    half: true,
+    columns: 4,
   },
   {
     title: "PO & Invoice",
     icon: "📄",
     fields: ["po_no", "po_date", "invoice_no", "invoice_date", "invoice_value"],
+    half: true,
+    columns: 4,
   },
   {
     title: "Insurance Details",
@@ -138,16 +159,25 @@ const formSections = [
       "sum_insured",
       "valid_upto",
     ],
+    half: true,
   },
   {
     title: "Goods Details",
     icon: "🏷️",
     fields: ["goods_grp", "goods_subgrp", "goods_desc"],
+    half: true,
+  },
+  {
+    title: "Rate & Charges",
+    icon: "💰",
+    fields: ["rate", "rate_uom"],
+    half: true,
   },
   {
     title: "Remarks",
     icon: "💬",
     fields: ["remark"],
+    half: true,
   },
 ];
 
@@ -159,8 +189,14 @@ export default function DocketPage() {
     docket_date: "",
     docket_loc: "",
     docket_to_loc: "",
-    // cnor: "",
-    // cnee: "",
+    cnor_name: "",
+    cnor_address: "",
+    cnor_pincode: "",
+    cnor_gstin: "",
+    cnee_name: "",
+    cnee_address: "",
+    cnee_pincode: "",
+    cnee_gstin: "",
     act_wt: "",
     chrg_wt: "",
     no_cb: 0,
@@ -520,6 +556,14 @@ export default function DocketPage() {
             docket_date:         toDate(docketData.docket_date),
             docket_loc:          docketData.docket_loc          || "",
             docket_to_loc:       docketData.docket_to_loc       || "",
+            cnor_name:           docketData.cnor_name           || "",
+            cnor_address:        docketData.cnor_address        || "",
+            cnor_pincode:        docketData.cnor_pincode        || "",
+            cnor_gstin:          docketData.cnor_gstin          || "",
+            cnee_name:           docketData.cnee_name           || "",
+            cnee_address:        docketData.cnee_address        || "",
+            cnee_pincode:        docketData.cnee_pincode        || "",
+            cnee_gstin:          docketData.cnee_gstin          || "",
             act_wt:              docketData.docket_act_wt       ?? "",
             chrg_wt:             docketData.docket_chrg_wt      ?? "",
             no_cb:               docketData.docket_crtns        ?? 0,
@@ -598,10 +642,10 @@ export default function DocketPage() {
       margin: 0,
     },
     sectionFields: {
-      padding: "18px 20px",
+      padding: "14px 16px",
       display: "grid",
-      gap: 16,
-      gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+      gap: 12,
+      gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
     },
     fullWidthField: {
       gridColumn: "1 / -1",
@@ -637,12 +681,18 @@ export default function DocketPage() {
     if (filteredFields.length === 0) return null;
 
     return (
-      <div key={section.title} style={sectionCardStyles.sectionCard}>
+      <div key={section.title} style={{ ...sectionCardStyles.sectionCard, gridColumn: section.half ? undefined : "1 / -1" }}>
         <div style={sectionCardStyles.sectionHeader}>
           <span style={sectionCardStyles.sectionIcon}>{section.icon}</span>
           <h4 style={sectionCardStyles.sectionTitle}>{section.title}</h4>
         </div>
-        <div style={sectionCardStyles.sectionFields}>
+        <div style={{
+          ...sectionCardStyles.sectionFields,
+          ...(section.columns ? {
+            gridTemplateColumns: `repeat(auto-fit, minmax(100px, 1fr))`,
+            gap: 10,
+          } : {}),
+        }}>
           {filteredFields.map((field) => {
             const isTextarea = field.type === "textarea";
             return (
@@ -803,8 +853,11 @@ export default function DocketPage() {
                 background: "#f8f6ff",
                 borderRadius: 14,
                 border: "1px solid #e9e5f0",
-                padding: "0 1px",
+                padding: "1px",
                 boxShadow: "0 2px 12px rgba(126, 34, 206, 0.06)",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                gap: 8,
               }}
             >
               {formSections.map((section) => renderFormSection(section))}

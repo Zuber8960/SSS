@@ -154,6 +154,18 @@ const getDocketById = async ({ docket_no, docket_loc, docket_date }) => {
     .first();
 };
 
+const getDocketByNo = async (docket_no) => {
+  return db('sss.sst_docket as d')
+    .leftJoin('sss.sst_docket_ewb as e', 'd.docket_no', 'e.docket_no')
+    .where({ 'd.docket_no': docket_no, 'd.record_status': 0 })
+    .select(
+      'd.*',
+      'e.cnor_name', 'e.cnor_address', 'e.cnor_pincode', 'e.cnor_gstin',
+      'e.cnee_name', 'e.cnee_address', 'e.cnee_pincode', 'e.cnee_gstin'
+    )
+    .first();
+};
+
 const getDocketDetails = async ({ docket_no, docket_loc, docket_date }) => {
   return db('sss.sst_docket_dtl')
     .where({ docket_no, docket_loc, docket_date, record_status: 0 });
@@ -355,6 +367,7 @@ const saveEwayBillToDB = async (ewbDataArray) => {
 module.exports = {
   getAllDockets,
   getDocketById,
+  getDocketByNo,
   getDocketDetails,
   createDocket,
   createDocketDetails,
