@@ -1,4 +1,5 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 const TenantController = require('./tenant.controller');
 
@@ -51,11 +52,22 @@ router.post('/login', async (req, res) => {
 
     const { tenant, config_value } = result;
 
+    const secret = process.env.JWT_SECRET || 'your_jwt_secret_key';
+    const tenantToken = jwt.sign(
+      {
+        tenantCode: tenant.tenant_code,
+        company_code: tenant.company_code
+      },
+      secret,
+      { expiresIn: '5h' }
+    );
+
     return res.status(200).json({
       success: true,
       tenantCode: tenant.tenant_code,
       tenantSlug: config_value ? config_value.tenant_slug : null,
-      config: config_value
+      config: config_value,
+      tenantToken
     });
   } catch (error) {
     console.error('Tenant login error:', error);

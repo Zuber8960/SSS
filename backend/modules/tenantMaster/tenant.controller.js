@@ -4,7 +4,7 @@ const getAllTenants = async () => {
   return db('sss.ssm_tenant_master as t')
     .join('sss.ssm_config as c', 't.tenant_code', 'c.config_key')
     .where({ 't.record_status': 0 })
-    .select('t.user_id', 't.tenant_code', 'c.config_value');
+    .select('t.user_id', 't.tenant_code', 'c.config_value', 't.company_code');
 };
 
 const authenticateTenant = async (userId, password) => {
@@ -17,7 +17,7 @@ const authenticateTenant = async (userId, password) => {
       })
       .first();
 
-    if (!tenant) {
+    if (!tenant) {  
       return null;
     }
 

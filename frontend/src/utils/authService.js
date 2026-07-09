@@ -1,9 +1,11 @@
 import Api from '../services/Api';
+import { getTenantToken } from './tenantService';
 
 const TOKEN_KEY = 'authToken';
 
 export const loginUser = async (userId, password) => {
-  const { data } = await Api.post('/login', { userId, password });
+  const tenantToken = getTenantToken();
+  const { data } = await Api.post('/login', { userId, password, ...(tenantToken && { tenantToken }) });
   if (data.token) localStorage.setItem(TOKEN_KEY, data.token);
   return data;
 };
@@ -25,4 +27,9 @@ export const isAuthenticated = () => !!localStorage.getItem(TOKEN_KEY);
 export const getAuthHeader = () => {
   const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+export const getCompanyCode = () => {
+  const user = JSON.parse(localStorage.getItem('current_user') || 'null');
+  return user?.company_code ?? null;
 };

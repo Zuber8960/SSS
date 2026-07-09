@@ -7,10 +7,12 @@ const Api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach token to every request (except login/reset which have no token yet)
+// Attach token and company code to every request
 Api.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_KEY);
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  const currentUser = JSON.parse(localStorage.getItem('current_user') || 'null');
+  if (currentUser?.company_code) config.headers['x-company-code'] = currentUser.company_code;
   return config;
 });
 

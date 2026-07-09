@@ -28,6 +28,7 @@ const authMiddleware = (req, res, next) => {
 
     // Attach user data to request object
     req.user = decoded;
+    req.company_code = decoded.company_code ?? req.headers['x-company-code'] ?? null;
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {

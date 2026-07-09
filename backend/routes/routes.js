@@ -14,11 +14,12 @@ const menuRoutes = require("../modules/menuMaster/menu.routes");
 const userRoleRoutes = require("../modules/userRole/userRole.routes");
 const tenantRoutes = require("../modules/tenantMaster/tenant.routes");
 const UserController = require('../modules/userMaster/user.controller');
+const TenantController = require('../modules/tenantMaster/tenant.controller');
 const axios = require('axios');
 
 router.post('/login', async (req, res) => {
   try {
-    const { userId, password } = req.body;
+    const { userId, password, tenantToken } = req.body;
 
     // Validate input
     if (!userId || !password) {
@@ -28,8 +29,16 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Resolve company_code from tenant JWT
+    let company_code = null;
+    if (tenantToken) {
+      const secret = process.env.JWT_SECRET || 'your_jwt_secret_key';
+      const decoded = jwt.verify(tenantToken, secret);
+      company_code = decoded.company_code ?? null;
+    }
+
     // Authenticate user from database
-    const user = await UserController.authenticateUser(userId, password);
+    const user = await UserController.authenticateUser(userId, password, company_code);
 
     if (user) {
       // Generate JWT token
@@ -39,7 +48,8 @@ router.post('/login', async (req, res) => {
           recId: user.rec_id,
           userId: user.user_id,
           userName: user.user_name,
-          isAdmin: user.is_admin
+          isAdmin: user.is_admin,
+          company_code
         },
         secret,
         { expiresIn: '24h' }
@@ -77,7 +87,7 @@ router.post('/login', async (req, res) => {
           email_id: user.email_id,
           mobile_no: user.mobile_no,
           is_admin: user.is_admin,
-          company_code: user.company_code
+          company_code
         }
       });
     } else {
