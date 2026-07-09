@@ -3,7 +3,6 @@ import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
   PageToolbar,
-  SearchBox,
   FormPanel,
   FormField,
   DataTable,
@@ -183,12 +182,7 @@ export default function LocationPage() {
               onClick: () => alert("Export not implemented yet"),
             },
           ]}
-        />
-
-        <SearchBox
-          placeholder="Search Location..."
-          value={searchText}
-          onChange={setSearchText}
+          search={{ placeholder: "Search Location...", value: searchText, onChange: setSearchText }}
         />
 
         <FormPanel>

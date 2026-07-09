@@ -24,15 +24,15 @@ import ChargesSection from "./docket/ChargesSection";
 import EwayBillSection from "./docket/EwayBillSection";
 
 const headerFields = [
-  { label: "Consignor Name", name: "cnor_name" },
-  { label: "Consignor Address", name: "cnor_address" },
-  { label: "Consignor Pincode", name: "cnor_pincode" },
-  { label: "Consignor GSTIN", name: "cnor_gstin" },
+  { label: "Cnor Name", name: "cnor_name" },
+  { label: "Cnor Address", name: "cnor_address" },
+  { label: "Cnor Pincode", name: "cnor_pincode" },
+  { label: "Cnor GSTIN", name: "cnor_gstin" },
 
-  { label: "Consignee Name", name: "cnee_name" },
-  { label: "Consignee Address", name: "cnee_address" },
-  { label: "Consignee Pincode", name: "cnee_pincode" },
-  { label: "Consignee GSTIN", name: "cnee_gstin" },
+  { label: "Cnsee Name", name: "cnee_name" },
+  { label: "Cnsee Address", name: "cnee_address" },
+  { label: "Cnsee Pincode", name: "cnee_pincode" },
+  { label: "Cnsee GSTIN", name: "cnee_gstin" },
 
   { label: "Docket No", name: "docket_no" },
   { label: "Docket Date", name: "docket_date", type: "date" },
@@ -102,7 +102,7 @@ const headerFields = [
       { label: "Sub Group 2", value: "SUB2" },
     ],
   },
-  { label: "Goods Description", name: "goods_desc" },
+  { label: "Goods Description", name: "goods_desc", fullWidth: true },
   { label: "Remarks", name: "remark", type: "textarea" },
 ];
 
@@ -118,12 +118,14 @@ const formSections = [
     icon: "🏬",
     fields: ["cnee_name", "cnee_address", "cnee_pincode", "cnee_gstin"],
     half: true,
+    columns: 2,
   },
   {
     title: "Consignor Details",
     icon: "🏢",
     fields: ["cnor_name", "cnor_address", "cnor_pincode", "cnor_gstin"],
     half: true,
+    columns: 2,
   },
   {
     title: "Package Details",
@@ -160,12 +162,14 @@ const formSections = [
       "valid_upto",
     ],
     half: true,
+    columns: 2,
   },
   {
     title: "Goods Details",
     icon: "🏷️",
     fields: ["goods_grp", "goods_subgrp", "goods_desc"],
     half: true,
+    columns: 2,
   },
   {
     title: "Rate & Charges",
@@ -688,8 +692,8 @@ export default function DocketPage() {
         </div>
         <div style={{
           ...sectionCardStyles.sectionFields,
-          ...(section.columns ? {
-            gridTemplateColumns: `repeat(auto-fit, minmax(100px, 1fr))`,
+          ...(section.columns && filteredFields.length > 1 ? {
+            gridTemplateColumns: `repeat(auto-fill, minmax(max(${section.columns === 2 ? 150 : 100}px, calc(${(100 / section.columns).toFixed(0)}% - 10px)), 1fr))`,
             gap: 10,
           } : {}),
         }}>
@@ -698,7 +702,7 @@ export default function DocketPage() {
             return (
               <div
                 key={field.name}
-                style={isTextarea ? sectionCardStyles.fullWidthField : undefined}
+                style={isTextarea || field.fullWidth ? sectionCardStyles.fullWidthField : undefined}
               >
                 <FormField
                   {...field}

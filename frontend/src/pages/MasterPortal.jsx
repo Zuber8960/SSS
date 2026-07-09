@@ -9,7 +9,7 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import { tenantLogin } from "../utils/tenantService";
 import CommonAlertDialog from "../components/common/CommonAlertDialog";
 import useAlert from "../components/common/UseAlert";
-import Footer from "../layouts/Footer";
+
 
 export default function MasterPortal() {
   const navigate = useNavigate();
@@ -118,7 +118,6 @@ export default function MasterPortal() {
         </Paper>
       </Box>
 
-      <Footer />
       <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
     </>
   );

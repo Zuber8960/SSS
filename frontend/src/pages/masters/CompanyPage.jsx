@@ -3,7 +3,6 @@ import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
   PageToolbar,
-  SearchBox,
   FormPanel,
   FormField,
   DataTable,
@@ -168,12 +167,7 @@ export default function CompanyPage() {
             { label: "Save", onClick: saveCompany },
             { label: "Export", onClick: () => alert("Export not implemented yet") },
           ]}
-        />
-
-        <SearchBox
-          placeholder="Search Company..."
-          value={searchText}
-          onChange={setSearchText}
+          search={{ placeholder: "Search Company...", value: searchText, onChange: setSearchText }}
         />
 
         <FormPanel>

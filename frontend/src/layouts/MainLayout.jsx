@@ -17,7 +17,7 @@ export default function MainLayout({ children }) {
 
   return (
     <PageTitleProvider>
-      <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+      <div style={{ display: "flex", height: "var(--full-h)", overflow: "hidden" }}>
         <Sidebar
           isMobileOpen={mobileSidebarOpen}
           onToggleMobile={closeMobileSidebar}

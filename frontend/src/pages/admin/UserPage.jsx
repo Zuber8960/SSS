@@ -7,7 +7,6 @@ import {
   FormPanel,
   PageBody,
   PageToolbar,
-  SearchBox,
 } from "../../components/common/MasterPage";
 import "../../styles/MasterPage.css";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
@@ -236,18 +235,13 @@ export default function UserPage() {
             { label: "Save", onClick: saveUser },
             { label: "Refresh", onClick: loadUsers },
           ]}
+          search={{ placeholder: "Search User...", value: searchText, onChange: setSearchText }}
         />
 
         {error && <div className="alertBox error">⚠️ {error}</div>}
         {loading && <div className="alertBox info">⏳ Loading...</div>}
 
-        <SearchBox
-          placeholder="Search User..."
-          value={searchText}
-          onChange={setSearchText}
-        />
-
-        <FormPanel>
+        <FormPanel flex>
           {userFields.map((field) => (
             <FormField key={field.name} {...field} form={form} setForm={setForm} />
           ))}

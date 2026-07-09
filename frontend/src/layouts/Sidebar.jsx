@@ -201,7 +201,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
             <h2 className="sidebarTitle">SSS-ERP</h2>
             <h5 className="sidebarSubtitle">Smart Transport ERP</h5>
           </div>
-          <Tooltip title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"} placement="right">
+          {/* <Tooltip title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"} placement="right"> */}
             <button
               type="button"
               className="sidebarToggle"
@@ -210,7 +210,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
             >
               {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
             </button>
-          </Tooltip>
+          {/* </Tooltip> */}
         </div>
 
         {/* ── Search Bar ── */}

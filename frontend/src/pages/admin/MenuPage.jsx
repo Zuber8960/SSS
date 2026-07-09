@@ -7,7 +7,6 @@ import {
   FormPanel,
   PageBody,
   PageToolbar,
-  SearchBox,
 } from "../../components/common/MasterPage";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useAlert from "../../components/common/UseAlert";
@@ -19,11 +18,11 @@ const statusOptions = [
 
 const menuFields = [
   { label: "Menu ID", name: "menu_id", type: "number" },
-  { label: "Parent Menu ID", name: "parent_menu_id", type: "number" },
+  { label: "Parent ID", name: "parent_menu_id", type: "number" },
   { label: "Menu Name", name: "menu_name" },
   { label: "Menu Path", name: "menu_path" },
   { label: "Menu Icon", name: "menu_icon" },
-  { label: "Display Sequence", name: "display_seq", type: "number" },
+  { label: "Sequence", name: "display_seq", type: "number" },
   { label: "Status", name: "active_yn", options: statusOptions },
 ];
 
@@ -169,10 +168,10 @@ export default function MenuPage() {
             { label: "Save", onClick: saveMenu },
             { label: "Refresh", onClick: loadMenus },
           ]}
+          search={{ placeholder: "Search Menu...", value: searchText, onChange: setSearchText }}
         />
         {loading && <div className="alertBox info">Loading...</div>}
-        <SearchBox placeholder="Search Menu..." value={searchText} onChange={setSearchText} />
-        <FormPanel>
+        <FormPanel flex>
           {menuFields.map((field) => (
             <FormField
               key={field.name}

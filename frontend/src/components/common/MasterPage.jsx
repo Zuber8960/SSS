@@ -61,9 +61,9 @@ export function PageBody({ title, children }) {
   );
 }
 
-export function PageToolbar({ actions }) {
+export function PageToolbar({ actions, search }) {
   return (
-    <div className="pageToolbar">
+    <div className="pageToolbar" style={{ alignItems: "center" }}>
       {actions.map((action) => (
         <button
           key={action.label}
@@ -73,6 +73,16 @@ export function PageToolbar({ actions }) {
           {action.label}
         </button>
       ))}
+      {search && (
+        <input
+          type="text"
+          placeholder={search.placeholder}
+          value={search.value}
+          onChange={(e) => search.onChange(e.target.value)}
+          className="searchBox"
+          style={{ marginLeft: "auto", marginBottom: 0, padding: "10px 16px" }}
+        />
+      )}
     </div>
   );
 }
@@ -89,10 +99,16 @@ export function SearchBox({ placeholder, value, onChange }) {
   );
 }
 
-export function FormPanel({ children, columns = "150px 300px 150px 300px" }) {
+export function FormPanel({ children, columns, flex, nowrap }) {
+  let className = "formGrid";
+  if (nowrap) className = "formGridFlexNowrap";
+  else if (flex) className = "formGridFlex";
   return (
     <div className="formPanel">
-      <div className="formGrid">
+      <div
+        className={className}
+        style={!flex && !nowrap && columns ? { gridTemplateColumns: `repeat(${columns}, 1fr)` } : undefined}
+      >
         {children}
       </div>
     </div>

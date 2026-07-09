@@ -3,7 +3,6 @@ import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
   PageToolbar,
-  SearchBox,
   FormPanel,
   FormField,
   DataTable,
@@ -169,12 +168,7 @@ export default function DivisionPage() {
             { label: "Save", onClick: saveDivision },
             { label: "Export", onClick: () => alert("Export not implemented yet") },
           ]}
-        />
-
-        <SearchBox
-          placeholder="Search Division..."
-          value={searchText}
-          onChange={setSearchText}
+          search={{ placeholder: "Search Division...", value: searchText, onChange: setSearchText }}
         />
 
         <FormPanel>

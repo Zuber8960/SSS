@@ -7,7 +7,6 @@ import {
   FormPanel,
   PageBody,
   PageToolbar,
-  SearchBox,
 } from "../../components/common/MasterPage";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useAlert from "../../components/common/UseAlert";
@@ -137,9 +136,9 @@ export default function RolePage() {
             { label: "Save", onClick: saveRole },
             { label: "Refresh", onClick: loadRoles },
           ]}
+          search={{ placeholder: "Search Role...", value: searchText, onChange: setSearchText }}
         />
         {loading && <div className="alertBox info">Loading...</div>}
-        <SearchBox placeholder="Search Role..." value={searchText} onChange={setSearchText} />
         <FormPanel columns="150px 300px">
           {roleFields.map((field) => (
             <FormField

@@ -262,6 +262,42 @@
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
+.formGridFlex {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.formGridFlex > * {
+  flex: 1 1 100px;
+  min-width: 100px;
+}
+
+.formGridFlex input,
+.formGridFlex select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.formGridFlexNowrap {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.formGridFlexNowrap > * {
+  flex: 1 1 0%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.formGridFlexNowrap input,
+.formGridFlexNowrap select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 /* Form Field */
 .formFieldGroup {
   display: flex;
