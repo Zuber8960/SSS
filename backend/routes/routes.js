@@ -15,6 +15,7 @@ const userRoleRoutes = require("../modules/userRole/userRole.routes");
 const tenantRoutes = require("../modules/tenantMaster/tenant.routes");
 const UserController = require('../modules/userMaster/user.controller');
 const TenantController = require('../modules/tenantMaster/tenant.controller');
+const manifestRoutes = require("../modules/manifest/manifest.routes");
 const axios = require('axios');
 
 router.post('/login', async (req, res) => {
@@ -55,26 +56,26 @@ router.post('/login', async (req, res) => {
         { expiresIn: '24h' }
       );
 
-      
-    const authGet = await axios.get(
-      'https://api.whitebooks.in/ewaybillapi/v1.03/ewayapi/getewaybill',
-      {
-        params: {
-          email: process.env.email,
-          username: process.env.username,
-          password: process.env.password,
-        },
-        headers: {
-          accept: '*/*',
-          ip_address: process.env.IP_ADDRESS,
-          client_id: process.env.client_id,
-          client_secret: process.env.client_secret,
-          gstin: process.env.GSTIN,
-        },
-      }
-    );
 
-    console.log(authGet);
+      const authGet = await axios.get(
+        'https://api.whitebooks.in/ewaybillapi/v1.03/ewayapi/getewaybill',
+        {
+          params: {
+            email: process.env.email,
+            username: process.env.username,
+            password: process.env.password,
+          },
+          headers: {
+            accept: '*/*',
+            ip_address: process.env.IP_ADDRESS,
+            client_id: process.env.client_id,
+            client_secret: process.env.client_secret,
+            gstin: process.env.GSTIN,
+          },
+        }
+      );
+
+      console.log(authGet);
 
       return res.status(200).json({
         success: true,
@@ -153,5 +154,6 @@ router.use('/docket', authMiddleware, docketRoutes);
 router.use('/roleMaster', authMiddleware, roleRoutes);
 router.use('/menuMaster', authMiddleware, menuRoutes);
 router.use('/userRole', authMiddleware, userRoleRoutes);
+router.use('/manifest', authMiddleware, manifestRoutes);
 
 module.exports = router;

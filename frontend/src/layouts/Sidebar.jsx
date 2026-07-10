@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
+import { getTenantConfig } from "../utils/tenantService";
 import { Link, useLocation } from "react-router-dom";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -25,13 +26,15 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import SearchIcon from "@mui/icons-material/Search";
 import "./Sidebar.css";
-import Logo from "../images/loogo.PNG";
-import { getTenantConfig } from "../utils/tenantService";
+import logoFallback from "../images/loogo.PNG";
 
 export default function Sidebar({ isMobileOpen, onToggleMobile }) {
   const { pathname } = useLocation();
-  const tenantBrand = getTenantConfig()?.brand || {};
+  const tenantConfig = getTenantConfig();
+  const tenantBrand = tenantConfig?.brand || {};
   const sidebarGradient = tenantBrand.gradient || "linear-gradient(180deg, #8e2de2, #c850c0, #a4508b)";
+  const logoSrc = tenantConfig?.logo_url || logoFallback;
+  const tenantName = tenantConfig?.tenant_name || "SSS-ERP";
   const [openAdmin, setOpenAdmin] = useState(() => pathname.startsWith("/admin"));
   const [openMasters, setOpenMasters] = useState(() => pathname.startsWith("/masters"));
   const [openTransaction, setOpenTransaction] = useState(() => pathname.startsWith("/transaction"));
@@ -184,23 +187,20 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
       <aside className={`sidebar${collapsed ? " collapsed" : ""}${isMobileOpen ? " mobileOpen" : ""}`} style={{ background: sidebarGradient }}>
         <div className="sidebarHeader">
           {!collapsed && (
-            <div>
+            <div className="sidebarLogoBlock">
+              <h2 className="sidebarLogoTitle">{tenantName}</h2>
               <img
-                src={Logo}
-                alt="Saral Samadhan"
-                style={{
-                  maxHeight: "80px",
-                  width: "70px",
-                  borderRadius: "50%",
-                  boxShadow: "0px 0px 15px 5px rgba(248, 249, 250, 0.6)",
-                }}
+                src={logoSrc}
+                alt={tenantName}
+                className="sidebarLogoLarge"
               />
             </div>
           )}
-          <div className="sidebarBrand">
+
+          {/* <div className="sidebarBrand">
             <h2 className="sidebarTitle">SSS-ERP</h2>
             <h5 className="sidebarSubtitle">Smart Transport ERP</h5>
-          </div>
+          </div> */}
           {/* <Tooltip title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"} placement="right"> */}
             <button
               type="button"
