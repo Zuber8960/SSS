@@ -28,7 +28,7 @@ export default function CompanyPage() {
   const { dialog, closeAlert, showSuccess, showError, showInfo, showWarning } = useAlert();
 
   const [form, setForm] = useState({
-    company_code: "",
+    rec_id: "",
     company_name: "",
     regoff_address: "",
     regoff_state_code: "",
@@ -47,7 +47,7 @@ export default function CompanyPage() {
 
   const clearForm = () => {
     setForm({
-      company_code: "",
+      rec_id: "",
       company_name: "",
       regoff_address: "",
       regoff_state_code: "",
@@ -67,43 +67,30 @@ export default function CompanyPage() {
     setOriginalCompany(null);
   };
 
-  const loadCompanies = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const data = await fetchAllCompanies();
-      setCompanies(data);
-    } catch (err) {
-      setError(err.message || "Failed to load companies");
-      console.error("Load companies error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const saveCompany = async () => {
-    if (!form.company_code || !form.company_name) {
-      showError("Company Code and Company Name are required");
+    if (!form.company_name) {
+      showError("Company Name is required");
       return;
     }
 
     const payload = {
       ...form,
-      pincode: form.pincode ? Number(form.pincode) : null,
-      phone: form.phone ? Number(form.phone) : null,
+      status: form.status === "Active" ? "A" : "I",
     };
 
     try {
-      if (isEditing && originalCompany?.company_code) {
-        await updateCompany(originalCompany.company_code, payload);
+      if (isEditing && originalCompany?.rec_id) {
+        const updated = await updateCompany(originalCompany.rec_id, payload);
+        const updatedRow = Array.isArray(updated) ? updated[0] : updated;
         setCompanies((prev) =>
           prev.map((company) =>
-            company.company_code === originalCompany.company_code ? payload : company
+            company.rec_id === originalCompany.rec_id ? updatedRow : company
           )
         );
         showSuccess("Company updated successfully");
       } else {
-        const created = await createCompany(payload);
+        delete payload.rec_id; // Ensure rec_id is not sent for new records
+        const created = await createCompany({ ...payload});
         setCompanies((prev) => [...prev, ...(Array.isArray(created) ? created : [created])]);
         showSuccess("Company created successfully");
       }
@@ -121,41 +108,53 @@ export default function CompanyPage() {
     setIsEditing(true);
   };
 
-  const deleteCompany = async (company_code) => {
-    if (!window.confirm("Delete Company ?")) return;
-
-    try {
-      await deleteCompany(company_code);
-      setCompanies((prev) => prev.filter((x) => x.company_code !== company_code));
-      showSuccess("Company deleted successfully");
-    } catch (err) {
-      setError(err.message || "Failed to delete company");
-      showError(err.message || "Failed to delete company");
-      console.error("Delete company error:", err);
-    }
+  const handleDeleteCompany = (rec_id) => {
+    showWarning(
+      "Delete Company",
+      "Are you sure you want to delete this company ?",
+      async () => {
+        try {
+          await deleteCompany(rec_id);
+          setCompanies((prev) => prev.filter((x) => x.rec_id !== rec_id));
+          showSuccess("Company deleted successfully");
+        } catch (err) {
+          setError(err.message || "Failed to delete company");
+          showError(err.message || "Failed to delete company");
+          console.error("Delete company error:", err);
+        }
+      }
+    );
   };
 
   const filteredCompanies = companies.filter(
-    (x) =>
-      x.company_code.toLowerCase().includes(searchText.toLowerCase()) ||
-      x.company_name.toLowerCase().includes(searchText.toLowerCase())
+    (x) => x.company_name.toLowerCase().includes(searchText.toLowerCase())
   );
 
   const companyColumns = [
-    { key: "company_code", label: "Code" },
     { key: "company_name", label: "Company" },
-    { key: "state", label: "State" },
-    { key: "city", label: "City" },
+    { key: "regoff_state_code", label: "State" },
+    { key: "regoff_city_code", label: "City" },
     { key: "status", label: "Status" },
   ];
 
   const companyActions = [
     { label: "Edit", onClick: editCompany },
-    { label: "Delete", onClick: (row) => deleteCompany(row.company_code) },
+    { label: "Delete", onClick: (row) => handleDeleteCompany(row.rec_id) },
   ];
 
   useEffect(() => {
-    loadCompanies();
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const data = await fetchAllCompanies();
+        setCompanies(data);
+      } catch (err) {
+        setError(err.message || "Failed to load companies");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   return (
@@ -171,7 +170,6 @@ export default function CompanyPage() {
         />
 
         <FormPanel>
-          <FormField label="Company Code" name="company_code" form={form} setForm={setForm} />
           <FormField label="Company Name" name="company_name" form={form} setForm={setForm} />
           <FormField label="Address" name="regoff_address" form={form} setForm={setForm} />
           <FormField label="State" name="regoff_state_code" form={form} setForm={setForm} />
@@ -191,7 +189,7 @@ export default function CompanyPage() {
         <DataTable
           columns={companyColumns}
           rows={filteredCompanies}
-          getKey={(row) => row.company_code}
+          getKey={(row) => row.rec_id}
           actions={companyActions}
         />
       </PageBody>

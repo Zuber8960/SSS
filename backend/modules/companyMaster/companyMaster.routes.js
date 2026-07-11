@@ -19,7 +19,7 @@ router.post('/', async (req, res) => {
     try {
         const recId = req.user.recId;
         const { company_code } = req;
-        const payload = { ...req.body, company_code: req.body.company_code || company_code };
+        const payload = { ...req.body, company_code };
         const data = await CompanyMasterController.saveCompanyData(recId, payload);
         res.status(201).json({ success: true, data });
     } catch (error) {
