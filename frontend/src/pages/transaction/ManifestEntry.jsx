@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
 import MainLayout from "../../layouts/MainLayout";
 
 import {
@@ -6,7 +6,6 @@ import {
   FormField,
   FormPanel,
   PageBody,
-  PageToolbar,
 } from "../../components/common/MasterPage";
 
 import useAlert from "../../components/common/UseAlert";
@@ -14,6 +13,8 @@ import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
 import { fetchDocketByDocketNo } from "../../utils/docket";
+import { AddIcon, DeleteIcon, EditIcon, SaveIcon, NoteAddIcon, ResetIcon } from "./docket/icons";
+import { IconButton, Tooltip } from "@mui/material";
 import {
   createManifest,
   fetchManifestByNo,
@@ -60,12 +61,13 @@ const emptyForm = {
 };
 
 export default function ManifestPage() {
-  const { dialog, closeAlert, showSuccess, showError, showInfo } = useAlert();
+  const { dialog, closeAlert, showSuccess, showError, showInfo, showWarning } = useAlert();
   const { isLoading, showLoading, hideLoading } = useLoading();
 
   const [form, setForm] = useState({ ...emptyForm });
   const [details, setDetails] = useState([]);
   const [docketCache, setDocketCache] = useState({});
+  const [selectedRows, setSelectedRows] = useState([]);
 
   // Mode: "create" | "edit"
   const [mode, setMode] = useState("create");
@@ -86,14 +88,6 @@ export default function ManifestPage() {
     return { total_wt: totalWt, total_pkgs: totalPkgs };
   }, [details]);
 
-  // ✅ Sync computed totals into form header fields
-  useEffect(() => {
-    setForm((prev) => ({
-      ...prev,
-      total_wt: computedTotals.total_wt,
-      total_pkgs: computedTotals.total_pkgs,
-    }));
-  }, [computedTotals]);
 
   // ✅ Add Row
   const addRow = () => {
@@ -109,9 +103,21 @@ export default function ManifestPage() {
     ]);
   };
 
-  // ✅ Delete Row
-  const deleteRow = (row) => {
-    setDetails((prev) => prev.filter((r) => r !== row.docket_no));
+  // ✅ Delete selected rows
+  const deleteSelectedRows = () => {
+    const ids = Array.from(selectedRows);
+    if (!ids.length) {
+      showError("Please select at least one row to delete");
+      return;
+    }
+    showWarning(
+      "Delete Rows",
+      `Are you sure you want to delete ${ids.length} selected row(s)?`,
+      () => {
+        setDetails((prev) => prev.filter((_, idx) => !ids.includes(idx)));
+        setSelectedRows([]);
+      }
+    );
   };
 
   // ✅ Update Row
@@ -172,8 +178,8 @@ export default function ManifestPage() {
     mnf_to_loc: form.to_loc,
     desp_veh_no: form.vehicle_no,
     loaded_by: form.driver_name,
-    mnf_actual_wt: parseFloat(form.total_wt) || 0,
-    mnf_no_of_dwb: parseFloat(form.total_pkgs) || 0,
+    mnf_actual_wt: computedTotals.total_wt,
+    mnf_no_of_dwb: computedTotals.total_pkgs,
     aud_user: form.remarks || "",
     aud_loc: form.from_loc || "",
   });
@@ -367,15 +373,6 @@ export default function ManifestPage() {
     flexWrap: "wrap",
   };
 
-  const buttonStyle = {
-    padding: "8px 18px",
-    border: "none",
-    borderRadius: 6,
-    background: "#7e22ce",
-    color: "#ffffff",
-    fontWeight: 600,
-    cursor: "pointer",
-  };
 
   return (
     <MainLayout>
@@ -391,22 +388,27 @@ export default function ManifestPage() {
             border: "1px solid #e9e5f0",
           }}
         >
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button type="button" onClick={handleCreateNew} style={buttonStyle}>
-              Create New
-            </button>
-
-            <button type="button" onClick={handleEditView} style={buttonStyle}>
-              Edit/View
-            </button>
-
-            <button type="button" onClick={handleClear} style={buttonStyle}>
-              Clear
-            </button>
-
-            <button type="button" onClick={handleSave} style={buttonStyle}>
-              Save
-            </button>
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            <Tooltip title="Create New">
+              <IconButton onClick={handleCreateNew} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
+                <NoteAddIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Edit / View">
+              <IconButton onClick={handleEditView} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
+                <EditIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Clear">
+              <IconButton onClick={handleClear} size="small" sx={{ color: "#dc2626", "&:hover": { background: "#fee2e2" } }}>
+                <ResetIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Save">
+              <IconButton onClick={handleSave} size="small" sx={{ color: "#16a34a", "&:hover": { background: "#dcfce7" } }}>
+                <SaveIcon />
+              </IconButton>
+            </Tooltip>
           </div>
 
           <span
@@ -455,11 +457,16 @@ export default function ManifestPage() {
                 </div>
               );
             }
+            const displayForm = {
+              ...form,
+              total_wt: computedTotals.total_wt,
+              total_pkgs: computedTotals.total_pkgs,
+            };
             return (
               <FormField
                 key={field.name}
                 {...field}
-                form={form}
+                form={displayForm}
                 setForm={setForm}
                 disabled={
                   field.name === "manifest_no" && mode === "create" && !isSearchActive
@@ -471,24 +478,47 @@ export default function ManifestPage() {
 
         <div style={sectionHeaderStyle}>
           <h3>Docket Details</h3>
-          <PageToolbar
-            actions={[
-              { label: "Add Row", onClick: addRow },
-            ]}
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <Tooltip title="Add Row">
+              <IconButton
+                onClick={addRow}
+                size="small"
+                sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}
+              >
+                <AddIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete selected">
+              <IconButton
+                onClick={deleteSelectedRows}
+                size="small"
+                sx={{ color: "#dc2626", "&:hover": { background: "#fee2e2" } }}
+              >
+                <DeleteIcon />
+              </IconButton>
+            </Tooltip>
+          </div>
         </div>
         <DataTable
           columns={detailColumns}
           rows={details}
           getKey={(row, index) => index}
-          actions={[
-            {
-              label: "Delete",
-              onClick: deleteRow,
-            },
-          ]}
+          actions={[]}
           editable
+          singleClick
+          checkboxSelection
           onCellChange={handleCellChange}
+          onRowSelectionModelChange={(model) => {
+            // MUI v7: { type: 'include', ids: Set } or { type: 'exclude', ids: Set }
+            // 'exclude' with empty ids means "all rows selected"
+            if (model?.type === 'exclude') {
+              const allIds = new Set(details.map((_, idx) => idx).filter(idx => !model.ids.has(idx)));
+              setSelectedRows(allIds);
+            } else {
+              const ids = model?.ids instanceof Set ? model.ids : new Set(Array.isArray(model) ? model : []);
+              setSelectedRows(ids);
+            }
+          }}
         />
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />

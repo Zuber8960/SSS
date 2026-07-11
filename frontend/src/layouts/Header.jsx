@@ -2,8 +2,8 @@ import { useNavigate } from "react-router-dom";
 import { logout as logoutUser } from "../utils/authService";
 import { getTenantConfig } from "../utils/tenantService";
 import { usePageTitle } from "../contexts/PageTitleContext";
-import MenuIcon from "@mui/icons-material/Menu";
-import CloseIcon from "@mui/icons-material/Close";
+import { Tooltip } from "@mui/material";
+import { MenuIcon, CloseIcon, LogoutSvgIcon } from "../icons";
 import "./Header.css";
 import logoImg from "../images/logo.png";
 
@@ -72,9 +72,11 @@ export default function Header({ onToggleSidebar, isMobileSidebarOpen }) {
           <span className="appHeaderUserName">{fullName}</span>
         </div>
 
-        <button onClick={logout} className="appHeaderLogout">
-          Logout
-        </button>
+        <Tooltip title="Logout">
+          <button onClick={logout} className="appHeaderLogout">
+            <LogoutSvgIcon />
+          </button>
+        </Tooltip>
       </div>
     </header>
   );
