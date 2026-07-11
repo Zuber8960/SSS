@@ -244,7 +244,7 @@ export default function DocketPage() {
   const [prePrinted, setPrePrinted] = useState(false);
   const [ewbList, setEwbList] = useState([]);
   const [showForm, setShowForm] = useState(true);
-  const [showCharges, setShowCharges] = useState(true);
+  const [showCharges, setShowCharges] = useState(false);
   const [sectionOrder, setSectionOrder] = useState(["ewayBill", "charges"]);
   const [isDocketNoEnabled, setIsDocketNoEnabled] = useState(false);
   const [docketNumberInput, setDocketNumberInput] = useState("");
