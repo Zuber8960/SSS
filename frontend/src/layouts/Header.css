@@ -103,6 +103,10 @@
     gap: 6px;
   }
 
+  .appHeaderLogo {
+    display: none;
+  }
+
   .appHeaderPageTitle {
     font-size: 16px;
     max-width: 36vw;
