@@ -217,8 +217,7 @@ router.post('/', async (req, res) => {
     const firstDigit = String(Math.floor(Math.random() * 10));
     const rest = require('crypto').randomBytes(7).toString('hex').toUpperCase().slice(0, 13);
     const docket_no = firstDigit + rest;
-    const { rec_id: _rec_id, ...restBody } = req.body;
-    const body = { ...restBody, docket_no, company_code };
+    const body = { ...req.body, docket_no, company_code };
 
     let docket = await DocketController.createDocket(body, trx);
 
@@ -238,7 +237,7 @@ router.post('/', async (req, res) => {
       await Promise.all(promise);
     }
     await trx.commit();
-    res.status(201).json({ success: true, message: 'Docket saved successfully' });
+    res.status(201).json({ success: true, message: 'Docket saved successfully', docket_no });
   } catch (err) {
     await trx.rollback();
     res.status(500).json({ success: false, message: err.message });

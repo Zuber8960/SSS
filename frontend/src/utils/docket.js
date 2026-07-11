@@ -4,7 +4,7 @@ export const fetchAllDockets        = ()                  => Api.get('/docket').
 export const fetchEwayBill          = (ewbLists)          => Api.get(`/docket/ewbDetails/${encodeURIComponent(ewbLists)}`).then(r => r.data?.length ? r.data.data : r.data || []);
 export const fetchDocketById        = (recId)             => Api.get(`/user/${recId}`).then(r => r.data.data);
 export const fetchDocketByDocketNo  = (docketNo)          => Api.get(`/docket/${encodeURIComponent(docketNo)}`).then(r => r.data.data || r.data);
-export const createDocket           = (docketData)        => Api.post('/docket', { ...docketData, rec_id: -1 }).then(r => r.data.data || r.data);
+export const createDocket           = (docketData)        => Api.post('/docket', docketData).then(r => r.data.data || r.data);
 export const updateDocket           = (docketNo, data)    => Api.put(`/docket/${encodeURIComponent(docketNo)}`, data).then(r => r.data.data || r.data);
 export const updateDocketByRecId    = (recId, data)       => Api.put(`/docket/rec/${encodeURIComponent(recId)}`, data).then(r => r.data.data || r.data);
 
