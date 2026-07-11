@@ -1,5 +1,8 @@
 import { useState, useMemo } from "react";
 import { ToggleSwitch } from "../../components/common/MasterPage";
+import { IconButton, Tooltip } from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import SaveIcon from "@mui/icons-material/Save";
 import MainLayout from "../../layouts/MainLayout";
 import moment from "moment";
 import {
@@ -10,15 +13,10 @@ import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
-import { useEffect } from "react";
 import {
-  fetchEwayBill,
   fetchDocketByDocketNo,
   createDocket,
-  updateDocket,
-  fetchEwayBillFromDB,
-  saveEwayBillToDB,
-  fetchAllEwayBillsFromDB,
+  updateDocketByRecId,
 } from "../../utils/docket";
 import ChargesSection from "./docket/ChargesSection";
 import EwayBillSection from "./docket/EwayBillSection";
@@ -114,16 +112,16 @@ const formSections = [
     fields: ["docket_no", "docket_date", "docket_loc", "docket_to_loc"],
   },
   {
-    title: "Consignee Details",
-    icon: "🏬",
-    fields: ["cnee_name", "cnee_address", "cnee_pincode", "cnee_gstin"],
+    title: "Consignor Details",
+    icon: "🏢",
+    fields: ["cnor_name", "cnor_address", "cnor_pincode", "cnor_gstin"],
     half: true,
     columns: 2,
   },
   {
-    title: "Consignor Details",
-    icon: "🏢",
-    fields: ["cnor_name", "cnor_address", "cnor_pincode", "cnor_gstin"],
+    title: "Consignee Details",
+    icon: "🏬",
+    fields: ["cnee_name", "cnee_address", "cnee_pincode", "cnee_gstin"],
     half: true,
     columns: 2,
   },
@@ -185,49 +183,51 @@ const formSections = [
   },
 ];
 
+const emptyForm = {
+  docket_no: "",
+  docket_date: "",
+  docket_loc: "",
+  docket_to_loc: "",
+  cnor_name: "",
+  cnor_address: "",
+  cnor_pincode: "",
+  cnor_gstin: "",
+  cnee_name: "",
+  cnee_address: "",
+  cnee_pincode: "",
+  cnee_gstin: "",
+  act_wt: "",
+  chrg_wt: "",
+  no_cb: 0,
+  no_w_crate: 0,
+  no_w_cbox: 0,
+  no_loose: 0,
+  no_others: 0,
+  tot_pkgs: 0,
+  rate: "",
+  rate_uom: "",
+  tot_amt: "",
+  po_no: "",
+  po_date: "",
+  invoice_no: "",
+  invoice_date: "",
+  invoice_value: "",
+  risk: "",
+  insurance_company: "",
+  insurance_policy_no: "",
+  insurance_cert_no: "",
+  sum_insured: "",
+  valid_upto: "",
+  goods_grp: "",
+  goods_subgrp: "",
+  goods_desc: "",
+  remark: "",
+};
+
 export default function DocketPage() {
   const { dialog, closeAlert, showSuccess, showError, showInfo, showWarning } = useAlert();
 
-  const [form, setForm] = useState({
-    docket_no: "",
-    docket_date: "",
-    docket_loc: "",
-    docket_to_loc: "",
-    cnor_name: "",
-    cnor_address: "",
-    cnor_pincode: "",
-    cnor_gstin: "",
-    cnee_name: "",
-    cnee_address: "",
-    cnee_pincode: "",
-    cnee_gstin: "",
-    act_wt: "",
-    chrg_wt: "",
-    no_cb: 0,
-    no_w_crate: 0,
-    no_w_cbox: 0,
-    no_loose: 0,
-    no_others: 0,
-    tot_pkgs: 0,
-    rate: "",
-    rate_uom: "",
-    tot_amt: "",
-    po_no: "",
-    po_date: "",
-    invoice_no: "",
-    invoice_date: "",
-    invoice_value: "",
-    risk: "",
-    insurance_company: "",
-    insurance_policy_no: "",
-    insurance_cert_no: "",
-    sum_insured: "",
-    valid_upto: "",
-    goods_grp: "",
-    goods_subgrp: "",
-    goods_desc: "",
-    remark: "",
-  });
+  const [form, setForm] = useState(emptyForm);
 
   const tot_amt = useMemo(
     () =>
@@ -241,17 +241,18 @@ export default function DocketPage() {
 
 
   const [withEWB, setWithEWB] = useState(false);
+  const [prePrinted, setPrePrinted] = useState(false);
   const [ewbList, setEwbList] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [showEwayBill, setShowEwayBill] = useState(true);
-  const [showCharges, setShowCharges] = useState(false);
+  const [showForm, setShowForm] = useState(true);
+  const [showCharges, setShowCharges] = useState(true);
   const [sectionOrder, setSectionOrder] = useState(["ewayBill", "charges"]);
   const [isDocketNoEnabled, setIsDocketNoEnabled] = useState(false);
   const [docketNumberInput, setDocketNumberInput] = useState("");
   const [isFormEditMode, setIsFormEditMode] = useState(false);
-  const [error, setError] = useState("");
+  const [docketExists, setDocketExists] = useState(false);
+  const [docketRecId, setDocketRecId] = useState(null);
+  const [ewbNoDisplay, setEwbNoDisplay] = useState("");
   const { isLoading, showLoading, hideLoading, withLoading } = useLoading();
-  const [docketId, setDocketId] = useState(null);
   const [dirtyFields, setDirtyFields] = useState(new Set());
 
   const moveSectionToTop = (section) => {
@@ -290,11 +291,6 @@ export default function DocketPage() {
     ]);
   };
 
-  // ✅ Delete rows
-  const deleteEwb = (row) => {
-    setEwbList((prev) => prev.filter((_, index) => index !== row.id));
-  };
-
   // ✅ Edit handlers
   const updateRow = (listSetter, list, index, field, value) => {
     const updated = [...list];
@@ -302,186 +298,31 @@ export default function DocketPage() {
     listSetter(updated);
   };
 
-  const fetchData = async (ewbLists) => {
-    try {
-      showLoading();
-      setError("");
-
-      // 1. Check which ewb numbers already exist in the database
-      let existingEwbNos = [];
-      let dbRecords = [];
-      try {
-        dbRecords = await fetchEwayBillFromDB(ewbLists);
-        existingEwbNos = (dbRecords || []).map(r => Number(r.ewb_no));
-      } catch (dbErr) {
-        console.warn("DB check failed, proceeding to fetch all from govt portal:", dbErr);
-      }
-
-      // 2. Determine which ewb numbers need to be fetched from government portal
-      const missingEwbNos = ewbLists.filter(no => !existingEwbNos.includes(no));
-
-      // 3. Fetch missing records from government portal and save to DB
-      let govtData = [];
-      if (missingEwbNos.length > 0) {
-        try {
-          const response = await fetchEwayBill(missingEwbNos);
-          govtData = response?.data || response || [];
-
-          // Save government portal data to DB
-          if (govtData.length > 0) {
-            try {
-              await saveEwayBillToDB(govtData);
-              showInfo(`${govtData.length} e-way bill(s) saved to database`);
-            } catch (saveErr) {
-              console.warn("Failed to save ewaybill to DB:", saveErr);
-            }
-          }
-        } catch (govtErr) {
-          console.warn("Failed to fetch from govt portal:", govtErr);
-          showWarning("Could not fetch from government portal");
-        }
-      } else {
-        showInfo("All e-way bills already exist in database");
-      }
-
-      // 4. Build combined records from both DB and govt data
-      const allRecords = [
-        ...(dbRecords || []),
-        ...(govtData.filter(obj => obj.data).map(obj => obj.data) || [])
-      ];
-
-      if (allRecords.length === 0) {
-        showWarning("No e-way bill records found");
-        setEwbList([]);
-        return;
-      }
-
-      const ewRecords = allRecords.map(f => {
-        // f may be a govt API object (docDate, docNo, fromPlace, toPlace)
-        // or a DB row (invoice_date, invoice_no, cnor_address, cnee_address)
-        const dateStr = f.docDate || f.invoice_date;
-        const m = moment(dateStr, ["DD/MM/YYYY", "YYYY-MM-DD"], true);
-        return {
-          docket_no: f.docNo || f.invoice_no || "",
-          docket_date: m.isValid() ? m.format("YYYY-MM-DD") : "",
-          docket_loc: f.fromPlace || f.cnor_address || "",
-          docket_to_loc: f.toPlace || f.cnee_address || "",
-          remark: f.status_desc || "",
-        };
-      });
-
-      const ewdata = {
-        docket_no: ewRecords.map(x => x.docket_no).filter(Boolean).join(", "),
-        docket_date: ewRecords
-          .map(x => x.docket_date)
-          .filter(Boolean)
-          .sort()
-          .pop() || "",
-        docket_loc: [...new Set(ewRecords.map(x => x.docket_loc).filter(Boolean))].join(", "),
-        docket_to_loc: [...new Set(ewRecords.map(x => x.docket_to_loc).filter(Boolean))].join(", "),
-        act_wt: "",
-        chrg_wt: "",
-        no_cb: 0,
-        no_w_crate: 0,
-        no_w_cbox: 0,
-        no_loose: 0,
-        no_others: 0,
-        tot_pkgs: 0,
-        rate: "",
-        rate_uom: "",
-        tot_amt: "",
-        po_no: "",
-        po_date: "",
-        invoice_no: "",
-        invoice_date: "",
-        invoice_value: "",
-        goods_grp: "",
-        goods_subgrp: "",
-        goods_desc: "",
-        remark: [...new Set(ewRecords.map(x => x.remark).filter(Boolean))].join(", ")
-      };
-      ewdata && setForm(ewdata);
-
-      // 5. Build ewb list from govt data (which includes ewbNo/ewayBillDate/validUpto)
-      const govtEwbRecords = govtData
-        .filter(obj => obj.data)
-        .map(obj => ({
-          ewb_no: obj.data.ewbNo,
-          ewb_date: moment(obj.data.ewayBillDate, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
-          ewb_valid: moment(obj.data.validUpto, "DD/MM/YYYY hh:mm:ss A").format("MM/DD/YYYY"),
-          inv_no: obj.data.docNo || obj.data.invoice_no || "",
-          inv_date: obj.data.docDate ? moment(obj.data.docDate, "DD/MM/YYYY").format("MM/DD/YYYY") : "",
-        }));
-
-      // For DB records without portal details, add basic entry
-      const dbEwbRecords = (dbRecords || [])
-        .filter(r => !govtEwbRecords.some(g => String(g.ewb_no) === String(r.ewb_no)))
-        .map(r => ({
-          ewb_no: r.ewb_no || "",
-          ewb_date: r.ewb_date ? moment(r.ewb_date).format("MM/DD/YYYY") : "",
-          ewb_valid: r.ewb_valid_upto ? moment(r.ewb_valid_upto).format("MM/DD/YYYY") : "",
-          inv_no: r.invoice_no || "",
-          inv_date: r.invoice_date ? moment(r.invoice_date).format("MM/DD/YYYY") : "",
-        }));
-
-      setEwbList([...govtEwbRecords, ...dbEwbRecords]);
-    } catch (err) {
-      setError(err.message || "Failed to load e-way bill data");
-      showError(err.message || "Failed to load e-way bill data");
-      console.error("Error loading e-way bill data:", err);
-    } finally {
-      hideLoading();
-    }
-  }
-
-  // commented out because don't want default e-way bill fetch when loading firrst time
-  // useEffect(() => {
-  //   const loadEwayBills = async () => {
-  //     try {
-  //       const data = await fetchAllEwayBillsFromDB();
-  //       const records = Array.isArray(data) ? data : [];
-  //       if (records.length === 0) return;
-  //       setEwbList(records.map(r => ({
-  //         ewb_no: r.ewb_no || "",
-  //         ewb_date: r.ewb_date ? moment(r.ewb_date).format("MM/DD/YYYY") : "",
-  //         ewb_valid: r.ewb_valid_upto ? moment(r.ewb_valid_upto).format("MM/DD/YYYY") : "",
-  //         inv_no: r.invoice_no || "",
-  //         inv_date: r.invoice_date ? moment(r.invoice_date).format("MM/DD/YYYY") : "",
-  //       })));
-  //     } catch (err) {
-  //       showError(err.message || "Failed to load e-way bills");
-  //     }
-  //   };
-  //   loadEwayBills();
-  // }, []);
 
   const showFormOnClick = async () => {
-    if (!showForm) {
-      console.log(ewbList);
-      const ewbLists = [...new Set(ewbList.filter(obj => obj.ewb_no).map(obj => obj.ewb_no))].map(Number);
-      await fetchData(ewbLists);
-    }
-    setShowForm((prev) => {
-      if (prev) {
-        setDocketNumberInput("");
-        setDocketId(null);
-      }
-      return !prev;
-    });
+    setShowForm((prev) => !prev);
+    // if (!showForm) {
+    //   console.log(ewbList);
+    //   const ewbLists = [...new Set(ewbList.filter(obj => obj.ewb_no).map(obj => obj.ewb_no))].map(Number);
+    //   await fetchData(ewbLists);
+    // }
+    // setShowForm((prev) => {
+    //   if (prev) {
+    //     setDocketNumberInput("");
+    //     setDocketId(null);
+    //   }
+    //   return !prev;
+    // });
   };
 
   // Save Form - POST for new, PUT for existing docket
   const handleFormSave = () => withLoading(async () => {
     try {
-      const docketNo = form.docket_no.trim();
-      if (!docketNo) {
-        showError("Docket number is required");
-        return;
-      }
-
       // Map form field names → DB column names
       const formToDb = {
+        docket_no:      "docket_no",
         docket_to_loc:    "docket_to_loc",
+        docket_loc:    "docket_loc",
         act_wt:           "docket_act_wt",
         chrg_wt:          "docket_chrg_wt",
         no_cb:            "docket_crtns",
@@ -504,9 +345,13 @@ export default function DocketPage() {
         goods_desc:       "docket_goods_desc",
         remark:           "docket_remark",
         tot_pkgs:         "docket_tot_pkgs", //docket_tot_pkgs
+        docket_date:     "docket_date",
       };
 
-      const payload = {};
+      const currentUser = JSON.parse(localStorage.getItem("current_user") || "null");
+      const aud_user = currentUser?.rec_id ?? null;
+
+      const payload = { aud_user };
       dirtyFields.forEach((formKey) => {
         if (formToDb[formKey]) {
           payload[formToDb[formKey]] = form[formKey];
@@ -519,17 +364,19 @@ export default function DocketPage() {
       // }
 
       let result;
-      if (isFormEditMode) {
-        if (Object.keys(payload).length === 0) {
+      if (docketExists && docketRecId != null) {
+        if (Object.keys(payload).length <= 1) {
           showInfo("No changes to save");
           return;
         }
-        result = await updateDocket(docketNo, payload);
+        result = await updateDocketByRecId(docketRecId, payload);
         setDirtyFields(new Set());
+        if (payload.docket_no) setDocketNumberInput(payload.docket_no);
         showSuccess("Docket updated successfully");
       } else {
-        // Create new docket (POST)
+        // Create new docket (POST) — backend strips rec_id: -1
         result = await createDocket(payload);
+        setDocketExists(true);
         showSuccess("Docket created successfully");
       }
 
@@ -543,15 +390,16 @@ export default function DocketPage() {
   const handleEditView = async () => {
     const docketNo = docketNumberInput.trim();
 
-    setIsFormEditMode(Boolean(docketNo));
+    // setIsFormEditMode(Boolean(docketNo));
+    setIsFormEditMode(true);
     setShowForm(true);
 
     if (docketNo) {
-      setDocketId(docketNo);
       try {
         const docketData = await fetchDocketByDocketNo(docketNo);
         if (docketData) {
           const toDate = (val) => {
+            if (!val) return "";
             const m = moment(val);
             return m.isValid() ? m.format("YYYY-MM-DD") : "";
           };
@@ -597,14 +445,28 @@ export default function DocketPage() {
           };
           setDirtyFields(new Set());
           setForm(mapped);
+          setDocketExists(true);
+          setDocketRecId(docketData.rec_id ?? null);
+          setEwbNoDisplay(docketData.ewb_no || "");
           showInfo("Docket data loaded successfully");
         }
       } catch (err) {
         showError(err.message || "Failed to fetch docket");
         console.error("Fetch docket error:", err);
-        // Even if fetch fails, keep the docket number in the form
-        setForm((prev) => ({ ...prev, docket_no: docketNo }));
+        setDocketExists(false);
+        if (err.message && err.message.includes("not found")) {
+          let empForm = { ...emptyForm, docket_no: docketNo };
+          setForm(empForm);
+        } else {
+          setForm((prev) => ({ ...prev, docket_no: docketNo }));
+        }
       }
+    } else {
+      setDocketExists(false);
+      setDocketRecId(null);
+      setDirtyFields(new Set());
+      setForm(emptyForm);
+      setEwbNoDisplay("");
     }
   };
 
@@ -660,7 +522,8 @@ export default function DocketPage() {
   const renderFormSection = (section) => {
     const sectionFieldConfigs = section.fields
       .map((name) => fieldMap[name])
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter((f) => f.name !== "docket_no" || prePrinted);
 
     if (sectionFieldConfigs.length === 0) return null;
 
@@ -713,7 +576,7 @@ export default function DocketPage() {
                   }}
                   disabled={
                     !isFormEditMode ||
-                    (["docket_date", "docket_no"].includes(field.name) && !isDocketNoEnabled)
+                    (["docket_no"].includes(field.name) && !isDocketNoEnabled)
                   }
                 />
               </div>
@@ -753,22 +616,9 @@ export default function DocketPage() {
             labelOff="Show Charges"
           />
         </div>
-        {/* ✅ Charges always renders first when visible */}
-        {showCharges && (
-          <ChargesSection
-            key="charges"
-            docketId={form.docket_no}
-            invoiceValue={form.invoice_value}
-            buttonStyle={sectionButtonStyle}
-            sectionHeaderStyle={sectionHeaderStyle}
-            sectionActionsStyle={sectionActionsStyle}
-            singleClick
-          />
-        )}
-
         {/* ✅ Detail Tables */}
-        {!withEWB && sectionOrder.map((section) => {
-          if (section === "ewayBill" && showEwayBill) {
+        {withEWB && sectionOrder.map((section) => {
+          if (section === "ewayBill") {
             return (
               <EwayBillSection
                 key="ewayBill"
@@ -788,6 +638,7 @@ export default function DocketPage() {
                 }
                 showError={showError}
                 showWarning={showWarning}
+                showSuccess={showSuccess}
                 sectionHeaderStyle={sectionHeaderStyle}
                 withEWB={withEWB}
               />
@@ -808,9 +659,26 @@ export default function DocketPage() {
               }}
               className="docketFormHeader"
             >
-              <h3>FORM</h3>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <h3 style={{ margin: 0 }}>FORM</h3>
+                <div className="formFieldGroup" style={{ width: 120 }}>
+                  <input
+                    type="text"
+                    value={ewbNoDisplay}
+                    placeholder="EWB No"
+                    disabled
+                    style={{ padding: "9px 14px", fontSize: 14 }}
+                  />
+                </div>
+                <ToggleSwitch
+                  checked={prePrinted}
+                  onChange={() => setPrePrinted((prev) => !prev)}
+                  labelOn="Pre Printed Stationary"
+                  labelOff="Auto Num Stationary"
+                />
+              </div>
               <div style={sectionActionsStyle}>
-                <div className="formFieldGroup" style={{ minWidth: 150 }}>
+                <div className="formFieldGroup" style={{ width: 75 }}>
                   <input
                     type="number"
                     value={tot_amt}
@@ -820,7 +688,7 @@ export default function DocketPage() {
                   />
                 </div>
 
-                <div className="formFieldGroup" style={{ minWidth: 150 }}>
+                <div className="formFieldGroup" style={{ width: 150 }}>
                   <input
                     type="text"
                     value={docketNumberInput}
@@ -829,27 +697,32 @@ export default function DocketPage() {
                     style={{ padding: "9px 14px", fontSize: 14 }}
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={handleEditView}
-                  style={sectionButtonStyle}
-                >
-                  Edit/View
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsDocketNoEnabled((prev) => !prev)}
-                  style={sectionButtonStyle}
-                >
-                  {isDocketNoEnabled ? "Disable Docket No" : "Enable Docket No"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleFormSave}
-                  style={sectionButtonStyle}
-                >
-                  Save
-                </button>
+                <Tooltip title="Edit / View">
+                  <IconButton
+                    onClick={handleEditView}
+                    size="small"
+                    sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}
+                  >
+                    <EditIcon />
+                  </IconButton>
+                </Tooltip>
+                {prePrinted && (
+                  <ToggleSwitch
+                    checked={isDocketNoEnabled}
+                    onChange={() => setIsDocketNoEnabled((prev) => !prev)}
+                    labelOn="Docket No On"
+                    labelOff="Docket No Off"
+                  />
+                )}
+                <Tooltip title="Save">
+                  <IconButton
+                    onClick={handleFormSave}
+                    size="small"
+                    sx={{ color: "#16a34a", "&:hover": { background: "#dcfce7" } }}
+                  >
+                    <SaveIcon />
+                  </IconButton>
+                </Tooltip>
               </div>
             </div>
             <div
@@ -867,6 +740,20 @@ export default function DocketPage() {
               {formSections.map((section) => renderFormSection(section))}
             </div>
           </>
+        )}
+
+        {showCharges && (
+          <div style={{ marginTop: 16 }}>
+          <ChargesSection
+            key="charges"
+            docketId={form.docket_no}
+            invoiceValue={form.invoice_value}
+            buttonStyle={sectionButtonStyle}
+            sectionHeaderStyle={sectionHeaderStyle}
+            sectionActionsStyle={sectionActionsStyle}
+            singleClick
+          />
+          </div>
         )}
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />

@@ -50,8 +50,19 @@ router.get('/ewayfile/db/:ewbNumbers', async (req, res) => {
       return res.json({ success: true, data: [] });
     }
     const { company_code } = req;
-    const data = await DocketController.getEwayBillFromDB(ewbNumbers, company_code);
-    res.json({ success: true, data });
+    const {results, apiCalls} = await DocketController.getEwayBillFromDB(ewbNumbers, company_code);
+    res.json({ success: true, data: results, apiCalls });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.put('/ewayfile/db/:recId', async (req, res) => {
+  try {
+    const recId = Number(req.params.recId);
+    if (isNaN(recId)) return res.status(400).json({ success: false, message: 'Invalid rec_id' });
+    await DocketController.updateEwayBillByRecId(recId, req.body);
+    res.json({ success: true, message: 'EWB updated successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -142,6 +153,35 @@ router.get('/', async (req, res) => {
   }
 });
 
+/* ================= GET / UPDATE BY REC_ID ================= */
+
+router.get('/rec/:recId', async (req, res) => {
+  try {
+    const { recId } = req.params;
+    const { company_code } = req;
+    const data = await DocketController.getDocketByRecId(Number(recId), company_code);
+    if (data) res.json({ success: true, data });
+    else res.status(404).json({ success: false, message: 'Docket not found' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.put('/rec/:recId', async (req, res) => {
+  const trx = await db.transaction();
+  try {
+    const { recId } = req.params;
+    const { company_code } = req;
+    const payload = req.body;
+    await DocketController.updateDocketByRecId(Number(recId), payload, trx);
+    await trx.commit();
+    res.json({ success: true, message: 'Docket updated successfully' });
+  } catch (err) {
+    await trx.rollback();
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 /* ================= GET BY SINGLE DOCKET NUMBER ================= */
 
 router.get('/:no', async (req, res) => {
@@ -149,7 +189,8 @@ router.get('/:no', async (req, res) => {
     const { no } = req.params;
     const { company_code } = req;
     const data = await DocketController.getDocketByNo(no, company_code);
-    res.json({ success: true, data });
+    if (data) res.json({ success: true, data });
+    else res.status(404).json({ success: false, message: 'Docket not found' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -173,19 +214,28 @@ router.post('/', async (req, res) => {
   const trx = await db.transaction();
   try {
     const { company_code } = req;
-    const { header, details } = req.body;
-    const headerWithCompany = { ...header, company_code: header.company_code || company_code };
-    await DocketController.createDocket(headerWithCompany, trx);
-    if (details?.length) {
-      const rows = details.map(d => ({
+    const firstDigit = String(Math.floor(Math.random() * 10));
+    const rest = require('crypto').randomBytes(7).toString('hex').toUpperCase().slice(0, 13);
+    const docket_no = firstDigit + rest;
+    const { rec_id: _rec_id, ...restBody } = req.body;
+    const body = { ...restBody, docket_no, company_code };
+
+    let docket = await DocketController.createDocket(body, trx);
+
+    if (docket?.length) {
+      const rows = docket.map(d => ({
         ...d,
-        docket_no: header.docket_no,
-        docket_loc: header.docket_loc,
-        docket_date: header.docket_date,
-        company_code: d.company_code || company_code,
+        docket_no: d.docket_no,
+        docket_loc: d.docket_loc,
+        docket_date: d.docket_date,
+        company_code,
         aud_date: new Date()
       }));
-      await DocketController.createDocketDetails(rows, trx);
+      let promise = [];
+      for (const row of rows) {
+        promise.push(DocketController.createDocketDetails(row, trx));
+      }
+      await Promise.all(promise);
     }
     await trx.commit();
     res.status(201).json({ success: true, message: 'Docket saved successfully' });

@@ -28,6 +28,9 @@ export const getTenantConfig = () => {
   }
 };
 
+export const getDateFormat = () =>
+  getTenantConfig()?.dateFormate || "DD/MM/YYYY";
+
 export const clearTenantConfig = () => {
   localStorage.removeItem(TENANT_KEY);
   localStorage.removeItem(TENANT_TOKEN_KEY);

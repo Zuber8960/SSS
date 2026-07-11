@@ -1,6 +1,50 @@
 import { useState, useEffect } from "react";
-import { DataGrid, useGridApiContext } from "@mui/x-data-grid";
+import { DataGrid, useGridApiContext, useGridApiRef } from "@mui/x-data-grid";
 import { Box, Button, Select, MenuItem } from "@mui/material";
+import { getDateFormat } from "../../utils/tenantService";
+
+function DateEditCell(props) {
+  const { id, field, value } = props;
+  const apiRef = useGridApiContext();
+  // Normalise to YYYY-MM-DD for the input[type=date]
+  const toInputFmt = (v) => {
+    if (!v) return "";
+    // try MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD
+    const fmts = ["MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM-DD"];
+    for (const f of fmts) {
+      const m = new Date(
+        f === "MM/DD/YYYY" ? v : f === "DD/MM/YYYY"
+          ? v.split("/").reverse().join("-") : v
+      );
+      if (!isNaN(m)) {
+        const y = m.getFullYear();
+        const mo = String(m.getMonth() + 1).padStart(2, "0");
+        const d = String(m.getDate()).padStart(2, "0");
+        return `${y}-${mo}-${d}`;
+      }
+    }
+    return v;
+  };
+  const handleChange = (e) => {
+    const raw = e.target.value; // YYYY-MM-DD from input[type=date]
+    if (!raw) return;
+    const [y, mo, d] = raw.split("-");
+    const fmt = getDateFormat();
+    const formatted = fmt
+      .replace("YYYY", y).replace("MM", mo).replace("DD", d);
+    apiRef.current.setEditCellValue({ id, field, value: formatted });
+    apiRef.current.stopCellEditMode({ id, field });
+  };
+  return (
+    <input
+      type="date"
+      defaultValue={toInputFmt(value)}
+      onChange={handleChange}
+      style={{ width: "100%", border: "none", outline: "none", fontSize: 14, padding: "0 8px" }}
+      autoFocus
+    />
+  );
+}
 
 export function ToggleSwitch({ checked, onChange, labelOn, labelOff, size = "default" }) {
   const label = checked ? labelOn : labelOff;
@@ -175,6 +219,7 @@ export function DataTable({
   checkboxSelection = false,
   onRowSelectionModelChange,
 }) {
+  const apiRef = useGridApiRef();
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
     pageSize: 5,
@@ -205,6 +250,10 @@ export function DataTable({
       // Commit immediately when user picks from a dropdown — no blur required
       ...(col.options && (col.editable ?? editable)
         ? { renderEditCell: (params) => <InstantSelectEditCell {...params} /> }
+        : {}),
+      // Date columns use a native calendar picker
+      ...(col.isDate && (col.editable ?? editable)
+        ? { renderEditCell: (params) => <DateEditCell {...params} /> }
         : {}),
     })),
 
@@ -271,10 +320,17 @@ export function DataTable({
         paginationModel={effectivePaginationModel}
         onPaginationModelChange={setPaginationModel}
         pageSizeOptions={[5]}
-        {...(!checkboxSelection ? { disableRowSelectionOnClick: true } : {})}
+        disableRowSelectionOnClick
         pagination
         autoHeight
-        {...(singleClick ? { singleClickEdit: true } : {})}
+        {...(singleClick ? {
+          apiRef,
+          onCellClick: (params) => {
+            if (params.colDef.editable) {
+              apiRef.current.startCellEditMode({ id: params.id, field: params.field });
+            }
+          }
+        } : {})}
         {...(checkboxSelection ? { checkboxSelection: true } : {})}
         {...(onRowSelectionModelChange ? { onRowSelectionModelChange } : {})}
         processRowUpdate={async (newRow, oldRow) => {

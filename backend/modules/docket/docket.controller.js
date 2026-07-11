@@ -1,7 +1,7 @@
 const moment = require('moment');
 const db = require('../../config/db');
 const axios = require('axios');
-
+const ewb = require('../../config/ewb');
 
 /* ================= GET ================= */
 
@@ -154,12 +154,25 @@ const getDocketById = async ({ docket_no, docket_loc, docket_date }, company_cod
   return query.first();
 };
 
+const getDocketByRecId = async (rec_id, company_code) => {
+  const query = db('sss.sst_docket as d')
+    .leftJoin('sss.sst_docket_ewb as e', 'd.docket_no', 'e.docket_no')
+    .where({ 'd.rec_id': rec_id, 'd.record_status': 0 })
+    .select(
+      'd.*', 'e.ewb_no',
+      'e.cnor_name', 'e.cnor_address', 'e.cnor_pincode', 'e.cnor_gstin',
+      'e.cnee_name', 'e.cnee_address', 'e.cnee_pincode', 'e.cnee_gstin'
+    );
+  if (company_code) query.andWhere({ 'd.company_code': company_code });
+  return query.first();
+};
+
 const getDocketByNo = async (docket_no, company_code) => {
   const query = db('sss.sst_docket as d')
     .leftJoin('sss.sst_docket_ewb as e', 'd.docket_no', 'e.docket_no')
     .where({ 'd.docket_no': docket_no, 'd.record_status': 0 })
     .select(
-      'd.*',
+      'd.*', 'e.ewb_no',
       'e.cnor_name', 'e.cnor_address', 'e.cnor_pincode', 'e.cnor_gstin',
       'e.cnee_name', 'e.cnee_address', 'e.cnee_pincode', 'e.cnee_gstin'
     );
@@ -203,11 +216,11 @@ const sanitizeDocketData = (data) => {
 
 /* ================= CREATE ================= */
 
-const createDocket = async (header, trx = db) => {
+const createDocket = async (body, trx = db) => {
   return trx('sss.sst_docket').insert({
-    ...sanitizeDocketData(header),
+    ...sanitizeDocketData({ ...body }),
     aud_date: new Date()
-  });
+  }).returning(['docket_no', 'docket_loc', 'docket_date', 'division_code']);
 };
 
 const createDocketDetails = async (details, trx = db) => {
@@ -217,13 +230,48 @@ const createDocketDetails = async (details, trx = db) => {
 /* ================= UPDATE ================= */
 
 const updateDocket = async (keys, data, trx = db) => {
-  const query = trx('sss.sst_docket')
+  return trx('sss.sst_docket')
     .where(keys)
     .update({
       ...sanitizeDocketData(data),
       aud_date: new Date()
     });
-  return query;
+};
+
+const updateDocketByRecId = async (rec_id, data, trx = db) => {
+  // Fetch current keys before updating
+  const current = await trx('sss.sst_docket')
+    .where({ rec_id })
+    .select('docket_no', 'docket_loc', 'docket_date')
+    .first();
+
+  if (!current) return null;
+
+  await trx('sss.sst_docket')
+    .where({ rec_id })
+    .update({
+      ...sanitizeDocketData(data),
+      aud_date: new Date(),
+      aud_user: data.aud_user
+    });
+
+  // Update shared fields in dtl rows (no delete)
+  const dtlUpdate = {};
+  if (data.docket_loc !== undefined)    dtlUpdate.docket_loc    = data.docket_loc;
+  if (data.docket_date !== undefined)   dtlUpdate.docket_date   = data.docket_date;
+  if (data.company_code !== undefined)  dtlUpdate.company_code  = data.company_code;
+  if (data.division_code !== undefined) dtlUpdate.division_code = data.division_code;
+  if (data.docket_no !== undefined) dtlUpdate.docket_no = data.docket_no;
+
+  if (Object.keys(dtlUpdate).length > 0) {
+    await trx('sss.sst_docket_dtl')
+      .where({
+        docket_no:   current.docket_no,
+        docket_loc:  current.docket_loc,
+        docket_date: current.docket_date
+      })
+      .update({ ...dtlUpdate, aud_date: new Date(), aud_user : data.aud_user});
+  }
 };
 
 const deleteDocketDetails = async (keys, trx = db) => {
@@ -283,23 +331,72 @@ const deleteCharge = async (chargeId, trx = db, company_code) => {
 
 /* ================= EWAY BILL DB OPERATIONS ================= */
 
+const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
+  const ewb_date = data.ewb_date ? moment(data.ewb_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : undefined;
+  const ewb_valid_upto = data.ewb_valid ? moment(data.ewb_valid, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : undefined;
+  const invoice_date = data.inv_date ? moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : undefined;
+  const update = {
+    ...(data.ewb_no   !== undefined && { ewb_no: String(data.ewb_no) }),
+    ...(ewb_date      !== undefined && { ewb_date }),
+    ...(ewb_valid_upto !== undefined && { ewb_valid_upto }),
+    ...(invoice_date  !== undefined && { invoice_date }),
+    ...(data.inv_no   !== undefined && { invoice_no: data.inv_no }),
+    aud_date: new Date(),
+  };
+  return trx('sss.sst_docket_ewb').where({ rec_id }).update(update);
+};
+
 const getEwayBillFromDB = async (ewbNumbers, company_code) => {
+  let apiCalls = false;
   const query = db('sss.sst_docket_ewb').whereIn('ewb_no', ewbNumbers).select('*');
   if (company_code) query.andWhere({ company_code });
-  return query;
-};
+  let results = await query;
+  if (!results.length) {
+    // If not found in DB, fetch from API
+    apiCalls = true;
+    let apiResults = await getListEwayDetails(ewbNumbers);
+    if (apiResults.find(d => d.data)) {
+      results = apiResults.map(({data}) => ({
+        ...data,
+        ewb_date: data.ewb_date ? moment(data.ewb_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
+        ewb_valid_upto: data.ewb_valid_upto ? moment(data.ewb_valid_upto, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
+        invoice_date: data.inv_date ? moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
+      }));
+    } else {
+      apiResults = ewb.ewb_dummy_data;
+      results = apiResults
+      .map(({data}) => data)
+      .filter(d => d.ewbNo && ewbNumbers.includes(d.ewbNo))
+      .map((ewbRes) => ({
+          ...ewbRes,
+          ewb_date: ewbRes.ewb_date ? moment(ewbRes.ewb_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
+          ewb_valid_upto: ewbRes.ewb_valid_upto ? moment(ewbRes.ewb_valid_upto, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
+          invoice_date: ewbRes.inv_date ? moment(ewbRes.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
+        }));
+    }
+    if (results.length) {
+      const ewbDbResult = await saveEwayBillToDB(results, company_code);
+      console.log('EWB saved to DB:', ewbDbResult);
+      results = ewbDbResult;
+    } else {
+      console.log('No EWB data found from API for:', ewbNumbers);
+    }
+  };
+  return {  results, apiCalls };
+}
 
 const saveEwayBillToDB = async (ewbDataArray, company_code) => {
   const rows = ewbDataArray.map(item => {
-    const data = item.data || item;
-    const ewb_date = moment(data.ewayBillDate, 'DD/MM/YYYY').format('YYYY-MM-DD') || null;
-    const ewb_valid_upto = data.validUpto ? moment(data.validUpto, 'DD/MM/YYYY').format('YYYY-MM-DD') : null;
-    const invoice_date = data.docDate ? moment(data.docDate, 'DD/MM/YYYY').format('YYYY-MM-DD') : null;
+    const data = item.data || item; // DD/MM/YYYY hh:mm:ss A
+    
+    const ewb_date = moment(data.ewb_date || data.ewayBillDate , ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') || null;
+    const ewb_valid_upto = moment(data.ewb_valid ||  data.validUpto, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') || null;
+    const invoice_date = data.inv_date ? moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') : null;
     return {
       ewb_no: String(data.ewbNo || ''),
       ewb_date,
       ewb_valid_upto,
-      invoice_no: data.docNo || '',
+      invoice_no: data.inv_no,
       docket_no: data.docNo || '',
       invoice_date,
       cnor_name: data.fromTrdName || '',
@@ -328,37 +425,37 @@ const saveEwayBillToDB = async (ewbDataArray, company_code) => {
     .insert(rows)
     .returning('*');
 
-  const docketRows = ewbDataArray.map(item => {
-    const data = item.data || item;
-    const docket_date = data.docDate ? moment(data.docDate, 'DD/MM/YYYY').format('YYYY-MM-DD') : null;
-    const totalQty = data.itemList?.reduce((sum, i) => sum + (i.quantity || 0), 0) || 0;
-    const goodsDesc = data.itemList?.map(i => i.productDesc || i.productName).filter(Boolean).join(', ') || '';
-    const hsnCode = data.itemList?.[0]?.hsnCode ? String(data.itemList[0].hsnCode) : '';
+  // const docketRows = ewbDataArray.map(item => {
+  //   const data = item.data || item;
+  //   const docket_date = data.docDate ? moment(data.docDate, 'DD/MM/YYYY').format('YYYY-MM-DD') : null;
+  //   const totalQty = data.itemList?.reduce((sum, i) => sum + (i.quantity || 0), 0) || 0;
+  //   const goodsDesc = data.itemList?.map(i => i.productDesc || i.productName).filter(Boolean).join(', ') || '';
+  //   const hsnCode = data.itemList?.[0]?.hsnCode ? String(data.itemList[0].hsnCode) : '';
 
-    return {
-      docket_loc: (data.fromPlace || '').toUpperCase(),
-      docket_no: data.docNo || '',
-      docket_date,
-      docket_to_loc: (data.toPlace || '').toUpperCase(),
-      docket_cnor_name: data.fromTrdName || '',
-      docket_cnee_name: data.toTrdName || '',
-      docket_dly_town: data.toPlace || '',
-      docket_act_wt: totalQty,
-      docket_chrg_wt: totalQty,
-      docket_inv_value: data.totalValue || 0,
-      docket_tot_amt: data.totInvValue || 0,
-      docket_goods_desc: goodsDesc,
-      hsn_code: hsnCode,
-      company_code: company_code || null,
-      aud_date: new Date(),
-      record_status: 0
-    };
-  });
+  //   return {
+  //     docket_loc: (data.fromPlace || '').toUpperCase(),
+  //     docket_no: data.docNo || '',
+  //     docket_date,
+  //     docket_to_loc: (data.toPlace || '').toUpperCase(),
+  //     docket_cnor_name: data.fromTrdName || '',
+  //     docket_cnee_name: data.toTrdName || '',
+  //     docket_dly_town: data.toPlace || '',
+  //     docket_act_wt: totalQty,
+  //     docket_chrg_wt: totalQty,
+  //     docket_inv_value: data.totalValue || 0,
+  //     docket_tot_amt: data.totInvValue || 0,
+  //     docket_goods_desc: goodsDesc,
+  //     hsn_code: hsnCode,
+  //     company_code: company_code || null,
+  //     aud_date: new Date(),
+  //     record_status: 0
+  //   };
+  // });
 
-  await db('sss.sst_docket')
-    .insert(docketRows)
-    .onConflict(['docket_no', 'docket_loc', 'docket_date'])
-    .ignore();
+  // await db('sss.sst_docket')
+  //   .insert(docketRows)
+  //   .onConflict(['docket_no', 'docket_loc', 'docket_date'])
+  //   .ignore();
 
   return ewbResult;
 };
@@ -367,10 +464,12 @@ module.exports = {
   getAllDockets,
   getDocketById,
   getDocketByNo,
+  getDocketByRecId,
   getDocketDetails,
   createDocket,
   createDocketDetails,
   updateDocket,
+  updateDocketByRecId,
   deleteDocket,
   deleteDocketDetails,
   getEwaybillDetails,
@@ -380,5 +479,6 @@ module.exports = {
   updateCharge,
   deleteCharge,
   getEwayBillFromDB,
-  saveEwayBillToDB
+  saveEwayBillToDB,
+  updateEwayBillByRecId,
 };
