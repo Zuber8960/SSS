@@ -16,6 +16,7 @@ const tenantRoutes = require("../modules/tenantMaster/tenant.routes");
 const UserController = require('../modules/userMaster/user.controller');
 const TenantController = require('../modules/tenantMaster/tenant.controller');
 const manifestRoutes = require("../modules/manifest/manifest.routes");
+const lorryMasterRoutes = require("../modules/lorryMaster/lorryMaster.routes");
 const axios = require('axios');
 
 router.post('/login', async (req, res) => {
@@ -155,5 +156,6 @@ router.use('/roleMaster', authMiddleware, roleRoutes);
 router.use('/menuMaster', authMiddleware, menuRoutes);
 router.use('/userRole', authMiddleware, userRoleRoutes);
 router.use('/manifest', authMiddleware, manifestRoutes);
+router.use('/lorryMaster', authMiddleware, lorryMasterRoutes);
 
 module.exports = router;

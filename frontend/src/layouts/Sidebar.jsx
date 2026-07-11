@@ -9,14 +9,21 @@ import ListItemText from "@mui/material/ListItemText";
 import Collapse from "@mui/material/Collapse";
 import HomeIcon from "@mui/icons-material/Home";
 import ShieldIcon from "@mui/icons-material/Shield";
+import SecurityIcon from "@mui/icons-material/Security";
 import BusinessIcon from "@mui/icons-material/Business";
+import ApartmentIcon from "@mui/icons-material/Apartment";
 import GroupIcon from "@mui/icons-material/Group";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
+import CategoryIcon from "@mui/icons-material/Category";
 import PublicIcon from "@mui/icons-material/Public";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import HandshakeIcon from "@mui/icons-material/Handshake";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
+import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
 import AssignmentIcon from "@mui/icons-material/Assignment";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import DescriptionIcon from "@mui/icons-material/Description";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import AccountTreeSharp from "@mui/icons-material/TireRepair";
 import AccessTime from "@mui/icons-material/ManageHistory";
 import ExpandLess from "@mui/icons-material/ExpandLess";
@@ -63,9 +70,9 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
       },
       children: [
         { path: "/admin/users",     label: "User Master",        icon: <GroupIcon /> },
-        { path: "/admin/roles",     label: "Role Master",        icon: <ShieldIcon /> },
+        { path: "/admin/roles",     label: "Role Master",        icon: <SecurityIcon /> },
         { path: "/admin/menus",     label: "Menu Master",        icon: <MenuBookIcon /> },
-        { path: "/admin/role-menu", label: "Role Menu Mapping",  icon: <AssignmentIcon /> },
+        { path: "/admin/role-menu", label: "Role Menu Mapping",  icon: <SwapHorizIcon /> },
         { path: "/admin/user-role", label: "User Role Mapping",  icon: <PublicIcon /> },
       ],
     },
@@ -81,10 +88,11 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         setOpenTransaction(false);
       },
       children: [
-        { path: "/masters/company",          label: "Company Master",    icon: <BusinessIcon /> },
-        { path: "/masters/division",         label: "Division Master",   icon: <MenuBookIcon /> },
+        { path: "/masters/company",          label: "Company Master",    icon: <ApartmentIcon /> },
+        { path: "/masters/division",         label: "Division Master",   icon: <CategoryIcon /> },
         { path: "/masters/location",         label: "Location Master",   icon: <LocationOnIcon /> },
         { path: "/masters/business-partner", label: "Business Partner",  icon: <HandshakeIcon /> },
+        { path: "/masters/lorry",            label: "Lorry Master",      icon: <DirectionsCarIcon /> },
       ],
     },
     {
@@ -99,9 +107,10 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         setOpenMasters(false);
       },
       children: [
-        { path: "/transaction/docket",           label: "Docket",          icon: <LocalShippingIcon /> },
+        { path: "/transaction/docket",           label: "Docket",          icon: <DescriptionIcon /> },
         { path: "/transaction/trip-sheet",       label: "Trip Sheet",      icon: <AccountTreeSharp /> },
         { path: "/transaction/manifest-entry",   label: "Manifest Entry",  icon: <AccessTime /> },
+        { path: "/transaction/hire-voucher",     label: "Hire Voucher",    icon: <ReceiptLongIcon /> },
       ],
     },
   ];

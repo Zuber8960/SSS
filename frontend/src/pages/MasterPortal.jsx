@@ -49,14 +49,23 @@ export default function MasterPortal() {
 
   return (
     <>
-      <Box
+          <Box
         sx={{
           minHeight: "100vh",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)",
           p: 3,
+
+          background: "linear-gradient(-45deg, #ff7e5f, #feb47b, #ff6a88, #ff99ac)",
+          backgroundSize: "400% 400%",
+          animation: "gradientMove 2s ease infinite",
+
+          "@keyframes gradientMove": {
+            "0%": { backgroundPosition: "0% 50%" },
+            "50%": { backgroundPosition: "100% 50%" },
+            "100%": { backgroundPosition: "0% 50%" },
+          },
         }}
       >
         <Paper
