@@ -240,10 +240,11 @@ export default function ManifestPage() {
       };
 
       setMode("edit");
-      setIsSearchActive(false);
+      // setIsSearchActive(false);
       showInfo("Manifest loaded successfully");
       return true;
     } catch (err) {
+      handleClear();
       showError(err.message || "Failed to fetch manifest");
       console.error("Fetch manifest error:", err);
       return false;
