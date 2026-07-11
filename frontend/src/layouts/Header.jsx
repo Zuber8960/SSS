@@ -3,7 +3,7 @@ import { logout as logoutUser } from "../utils/authService";
 import { getTenantConfig } from "../utils/tenantService";
 import { usePageTitle } from "../contexts/PageTitleContext";
 import { Tooltip } from "@mui/material";
-import { MenuIcon, CloseIcon, LogoutSvgIcon } from "../icons";
+import { MenuIcon, CloseIcon, LogoutSvgIcon } from "../components/common/icons";
 import "./Header.css";
 import logoImg from "../images/logo.png";
 

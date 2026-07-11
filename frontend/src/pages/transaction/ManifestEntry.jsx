@@ -13,7 +13,7 @@ import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
 import { fetchDocketByDocketNo } from "../../utils/docket";
-import { AddIcon, DeleteIcon, EditIcon, SaveIcon, NoteAddIcon, ResetIcon } from "./docket/icons";
+import { AddIcon, DeleteIcon, EditIcon, SaveIcon, NoteAddIcon, ResetIcon } from "../../components/common/icons";
 import { IconButton, Tooltip } from "@mui/material";
 import {
   createManifest,

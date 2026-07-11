@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { ToggleSwitch } from "../../components/common/MasterPage";
 import { IconButton, Tooltip } from "@mui/material";
-import { EditIcon, SaveIcon, SECTION_ICONS } from "./docket/icons";
+import { EditIcon, SaveIcon, SECTION_ICONS } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import moment from "moment";
 import {
