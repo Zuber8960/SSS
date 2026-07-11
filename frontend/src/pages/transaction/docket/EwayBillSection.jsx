@@ -1,9 +1,7 @@
 import { useState } from "react";
 import moment from "moment";
 import { IconButton, Tooltip } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
-import DeleteIcon from "@mui/icons-material/Delete";
-import SaveIcon from "@mui/icons-material/Save";
+import { AddIcon, DeleteIcon, SaveIcon } from "./icons";
 import { DataTable } from "../../../components/common/MasterPage";
 import { fetchEwayBillFromDB, saveEwayBillToDB, updateEwayBillByRecId } from "../../../utils/docket";
 import { getDateFormat } from "../../../utils/tenantService";

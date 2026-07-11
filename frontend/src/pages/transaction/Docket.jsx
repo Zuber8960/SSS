@@ -1,8 +1,7 @@
 import { useState, useMemo } from "react";
 import { ToggleSwitch } from "../../components/common/MasterPage";
 import { IconButton, Tooltip } from "@mui/material";
-import EditIcon from "@mui/icons-material/Edit";
-import SaveIcon from "@mui/icons-material/Save";
+import { EditIcon, SaveIcon, SECTION_ICONS } from "./docket/icons";
 import MainLayout from "../../layouts/MainLayout";
 import moment from "moment";
 import {
@@ -108,26 +107,26 @@ const headerFields = [
 const formSections = [
   {
     title: "Docket Information",
-    icon: "📋",
+    icon: SECTION_ICONS.docketInfo,
     fields: ["docket_no", "docket_date", "docket_loc", "docket_to_loc"],
   },
   {
     title: "Consignor Details",
-    icon: "🏢",
+    icon: SECTION_ICONS.consignor,
     fields: ["cnor_name", "cnor_address", "cnor_pincode", "cnor_gstin"],
     half: true,
     columns: 2,
   },
   {
     title: "Consignee Details",
-    icon: "🏬",
+    icon: SECTION_ICONS.consignee,
     fields: ["cnee_name", "cnee_address", "cnee_pincode", "cnee_gstin"],
     half: true,
     columns: 2,
   },
   {
     title: "Package Details",
-    icon: "📦",
+    icon: SECTION_ICONS.package,
     fields: [
       "act_wt",
       "chrg_wt",
@@ -143,14 +142,14 @@ const formSections = [
   },
   {
     title: "PO & Invoice",
-    icon: "📄",
+    icon: SECTION_ICONS.poInvoice,
     fields: ["po_no", "po_date", "invoice_no", "invoice_date", "invoice_value"],
     half: true,
     columns: 4,
   },
   {
     title: "Insurance Details",
-    icon: "🛡️",
+    icon: SECTION_ICONS.insurance,
     fields: [
       "risk",
       "insurance_company",
@@ -164,20 +163,20 @@ const formSections = [
   },
   {
     title: "Goods Details",
-    icon: "🏷️",
+    icon: SECTION_ICONS.goods,
     fields: ["goods_grp", "goods_subgrp", "goods_desc"],
     half: true,
     columns: 2,
   },
   {
     title: "Rate & Charges",
-    icon: "💰",
+    icon: SECTION_ICONS.rateCharges,
     fields: ["rate", "rate_uom"],
     half: true,
   },
   {
     title: "Remarks",
-    icon: "💬",
+    icon: SECTION_ICONS.remarks,
     fields: ["remark"],
     half: true,
   },
