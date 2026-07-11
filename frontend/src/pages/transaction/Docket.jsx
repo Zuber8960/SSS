@@ -377,6 +377,7 @@ export default function DocketPage() {
         // Create new docket (POST) — backend strips rec_id: -1
         result = await createDocket(payload);
         setDocketExists(true);
+        if (result?.docket_no) setDocketNumberInput(result.docket_no);
         showSuccess("Docket created successfully");
       }
 
