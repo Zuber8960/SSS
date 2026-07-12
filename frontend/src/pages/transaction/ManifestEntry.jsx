@@ -451,6 +451,17 @@ export default function ManifestPage() {
               total_wt: computedTotals.total_wt,
               total_pkgs: computedTotals.total_pkgs,
             };
+            if (field.name === "remarks") {
+              return (
+                <div key={field.name} style={{ gridColumn: "1 / -1" }}>
+                  <FormField
+                    {...field}
+                    form={displayForm}
+                    setForm={setForm}
+                  />
+                </div>
+              );
+            }
             return (
               <FormField
                 key={field.name}
