@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { FormControl, InputLabel, Select, MenuItem, Typography, Stack, Box } from "@mui/material";
+import { FormControl, InputLabel, Select, MenuItem, Typography, Stack, Box, IconButton, Tooltip } from "@mui/material";
+import { AddIcon, SaveIcon, DeleteIcon } from "../../../components/common/icons";
 import { DataTable } from "../../../components/common/MasterPage";
 import {
   fetchAllDockets,
@@ -65,7 +66,6 @@ const recalculateChargeList = (rows, invValue) =>
 export default function ChargesSection({
   docketId,
   invoiceValue,
-  buttonStyle,
   sectionHeaderStyle,
   onChargesChange,
   singleClick = false,
@@ -254,22 +254,8 @@ export default function ChargesSection({
               ))}
             </Select>
           </FormControl>
-          <button
-            type="button"
-            onClick={addChargeRow}
-            style={{ ...buttonStyle, opacity: selectedDocketId ? 1 : 0.45, cursor: selectedDocketId ? "pointer" : "not-allowed" }}
-            disabled={!selectedDocketId}
-          >
-            Add Charge
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            style={{ ...buttonStyle, opacity: selectedDocketId ? 1 : 0.45, cursor: selectedDocketId ? "pointer" : "not-allowed" }}
-            disabled={!selectedDocketId}
-          >
-            Save
-          </button>
+          <Tooltip title="Add Charge"><IconButton size="small" onClick={addChargeRow} disabled={!selectedDocketId} sx={{ color: "#7e22ce", opacity: selectedDocketId ? 1 : 0.45, "&:hover": { background: "#f3e8ff" } }}><AddIcon /></IconButton></Tooltip>
+          <Tooltip title="Save"><IconButton size="small" onClick={handleSave} disabled={!selectedDocketId} sx={{ color: "#16a34a", opacity: selectedDocketId ? 1 : 0.45, "&:hover": { background: "#dcfce7" } }}><SaveIcon /></IconButton></Tooltip>
         </Stack>
       </Box>
 
@@ -278,7 +264,7 @@ export default function ChargesSection({
         rows={chargeList}
         getKey={(row) => row.rec_id}
         actions={[
-          { label: "Delete", onClick: (row) => deleteCharge(row) },
+          { label: "Delete", icon: <DeleteIcon />, onClick: (row) => deleteCharge(row) },
         ]}
         editable
         singleClick={singleClick}

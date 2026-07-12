@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { NoteAddIcon, SaveIcon, ExportIcon, EditIcon, DeleteIcon, RefreshIcon, AddRowIcon, ResetIcon, ViewIcon, AddIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
@@ -134,8 +135,8 @@ export default function DivisionPage() {
   ];
 
   const divisionActions = [
-    { label: "Edit", onClick: editDivision },
-    { label: "Delete", onClick: (row) => deleteDivision(row.rec_id) },
+    { label: "Edit", icon: <EditIcon />, onClick: editDivision },
+    { label: "Delete", icon: <DeleteIcon />, onClick: (row) => deleteDivision(row.rec_id) },
   ];
 
   const [, setError] = useState("");
@@ -164,9 +165,9 @@ export default function DivisionPage() {
       <PageBody title="Division Master">
         <PageToolbar
           actions={[
-            { label: "New", onClick: clearForm },
-            { label: "Save", onClick: saveDivision },
-            { label: "Export", onClick: () => alert("Export not implemented yet") },
+            { label: "New", icon: <NoteAddIcon />, onClick: clearForm },
+            { label: "Save", icon: <SaveIcon />, onClick: saveDivision },
+            { label: "Export", icon: <ExportIcon />, onClick: () => alert("Export not implemented yet") },
           ]}
           search={{ placeholder: "Search Division...", value: searchText, onChange: setSearchText }}
         />

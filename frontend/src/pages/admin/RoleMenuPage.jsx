@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { NoteAddIcon, SaveIcon, ExportIcon, EditIcon, DeleteIcon, RefreshIcon, AddRowIcon, ResetIcon, ViewIcon, AddIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
@@ -94,15 +95,15 @@ export default function RoleMenuPage() {
     { key: "deleteYn", label: "Delete", render: (row) => (row.deleteYn ? "Y" : "N") },
   ];
 
-  const roleActions = [{ label: "Delete", onClick: (_, index) => deleteMapping(index) }];
+  const roleActions = [{ label: "Delete", icon: <DeleteIcon />, onClick: (_, index) => deleteMapping(index) }];
 
   return (
     <MainLayout>
       <PageBody title="Role Menu Mapping">
         <PageToolbar
           actions={[
-            { label: "New", onClick: clearForm },
-            { label: "Save", onClick: saveMapping },
+            { label: "New", icon: <NoteAddIcon />, onClick: clearForm },
+            { label: "Save", icon: <SaveIcon />, onClick: saveMapping },
           ]}
         />
 

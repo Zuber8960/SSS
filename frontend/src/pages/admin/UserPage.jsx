@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { NoteAddIcon, SaveIcon, ExportIcon, EditIcon, DeleteIcon, RefreshIcon, AddRowIcon, ResetIcon, ViewIcon, AddIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import { fetchAllUsers, createUser, updateUser, deleteUser } from "../../utils/userAPI";
 import {
@@ -231,9 +232,9 @@ export default function UserPage() {
       <PageBody title="User Master">
         <PageToolbar
           actions={[
-            { label: "New", onClick: clearForm },
-            { label: "Save", onClick: saveUser },
-            { label: "Refresh", onClick: loadUsers },
+            { label: "New", icon: <NoteAddIcon />, onClick: clearForm },
+            { label: "Save", icon: <SaveIcon />, onClick: saveUser },
+            { label: "Refresh", icon: <RefreshIcon />, onClick: loadUsers },
           ]}
           search={{ placeholder: "Search User...", value: searchText, onChange: setSearchText }}
         />
@@ -262,8 +263,8 @@ export default function UserPage() {
           rows={filteredUsers}
           getKey={(row) => row.rec_id}
           actions={[
-            { label: "Edit", onClick: editUser },
-            { label: "Delete", onClick: handleDeleteUser },
+            { label: "Edit", icon: <EditIcon />, onClick: editUser },
+            { label: "Delete", icon: <DeleteIcon />, onClick: handleDeleteUser },
           ]}
         />
 

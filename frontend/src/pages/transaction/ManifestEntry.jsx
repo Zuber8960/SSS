@@ -378,41 +378,30 @@ export default function ManifestPage() {
     <MainLayout>
       <PageBody title="Manifest Entry">
         {/* ✅ Top Toolbar */}
-        <div
-          style={{
-            ...sectionHeaderStyle,
-            marginBottom: 16,
-            padding: "12px 16px",
-            background: "#f6f3ff",
-            borderRadius: 8,
-            border: "1px solid #e9e5f0",
-          }}
-        >
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            <Tooltip title="Create New">
-              <IconButton onClick={handleCreateNew} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
-                <NoteAddIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Edit / View">
-              <IconButton onClick={handleEditView} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
-                <EditIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Clear">
-              <IconButton onClick={handleClear} size="small" sx={{ color: "#dc2626", "&:hover": { background: "#fee2e2" } }}>
-                <ResetIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Save">
-              <IconButton onClick={handleSave} size="small" sx={{ color: "#16a34a", "&:hover": { background: "#dcfce7" } }}>
-                <SaveIcon />
-              </IconButton>
-            </Tooltip>
-          </div>
-
+        <div className="pageToolbar" style={{ alignItems: "center" }}>
+          <Tooltip title="Create New">
+            <IconButton onClick={handleCreateNew} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
+              <NoteAddIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Edit / View">
+            <IconButton onClick={handleEditView} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Clear">
+            <IconButton onClick={handleClear} size="small" sx={{ color: "#dc2626", "&:hover": { background: "#fee2e2" } }}>
+              <ResetIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Save">
+            <IconButton onClick={handleSave} size="small" sx={{ color: "#16a34a", "&:hover": { background: "#dcfce7" } }}>
+              <SaveIcon />
+            </IconButton>
+          </Tooltip>
           <span
             style={{
+              marginLeft: "auto",
               fontSize: 13,
               fontWeight: 600,
               color: mode === "create" ? "#16a34a" : "#ca8a04",

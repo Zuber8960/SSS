@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { NoteAddIcon, SaveIcon, ExportIcon, EditIcon, DeleteIcon, RefreshIcon, AddRowIcon, ResetIcon, ViewIcon, AddIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 
 import {
@@ -101,8 +102,8 @@ export default function TripSheetPage() {
         {/* ✅ Toolbar */}
         <PageToolbar
           actions={[
-            { label: "Add Row", onClick: addRow },
-            { label: "Save", onClick: handleSave },
+            { label: "Add Row", icon: <AddRowIcon />, onClick: addRow },
+            { label: "Save", icon: <SaveIcon />, onClick: handleSave },
           ]}
         />
 
@@ -128,6 +129,7 @@ export default function TripSheetPage() {
           actions={[
             {
               label: "Delete",
+              icon: <DeleteIcon />,
               onClick: deleteRow,
             },
           ]}

@@ -9,6 +9,10 @@ export { default as DeleteIcon } from "@mui/icons-material/Delete";
 export { default as NoteAddIcon } from "@mui/icons-material/NoteAdd";
 export { default as ClearIcon } from "@mui/icons-material/Clear";
 export { default as ResetIcon } from "@mui/icons-material/RestartAlt";
+export { default as RefreshIcon } from "@mui/icons-material/Refresh";
+export { default as ExportIcon } from "@mui/icons-material/FileDownload";
+export { default as ViewIcon } from "@mui/icons-material/Visibility";
+export { default as AddRowIcon } from "@mui/icons-material/PlaylistAdd";
 
 export function LogoutSvgIcon({ width = 16, height = 16 }) {
   return React.createElement(

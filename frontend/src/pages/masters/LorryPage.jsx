@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SaveIcon, RefreshIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
@@ -22,9 +23,11 @@ import {
   FormControlLabel,
   FormGroup,
   FormLabel,
+  IconButton,
   Select,
   MenuItem,
   Paper,
+  Tooltip,
   Typography,
   Chip,
 } from "@mui/material";
@@ -370,7 +373,7 @@ export default function LorryPage() {
         <PageToolbar
           actions={[
             // { label: "New", onClick: clearForm },
-            { label: "Save", onClick: saveLorry },
+            { label: "Save", icon: <SaveIcon />, onClick: saveLorry },
           ]}
         />
 
@@ -456,25 +459,7 @@ export default function LorryPage() {
             </FormGroup>
           </FormControl>
 
-          <Button
-            variant="outlined"
-            onClick={loadLorries}
-            startIcon={<span>⟳</span>}
-            sx={{
-              mt: "18px",
-              minWidth: "120px",
-              borderColor: "#a855f7",
-              color: "#a855f7",
-              fontWeight: 600,
-              fontSize: "13px",
-              textTransform: "none",
-              borderRadius: "10px",
-              py: 0.8,
-              "&:hover": { borderColor: "#9333ea", background: "rgba(168,85,247,0.06)" },
-            }}
-          >
-            Refresh
-          </Button>
+          <Tooltip title="Refresh"><IconButton size="small" onClick={loadLorries} sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}><RefreshIcon /></IconButton></Tooltip>
         </Box>
 
         {/* ═══════════════════ VEHICLE DETAILS ═══════════════════ */}

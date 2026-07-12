@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { NoteAddIcon, SaveIcon, ExportIcon, EditIcon, DeleteIcon, RefreshIcon, AddRowIcon, ResetIcon, ViewIcon, AddIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import { fetchAllRoles, createRole, updateRole, deleteRole } from "../../utils/roleMaster";
 import {
@@ -132,9 +133,9 @@ export default function RolePage() {
       <PageBody title="Role Master">
         <PageToolbar
           actions={[
-            { label: "New", onClick: clearForm },
-            { label: "Save", onClick: saveRole },
-            { label: "Refresh", onClick: loadRoles },
+            { label: "New", icon: <NoteAddIcon />, onClick: clearForm },
+            { label: "Save", icon: <SaveIcon />, onClick: saveRole },
+            { label: "Refresh", icon: <RefreshIcon />, onClick: loadRoles },
           ]}
           search={{ placeholder: "Search Role...", value: searchText, onChange: setSearchText }}
         />
@@ -155,8 +156,8 @@ export default function RolePage() {
           rows={filteredRoles}
           getKey={(row) => row.rec_id}
           actions={[
-            { label: "Edit", onClick: editRole },
-            { label: "Delete", onClick: handleDelete },
+            { label: "Edit", icon: <EditIcon />, onClick: editRole },
+            { label: "Delete", icon: <DeleteIcon />, onClick: handleDelete },
           ]}
         />
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />

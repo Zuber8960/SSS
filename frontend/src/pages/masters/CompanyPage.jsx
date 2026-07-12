@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { NoteAddIcon, SaveIcon, ExportIcon, EditIcon, DeleteIcon, RefreshIcon, AddRowIcon, ResetIcon, ViewIcon, AddIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
@@ -138,8 +139,8 @@ export default function CompanyPage() {
   ];
 
   const companyActions = [
-    { label: "Edit", onClick: editCompany },
-    { label: "Delete", onClick: (row) => handleDeleteCompany(row.rec_id) },
+    { label: "Edit", icon: <EditIcon />, onClick: editCompany },
+    { label: "Delete", icon: <DeleteIcon />, onClick: (row) => handleDeleteCompany(row.rec_id) },
   ];
 
   useEffect(() => {
@@ -162,9 +163,9 @@ export default function CompanyPage() {
       <PageBody title="Company Master">
         <PageToolbar
           actions={[
-            { label: "New", onClick: clearForm },
-            { label: "Save", onClick: saveCompany },
-            { label: "Export", onClick: () => alert("Export not implemented yet") },
+            { label: "New", icon: <NoteAddIcon />, onClick: clearForm },
+            { label: "Save", icon: <SaveIcon />, onClick: saveCompany },
+            { label: "Export", icon: <ExportIcon />, onClick: () => alert("Export not implemented yet") },
           ]}
           search={{ placeholder: "Search Company...", value: searchText, onChange: setSearchText }}
         />

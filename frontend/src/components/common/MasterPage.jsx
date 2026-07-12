@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { DataGrid, useGridApiContext, useGridApiRef } from "@mui/x-data-grid";
-import { Box, Button, Select, MenuItem } from "@mui/material";
+import { Box, Button, Select, MenuItem, IconButton, Tooltip } from "@mui/material";
 import { getDateFormat } from "../../utils/tenantService";
 
 function DateEditCell(props) {
@@ -109,13 +109,19 @@ export function PageToolbar({ actions, search }) {
   return (
     <div className="pageToolbar" style={{ alignItems: "center" }}>
       {actions.map((action) => (
-        <button
-          key={action.label}
-          className={action.active ? "active" : ""}
-          onClick={action.onClick}
-        >
-          {action.label}
-        </button>
+        <Tooltip key={action.label} title={action.label}>
+          <IconButton
+            onClick={action.onClick}
+            size="small"
+            sx={{
+              color: action.color === "error" ? "#dc2626" : "#7e22ce",
+              background: action.active ? (action.color === "error" ? "#fee2e2" : "#f3e8ff") : "transparent",
+              "&:hover": { background: action.color === "error" ? "#fee2e2" : "#f3e8ff" },
+            }}
+          >
+            {action.icon}
+          </IconButton>
+        </Tooltip>
       ))}
       {search && (
         <input
@@ -278,27 +284,18 @@ export function DataTable({
               width: "100%",
             }}>
               {actions.map((action) => (
-                <Button
-                  key={action.label}
-                  variant="contained"
-                  sx={{
-                    minWidth: "60px",
-                    padding: "8px",
-                    fontSize: "11px",
-                    lineHeight: 1.2,
-                    fontWeight: "bold"
-                  }}
-                  color={
-                    action.label.toLowerCase() === "delete"
-                      ? "error"
-                      : "primary"
-                  }
-                  onClick={() =>
-                    action.onClick(params.row)
-                  }
-                >
-                  {action.label}
-                </Button>
+                <Tooltip key={action.label} title={action.label}>
+                  <IconButton
+                    size="small"
+                    onClick={() => action.onClick(params.row)}
+                    sx={{
+                      color: action.label.toLowerCase() === "delete" ? "#dc2626" : "#7e22ce",
+                      "&:hover": { background: action.label.toLowerCase() === "delete" ? "#fee2e2" : "#f3e8ff" },
+                    }}
+                  >
+                    {action.icon}
+                  </IconButton>
+                </Tooltip>
               ))}
             </Box>
           ),

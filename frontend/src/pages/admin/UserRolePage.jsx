@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { NoteAddIcon, SaveIcon, ExportIcon, EditIcon, DeleteIcon, RefreshIcon, AddRowIcon, ResetIcon, ViewIcon, AddIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import { fetchAllUserRoles, createUserRole, deleteUserRole } from "../../utils/userRole";
 import { fetchAllUsers } from "../../utils/userAPI";
@@ -116,9 +117,9 @@ export default function UserRolePage() {
       <PageBody title="User Role Mapping">
         <PageToolbar
           actions={[
-            { label: "New", onClick: clearForm },
-            { label: "Save", onClick: saveMapping },
-            { label: "Refresh", onClick: loadMappings },
+            { label: "New", icon: <NoteAddIcon />, onClick: clearForm },
+            { label: "Save", icon: <SaveIcon />, onClick: saveMapping },
+            { label: "Refresh", icon: <RefreshIcon />, onClick: loadMappings },
           ]}
           search={{ placeholder: "Search...", value: searchText, onChange: setSearchText }}
         />
@@ -144,7 +145,7 @@ export default function UserRolePage() {
           rows={filteredMappings}
           getKey={(row) => `${row.user_id}_${row.role_code}`}
           actions={[
-            { label: "Delete", onClick: handleDelete },
+            { label: "Delete", icon: <DeleteIcon />, onClick: handleDelete },
           ]}
         />
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />

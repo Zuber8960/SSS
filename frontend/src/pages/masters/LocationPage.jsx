@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { NoteAddIcon, SaveIcon, ExportIcon, EditIcon, DeleteIcon, RefreshIcon, AddRowIcon, ResetIcon, ViewIcon, AddIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
@@ -145,8 +146,8 @@ export default function LocationPage() {
   ];
 
   const locationActions = [
-    { label: "Edit", onClick: editLocation },
-    { label: "Delete", onClick: (row) => deleteLocation(row.record_id) },
+    { label: "Edit", icon: <EditIcon />, onClick: editLocation },
+    { label: "Delete", icon: <DeleteIcon />, onClick: (row) => deleteLocation(row.record_id) },
   ];
 
   const [error, setError] = useState("");
@@ -175,11 +176,11 @@ export default function LocationPage() {
       <PageBody title="Location Master">
         <PageToolbar
           actions={[
-            { label: "New", onClick: clearForm },
-            { label: "Save", onClick: saveLocation },
+            { label: "New", icon: <NoteAddIcon />, onClick: clearForm },
+            { label: "Save", icon: <SaveIcon />, onClick: saveLocation },
             {
               label: "Export",
-              onClick: () => alert("Export not implemented yet"),
+              icon: <ExportIcon />, onClick: () => alert("Export not implemented yet"),
             },
           ]}
           search={{ placeholder: "Search Location...", value: searchText, onChange: setSearchText }}

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import MainLayout from "../../layouts/MainLayout";
 import moment from "moment";
+import { IconButton, Tooltip } from "@mui/material";
+import { NoteAddIcon, SaveIcon, ResetIcon, ViewIcon, AddRowIcon, DeleteIcon } from "../../components/common/icons";
 
 import {
   DataTable,
@@ -586,88 +588,15 @@ export default function HireVoucherPage() {
         </div>
 
         {/* ✅ TOOLBAR */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            flexWrap: "wrap",
-            marginBottom: 16,
-            padding: "12px 16px",
-            background: "#f6f3ff",
-            borderRadius: 8,
-            border: "1px solid #e9e5f0",
-          }}
-        >
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={handleCreateNew}
-              style={{
-                padding: "8px 18px",
-                border: "none",
-                borderRadius: 6,
-                background: "#7e22ce",
-                color: "#ffffff",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Create New
-            </button>
-
-            <button
-              type="button"
-              onClick={handleEditView}
-              style={{
-                padding: "8px 18px",
-                border: "none",
-                borderRadius: 6,
-                background: "#7e22ce",
-                color: "#ffffff",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Edit/View
-            </button>
-
-            <button
-              type="button"
-              onClick={handleClear}
-              style={{
-                padding: "8px 18px",
-                border: "none",
-                borderRadius: 6,
-                background: "#7e22ce",
-                color: "#ffffff",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Clear
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSave}
-              style={{
-                padding: "8px 18px",
-                border: "none",
-                borderRadius: 6,
-                background: "#7e22ce",
-                color: "#ffffff",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Save
-            </button>
-          </div>
+        <div className="pageToolbar" style={{ alignItems: "center" }}>
+          <Tooltip title="Create New"><IconButton onClick={handleCreateNew} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}><NoteAddIcon /></IconButton></Tooltip>
+          <Tooltip title="Edit / View"><IconButton onClick={handleEditView} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}><ViewIcon /></IconButton></Tooltip>
+          <Tooltip title="Clear"><IconButton onClick={handleClear} size="small" sx={{ color: "#dc2626", "&:hover": { background: "#fee2e2" } }}><ResetIcon /></IconButton></Tooltip>
+          <Tooltip title="Save"><IconButton onClick={handleSave} size="small" sx={{ color: "#16a34a", "&:hover": { background: "#dcfce7" } }}><SaveIcon /></IconButton></Tooltip>
 
           <span
             style={{
+              marginLeft: "auto",
               fontSize: 13,
               fontWeight: 600,
               color: mode === "create" ? "#16a34a" : "#ca8a04",
@@ -715,7 +644,7 @@ export default function HireVoucherPage() {
           <h3 style={{ margin: 0, color: "#4a3466" }}>Existing Vouchers</h3>
           <PageToolbar
             actions={[
-              { label: "Add Row", onClick: addRow },
+              { label: "Add Row", icon: <AddRowIcon />, onClick: addRow },
             ]}
           />
         </div>
@@ -727,6 +656,7 @@ export default function HireVoucherPage() {
           actions={[
             {
               label: "Delete",
+              icon: <DeleteIcon />,
               onClick: deleteRow,
             },
           ]}

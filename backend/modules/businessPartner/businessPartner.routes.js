@@ -2,11 +2,20 @@ const express = require('express');
 const router = express.Router();
 const BusinessPartnerController = require('./businessPartner.controller');
 
+router.get('/types', async (req, res) => {
+    try {
+        const data = await BusinessPartnerController.getAllBpTypes();
+        res.status(200).json({ success: true, data });
+    } catch (error) {
+        console.error('BP Types error:', error);
+        res.status(500).json({ success: false, message: 'Error retrieving BP types' });
+    }
+});
+
 router.get('/', async (req, res) => {
     try {
-        const recId = req.user.recId;
         const { company_code } = req;
-        const data = await BusinessPartnerController.getAllBusinessPartnerData(recId, company_code);
+        const data = await BusinessPartnerController.getAllBusinessPartnerData(company_code.toString());
         res.status(200).json({ success: true, data });
     } catch (error) {
         console.error('Business Partner error:', error);
@@ -14,12 +23,21 @@ router.get('/', async (req, res) => {
     }
 });
 
+router.get('/:recId', async (req, res) => {
+    try {
+        const data = await BusinessPartnerController.getBusinessPartnerDataByRecId(req.params.recId);
+        if (!data) return res.status(404).json({ success: false, message: 'Business partner not found' });
+        res.status(200).json({ success: true, data });
+    } catch (error) {
+        console.error('Business Partner error:', error);
+        res.status(500).json({ success: false, message: 'Error retrieving business partner' });
+    }
+});
+
 router.post('/', async (req, res) => {
     try {
-        const recId = req.user.recId;
-        const { company_code } = req;
-        const payload = { ...req.body, company_code: req.body.company_code || company_code };
-        const data = await BusinessPartnerController.saveBusinessPartnerData(recId, payload);
+        const userId = req.user?.recId;
+        const data = await BusinessPartnerController.saveBusinessPartnerData(userId, req.body);
         res.status(201).json({ success: true, data });
     } catch (error) {
         console.error('Business Partner error:', error);
@@ -29,12 +47,9 @@ router.post('/', async (req, res) => {
 
 router.put('/:recId', async (req, res) => {
     try {
-        const { recId } = req.params;
-        const { company_code } = req;
-        const payload = req.body;
-        const data = await BusinessPartnerController.updateBusinessPartnerData(recId, payload, company_code);
+        const data = await BusinessPartnerController.updateBusinessPartnerData(req.params.recId, req.body);
         if (!data || data.length === 0) {
-            return res.status(404).json({ success: false, message: 'Business partner data not found' });
+            return res.status(404).json({ success: false, message: 'Business partner not found' });
         }
         res.status(200).json({ success: true, data });
     } catch (error) {
@@ -45,13 +60,11 @@ router.put('/:recId', async (req, res) => {
 
 router.delete('/:recId', async (req, res) => {
     try {
-        const { recId } = req.params;
-        const { company_code } = req;
-        const deletedCount = await BusinessPartnerController.deleteBusinessPartnerData(recId, company_code);
+        const deletedCount = await BusinessPartnerController.deleteBusinessPartnerData(req.params.recId);
         if (!deletedCount) {
-            return res.status(404).json({ success: false, message: 'Business partner data not found' });
+            return res.status(404).json({ success: false, message: 'Business partner not found' });
         }
-        res.status(200).json({ success: true, message: 'Business partner data deleted successfully' });
+        res.status(200).json({ success: true, message: 'Business partner deleted successfully' });
     } catch (error) {
         console.error('Business Partner error:', error);
         res.status(500).json({ success: false, message: 'Error deleting business partner data' });

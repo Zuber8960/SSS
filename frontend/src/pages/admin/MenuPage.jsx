@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { NoteAddIcon, SaveIcon, ExportIcon, EditIcon, DeleteIcon, RefreshIcon, AddRowIcon, ResetIcon, ViewIcon, AddIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import { fetchAllMenus, createMenu, updateMenu, deleteMenu } from "../../utils/menuMaster";
 import {
@@ -164,9 +165,9 @@ export default function MenuPage() {
       <PageBody title="Menu Master">
         <PageToolbar
           actions={[
-            { label: "New", onClick: clearForm },
-            { label: "Save", onClick: saveMenu },
-            { label: "Refresh", onClick: loadMenus },
+            { label: "New", icon: <NoteAddIcon />, onClick: clearForm },
+            { label: "Save", icon: <SaveIcon />, onClick: saveMenu },
+            { label: "Refresh", icon: <RefreshIcon />, onClick: loadMenus },
           ]}
           search={{ placeholder: "Search Menu...", value: searchText, onChange: setSearchText }}
         />
@@ -187,8 +188,8 @@ export default function MenuPage() {
           rows={filteredMenus}
           getKey={(row) => row.rec_id}
           actions={[
-            { label: "Edit", onClick: editMenu },
-            { label: "Delete", onClick: handleDelete },
+            { label: "Edit", icon: <EditIcon />, onClick: editMenu },
+            { label: "Delete", icon: <DeleteIcon />, onClick: handleDelete },
           ]}
         />
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
