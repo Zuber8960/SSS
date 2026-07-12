@@ -458,7 +458,8 @@ export default function ManifestPage() {
                 form={displayForm}
                 setForm={setForm}
                 disabled={
-                  field.name === "manifest_no" && mode === "create" && !isSearchActive
+                  field.disabled ||
+                  (field.name === "manifest_no" && mode === "create" && !isSearchActive)
                 }
               />
             );
