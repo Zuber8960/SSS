@@ -77,6 +77,8 @@ export default function CompanyPage() {
     const payload = {
       ...form,
       status: form.status === "Active" ? "A" : "I",
+      closed_on: form.closed_on || null,
+      opened_on: form.opened_on || null,
     };
 
     try {
