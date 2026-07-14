@@ -25,6 +25,8 @@ import {
   fetchNextHireVoucherNo,
 } from "../../utils/hireVoucher";
 
+import { fetchManifestByNo } from "../../utils/manifest";
+
 // ------------------- IMAGE CONFIG -------------------
 const voucherImage = vocherimage;
 const bgPlaceholder = "/images/logo.png";
@@ -76,17 +78,17 @@ const headerFields = [
   { label: "HV Date", name: "hv_date", type: "date" },
 
   // Order Details
-  { label: "Order ID", name: "order_id" },
-  { label: "Order Loc", name: "order_loc" },
-  { label: "Veh Type", name: "veh_type" },
-  { label: "Pickup", name: "pickup" },
-  { label: "Req Wt", name: "req_wt", type: "number" },
-  { label: "Remarks", name: "remarks", type: "textarea" },
+  // { label: "Order ID", name: "order_id" },
+  // { label: "Order Loc", name: "order_loc" },
+  // { label: "Veh Type", name: "veh_type" },
+  // { label: "Pickup", name: "pickup" },
+  // { label: "Req Wt", name: "req_wt", type: "number" },
+  // { label: "Remarks", name: "remarks", type: "textarea" },
 
   // Vehicle Hire Voucher
   { label: "VHV No", name: "vhv_no" },
   { label: "Date", name: "vhv_date", type: "date" },
-  { label: "Loc", name: "vhv_loc" },
+  { label: "From Loc", name: "vhv_loc" },
   { label: "To Loc", name: "vhv_to_loc" },
   { label: "State", name: "vhv_state" },
   { label: "City", name: "vhv_city" },
@@ -102,19 +104,19 @@ const headerFields = [
 
 // ------------------- FORM SECTIONS (card layout) -------------------
 const formSections = [
-  {
-    title: "Order Details",
-    icon: "📦",
-    fields: ["order_id", "order_loc", "veh_type", "pickup", "req_wt", "remarks"],
-    half: true,
-    columns: 2,
-  },
+  // {
+  //   title: "Order Details",
+  //   icon: "📦",
+  //   fields: ["order_id", "order_loc", "veh_type", "pickup", "req_wt", "remarks"],
+  //   half: true,
+  //   columns: 2,
+  // },
   {
     title: "Vehicle Hire Voucher",
     icon: "🚛",
     fields: ["vhv_no", "vhv_date", "vhv_loc", "vhv_to_loc", "vhv_state", "vhv_city", "vhv_town", "vhv_pin", "via1", "via2", "via3", "via4", "via5", "via6"],
-    half: true,
-    columns: 2,
+    half: false,
+    horizontal: true,
   },
 ];
 
@@ -130,14 +132,19 @@ const detailColumns = [
   { key: "pickup", label: "Pickup" },
 ];
 
+// ------------------- MANIFEST DETAILS TABLE COLUMNS -------------------
+const manifestColumns = [
+  { key: "manifest_no", label: "Manifest No" },
+  { key: "manifest_date", label: "Date" },
+  { key: "from_loc", label: "From Loc" },
+  { key: "to_loc", label: "To Loc" },
+  { key: "vehicle_no", label: "Vehicle No" },
+  { key: "driver_name", label: "Driver Name" },
+];
+
 const emptyForm = {
   hv_no: "",
   hv_date: "",
-  order_id: "",
-  order_loc: "",
-  veh_type: "",
-  pickup: "",
-  req_wt: "",
   from_loc: "",
   to_loc: "",
   lorry_hire_rate: "",
@@ -238,6 +245,8 @@ export default function HireVoucherPage() {
 
   const [form, setForm] = useState({ ...emptyForm });
   const [details, setDetails] = useState([]);
+  const [manifestDetails, setManifestDetails] = useState([]);
+  const [manifestCache, setManifestCache] = useState({});
 
   // Mode: "create" | "edit"
   const [mode, setMode] = useState("create");
@@ -297,15 +306,84 @@ export default function HireVoucherPage() {
     updateRow(rowIndex, key, value);
   };
 
+  // ------------------- MANIFEST DETAILS HANDLERS -------------------
+  const addManifestRow = () => {
+    setManifestDetails([
+      ...manifestDetails,
+      {
+        manifest_no: "",
+        manifest_date: "",
+        from_loc: "",
+        to_loc: "",
+        vehicle_no: "",
+        driver_name: "",
+      },
+    ]);
+  };
+
+  const deleteManifestRow = (row) => {
+    setManifestDetails((prev) => prev.filter((r) => r !== row));
+  };
+
+  const updateManifestRow = (index, field, value) => {
+    const updated = [...manifestDetails];
+    updated[index][field] = value;
+    setManifestDetails(updated);
+  };
+
+  // When manifest_no changes, fetch details from API and auto-fill the row
+  const fetchAndFillManifest = async (index, manifestNo) => {
+    if (!manifestNo) return;
+    try {
+      showLoading();
+      let manifestData = manifestCache[manifestNo];
+      if (!manifestData) {
+        manifestData = await fetchManifestByNo(manifestNo);
+        if (manifestData) {
+          setManifestCache((prev) => ({ ...prev, [manifestNo]: manifestData }));
+        }
+      }
+      if (manifestData && manifestData.header) {
+        const hdr = manifestData.header;
+        setManifestDetails((prev) => {
+          const upd = [...prev];
+          if (upd[index]) {
+            upd[index] = {
+              ...upd[index],
+              manifest_date: hdr.mnf_date ? hdr.mnf_date.substring(0, 10) : "",
+              from_loc: hdr.mnf_loc || "",
+              to_loc: hdr.mnf_to_loc || "",
+              vehicle_no: hdr.desp_veh_no || "",
+              driver_name: hdr.loaded_by || "",
+            };
+          }
+          return upd;
+        });
+      }
+    } catch (err) {
+      showError(err.message || "Failed to fetch manifest details");
+      console.error("Fetch manifest error:", err);
+    } finally {
+      hideLoading();
+    }
+  };
+
+  const handleManifestCellChange = (rowIndex, key, value) => {
+    updateManifestRow(rowIndex, key, value);
+    if (key === "manifest_no") {
+      fetchAndFillManifest(rowIndex, value);
+    }
+  };
+
   // ------------------- MAP HELPERS -------------------
   const mapFormToHeader = () => ({
     hv_no: form.hv_no,
     hv_date: form.hv_date || null,
-    order_id: form.order_id,
-    order_loc: form.order_loc,
-    veh_type: form.veh_type,
-    pickup: form.pickup,
-    req_wt: parseFloat(form.req_wt) || 0,
+    // order_id: form.order_id,
+    // order_loc: form.order_loc,
+    // veh_type: form.veh_type,
+    // pickup: form.pickup,
+    // req_wt: parseFloat(form.req_wt) || 0,
     from_loc: form.from_loc,
     to_loc: form.to_loc,
     lorry_hire_rate: parseFloat(form.lorry_hire_rate) || 0,
@@ -345,11 +423,11 @@ export default function HireVoucherPage() {
   const mapHeaderToForm = (hdr) => ({
     hv_no: hdr.hv_no || "",
     hv_date: hdr.hv_date ? hdr.hv_date.substring(0, 10) : "",
-    order_id: hdr.order_id || "",
-    order_loc: hdr.order_loc || "",
-    veh_type: hdr.veh_type || "",
-    pickup: hdr.pickup || "",
-    req_wt: hdr.req_wt ?? "",
+    // order_id: hdr.order_id || "",
+    // order_loc: hdr.order_loc || "",
+    // veh_type: hdr.veh_type || "",
+    // pickup: hdr.pickup || "",
+    // req_wt: hdr.req_wt ?? "",
     from_loc: hdr.from_loc || "",
     to_loc: hdr.to_loc || "",
     lorry_hire_rate: hdr.lorry_hire_rate ?? "",
@@ -423,6 +501,8 @@ export default function HireVoucherPage() {
   const handleCreateNew = () => {
     setForm({ ...emptyForm });
     setDetails([]);
+    setManifestDetails([]);
+    setManifestCache({});
     originalKey.current = null;
     setMode("create");
     setIsSearchActive(false);
@@ -450,6 +530,8 @@ export default function HireVoucherPage() {
   const handleClear = () => {
     setForm({ ...emptyForm });
     setDetails([]);
+    setManifestDetails([]);
+    setManifestCache({});
     originalKey.current = null;
     setMode("create");
     setIsSearchActive(false);
@@ -525,25 +607,33 @@ export default function HireVoucherPage() {
 
     if (sectionFieldConfigs.length === 0) return null;
 
+    // Horizontal layout: display fields in a row with wrapping
+    const horizontalStyle = {
+      padding: "14px 16px",
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 10,
+      alignItems: "flex-start",
+    };
+
     return (
       <div key={section.title} style={{ ...sectionCardStyles.sectionCard, gridColumn: section.half ? undefined : "1 / -1" }}>
         <div style={sectionCardStyles.sectionHeader}>
           <span style={sectionCardStyles.sectionIcon}>{section.icon}</span>
           <h4 style={sectionCardStyles.sectionTitle}>{section.title}</h4>
         </div>
-        <div style={{
-          ...sectionCardStyles.sectionFields,
-          ...(section.columns && sectionFieldConfigs.length > 1 ? {
-            gridTemplateColumns: `repeat(auto-fill, minmax(max(${section.columns === 2 ? 150 : 100}px, calc(${(100 / section.columns).toFixed(0)}% - 10px)), 1fr))`,
-            gap: 10,
-          } : {}),
-        }}>
+        <div style={section.horizontal ? horizontalStyle : sectionCardStyles.sectionFields}>
           {sectionFieldConfigs.map((field) => {
             const isTextarea = field.type === "textarea";
+            const fieldStyle = {
+              minWidth: 130,
+              flex: "0 1 auto",
+              ...(isTextarea || field.fullWidth ? { flex: "1 1 100%" } : {}),
+            };
             return (
               <div
                 key={field.name}
-                style={isTextarea || field.fullWidth ? sectionCardStyles.fullWidthField : undefined}
+                style={fieldStyle}
               >
                 <FormField
                   {...field}
@@ -613,7 +703,7 @@ export default function HireVoucherPage() {
           </span>
         </div>
 
-        {/* ✅ HEADER FORM (Card Layout matching Docket.jsx) */}
+        {/* ✅ HEADER FORM (Card Layout) */}
         <div
           style={{
             background: "#f8f6ff",
@@ -621,13 +711,45 @@ export default function HireVoucherPage() {
             border: "1px solid #e9e5f0",
             padding: "1px",
             boxShadow: "0 2px 12px rgba(126, 34, 206, 0.06)",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            gap: 8,
           }}
         >
           {formSections.map((section) => renderFormSection(section))}
         </div>
+
+        {/* ✅ MANIFEST DETAILS TABLE */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+            marginTop: 24,
+            marginBottom: 12,
+          }}
+        >
+          <h3 style={{ margin: 0, color: "#4a3466" }}>Manifest Details</h3>
+          <PageToolbar
+            actions={[
+              { label: "Add Row", icon: <AddRowIcon />, onClick: addManifestRow },
+            ]}
+          />
+        </div>
+
+        <DataTable
+          columns={manifestColumns}
+          rows={manifestDetails}
+          getKey={(row, index) => index}
+          actions={[
+            {
+              label: "Delete",
+              icon: <DeleteIcon />,
+              onClick: deleteManifestRow,
+            },
+          ]}
+          editable
+          onCellChange={handleManifestCellChange}
+        />
 
         {/* ✅ DETAIL TABLE (Existing Vouchers) */}
         <div
