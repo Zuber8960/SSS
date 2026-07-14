@@ -7,6 +7,8 @@ const path = require('path');
 const fs = require('fs');
 app.use(express.json());
 
+// ✅ Serve static uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 console.log('FRONTEND_URL =', process.env.FRONTEND_URL);
 

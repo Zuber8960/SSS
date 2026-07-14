@@ -173,6 +173,12 @@ module.exports = {
     const rows = await query;
     return rows.map(mapDbToForm);
   },
+  async getByVehicleId(vehicleId, company_code) {
+    const query = db(TABLE).where({ lry_regis_no: vehicleId });
+    if (company_code) query.andWhere({ company_code });
+    const row = await query.first();
+    return mapDbToForm(row);
+  },
 
   async getByRecId(recId, company_code) {
     const query = db(TABLE).where({ rec_id: recId });
@@ -182,13 +188,28 @@ module.exports = {
   },
 
   async create(recId, payload, company_code) {
-    const dbPayload = mapFormToDb(payload);
+    let dbPayload = mapFormToDb(payload);
+
     dbPayload.company_code = payload.company_code || company_code;
     dbPayload.aud_user = recId;
     dbPayload.aud_branch = payload.branch_code;
     dbPayload.aud_date = new Date();
-    const [row] = await db(TABLE).insert(dbPayload).returning('*');
-    return mapDbToForm(row);
+
+    // ✅ remove undefined
+    dbPayload = Object.fromEntries(
+      Object.entries(dbPayload).filter(([_, v]) => v !== undefined)
+    );
+
+    try {
+      const [row] = await db(TABLE)
+        .insert(dbPayload)
+        .returning("*");
+
+      return mapDbToForm(row);
+    } catch (err) {
+      console.error("Insert failed:", err);
+      throw err;
+    }
   },
 
   async update(recId, payload, company_code) {
