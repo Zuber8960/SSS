@@ -33,9 +33,9 @@ router.get('/ewbDetails/:ewbLists', async (req, res) => {
 
 router.get('/ewayfile/db', async (req, res) => {
   try {
-    const { company_code } = req;
+    const { tenant_id } = req;
     const query = db('sss.sst_docket_ewb').select('*').orderBy('aud_date', 'desc');
-    if (company_code) query.where({ company_code });
+    if (tenant_id) query.where({ tenant_id });
     const data = await query;
     res.json({ success: true, data });
   } catch (err) {
@@ -49,8 +49,8 @@ router.get('/ewayfile/db/:ewbNumbers', async (req, res) => {
     if (!ewbNumbers?.length) {
       return res.json({ success: true, data: [] });
     }
-    const { company_code } = req;
-    const {results, apiCalls} = await DocketController.getEwayBillFromDB(ewbNumbers, company_code);
+    const { tenant_id } = req;
+    const {results, apiCalls} = await DocketController.getEwayBillFromDB(ewbNumbers, tenant_id);
     res.json({ success: true, data: results, apiCalls });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -70,12 +70,12 @@ router.put('/ewayfile/db/:recId', async (req, res) => {
 
 router.post('/ewayfile/db', async (req, res) => {
   try {
-    const { company_code } = req;
+    const { tenant_id } = req;
     const ewbData = req.body;
     if (!Array.isArray(ewbData) || !ewbData.length) {
       return res.status(400).json({ success: false, message: 'Ewaybill data array is required' });
     }
-    const data = await DocketController.saveEwayBillToDB(ewbData, company_code);
+    const data = await DocketController.saveEwayBillToDB(ewbData, tenant_id);
     res.status(201).json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -87,8 +87,8 @@ router.post('/ewayfile/db', async (req, res) => {
 router.get('/charges/:chargeId', async (req, res) => {
   try {
     const { chargeId } = req.params;
-    const { company_code } = req;
-    const data = await DocketController.getChargesByDocketId(chargeId, company_code);
+    const { tenant_id } = req;
+    const data = await DocketController.getChargesByDocketId(chargeId, tenant_id);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -98,9 +98,9 @@ router.get('/charges/:chargeId', async (req, res) => {
 router.put('/charges/:chargeId', async (req, res) => {
   try {
     const { chargeId } = req.params;
-    const { company_code } = req;
+    const { tenant_id } = req;
     const chargeData = req.body;
-    const data = await DocketController.updateCharge(chargeId, chargeData, db, company_code);
+    const data = await DocketController.updateCharge(chargeId, chargeData, db, tenant_id);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -110,8 +110,8 @@ router.put('/charges/:chargeId', async (req, res) => {
 router.delete('/charges/:chargeId', async (req, res) => {
   try {
     const { chargeId } = req.params;
-    const { company_code } = req;
-    const data = await DocketController.deleteCharge(chargeId, db, company_code);
+    const { tenant_id } = req;
+    const data = await DocketController.deleteCharge(chargeId, db, tenant_id);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -121,8 +121,8 @@ router.delete('/charges/:chargeId', async (req, res) => {
 router.get('/:docketId/charges', async (req, res) => {
   try {
     const { docketId } = req.params;
-    const { company_code } = req;
-    const data = await DocketController.getChargesByDocketId(docketId, company_code);
+    const { tenant_id } = req;
+    const data = await DocketController.getChargesByDocketId(docketId, tenant_id);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -132,8 +132,8 @@ router.get('/:docketId/charges', async (req, res) => {
 router.post('/:docketId/charges', async (req, res) => {
   try {
     const { docketId } = req.params;
-    const { company_code } = req;
-    const chargeData = { ...req.body, company_code: req.body.company_code || company_code };
+    const { tenant_id } = req;
+    const chargeData = { ...req.body, tenant_id };
     const data = await DocketController.createCharge(docketId, chargeData);
     res.status(201).json({ success: true, data });
   } catch (err) {
@@ -145,8 +145,8 @@ router.post('/:docketId/charges', async (req, res) => {
 
 router.get('/', async (req, res) => {
   try {
-    const { company_code } = req;
-    const data = await DocketController.getAllDockets(company_code);
+    const { tenant_id } = req;
+    const data = await DocketController.getAllDockets(tenant_id);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -158,8 +158,8 @@ router.get('/', async (req, res) => {
 router.get('/rec/:recId', async (req, res) => {
   try {
     const { recId } = req.params;
-    const { company_code } = req;
-    const data = await DocketController.getDocketByRecId(Number(recId), company_code);
+    const { tenant_id } = req;
+    const data = await DocketController.getDocketByRecId(Number(recId), tenant_id);
     if (data) res.json({ success: true, data });
     else res.status(404).json({ success: false, message: 'Docket not found' });
   } catch (err) {
@@ -171,7 +171,7 @@ router.put('/rec/:recId', async (req, res) => {
   const trx = await db.transaction();
   try {
     const { recId } = req.params;
-    const { company_code } = req;
+    const { tenant_id } = req;
     const payload = req.body;
     await DocketController.updateDocketByRecId(Number(recId), payload, trx);
     await trx.commit();
@@ -187,8 +187,8 @@ router.put('/rec/:recId', async (req, res) => {
 router.get('/:no', async (req, res) => {
   try {
     const { no } = req.params;
-    const { company_code } = req;
-    const data = await DocketController.getDocketByNo(no, company_code);
+    const { tenant_id } = req;
+    const data = await DocketController.getDocketByNo(no, tenant_id);
     if (data) res.json({ success: true, data });
     else res.status(404).json({ success: false, message: 'Docket not found' });
   } catch (err) {
@@ -199,9 +199,9 @@ router.get('/:no', async (req, res) => {
 router.get('/:no/:loc/:date', async (req, res) => {
   try {
     const { no, loc, date } = req.params;
-    const { company_code } = req;
-    const header = await DocketController.getDocketById({ docket_no: no, docket_loc: loc, docket_date: date }, company_code);
-    const details = await DocketController.getDocketDetails({ docket_no: no, docket_loc: loc, docket_date: date }, company_code);
+    const { tenant_id } = req;
+    const header = await DocketController.getDocketById({ docket_no: no, docket_loc: loc, docket_date: date }, tenant_id);
+    const details = await DocketController.getDocketDetails({ docket_no: no, docket_loc: loc, docket_date: date }, tenant_id);
     res.json({ success: true, header, details });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -213,11 +213,11 @@ router.get('/:no/:loc/:date', async (req, res) => {
 router.post('/', async (req, res) => {
   const trx = await db.transaction();
   try {
-    const { company_code } = req;
+    const { tenant_id } = req;
     const firstDigit = String(Math.floor(Math.random() * 10));
     const rest = require('crypto').randomBytes(7).toString('hex').toUpperCase().slice(0, 13);
     const docket_no = firstDigit + rest;
-    const body = { ...req.body, docket_no, company_code };
+    const body = { ...req.body, docket_no, tenant_id };
 
     let docket = await DocketController.createDocket(body, trx);
 
@@ -227,7 +227,7 @@ router.post('/', async (req, res) => {
         docket_no: d.docket_no,
         docket_loc: d.docket_loc,
         docket_date: d.docket_date,
-        company_code,
+        tenant_id,
         aud_date: new Date()
       }));
       let promise = [];
@@ -250,11 +250,11 @@ router.put('/:no', async (req, res) => {
   const trx = await db.transaction();
   try {
     const { no } = req.params;
-    const { company_code } = req;
+    const { tenant_id } = req;
     const { header, details } = req.body;
     const payload = header || req.body;
 
-    const existing = await DocketController.getAllDockets(company_code).then(dockets =>
+    const existing = await DocketController.getAllDockets(tenant_id).then(dockets =>
       dockets.find(d => String(d.docket_no) === String(no))
     );
 
@@ -268,7 +268,7 @@ router.put('/:no', async (req, res) => {
     await DocketController.deleteDocketDetails(keys, trx);
 
     if (details?.length) {
-      const rows = details.map(d => ({ ...d, ...keys, company_code: d.company_code || company_code, aud_date: new Date() }));
+      const rows = details.map(d => ({ ...d, ...keys, tenant_id, aud_date: new Date() }));
       await DocketController.createDocketDetails(rows, trx);
     }
 
@@ -284,13 +284,13 @@ router.put('/:no/:loc/:date', async (req, res) => {
   const trx = await db.transaction();
   try {
     const { no, loc, date } = req.params;
-    const { company_code } = req;
+    const { tenant_id } = req;
     const { header, details } = req.body;
     const keys = { docket_no: no, docket_loc: loc, docket_date: date };
     await DocketController.updateDocket(keys, header, trx);
     await DocketController.deleteDocketDetails(keys, trx);
     if (details?.length) {
-      const rows = details.map(d => ({ ...d, ...keys, company_code: d.company_code || company_code, aud_date: new Date() }));
+      const rows = details.map(d => ({ ...d, ...keys, tenant_id, aud_date: new Date() }));
       await DocketController.createDocketDetails(rows, trx);
     }
     await trx.commit();
@@ -307,8 +307,8 @@ router.delete('/:no/:loc/:date', async (req, res) => {
   const trx = await db.transaction();
   try {
     const { no, loc, date } = req.params;
-    const { company_code } = req;
-    await DocketController.deleteDocket({ docket_no: no, docket_loc: loc, docket_date: date, company_code }, trx);
+    const { tenant_id } = req;
+    await DocketController.deleteDocket({ docket_no: no, docket_loc: loc, docket_date: date, tenant_id }, trx);
     await trx.commit();
     res.json({ success: true, message: 'Docket deleted successfully' });
   } catch (err) {

@@ -5,8 +5,8 @@ const DivisionMasterController = require('./divisionMaster.controller');
 router.get('/', async (req, res) => {
     try {
         const recId = req.user.recId;
-        const { company_code } = req;
-        const data = await DivisionMasterController.getAllDivisionData(recId, company_code);
+        const { tenant_id } = req;
+        const data = await DivisionMasterController.getAllDivisionData(recId, tenant_id);
         res.status(200).json({ success: true, data });
     } catch (error) {
         console.error('Division Master error:', error);
@@ -17,8 +17,8 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const recId = req.user.recId;
-        const { company_code } = req;
-        const payload = { ...req.body, company_code: req.body.company_code || company_code };
+        const { tenant_id } = req;
+        const payload = { ...req.body, tenant_id: req.body.tenant_id || tenant_id };
         const data = await DivisionMasterController.saveDivisionData(recId, payload);
         res.status(201).json({ success: true, data });
     } catch (error) {
@@ -30,9 +30,9 @@ router.post('/', async (req, res) => {
 router.put('/:recId', async (req, res) => {
     try {
         const { recId } = req.params;
-        const { company_code } = req;
+        const { tenant_id } = req;
         const payload = req.body;
-        const data = await DivisionMasterController.updateDivisionData(recId, payload, company_code);
+        const data = await DivisionMasterController.updateDivisionData(recId, payload, tenant_id);
         if (!data || data.length === 0) {
             return res.status(404).json({ success: false, message: 'Division data not found' });
         }
@@ -46,8 +46,8 @@ router.put('/:recId', async (req, res) => {
 router.delete('/:recId', async (req, res) => {
     try {
         const { recId } = req.params;
-        const { company_code } = req;
-        const deletedCount = await DivisionMasterController.deleteDivisionData(recId, company_code);
+        const { tenant_id } = req;
+        const deletedCount = await DivisionMasterController.deleteDivisionData(recId, tenant_id);
         if (!deletedCount) {
             return res.status(404).json({ success: false, message: 'Division data not found' });
         }

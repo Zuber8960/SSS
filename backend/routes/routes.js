@@ -31,16 +31,16 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Resolve company_code from tenant JWT
-    let company_code = null;
+    // Resolve tenant_id from tenant JWT
+    let tenant_id = null;
     if (tenantToken) {
       const secret = process.env.JWT_SECRET || 'your_jwt_secret_key';
       const decoded = jwt.verify(tenantToken, secret);
-      company_code = decoded.company_code ?? null;
+      tenant_id = decoded.tenant_id ?? null;
     }
 
     // Authenticate user from database
-    const user = await UserController.authenticateUser(userId, password, company_code);
+    const user = await UserController.authenticateUser(userId, password, tenant_id);
 
     if (user) {
       // Generate JWT token
@@ -51,7 +51,7 @@ router.post('/login', async (req, res) => {
           userId: user.user_id,
           userName: user.user_name,
           isAdmin: user.is_admin,
-          company_code
+          tenant_id: user.tenant_id
         },
         secret,
         { expiresIn: '24h' }
@@ -89,7 +89,7 @@ router.post('/login', async (req, res) => {
           email_id: user.email_id,
           mobile_no: user.mobile_no,
           is_admin: user.is_admin,
-          company_code
+          tenant_id: user.tenant_id
         }
       });
     } else {

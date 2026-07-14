@@ -2,11 +2,11 @@ const db = require('../../config/db');
 
 module.exports = {
 
-    async getAllBusinessPartnerData(company_code) {
+    async getAllBusinessPartnerData(tenant_id) {
         return db('sss.ssm_business_partner as bp')
             .leftJoin('sss.ssm_business_partner_type as bpt', 'bp.bp_type', 'bpt.rec_id')
             .select('bp.*', 'bpt.rec_name as bp_type_name')
-            .where({company_code});
+            .where({tenant_id});
     },
 
     async getBusinessPartnerDataByRecId(recId) {

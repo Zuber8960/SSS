@@ -142,19 +142,19 @@ const getListEwayDetails = async (ewbLists) => {
   }
 };
 
-const getAllDockets = async (company_code) => {
+const getAllDockets = async (tenant_id) => {
   const query = db('sss.sst_docket').select('*').where({ record_status: 0 });
-  if (company_code) query.andWhere({ company_code });
+  if (tenant_id) query.andWhere({ tenant_id });
   return query;
 };
 
-const getDocketById = async ({ docket_no, docket_loc, docket_date }, company_code) => {
+const getDocketById = async ({ docket_no, docket_loc, docket_date }, tenant_id) => {
   const query = db('sss.sst_docket').where({ docket_no, docket_loc, docket_date, record_status: 0 });
-  if (company_code) query.andWhere({ company_code });
+  if (tenant_id) query.andWhere({ tenant_id });
   return query.first();
 };
 
-const getDocketByRecId = async (rec_id, company_code) => {
+const getDocketByRecId = async (rec_id, tenant_id) => {
   const query = db('sss.sst_docket as d')
     .leftJoin('sss.sst_docket_ewb as e', 'd.docket_no', 'e.docket_no')
     .where({ 'd.rec_id': rec_id, 'd.record_status': 0 })
@@ -163,11 +163,11 @@ const getDocketByRecId = async (rec_id, company_code) => {
       'e.cnor_name', 'e.cnor_address', 'e.cnor_pincode', 'e.cnor_gstin',
       'e.cnee_name', 'e.cnee_address', 'e.cnee_pincode', 'e.cnee_gstin'
     );
-  if (company_code) query.andWhere({ 'd.company_code': company_code });
+  if (tenant_id) query.andWhere({ 'd.tenant_id': tenant_id });
   return query.first();
 };
 
-const getDocketByNo = async (docket_no, company_code) => {
+const getDocketByNo = async (docket_no, tenant_id) => {
   const query = db('sss.sst_docket as d')
     .leftJoin('sss.sst_docket_ewb as e', 'd.docket_no', 'e.docket_no')
     .where({ 'd.docket_no': docket_no, 'd.record_status': 0 })
@@ -176,13 +176,13 @@ const getDocketByNo = async (docket_no, company_code) => {
       'e.cnor_name', 'e.cnor_address', 'e.cnor_pincode', 'e.cnor_gstin',
       'e.cnee_name', 'e.cnee_address', 'e.cnee_pincode', 'e.cnee_gstin'
     );
-  if (company_code) query.andWhere({ 'd.company_code': company_code });
+  if (tenant_id) query.andWhere({ 'd.tenant_id': tenant_id });
   return query.first();
 };
 
-const getDocketDetails = async ({ docket_no, docket_loc, docket_date }, company_code) => {
+const getDocketDetails = async ({ docket_no, docket_loc, docket_date }, tenant_id) => {
   const query = db('sss.sst_docket_dtl').where({ docket_no, docket_loc, docket_date, record_status: 0 });
-  if (company_code) query.andWhere({ company_code });
+  if (tenant_id) query.andWhere({ tenant_id });
   return query;
 };
 
@@ -259,7 +259,7 @@ const updateDocketByRecId = async (rec_id, data, trx = db) => {
   const dtlUpdate = {};
   if (data.docket_loc !== undefined)    dtlUpdate.docket_loc    = data.docket_loc;
   if (data.docket_date !== undefined)   dtlUpdate.docket_date   = data.docket_date;
-  if (data.company_code !== undefined)  dtlUpdate.company_code  = data.company_code;
+  // if (data.company_code !== undefined)  dtlUpdate.company_code  = data.company_code;
   if (data.division_code !== undefined) dtlUpdate.division_code = data.division_code;
   if (data.docket_no !== undefined) dtlUpdate.docket_no = data.docket_no;
 
@@ -293,9 +293,9 @@ const deleteDocket = async (keys, trx = db) => {
 
 /* ================= CHARGES ================= */
 
-const getChargesByDocketId = async (docketNo, company_code) => {
+const getChargesByDocketId = async (docketNo, tenant_id) => {
   const query = db('sss.sst_docket_charges').where({ docket_no: docketNo, record_status: 0 }).select('*');
-  if (company_code) query.andWhere({ company_code });
+  if (tenant_id) query.andWhere({ tenant_id });
   return query;
 };
 
@@ -306,15 +306,15 @@ const createCharge = async (docketNo, chargeData, trx = db) => {
       charge_code: chargeData.charge_code,
       user_code: chargeData.user_code,
       charge_amt: chargeData.charge_amt,
-      company_code: chargeData.company_code || null,
+      tenant_id: chargeData.tenant_id || null,
       aud_date: new Date()
     })
     .returning('*');
 };
 
-const updateCharge = async (chargeId, chargeData, trx = db, company_code) => {
+const updateCharge = async (chargeId, chargeData, trx = db, tenant_id) => {
   const query = trx('sss.sst_docket_charges').where({ rec_id: chargeId });
-  if (company_code) query.andWhere({ company_code });
+  if (tenant_id) query.andWhere({ tenant_id });
   return query.update({
     charge_code: chargeData.charge_code,
     user_code: chargeData.user_code,
@@ -323,9 +323,9 @@ const updateCharge = async (chargeId, chargeData, trx = db, company_code) => {
   }).returning('*');
 };
 
-const deleteCharge = async (chargeId, trx = db, company_code) => {
+const deleteCharge = async (chargeId, trx = db, tenant_id) => {
   const query = trx('sss.sst_docket_charges').where({ rec_id: chargeId });
-  if (company_code) query.andWhere({ company_code });
+  if (tenant_id) query.andWhere({ tenant_id });
   return query.update({ record_status: 1 });
 };
 
@@ -346,10 +346,10 @@ const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
   return trx('sss.sst_docket_ewb').where({ rec_id }).update(update);
 };
 
-const getEwayBillFromDB = async (ewbNumbers, company_code) => {
+const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
   let apiCalls = false;
   const query = db('sss.sst_docket_ewb').whereIn('ewb_no', ewbNumbers).select('*');
-  if (company_code) query.andWhere({ company_code });
+  if (tenant_id) query.andWhere({ tenant_id });
   let results = await query;
   if (!results.length) {
     // If not found in DB, fetch from API
@@ -375,7 +375,7 @@ const getEwayBillFromDB = async (ewbNumbers, company_code) => {
         }));
     }
     if (results.length) {
-      const ewbDbResult = await saveEwayBillToDB(results, company_code);
+      const ewbDbResult = await saveEwayBillToDB(results, tenant_id);
       console.log('EWB saved to DB:', ewbDbResult);
       results = ewbDbResult;
     } else {
@@ -385,7 +385,7 @@ const getEwayBillFromDB = async (ewbNumbers, company_code) => {
   return {  results, apiCalls };
 }
 
-const saveEwayBillToDB = async (ewbDataArray, company_code) => {
+const saveEwayBillToDB = async (ewbDataArray, tenant_id) => {
   const rows = ewbDataArray.map(item => {
     const data = item.data || item; // DD/MM/YYYY hh:mm:ss A
     
@@ -416,7 +416,7 @@ const saveEwayBillToDB = async (ewbDataArray, company_code) => {
       product_name: data.itemList?.map(i => i.productName || i.productDesc).filter(Boolean).join(', ') || '',
       hsn_code: data.itemList?.map(i => i.hsnCode).filter(Boolean).join(', ') || '',
       quantity: data.itemList?.reduce((sum, i) => sum + (i.quantity || 0), 0) || 0,
-      company_code: company_code || null,
+      tenant_id: tenant_id || null,
       aud_date: new Date()
     };
   });
@@ -446,7 +446,7 @@ const saveEwayBillToDB = async (ewbDataArray, company_code) => {
   //     docket_tot_amt: data.totInvValue || 0,
   //     docket_goods_desc: goodsDesc,
   //     hsn_code: hsnCode,
-  //     company_code: company_code || null,
+  //     tenant_id: tenant_id || null,
   //     aud_date: new Date(),
   //     record_status: 0
   //   };

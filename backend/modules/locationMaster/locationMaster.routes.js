@@ -6,8 +6,8 @@ const LocationMasterController = require('./locationMaster.controller');
 router.get('/', async (req, res) => {
     try {
         const recId = req.user.recId;
-        const { company_code } = req;
-        const data = await LocationMasterController.getAllLocationData(recId, company_code);
+        const { tenant_id } = req;
+        const data = await LocationMasterController.getAllLocationData(recId, tenant_id);
         res.status(200).json({ success: true, data });
     } catch (error) {
         console.error('Location Master error:', error);
@@ -18,9 +18,9 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const recId = req.user.recId;
-        const { company_code } = req;
+        const { tenant_id } = req;
         const payload = req.body;
-        const data = await LocationMasterController.saveLocationData(recId, payload, company_code);
+        const data = await LocationMasterController.saveLocationData(recId, payload, tenant_id);
         res.status(201).json({ success: true, data });
     } catch (error) {
         console.error('Location Master error:', error);
@@ -31,9 +31,9 @@ router.post('/', async (req, res) => {
 router.put('/:recId', async (req, res) => {
     try {
         const { recId } = req.params;
-        const { company_code } = req;
+        const { tenant_id } = req;
         const payload = req.body;
-        const data = await LocationMasterController.updateLocationData(recId, payload, company_code);
+        const data = await LocationMasterController.updateLocationData(recId, payload, tenant_id);
         if (!data || data.length === 0) {
             return res.status(404).json({ success: false, message: 'Location data not found' });
         }
@@ -47,8 +47,8 @@ router.put('/:recId', async (req, res) => {
 router.delete('/:recId', async (req, res) => {
     try {
         const { recId } = req.params;
-        const { company_code } = req;
-        const deletedCount = await LocationMasterController.deleteLocationData(recId, company_code);
+        const { tenant_id } = req;
+        const deletedCount = await LocationMasterController.deleteLocationData(recId, tenant_id);
         if (!deletedCount) {
             return res.status(404).json({ success: false, message: 'Location data not found' });
         }

@@ -167,23 +167,23 @@ function mapDbToForm(row) {
 
 module.exports = {
 
-  async getAll(recId, company_code) {
+  async getAll(recId, tenant_id) {
     const query = db(TABLE).select('*');
-    if (company_code) query.where({ company_code });
+    if (tenant_id) query.where({ tenant_id });
     const rows = await query;
     return rows.map(mapDbToForm);
   },
 
-  async getByRecId(recId, company_code) {
+  async getByRecId(recId, tenant_id) {
     const query = db(TABLE).where({ rec_id: recId });
-    if (company_code) query.andWhere({ company_code });
+    if (tenant_id) query.andWhere({ tenant_id });
     const row = await query.first();
     return mapDbToForm(row);
   },
 
-  async create(recId, payload, company_code) {
+  async create(recId, payload, tenant_id) {
     const dbPayload = mapFormToDb(payload);
-    dbPayload.company_code = payload.company_code || company_code;
+    dbPayload.tenant_id = payload.tenant_id || tenant_id;
     dbPayload.aud_user = recId;
     dbPayload.aud_branch = payload.branch_code;
     dbPayload.aud_date = new Date();
@@ -191,21 +191,21 @@ module.exports = {
     return mapDbToForm(row);
   },
 
-  async update(recId, payload, company_code) {
+  async update(recId, payload, tenant_id) {
     const dbPayload = mapFormToDb(payload);
-    delete dbPayload.company_code;
+    delete dbPayload.tenant_id;
     dbPayload.aud_user = recId;
     dbPayload.aud_branch = payload.branch_code;
     dbPayload.aud_date = new Date();
     const query = db(TABLE).where({ rec_id: recId });
-    if (company_code) query.andWhere({ company_code });
+    if (tenant_id) query.andWhere({ tenant_id });
     const [row] = await query.update(dbPayload).returning('*');
     return mapDbToForm(row);
   },
 
-  async remove(recId, company_code) {
+  async remove(recId, tenant_id) {
     const query = db(TABLE).where({ rec_id: recId });
-    if (company_code) query.andWhere({ company_code });
+    if (tenant_id) query.andWhere({ tenant_id });
     return query.del();
   }
 };

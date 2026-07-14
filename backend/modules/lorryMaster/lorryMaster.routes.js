@@ -5,8 +5,8 @@ const LorryMasterController = require('./lorryMaster.controller');
 router.get('/', async (req, res) => {
     try {
         const recId = req.user.recId;
-        const { company_code } = req;
-        const data = await LorryMasterController.getAll(recId, company_code);
+        const { tenant_id } = req;
+        const data = await LorryMasterController.getAll(recId, tenant_id);
         res.status(200).json({ success: true, data });
     } catch (error) {
         console.error('Lorry Master error:', error);
@@ -17,8 +17,8 @@ router.get('/', async (req, res) => {
 router.get('/:recId', async (req, res) => {
     try {
         const { recId } = req.params;
-        const { company_code } = req;
-        const data = await LorryMasterController.getByRecId(recId, company_code);
+        const { tenant_id } = req;
+        const data = await LorryMasterController.getByRecId(recId, tenant_id);
         if (!data) {
             return res.status(404).json({ success: false, message: 'Lorry data not found' });
         }
@@ -32,9 +32,9 @@ router.get('/:recId', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const recId = req.user.recId;
-        const { company_code } = req;
-        const payload = { ...req.body, company_code: req.body.company_code || company_code };
-        const data = await LorryMasterController.create(recId, payload, company_code);
+        const { tenant_id } = req;
+        const payload = { ...req.body, tenant_id };
+        const data = await LorryMasterController.create(recId, payload, tenant_id);
         res.status(201).json({ success: true, data });
     } catch (error) {
         console.error('Lorry Master error:', error);
@@ -45,9 +45,9 @@ router.post('/', async (req, res) => {
 router.put('/:recId', async (req, res) => {
     try {
         const { recId } = req.params;
-        const { company_code } = req;
+        const { tenant_id } = req;
         const payload = req.body;
-        const data = await LorryMasterController.update(recId, payload, company_code);
+        const data = await LorryMasterController.update(recId, payload, tenant_id);
         if (!data) {
             return res.status(404).json({ success: false, message: 'Lorry data not found' });
         }
@@ -61,8 +61,8 @@ router.put('/:recId', async (req, res) => {
 router.delete('/:recId', async (req, res) => {
     try {
         const { recId } = req.params;
-        const { company_code } = req;
-        const deletedCount = await LorryMasterController.remove(recId, company_code);
+        const { tenant_id } = req;
+        const deletedCount = await LorryMasterController.remove(recId, tenant_id);
         if (!deletedCount) {
             return res.status(404).json({ success: false, message: 'Lorry data not found' });
         }

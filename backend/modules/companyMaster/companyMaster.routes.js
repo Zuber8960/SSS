@@ -6,8 +6,8 @@ const CompanyMasterController = require('./companyMaster.controller');
 router.get('/', async (req, res) => {
     try {
         const recId = req.user.recId;
-        const { company_code } = req;
-        const data = await CompanyMasterController.getAllCompanyData(recId, company_code);
+        const { tenant_id } = req;
+        const data = await CompanyMasterController.getAllCompanyData(recId, tenant_id);
         res.status(200).json({ success: true, data });
     } catch (error) {
         console.error('Company Master error:', error);
@@ -18,8 +18,8 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const recId = req.user.recId;
-        const { company_code } = req;
-        const payload = { ...req.body, company_code };
+        const { tenant_id } = req;
+        const payload = { ...req.body, tenant_id };
         const data = await CompanyMasterController.saveCompanyData(recId, payload);
         res.status(201).json({ success: true, data });
     } catch (error) {
@@ -31,9 +31,9 @@ router.post('/', async (req, res) => {
 router.put('/:recId', async (req, res) => {
     try {
         const { recId } = req.params;
-        const { company_code } = req;
+        const { tenant_id } = req;
         const payload = req.body;
-        const data = await CompanyMasterController.updateCompanyData(recId, payload, company_code);
+        const data = await CompanyMasterController.updateCompanyData(recId, payload, tenant_id);
         if (!data || data.length === 0) {
             return res.status(404).json({ success: false, message: 'Company data not found' });
         }
@@ -47,8 +47,8 @@ router.put('/:recId', async (req, res) => {
 router.delete('/:recId', async (req, res) => {
     try {
         const { recId } = req.params;
-        const { company_code } = req;
-        const deletedCount = await CompanyMasterController.deleteCompanyData(recId, company_code);
+        const { tenant_id } = req;
+        const deletedCount = await CompanyMasterController.deleteCompanyData(recId, tenant_id);
         if (!deletedCount) {
             return res.status(404).json({ success: false, message: 'Company data not found' });
         }

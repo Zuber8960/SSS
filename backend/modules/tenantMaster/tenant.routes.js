@@ -56,7 +56,7 @@ router.post('/login', async (req, res) => {
     const tenantToken = jwt.sign(
       {
         tenantCode: tenant.tenant_code,
-        company_code: tenant.company_code
+        tenant_id: tenant.rec_id
       },
       secret,
       { expiresIn: '5h' }

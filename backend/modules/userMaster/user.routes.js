@@ -19,8 +19,8 @@ router.get('/profile', async (req, res) => {
 
 router.get('/', async (req, res) => {
   try {
-    const { company_code } = req;
-    const users = await UserContoller.getAllUsers(company_code);
+    const { tenant_id } = req;
+    const users = await UserContoller.getAllUsers(tenant_id);
     res.status(200).json({ success: true, data: users });
   } catch (error) {
     console.error('Get users error:', error);
@@ -31,8 +31,8 @@ router.get('/', async (req, res) => {
 router.get('/:recId', async (req, res) => {
   try {
     const { recId } = req.params;
-    const { company_code } = req;
-    const user = await UserContoller.getUserById(recId, company_code);
+    const { tenant_id } = req;
+    const user = await UserContoller.getUserById(recId, tenant_id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
@@ -45,14 +45,14 @@ router.get('/:recId', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { company_code } = req;
+    const { tenant_id } = req;
     const { user_id, user_name, password_hash, email_id, mobile_no, division_code, loc_code, is_admin } = req.body;
-    if (!user_id || !user_name || !password_hash || !company_code) {
-      return res.status(400).json({ success: false, message: 'User ID, User Name, Password, and Company Code are required' });
+    if (!user_id || !user_name || !password_hash || !tenant_id) {
+      return res.status(400).json({ success: false, message: 'User ID, User Name, Password, and Tenant ID are required' });
     }
     const userData = {
       user_id, user_name, password_hash, email_id, mobile_no,
-      company_code, division_code, loc_code,
+      tenant_id, division_code, loc_code,
       is_admin: is_admin || 'N',
       created_by: req.user.userId
     };
@@ -67,9 +67,9 @@ router.post('/', async (req, res) => {
 router.put('/:recId', async (req, res) => {
   try {
     const { recId } = req.params;
-    const { company_code } = req;
+    const { tenant_id } = req;
     const { user_name, email_id, mobile_no, division_code, loc_code, is_admin, user_status } = req.body;
-    const existingUser = await UserContoller.getUserById(recId, company_code);
+    const existingUser = await UserContoller.getUserById(recId, tenant_id);
     if (!existingUser) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
@@ -86,8 +86,8 @@ router.put('/:recId', async (req, res) => {
 router.delete('/:recId', async (req, res) => {
   try {
     const { recId } = req.params;
-    const { company_code } = req;
-    const existingUser = await UserContoller.getUserById(recId, company_code);
+    const { tenant_id } = req;
+    const existingUser = await UserContoller.getUserById(recId, tenant_id);
     if (!existingUser) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }

@@ -14,8 +14,8 @@ router.get('/types', async (req, res) => {
 
 router.get('/', async (req, res) => {
     try {
-        const { company_code } = req;
-        const data = await BusinessPartnerController.getAllBusinessPartnerData(company_code.toString());
+        const { tenant_id } = req;
+        const data = await BusinessPartnerController.getAllBusinessPartnerData(tenant_id.toString());
         res.status(200).json({ success: true, data });
     } catch (error) {
         console.error('Business Partner error:', error);

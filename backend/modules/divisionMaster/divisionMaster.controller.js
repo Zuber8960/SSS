@@ -2,15 +2,15 @@ const db = require('../../config/db');
 
 module.exports = {
 
-    async getAllDivisionData(recId, company_code) {
+    async getAllDivisionData(recId, tenant_id) {
         const query = db('sss.ssm_division').select('*');
-        if (company_code) query.where({ company_code });
+        if (tenant_id) query.where({ tenant_id });
         return query;
     },
 
-    async getDivisionDataByRecId(recId, company_code) {
+    async getDivisionDataByRecId(recId, tenant_id) {
         const query = db('sss.ssm_division').where({ rec_id: recId });
-        if (company_code) query.andWhere({ company_code });
+        if (tenant_id) query.andWhere({ tenant_id });
         return query.first();
     },
 
@@ -20,17 +20,17 @@ module.exports = {
         return db('sss.ssm_division').insert(record).returning('*');
     },
 
-    async updateDivisionData(recId, payload, company_code) {
+    async updateDivisionData(recId, payload, tenant_id) {
         const updates = { ...payload, modified_on: new Date() };
         delete updates.rec_id;
         const query = db('sss.ssm_division').where({ rec_id: recId });
-        if (company_code) query.andWhere({ company_code });
+        if (tenant_id) query.andWhere({ tenant_id });
         return query.update(updates).returning('*');
     },
 
-    async deleteDivisionData(recId, company_code) {
+    async deleteDivisionData(recId, tenant_id) {
         const query = db('sss.ssm_division').where({ rec_id: recId });
-        if (company_code) query.andWhere({ company_code });
+        if (tenant_id) query.andWhere({ tenant_id });
         return query.del();
     }
 };

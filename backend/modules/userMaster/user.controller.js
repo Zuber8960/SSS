@@ -1,17 +1,17 @@
 const db = require('../../config/db');
 const bcrypt = require('bcrypt');
 
-const getAllUsers = async (company_code) => {
+const getAllUsers = async (tenant_id) => {
   return db('sss.ssm_user')
-    .where({ record_status: 0, company_code })
-    .select('rec_id', 'user_id', 'user_name', 'email_id', 'mobile_no', 'company_code', 'is_admin', 'last_login_on', 'created_on', 'user_status');
+    .where({ record_status: 0, tenant_id })
+    .select('rec_id', 'user_id', 'user_name', 'email_id', 'mobile_no', 'tenant_id', 'is_admin', 'last_login_on', 'created_on', 'user_status');
 };
 
-const getUserById = async (recId, company_code) => {
+const getUserById = async (recId, tenant_id) => {
   const query = db('sss.ssm_user')
     .where({ rec_id: recId })
-    .select('rec_id', 'user_id', 'user_name', 'email_id', 'mobile_no', 'company_code', 'division_code', 'loc_code', 'is_admin', 'user_status', 'last_login_on', 'created_on');
-  if (company_code) query.andWhere({ company_code });
+    .select('rec_id', 'user_id', 'user_name', 'email_id', 'mobile_no', 'tenant_id', 'division_code', 'loc_code', 'is_admin', 'user_status', 'last_login_on', 'created_on');
+  if (tenant_id) query.andWhere({ tenant_id });
   return query.first();
 };
 
@@ -107,11 +107,11 @@ const deleteUser = async (recId) => {
  * @param {string} password - Plain text password
  * @returns {Object} - User object if authenticated, null otherwise
  */
-const authenticateUser = async (userId, password, company_code) => {
+const authenticateUser = async (userId, password, tenant_id) => {
   try {
     // Query user by user_id and active status
     let conditions = { user_id: userId, record_status: 0 };
-    if (company_code) conditions.company_code = company_code;
+    if (tenant_id) conditions.tenant_id = tenant_id;
     const user = await db('sss.ssm_user').where(conditions).first();
 
     // Check if user exists
