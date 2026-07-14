@@ -78,7 +78,7 @@ export default function LocationPage() {
       mobile_no: form.mobile_no ? Number(form.mobile_no) : null,
       telephone_no: form.telephone_no ? Number(form.telephone_no) : null,
       longitude: form.longitude ? Number(form.longitude) : null,
-      loc_code: form.loc_code ? Number(form.loc_code) : null,
+      loc_code: form.loc_code ? form.loc_code : null,
     };
 
     try {

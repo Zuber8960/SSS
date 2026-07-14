@@ -173,6 +173,19 @@ module.exports = {
     const rows = await query;
     return rows.map(mapDbToForm);
   },
+  async getByVehicleId(vehicleId, company_code) {
+    const query = db(TABLE).where({ lry_regis_no: vehicleId });
+    if (company_code) query.andWhere({ company_code });
+    const row = await query.first();
+    return mapDbToForm(row);
+  },
+
+  async getByRecId(recId, tenant_id) {
+    const query = db(TABLE).where({ rec_id: recId });
+    if (tenant_id) query.andWhere({ tenant_id });
+    const row = await query.first();
+    return mapDbToForm(row);
+  },
 
   async getByRecId(recId, tenant_id) {
     const query = db(TABLE).where({ rec_id: recId });
@@ -182,13 +195,28 @@ module.exports = {
   },
 
   async create(recId, payload, tenant_id) {
-    const dbPayload = mapFormToDb(payload);
-    dbPayload.tenant_id = payload.tenant_id || tenant_id;
+    let dbPayload = mapFormToDb(payload);
+
+    dbPayload.tenant_id = tenant_id;
     dbPayload.aud_user = recId;
     dbPayload.aud_branch = payload.branch_code;
     dbPayload.aud_date = new Date();
-    const [row] = await db(TABLE).insert(dbPayload).returning('*');
-    return mapDbToForm(row);
+
+    // ✅ remove undefined
+    dbPayload = Object.fromEntries(
+      Object.entries(dbPayload).filter(([_, v]) => v !== undefined)
+    );
+
+    try {
+      const [row] = await db(TABLE)
+        .insert(dbPayload)
+        .returning("*");
+
+      return mapDbToForm(row);
+    } catch (err) {
+      console.error("Insert failed:", err);
+      throw err;
+    }
   },
 
   async update(recId, payload, tenant_id) {

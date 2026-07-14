@@ -6,6 +6,9 @@ export const fetchAllHireVouchers = () =>
 export const fetchHireVoucherByNo = (hvNo) =>
   Api.get(`/hireVoucher/by-no/${encodeURIComponent(hvNo)}`).then(r => r.data.data || r.data);
 
+export const fetchHireVoucherByVhvNo = (vhvNo) =>
+  Api.get(`/hireVoucher/by-vhv-no/${encodeURIComponent(vhvNo)}`).then(r => r.data.data || r.data);
+
 export const fetchNextHireVoucherNo = () =>
   Api.get('/hireVoucher/next-no').then(r => r.data.data || r.data);
 

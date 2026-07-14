@@ -173,6 +173,8 @@ export function FormField({
   type = "text",
   options,
   disabled = false,
+  onKeyDown,
+  onBlur,
 }) {
   const updateField = (value) => setForm({ ...form, [name]: value });
 
@@ -184,6 +186,8 @@ export function FormField({
           value={form[name]}
           disabled={disabled}
           onChange={(e) => updateField(e.target.value)}
+          onKeyDown={onKeyDown}
+          onBlur={onBlur}
         >
           <option value="">Select {label}</option>
           {options.map((option) => (
@@ -206,6 +210,8 @@ export function FormField({
               updateField(e.target.value);
             }
           }}
+          onKeyDown={onKeyDown}
+          onBlur={onBlur}
           placeholder={`Enter ${label}`}
         />
       )}
