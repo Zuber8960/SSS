@@ -124,6 +124,21 @@ router.delete('/:no/:loc/:date', async (req, res) => {
   }
 });
 
+/* ================= GET BY VHV NO ================= */
+
+router.get('/by-vhv-no/:vhvNo', async (req, res) => {
+  try {
+    const { vhvNo } = req.params;
+    const data = await HireVoucherController.getHireVoucherByVhvNo(vhvNo);
+    if (!data) {
+      return res.status(404).json({ success: false, message: 'Hire Voucher not found for this VHV No' });
+    }
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 /* ================= GET VENDOR BY LORRY NO ================= */
 
 router.get('/vendor/:lorryNo', async (req, res) => {

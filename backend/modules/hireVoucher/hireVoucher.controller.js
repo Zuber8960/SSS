@@ -166,6 +166,26 @@ const deleteHireVoucher = async (keys, trx = db) => {
     .update({ record_status: 1 });
 };
 
+/* ================= GET HIRE VOUCHER BY VHV NO ================= */
+
+const getHireVoucherByVhvNo = async (vhvNo) => {
+  const header = await db('sss.sst_vha_hdr')
+    .where({ vhv_no: vhvNo, record_status: 0 })
+    .first();
+
+  if (!header) return null;
+
+  const details = await db('sss.sst_vha_dtl')
+    .where({
+      hv_no: header.hv_no,
+      hv_loc: header.hv_loc || header.from_loc,
+      hv_date: header.hv_date
+    })
+    .orderBy('vhv_srno');
+
+  return { header, details };
+};
+
 /* ================= GET VENDOR BY LORRY NO ================= */
 
 const getVendorByLorryNo = async (lorryNo) => {
@@ -180,6 +200,7 @@ module.exports = {
   getAllHireVouchers,
   getHireVoucherByKey,
   getHireVoucherByNo,
+  getHireVoucherByVhvNo,
   getHireVoucherDetails,
   getNextHireVoucherNo,
   createHireVoucher,

@@ -21,6 +21,7 @@ import vocherimage from "../../images/loogo.PNG";
 import {
   createHireVoucher,
   fetchHireVoucherByNo,
+  fetchHireVoucherByVhvNo,
   updateHireVoucher,
   fetchNextHireVoucherNo,
 } from "../../utils/hireVoucher";
@@ -77,14 +78,6 @@ const headerFields = [
   { label: "HV No", name: "hv_no" },
   { label: "HV Date", name: "hv_date", type: "date" },
 
-  // Order Details
-  // { label: "Order ID", name: "order_id" },
-  // { label: "Order Loc", name: "order_loc" },
-  // { label: "Veh Type", name: "veh_type" },
-  // { label: "Pickup", name: "pickup" },
-  // { label: "Req Wt", name: "req_wt", type: "number" },
-  // { label: "Remarks", name: "remarks", type: "textarea" },
-
   // Vehicle Hire Voucher
   { label: "VHV No", name: "vhv_no" },
   { label: "Date", name: "vhv_date", type: "date" },
@@ -104,13 +97,6 @@ const headerFields = [
 
 // ------------------- FORM SECTIONS (card layout) -------------------
 const formSections = [
-  // {
-  //   title: "Order Details",
-  //   icon: "📦",
-  //   fields: ["order_id", "order_loc", "veh_type", "pickup", "req_wt", "remarks"],
-  //   half: true,
-  //   columns: 2,
-  // },
   {
     title: "Vehicle Hire Voucher",
     icon: "🚛",
@@ -250,7 +236,8 @@ export default function HireVoucherPage() {
 
   // Mode: "create" | "edit"
   const [mode, setMode] = useState("create");
-  const [isSearchActive, setIsSearchActive] = useState(false);
+  // Toggle: when true, VHV No field is enabled for user to type
+  const [searchMode, setSearchMode] = useState(false);
 
   // Store original composite key for updates
   const originalKey = useRef(null);
@@ -379,11 +366,6 @@ export default function HireVoucherPage() {
   const mapFormToHeader = () => ({
     hv_no: form.hv_no,
     hv_date: form.hv_date || null,
-    // order_id: form.order_id,
-    // order_loc: form.order_loc,
-    // veh_type: form.veh_type,
-    // pickup: form.pickup,
-    // req_wt: parseFloat(form.req_wt) || 0,
     from_loc: form.from_loc,
     to_loc: form.to_loc,
     lorry_hire_rate: parseFloat(form.lorry_hire_rate) || 0,
@@ -423,11 +405,6 @@ export default function HireVoucherPage() {
   const mapHeaderToForm = (hdr) => ({
     hv_no: hdr.hv_no || "",
     hv_date: hdr.hv_date ? hdr.hv_date.substring(0, 10) : "",
-    // order_id: hdr.order_id || "",
-    // order_loc: hdr.order_loc || "",
-    // veh_type: hdr.veh_type || "",
-    // pickup: hdr.pickup || "",
-    // req_wt: hdr.req_wt ?? "",
     from_loc: hdr.from_loc || "",
     to_loc: hdr.to_loc || "",
     lorry_hire_rate: hdr.lorry_hire_rate ?? "",
@@ -461,7 +438,7 @@ export default function HireVoucherPage() {
     pickup: dtl.pickup || "",
   });
 
-  // ------------------- FETCH & LOAD -------------------
+  // ------------------- FETCH & LOAD BY HV NO -------------------
   const fetchAndLoadHireVoucher = async (hvNo) => {
     try {
       showLoading();
@@ -485,12 +462,58 @@ export default function HireVoucherPage() {
       };
 
       setMode("edit");
+      setSearchMode(false);
       showInfo("Hire Voucher loaded successfully");
       return true;
     } catch (err) {
       handleClear();
       showError(err.message || "Failed to fetch hire voucher");
       console.error("Fetch hire voucher error:", err);
+      return false;
+    } finally {
+      hideLoading();
+    }
+  };
+
+  // ------------------- FETCH & LOAD BY VHV NO (for edit/view) -------------------
+  const fetchAndLoadByVhvNo = async (vhvNo) => {
+    if (!vhvNo) {
+      showError("Please enter a VHV No to search");
+      return;
+    }
+
+    try {
+      showLoading();
+      const data = await fetchHireVoucherByVhvNo(vhvNo);
+
+      if (!data || !data.header) {
+        showError("No Hire Voucher found for VHV No: " + vhvNo);
+        return false;
+      }
+
+      const hdr = data.header;
+      const dtls = data.details || [];
+
+      setForm(mapHeaderToForm(hdr));
+      setDetails(dtls.map(mapDetailToForm));
+
+      originalKey.current = {
+        hv_no: hdr.hv_no,
+        hv_loc: hdr.from_loc,
+        hv_date: hdr.hv_date,
+      };
+
+      setMode("edit");
+      setSearchMode(false);
+      showInfo("Hire Voucher loaded successfully for VHV No: " + vhvNo);
+      return true;
+    } catch (err) {
+      if (err.response?.status === 404) {
+        showError("No Hire Voucher found for VHV No: " + vhvNo);
+      } else {
+        showError(err.message || "Failed to fetch hire voucher by VHV No");
+        console.error("Fetch by VHV No error:", err);
+      }
       return false;
     } finally {
       hideLoading();
@@ -505,26 +528,52 @@ export default function HireVoucherPage() {
     setManifestCache({});
     originalKey.current = null;
     setMode("create");
-    setIsSearchActive(false);
+    setSearchMode(false);
     hasFetchedNextNo.current = false;
     showInfo("New hire voucher form ready");
   };
 
   const handleEditView = async () => {
-    const hvNo = form.hv_no.trim();
-
-    if (!hvNo && !isSearchActive) {
-      setIsSearchActive(true);
-      showInfo("Type the HV No in the field and press Enter");
+    if (!searchMode) {
+      setMode("view");
+      setSearchMode(true);
+      showInfo("Type the VHV No and press Enter or leave the field to search");
       return;
     }
 
-    if (!hvNo && isSearchActive) {
-      showError("Please type a HV No first");
+    // const vhvNo = (form.vhv_no || "").trim();
+
+    // if (!vhvNo) {
+    //   showError("Please enter a VHV No to search");
+    //   return;
+    // }
+
+    // await fetchAndLoadByVhvNo(vhvNo);
+  };
+
+  const handleVhvNoSearch = async (vhvNo) => {
+    const trimmed = (vhvNo || "").trim();
+
+    if (!trimmed) {
       return;
     }
 
-    await fetchAndLoadHireVoucher(hvNo);
+    if (!searchMode) {
+      setSearchMode(true);
+    }
+
+    await fetchAndLoadByVhvNo(trimmed);
+  };
+
+  const handleVhvNoKeyDown = async (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      await handleVhvNoSearch(form.vhv_no);
+    }
+  };
+
+  const handleVhvNoBlur = async () => {
+    await handleVhvNoSearch(form.vhv_no);
   };
 
   const handleClear = () => {
@@ -534,7 +583,7 @@ export default function HireVoucherPage() {
     setManifestCache({});
     originalKey.current = null;
     setMode("create");
-    setIsSearchActive(false);
+    setSearchMode(false);
     hasFetchedNextNo.current = false;
     showInfo("Form cleared");
   };
@@ -640,8 +689,11 @@ export default function HireVoucherPage() {
                   form={form}
                   setForm={setForm}
                   disabled={
-                    field.name === "hv_no" && mode === "create" && !isSearchActive
+                    (field.name === "hv_no" && mode === "create") ||
+                    (field.name === "vhv_no" && mode === "create" && !searchMode)
                   }
+                  onKeyDown={field.name === "vhv_no" ? handleVhvNoKeyDown : undefined}
+                  onBlur={field.name === "vhv_no" ? handleVhvNoBlur : undefined}
                 />
               </div>
             );
@@ -695,11 +747,7 @@ export default function HireVoucherPage() {
               borderRadius: 12,
             }}
           >
-            {isSearchActive
-              ? "Type HV No & press Enter"
-              : mode === "create"
-                ? "CREATE"
-                : "EDIT"}
+            {mode === "create" ? "CREATE" : searchMode ? "VIEW" : "EDIT"}
           </span>
         </div>
 
