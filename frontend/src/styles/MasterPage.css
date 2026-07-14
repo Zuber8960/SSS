@@ -166,12 +166,12 @@
 }
 
 .pageToolbar button {
-  padding: 10px 20px;
+  padding: 6px 20px;
   background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%);
   color: #ffffff;
   border: none;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -613,8 +613,8 @@
   }
 
   .pageToolbar button {
-    padding: 8px 12px;
-    font-size: 12px;
+    padding: 5px 10px;
+    font-size: 11px;
   }
 
   .toggleSwitch {
@@ -798,8 +798,8 @@
   }
 
   .pageToolbar button {
-    padding: 8px 14px;
-    font-size: 12px;
+    padding: 5px 10px;
+    font-size: 11px;
   }
 
   .searchBox {
