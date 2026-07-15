@@ -15,14 +15,14 @@ module.exports = {
     },
 
     async saveLocationData(recId, payload, company_code) {
-        let locationData = await db('sss.ssm_location').select('*').orderBy('loc_id', 'desc').first();
+        // let locationData = await db('sss.ssm_location').select('*').orderBy('loc_id', 'desc').first();
         const record = {
             ...payload,
             record_created_by: recId,
             record_created_on: new Date(),
             company_code: payload.company_code || company_code,
-            division_code: locationData ? locationData.division_code + 1 : 1,
-            loc_id: locationData ? locationData.loc_id + 1 : 1,
+            division_code: Number(payload.division_code) || 0 ,
+            loc_id: payload.loc_id || 0,
         };
         return db('sss.ssm_location').insert(record).returning('*');
     },

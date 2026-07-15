@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo,useEffect } from "react";
 import { ToggleSwitch } from "../../components/common/MasterPage";
 import { IconButton, Tooltip } from "@mui/material";
 import { EditIcon, SaveIcon, SECTION_ICONS } from "../../components/common/icons";
@@ -17,6 +17,7 @@ import {
   createDocket,
   updateDocketByRecId,
 } from "../../utils/docket";
+import { fetchAllLocations } from "../../utils/locationMaster";
 import ChargesSection from "./docket/ChargesSection";
 import EwayBillSection from "./docket/EwayBillSection";
 
@@ -33,8 +34,8 @@ const headerFields = [
 
   { label: "Docket No", name: "docket_no" },
   { label: "Docket Date", name: "docket_date", type: "date" },
-  { label: "From Location", name: "docket_loc" },
-  { label: "To Location", name: "docket_to_loc" },
+  { label: "From Location", name: "docket_loc", isLocation: true },
+  { label: "To Location", name: "docket_to_loc", isLocation: true },
   // { label: "Consignor", name: "cnor" },
   // { label: "Consignee", name: "cnee" },
   { label: "Actual Wt", name: "act_wt", type: "number" },
@@ -227,6 +228,7 @@ export default function DocketPage() {
   const { dialog, closeAlert, showSuccess, showError, showInfo, showWarning } = useAlert();
 
   const [form, setForm] = useState(emptyForm);
+  const [locations, setLocations] = useState([]);
 
   const tot_amt = useMemo(
     () =>
@@ -253,6 +255,19 @@ export default function DocketPage() {
   const [ewbNoDisplay, setEwbNoDisplay] = useState("");
   const { isLoading, showLoading, hideLoading, withLoading } = useLoading();
   const [dirtyFields, setDirtyFields] = useState(new Set());
+
+  // Build location dropdown options
+  const locationOptions = locations.map((loc) => ({
+    label: `${loc.loc_code} - ${loc.loc_name}`,
+    value: loc.loc_code,
+  }));
+
+  // Load locations on mount
+  useEffect(() => {
+    fetchAllLocations()
+      .then((data) => setLocations(data))
+      .catch((err) => console.error("Failed to load locations:", err));
+  }, []);
 
   const moveSectionToTop = (section) => {
     setSectionOrder((prev) => [section, ...prev.filter((item) => item !== section)]);
@@ -562,13 +577,17 @@ export default function DocketPage() {
         }}>
           {filteredFields.map((field) => {
             const isTextarea = field.type === "textarea";
+            // Inject location options for location fields
+            const fieldProps = field.isLocation
+              ? { ...field, options: locationOptions }
+              : field;
             return (
               <div
                 key={field.name}
                 style={isTextarea || field.fullWidth ? sectionCardStyles.fullWidthField : undefined}
               >
                 <FormField
-                  {...field}
+                  {...fieldProps}
                   form={form}
                   setForm={(updated) => {
                     setDirtyFields((prev) => new Set(prev).add(field.name));

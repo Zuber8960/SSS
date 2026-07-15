@@ -9,6 +9,7 @@ import {
   DataTable,
 } from "../../components/common/MasterPage";
 import { fetchAllLocations, saveLocations, updateLocation as updateLocationApi, deleteLocation as deleteLocationApi } from "../../utils/locationMaster";
+import { fetchAllDivisionsApi } from "../../utils/divisionMaster";
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 
@@ -23,6 +24,7 @@ export default function LocationPage() {
     loc_name: "",
     loc_type: "HO",
     loc_country: "INDIA",
+    loc_address: "",
     loc_state: "",
     loc_town: "",
     loc_postal_code: null,
@@ -30,7 +32,9 @@ export default function LocationPage() {
     loc_closed_on: null,
     loc_status: "A",
     parent_loc_code: null,
+    division_code: "",
     longitude: "",
+    latitude: "",
     mobile_no: null,
     telephone_no: null,
   });
@@ -45,6 +49,7 @@ export default function LocationPage() {
       loc_name: "",
       loc_type: "HO",
       loc_country: "INDIA",
+      loc_address: "",
       loc_state: "",
       loc_town: "",
       loc_postal_code: "",
@@ -52,7 +57,9 @@ export default function LocationPage() {
       loc_closed_on: "",
       loc_status: "A",
       parent_loc_code: "",
+      division_code: "",
       longitude: "",
+      latitude: "",
       mobile_no: "",
       telephone_no: ""
     });
@@ -78,6 +85,7 @@ export default function LocationPage() {
       mobile_no: form.mobile_no ? Number(form.mobile_no) : null,
       telephone_no: form.telephone_no ? Number(form.telephone_no) : null,
       longitude: form.longitude ? Number(form.longitude) : null,
+      latitude: form.latitude ? Number(form.latitude) : null,
       loc_code: form.loc_code ? form.loc_code : null,
     };
 
@@ -152,6 +160,19 @@ export default function LocationPage() {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [divisions, setDivisions] = useState([]);
+
+  useEffect(() => {
+    const loadDivisions = async () => {
+      try {
+        const data = await fetchAllDivisionsApi();
+        setDivisions(data);
+      } catch (err) {
+        console.error("Error loading divisions:", err);
+      }
+    };
+    loadDivisions();
+  }, []);
 
   useEffect(() => {
     const loadLocationAtMount = async () => {
@@ -197,6 +218,7 @@ export default function LocationPage() {
             options={["HO", "RO", "ZO", "AO", "BRANCH", "WAREHOUSE", "YARD"]}
           />
           <FormField label="Country" name="loc_country" form={form} setForm={setForm} />
+          <FormField label="Address" name="loc_address" form={form} setForm={setForm} />
           <FormField label="State" name="loc_state" form={form} setForm={setForm} />
           <FormField label="Town / City" name="loc_town" form={form} setForm={setForm} />
           <FormField label="Postal Code" name="loc_postal_code" form={form} setForm={setForm} />
@@ -224,8 +246,19 @@ export default function LocationPage() {
               { label: "Inactive", value: "I" },
             ]}
           />
+          <FormField
+            label="Division Code"
+            name="division_code"
+            form={form}
+            setForm={setForm}
+            options={divisions.map((div) => ({
+              label: `${div.division_code} - ${div.division_name}`,
+              value: div.division_code,
+            }))}
+          />
           <FormField label="Parent Location Code" name="parent_loc_code" form={form} setForm={setForm} />
           <FormField label="Longitude" name="longitude" form={form} setForm={setForm} />
+          <FormField label="Latitude" name="latitude" form={form} setForm={setForm} />
           <FormField label="Mobile No" name="mobile_no" form={form} setForm={setForm} />
           <FormField label="Telephone No" name="telephone_no" form={form} setForm={setForm} />
         </FormPanel>

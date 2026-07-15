@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import MainLayout from "../../layouts/MainLayout";
 
 import {
@@ -13,6 +13,7 @@ import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
 import { fetchDocketByDocketNo } from "../../utils/docket";
+import { fetchAllLocations } from "../../utils/locationMaster";
 import { AddIcon, DeleteIcon, EditIcon, SaveIcon, NoteAddIcon, ResetIcon } from "../../components/common/icons";
 import { IconButton, Tooltip } from "@mui/material";
 import {
@@ -25,8 +26,8 @@ import {
 const manifestFields = [
   { label: "Manifest No", name: "manifest_no" },
   { label: "Manifest Date", name: "manifest_date", type: "date" },
-  { label: "From Location", name: "from_loc" },
-  { label: "To Location", name: "to_loc" },
+  { label: "From Location", name: "from_loc", isLocation: true },
+  { label: "To Location", name: "to_loc", isLocation: true },
 
   { label: "Vehicle No", name: "vehicle_no" },
   { label: "Driver Name", name: "driver_name" },
@@ -68,6 +69,20 @@ export default function ManifestPage() {
   const [details, setDetails] = useState([]);
   const [docketCache, setDocketCache] = useState({});
   const [selectedRows, setSelectedRows] = useState([]);
+  const [locations, setLocations] = useState([]);
+
+  // Build location dropdown options
+  const locationOptions = locations.map((loc) => ({
+    label: `${loc.loc_code} - ${loc.loc_name}`,
+    value: loc.loc_code,
+  }));
+
+  // Load locations on mount
+  useEffect(() => {
+    fetchAllLocations()
+      .then((data) => setLocations(data))
+      .catch((err) => console.error("Failed to load locations:", err));
+  }, []);
 
   // Mode: "create" | "edit"
   const [mode, setMode] = useState("create");
@@ -373,6 +388,13 @@ export default function ManifestPage() {
     flexWrap: "wrap",
   };
 
+  // Inject location options for location fields in FormPanel
+  const getFieldWithOptions = (field) => {
+    if (field.isLocation) {
+      return { ...field, options: locationOptions };
+    }
+    return field;
+  };
 
   return (
     <MainLayout>
@@ -451,11 +473,12 @@ export default function ManifestPage() {
               total_wt: computedTotals.total_wt,
               total_pkgs: computedTotals.total_pkgs,
             };
+            const enhancedField = getFieldWithOptions(field);
             if (field.name === "remarks") {
               return (
                 <div key={field.name} style={{ gridColumn: "1 / -1" }}>
                   <FormField
-                    {...field}
+                    {...enhancedField}
                     form={displayForm}
                     setForm={setForm}
                   />
@@ -465,7 +488,7 @@ export default function ManifestPage() {
             return (
               <FormField
                 key={field.name}
-                {...field}
+                {...enhancedField}
                 form={displayForm}
                 setForm={setForm}
                 disabled={
