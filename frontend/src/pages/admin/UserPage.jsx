@@ -28,15 +28,32 @@ const userFields = [
   },
 ];
 
+const adminField = {
+  label: "Admin User",
+  name: "is_admin",
+  options: [
+    { label: "Yes", value: "Y" },
+    { label: "No", value: "N" },
+  ],
+};
+
 const userColumns = [
   { key: "user_id", label: "User ID" },
   { key: "user_name", label: "User Name" },
   { key: "email_id", label: "Email" },
   { key: "mobile_no", label: "Mobile" },
   { key: "user_status", label: "Status" },
+  {
+    key: "is_admin",
+    label: "Admin User",
+    render: (row) => (row.is_admin === "Y" ? "Yes" : "No"),
+  },
 ];
 
 export default function UserPage() {
+  const currentUser = JSON.parse(localStorage.getItem("current_user") || "{}");
+  const isSuperAdmin = currentUser?.is_admin === "Y";
+
   const [searchText, setSearchText] = useState("");
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -53,6 +70,7 @@ export default function UserPage() {
     email_id: "",
     mobile_no: "",
     user_status: "A",
+    is_admin: "N",
     password_hash: "",
   });
 
@@ -108,6 +126,7 @@ export default function UserPage() {
       email_id: "",
       mobile_no: "",
       user_status: "A",
+      is_admin: "N",
       password_hash: "",
     });
     setIsEditing(false);
@@ -149,7 +168,8 @@ export default function UserPage() {
           user_name: form.user_name,
           email_id: form.email_id,
           mobile_no: form.mobile_no,
-          user_status: form.user_status
+          user_status: form.user_status,
+          ...(isSuperAdmin && { is_admin: form.is_admin }),
         });
 
         // ✅ Update state locally
@@ -161,10 +181,7 @@ export default function UserPage() {
 
         showSuccess("User updated successfully");
       } else {
-        const newUser = await createUser({
-          ...form,
-          company_code: 1,
-        });
+        const newUser = await createUser(form);
 
         // ✅ Add locally
         setUsers((prev) => [...prev, newUser[0]]);
@@ -188,6 +205,7 @@ export default function UserPage() {
       email_id: row.email_id || "",
       mobile_no: row.mobile_no || "",
       user_status: row.user_status || "A",
+      is_admin: row.is_admin || "N",
       password_hash: ""
     };
 
@@ -244,8 +262,21 @@ export default function UserPage() {
 
         <FormPanel flex>
           {userFields.map((field) => (
-            <FormField key={field.name} {...field} form={form} setForm={setForm} />
+            <FormField
+              key={field.name}
+              {...field}
+              form={form}
+              setForm={setForm}
+              disabled={isEditing && field.name === "user_id"}
+            />
           ))}
+
+          <FormField
+            {...adminField}
+            form={form}
+            setForm={setForm}
+            disabled={!isSuperAdmin}
+          />
 
           {!isEditing && (
             <FormField

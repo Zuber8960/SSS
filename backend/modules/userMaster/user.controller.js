@@ -35,7 +35,7 @@ const createUser = async (userData) => {
       user_id: userData.user_id,
       user_name: userData.user_name,
       password_hash: hashedPassword,
-      company_code: userData.company_code,
+      tenant_id : userData.tenant_id ,
       division_code: userData.division_code || null,
       loc_code: userData.loc_code || null,
       mobile_no: userData.mobile_no || null,
