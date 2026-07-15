@@ -16,6 +16,7 @@ import {
   updateBusinessPartner as updateBusinessPartnerApi,
   deleteBusinessPartner as deleteBusinessPartnerApi,
 } from "../../utils/businessPartner";
+import { fetchAllDivisionsApi } from "../../utils/divisionMaster";
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 
@@ -28,7 +29,7 @@ const selectSx = (hasValue) => ({
   "& .MuiOutlinedInput-notchedOutline": { border: "1.5px solid #e2e8f0", borderRadius: "8px" },
   "&:hover .MuiOutlinedInput-notchedOutline": { border: "1.5px solid #e2e8f0" },
   "&.Mui-focused .MuiOutlinedInput-notchedOutline": { border: "1.5px solid #a855f7", boxShadow: "0 0 0 3px rgba(168,85,247,0.1)" },
-  "& .MuiSelect-select": { padding: "12px 5px" },
+  "& .MuiSelect-select": { padding: "8px 5px" },
 });
 
 const ID_TYPES = ["PAN", "AADHAR", "PASSPORT", "DL"];
@@ -110,6 +111,7 @@ function SelectField({ label, name, value, onChange, options, placeholder }) {
 export default function BusinessPartnerPage() {
   const [partners, setPartners] = useState([]);
   const [bpTypes, setBpTypes] = useState([]);
+  const [divisions, setDivisions] = useState([]);
   const { dialog, closeAlert, showSuccess, showError, showWarning } = useAlert();
   const [searchText, setSearchText] = useState("");
   const [form, setForm] = useState(emptyForm);
@@ -247,15 +249,23 @@ export default function BusinessPartnerPage() {
   // BP Type options for dropdown: { value: rec_id, label: rec_name }
   const bpTypeOptions = bpTypes.map((t) => ({ value: String(t.rec_id), label: t.rec_name }));
 
+  // Division options for dropdown: { value: division_code, label: "code - name" }
+  const divisionOptions = divisions.map((div) => ({
+    value: div.division_code,
+    label: `${div.division_code} - ${div.division_name}`,
+  }));
+
   useEffect(() => {
     (async () => {
       try {
-        const [partnerData, typeData] = await Promise.all([
+        const [partnerData, typeData, divisionData] = await Promise.all([
           fetchAllBusinessPartners(),
           fetchBpTypes(),
+          fetchAllDivisionsApi(),
         ]);
         setPartners(partnerData);
         setBpTypes(typeData);
+        setDivisions(divisionData);
       } catch (err) {
         showError(err.message || "Failed to load data");
         console.error("Load error:", err);
@@ -276,7 +286,8 @@ export default function BusinessPartnerPage() {
 
         {/* Basic Details */}
         <FormPanel>
-          <FormField label="Division Code" name="division_code" form={form} setForm={setFormTracked} disabled />
+          <FormField label="Division Code" name="division_code" form={form} setForm={setFormTracked}
+            options={divisionOptions} />
           <FormField label="PAN No" name="bp_pan_no" form={form} setForm={setFormTracked} />
           <FormField label="PAN Name" name="bp_pan_name" form={form} setForm={setFormTracked} />
           <FormField label="BP Name" name="bp_name" form={form} setForm={setFormTracked} />
