@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { NoteAddIcon, SaveIcon, ExportIcon, EditIcon, DeleteIcon, RefreshIcon, AddRowIcon, ResetIcon, ViewIcon, AddIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import { fetchAllUsers, createUser, updateUser, deleteUser } from "../../utils/userAPI";
+import { fetchAllLocations } from "../../utils/locationMaster";
+import { fetchAllDivisionsApi } from "../../utils/divisionMaster";
 import {
   DataTable,
   FormField,
@@ -43,6 +45,8 @@ const userColumns = [
   { key: "email_id", label: "Email" },
   { key: "mobile_no", label: "Mobile" },
   { key: "user_status", label: "Status" },
+  { key: "location_id", label: "Location ID" },
+  { key: "division_code", label: "Division Code" },
   {
     key: "is_admin",
     label: "Admin User",
@@ -56,6 +60,8 @@ export default function UserPage() {
 
   const [searchText, setSearchText] = useState("");
   const [users, setUsers] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [divisions, setDivisions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
@@ -72,7 +78,29 @@ export default function UserPage() {
     user_status: "A",
     is_admin: "N",
     password_hash: "",
+    location_id: "",
+    division_code: "",
   });
+
+  // ✅ Load locations
+  const loadLocations = async () => {
+    try {
+      const data = await fetchAllLocations();
+      setLocations(data);
+    } catch (err) {
+      console.error("Failed to load locations:", err);
+    }
+  };
+
+  // ✅ Load divisions
+  const loadDivisions = async () => {
+    try {
+      const data = await fetchAllDivisionsApi();
+      setDivisions(data);
+    } catch (err) {
+      console.error("Failed to load divisions:", err);
+    }
+  };
 
   // ✅ Single API call
   const loadUsers = async () => {
@@ -89,21 +117,27 @@ export default function UserPage() {
   };
 
   useEffect(() => {
-    const loadUsersAtMount = async () => {
+    const loadDataAtMount = async () => {
       setLoading(true);
       setError("");
       try {
-        const data = await fetchAllUsers();
-        setUsers(data);
+        const [userData, locationData, divisionData] = await Promise.all([
+          fetchAllUsers(),
+          fetchAllLocations(),
+          fetchAllDivisionsApi(),
+        ]);
+        setUsers(userData);
+        setLocations(locationData);
+        setDivisions(divisionData);
       } catch (err) {
-        setError(err.message || "Failed to load users");
-        console.error("Error loading users:", err);
+        setError(err.message || "Failed to load data");
+        console.error("Error loading data:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    loadUsersAtMount();
+    loadDataAtMount();
   }, []);
 
   const hasChanges = () => {
@@ -113,7 +147,9 @@ export default function UserPage() {
       form.user_name !== originalUser.user_name ||
       form.email_id !== originalUser.email_id ||
       form.mobile_no !== originalUser.mobile_no ||
-      form.user_status !== originalUser.user_status
+      form.user_status !== originalUser.user_status ||
+      form.location_id !== originalUser.location_id ||
+      form.division_code !== originalUser.division_code
     );
   };
 
@@ -128,6 +164,8 @@ export default function UserPage() {
       user_status: "A",
       is_admin: "N",
       password_hash: "",
+      location_id: "",
+      division_code: "",
     });
     setIsEditing(false);
   };
@@ -157,6 +195,16 @@ export default function UserPage() {
     setLoading(true);
 
     try {
+      const payload = {
+        user_name: form.user_name,
+        email_id: form.email_id,
+        mobile_no: form.mobile_no,
+        user_status: form.user_status,
+        location_id: form.location_id || null,
+        division_code: form.division_code || null,
+        ...(isSuperAdmin && { is_admin: form.is_admin }),
+      };
+
       if (isEditing) {
         // ✅ Check for changes BEFORE API call
         if (!hasChanges()) {
@@ -164,13 +212,7 @@ export default function UserPage() {
           return;
         }
 
-        await updateUser(form.rec_id, {
-          user_name: form.user_name,
-          email_id: form.email_id,
-          mobile_no: form.mobile_no,
-          user_status: form.user_status,
-          ...(isSuperAdmin && { is_admin: form.is_admin }),
-        });
+        await updateUser(form.rec_id, payload);
 
         // ✅ Update state locally
         setUsers((prev) =>
@@ -181,7 +223,7 @@ export default function UserPage() {
 
         showSuccess("User updated successfully");
       } else {
-        const newUser = await createUser(form);
+        const newUser = await createUser({ ...form, ...payload });
 
         // ✅ Add locally
         setUsers((prev) => [...prev, newUser[0]]);
@@ -206,7 +248,9 @@ export default function UserPage() {
       mobile_no: row.mobile_no || "",
       user_status: row.user_status || "A",
       is_admin: row.is_admin || "N",
-      password_hash: ""
+      password_hash: "",
+      location_id: row.location_id || "",
+      division_code: row.division_code || "",
     };
 
     setForm(formatted);
@@ -245,6 +289,18 @@ export default function UserPage() {
       x.user_name?.toLowerCase().includes(searchText.toLowerCase())
   );
 
+  // Build location dropdown options
+  const locationOptions = locations.map((loc) => ({
+    label: `${loc.loc_code} - ${loc.loc_name}`,
+    value: loc.loc_code,
+  }));
+
+  // Build division dropdown options
+  const divisionOptions = divisions.map((div) => ({
+    label: `${div.division_code} - ${div.division_name}`,
+    value: div.division_code,
+  }));
+
   return (
     <MainLayout>
       <PageBody title="User Master">
@@ -270,6 +326,22 @@ export default function UserPage() {
               disabled={isEditing && field.name === "user_id"}
             />
           ))}
+
+          <FormField
+            label="Location ID"
+            name="location_id"
+            form={form}
+            setForm={setForm}
+            options={locationOptions}
+          />
+
+          <FormField
+            label="Division Code"
+            name="division_code"
+            form={form}
+            setForm={setForm}
+            options={divisionOptions}
+          />
 
           <FormField
             {...adminField}

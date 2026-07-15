@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 const getAllUsers = async (tenant_id) => {
   return db('sss.ssm_user')
     .where({ record_status: 0, tenant_id })
-    .select('rec_id', 'user_id', 'user_name', 'email_id', 'mobile_no', 'tenant_id', 'is_admin', 'last_login_on', 'created_on', 'user_status');
+    .select('rec_id', 'user_id', 'user_name', 'email_id', 'mobile_no', 'tenant_id', 'is_admin', 'last_login_on', 'created_on', 'user_status','division_code', 'loc_code as location_id',);
 };
 
 const getUserById = async (recId, tenant_id) => {
@@ -37,7 +37,7 @@ const createUser = async (userData) => {
       password_hash: hashedPassword,
       tenant_id : userData.tenant_id ,
       division_code: userData.division_code || null,
-      loc_code: userData.loc_code || null,
+      loc_code: userData.location_id || null,
       mobile_no: userData.mobile_no || null,
       email_id: userData.email_id || null,
       is_admin: userData.is_admin || 'N',

@@ -46,13 +46,13 @@ router.get('/:recId', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { tenant_id } = req;
-    const { user_id, user_name, password_hash, email_id, mobile_no, division_code, loc_code, is_admin } = req.body;
+    const { user_id, user_name, password_hash, email_id, mobile_no, division_code, location_id, is_admin } = req.body;
     if (!user_id || !user_name || !password_hash || !tenant_id) {
       return res.status(400).json({ success: false, message: 'User ID, User Name, Password, and Tenant ID are required' });
     }
     const userData = {
       user_id, user_name, password_hash, email_id, mobile_no,
-      tenant_id, division_code, loc_code,
+      tenant_id, division_code, location_id,
       is_admin: is_admin || 'N',
       created_by: req.user.userId
     };
