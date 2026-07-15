@@ -17,6 +17,8 @@ app.use(cors({
   origin: [
     'http://198.38.86.85:4000',
     'http://localhost:4000',
+    'http://198.38.86.85/sss',
+    'http://198.38.86.85',
     process.env.FRONTEND_URL
   ],
   credentials: true
