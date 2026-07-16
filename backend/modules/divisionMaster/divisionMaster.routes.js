@@ -18,7 +18,7 @@ router.post('/', async (req, res) => {
     try {
         const recId = req.user.recId;
         const { tenant_id } = req;
-        const payload = { ...req.body, tenant_id: req.body.tenant_id || tenant_id };
+        const payload = { ...req.body, tenant_id: tenant_id };
         const data = await DivisionMasterController.saveDivisionData(recId, payload);
         res.status(201).json({ success: true, data });
     } catch (error) {
