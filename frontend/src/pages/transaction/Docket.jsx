@@ -35,12 +35,45 @@ const headerFields = [
 
   { label: "Docket No", name: "docket_no" },
   { label: "Docket Date", name: "docket_date", type: "date" },
-  { label: "From Town", name: "docket_from_town" },
   { label: "From Location", name: "docket_loc", isLocation: true },
-  { label: "To Town", name: "docket_to_town" },
+  { label: "From Town", name: "docket_from_town" },
   { label: "To Location", name: "docket_to_loc", isLocation: true },
-  // { label: "Consignor", name: "cnor" },
-  // { label: "Consignee", name: "cnee" },
+  { label: "To Town", name: "docket_to_town" },
+
+  {
+    label: "Transit Type", name: "transit_type", options: [
+      { label: "ROAD", value: "ROAD" },
+      { label: "MULTIMODAL", value: "MULTIMODAL" },
+    ]
+  },
+  {
+    label: "Load Type", name: "load_type", options: [
+      { label: "FTL", value: "FTL" },
+      { label: "LTL", value: "LTL" },
+      { label: "SUNDRY", value: "SUNDRY" },
+    ]
+  },
+  {
+    label: "Pay Type", name: "pay_type", options: [
+      { label: "TBB", value: "TBB" },
+      { label: "PAID", value: "PAID" },
+      { label: "TO PAY", value: "TO PAY" },
+    ]
+  },
+  { label: "Pay Location", name: "pay_loc" },
+  {
+    label: "Delivery Type", name: "dly_type", options: [
+      { label: "Door Delivery", value: "door delivery" },
+      { label: "Godown Delivery", value: "godown delivery" },
+    ]
+  },
+  {
+    label: "CC Attached", name: "cc", options: [
+      { label: "YES", value: "YES" },
+      { label: "NO", value: "NO" },
+    ]
+  },
+
   { label: "Actual Wt", name: "act_wt", type: "number" },
   { label: "Charge Wt", name: "chrg_wt", type: "number" },
 
@@ -112,7 +145,8 @@ const formSections = [
   {
     title: "Docket Information",
     icon: SECTION_ICONS.docketInfo,
-    fields: ["docket_no", "docket_date", "docket_from_town", "docket_loc", "docket_to_town", "docket_to_loc"],
+    fields: ["docket_no", "docket_date", "docket_loc", "docket_from_town", "docket_to_loc", "docket_to_town",
+      "transit_type", "load_type", "pay_type", "pay_loc", "dly_type", "cc"],
   },
   {
     title: "Consignor Details",
@@ -201,6 +235,12 @@ const emptyForm = {
   cnee_address: "",
   cnee_pincode: "",
   cnee_gstin: "",
+  transit_type: "",
+  load_type: "",
+  pay_type: "",
+  pay_loc: "",
+  dly_type: "",
+  cc: "",
   act_wt: "",
   chrg_wt: "",
   no_cb: 0,
@@ -307,6 +347,17 @@ export default function DocketPage() {
     }
   }, [form.docket_loc, form.docket_to_loc]);
 
+  // Auto-set Pay Location based on Pay Type
+  useEffect(() => {
+    if (form.pay_type === "PAID" && form.docket_loc) {
+      setForm((prev) => prev.pay_loc !== form.docket_loc ? { ...prev, pay_loc: form.docket_loc } : prev);
+      setDirtyFields((prev) => new Set(prev).add("pay_loc"));
+    } else if (form.pay_type === "TO PAY" && form.docket_to_loc) {
+      setForm((prev) => prev.pay_loc !== form.docket_to_loc ? { ...prev, pay_loc: form.docket_to_loc } : prev);
+      setDirtyFields((prev) => new Set(prev).add("pay_loc"));
+    }
+  }, [form.pay_type, form.docket_loc, form.docket_to_loc]);
+
   const fetchBpSuggestions = async (searchTerm, prefix) => {
     if (!searchTerm || searchTerm.trim().length < 3) {
       setBpSuggestions((prev) => ({ ...prev, [prefix]: [] }));
@@ -395,6 +446,14 @@ export default function DocketPage() {
     value: loc.loc_code,
   }));
 
+  // Pay Location dropdown - only shows From/To locations selected by user
+  const payLocOptions = useMemo(() => {
+    const opts = [];
+    if (form.docket_loc) opts.push({ label: form.docket_loc, value: form.docket_loc });
+    if (form.docket_to_loc && form.docket_to_loc !== form.docket_loc) opts.push({ label: form.docket_to_loc, value: form.docket_to_loc });
+    return opts;
+  }, [form.docket_loc, form.docket_to_loc]);
+
   // Load locations on mount
   useEffect(() => {
     fetchAllLocations()
@@ -462,6 +521,12 @@ export default function DocketPage() {
         docket_no:      "docket_no",
         docket_to_loc:    "docket_to_loc",
         docket_loc:    "docket_loc",
+        transit_type: "docket_transit_type",
+        load_type: "docket_load_type",
+        pay_type: "docket_pay_type",
+        pay_loc: "docket_pay_loc",
+        dly_type: "docket_dly_type",
+        cc: "docket_cc",
         cnor_name:        "docket_cnor_name",
         cnor_address:     "cnor_address",
         cnor_pincode:     "cnor_pincode",
@@ -572,6 +637,12 @@ export default function DocketPage() {
             cnee_address:        docketData.cnee_address        || "",
             cnee_pincode:        docketData.cnee_pincode        || "",
             cnee_gstin:          docketData.cnee_gstin          || "",
+            transit_type: docketData.docket_transit_type || "",
+            load_type: docketData.docket_load_type || "",
+            pay_type: docketData.docket_pay_type || "",
+            pay_loc: docketData.docket_pay_loc || "",
+            dly_type: docketData.docket_dly_type || "",
+            cc: docketData.docket_cc || "",
             act_wt:              docketData.docket_act_wt       ?? "",
             chrg_wt:             docketData.docket_chrg_wt      ?? "",
             no_cb:               docketData.docket_crtns        ?? 0,
@@ -710,9 +781,12 @@ export default function DocketPage() {
 
     const renderFieldInput = (field) => {
       const isTextarea = field.type === "textarea";
-      const fieldProps = field.isLocation
+      let fieldProps = field.isLocation
         ? { ...field, options: locationOptions }
         : field;
+      if (field.name === "pay_loc") {
+        fieldProps = { ...fieldProps, options: payLocOptions };
+      }
       const isNameField = (isCnor || isCnee) && field.name === `${prefix}_name`;
 
       if (isNameField) {
