@@ -115,6 +115,7 @@ const handleLogin = async () => {
     }, 1000);
 
   } catch (err) {
+    console.log(err);
     showError(err.message || "Invalid credentials");
   } finally {
     setLoading(false);
