@@ -1,4 +1,4 @@
-import { useState, useMemo,useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { ToggleSwitch } from "../../components/common/MasterPage";
 import { IconButton, Tooltip } from "@mui/material";
 import { EditIcon, SaveIcon, SECTION_ICONS } from "../../components/common/icons";
@@ -35,12 +35,14 @@ const headerFields = [
 
   { label: "Docket No", name: "docket_no" },
   { label: "Docket Date", name: "docket_date", type: "date" },
+  { label: "From Town", name: "docket_from_town" },
   { label: "From Location", name: "docket_loc", isLocation: true },
+  { label: "To Town", name: "docket_to_town" },
   { label: "To Location", name: "docket_to_loc", isLocation: true },
   // { label: "Consignor", name: "cnor" },
   // { label: "Consignee", name: "cnee" },
   { label: "Actual Wt", name: "act_wt", type: "number" },
-  { label: "Charge Wt", name: "chrg_wt", type: "number" } ,
+  { label: "Charge Wt", name: "chrg_wt", type: "number" },
 
   { label: "No of CB", name: "no_cb", type: "number" },
   { label: "NOS W. Crate", name: "no_w_crate", type: "number" },
@@ -110,7 +112,7 @@ const formSections = [
   {
     title: "Docket Information",
     icon: SECTION_ICONS.docketInfo,
-    fields: ["docket_no", "docket_date", "docket_loc", "docket_to_loc"],
+    fields: ["docket_no", "docket_date", "docket_from_town", "docket_loc", "docket_to_town", "docket_to_loc"],
   },
   {
     title: "Consignor Details",
@@ -187,7 +189,9 @@ const formSections = [
 const emptyForm = {
   docket_no: "",
   docket_date: "",
+  docket_from_town: "",
   docket_loc: "",
+  docket_to_town: "",
   docket_to_loc: "",
   cnor_name: "",
   cnor_address: "",
@@ -241,6 +245,21 @@ export default function DocketPage() {
     [form.no_cb, form.no_w_crate, form.no_w_cbox, form.no_loose, form.no_others]
   );
 
+  const packageTotal = useMemo(
+    () =>
+      (parseFloat(form.no_cb) || 0) +
+      (parseFloat(form.no_w_crate) || 0) +
+      (parseFloat(form.no_w_cbox) || 0) +
+      (parseFloat(form.no_loose) || 0) +
+      (parseFloat(form.no_others) || 0),
+    [form.no_cb, form.no_w_crate, form.no_w_cbox, form.no_loose, form.no_others]
+  );
+
+  useEffect(() => {
+    setForm((prev) => (
+      prev.tot_pkgs === packageTotal ? prev : { ...prev, tot_pkgs: packageTotal }
+    ));
+  }, [packageTotal]);
 
   const [withEWB, setWithEWB] = useState(false);
   const [prePrinted, setPrePrinted] = useState(false);
@@ -256,19 +275,106 @@ export default function DocketPage() {
   const [ewbNoDisplay, setEwbNoDisplay] = useState("");
   const { isLoading, showLoading, hideLoading, withLoading } = useLoading();
   const [dirtyFields, setDirtyFields] = useState(new Set());
+  const [bpSuggestions, setBpSuggestions] = useState({});
+  const searchTimeoutRef = useRef(null);
+  const prevLocRef = useRef({ docket_loc: "", docket_to_loc: "" });
+
+  // Clear consignor/consignee data when location changes
+  useEffect(() => {
+    const prev = prevLocRef.current;
+    const updates = {};
+    if (form.docket_loc !== prev.docket_loc) {
+      updates.cnor_name = "";
+      updates.cnor_address = "";
+      updates.cnor_pincode = "";
+      updates.cnor_gstin = "";
+    }
+    if (form.docket_to_loc !== prev.docket_to_loc) {
+      updates.cnee_name = "";
+      updates.cnee_address = "";
+      updates.cnee_pincode = "";
+      updates.cnee_gstin = "";
+    }
+    prevLocRef.current = { docket_loc: form.docket_loc, docket_to_loc: form.docket_to_loc };
+    const keys = Object.keys(updates);
+    if (keys.length > 0) {
+      setForm((prev) => ({ ...prev, ...updates }));
+      setDirtyFields((prev) => {
+        const s = new Set(prev);
+        keys.forEach((k) => s.add(k));
+        return s;
+      });
+    }
+  }, [form.docket_loc, form.docket_to_loc]);
+
+  const fetchBpSuggestions = async (searchTerm, prefix) => {
+    if (!searchTerm || searchTerm.trim().length < 3) {
+      setBpSuggestions((prev) => ({ ...prev, [prefix]: [] }));
+      return;
+    }
+    const locCode = prefix === "cnee" ? form.docket_to_loc : form.docket_loc;
+    try {
+      const result = await fetchBpByBpName(searchTerm.trim(), locCode || null);
+      if (result) {
+        // If API returns single object, wrap in array; if array, use as-is
+        const list = Array.isArray(result) ? result : [result];
+        setBpSuggestions((prev) => ({ ...prev, [prefix]: list }));
+      } else {
+        setBpSuggestions((prev) => ({ ...prev, [prefix]: [] }));
+      }
+    } catch {
+      setBpSuggestions((prev) => ({ ...prev, [prefix]: [] }));
+    }
+  };
+
+  const handleBpNameChange = (value, prefix) => {
+    setForm((prev) => ({ ...prev, [`${prefix}_name`]: value }));
+    setDirtyFields((prev) => new Set(prev).add(`${prefix}_name`));
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      fetchBpSuggestions(value, prefix);
+    }, 300);
+  };
+
+  const selectBpSuggestion = (bp, prefix) => {
+    // First set the name immediately
+    setForm((prev) => ({
+      ...prev,
+      [`${prefix}_name`]: bp.bp_name || prev[`${prefix}_name`],
+      [`${prefix}_address`]: bp.bp_addres || prev[`${prefix}_address`],
+      [`${prefix}_pincode`]: bp.bp_pincode || prev[`${prefix}_pincode`],
+      [`${prefix}_gstin`]: bp.bp_gstin || prev[`${prefix}_gstin`],
+    }));
+    setDirtyFields((prev) => new Set(prev).add(`${prefix}_name`));
+    setBpSuggestions((prev) => ({ ...prev, [prefix]: [] }));
+    // Then do a full lookup to get all details (address, pincode, gstin)
+    if (bp.bp_name) {
+      lookupBpByName(bp.bp_name, prefix);
+    }
+  };
+
+  const handleBpNameBlur = (prefix) => {
+    setTimeout(() => {
+      setBpSuggestions((prev) => ({ ...prev, [prefix]: [] }));
+      const bpName = form[`${prefix}_name`];
+      if (bpName && bpName.trim().length >= 3) {
+        lookupBpByName(bpName, prefix);
+      }
+    }, 200);
+  };
+
   const lookupBpByName = async (bpName, prefix) => {
     if (!bpName.trim()) return;
-    // docket_to_loc filters consignor (cnee), docket_loc filters consignee (cnor)
     const locCode = prefix === "cnee" ? form.docket_to_loc : form.docket_loc;
     try {
       const bp = await fetchBpByBpName(bpName.trim(), locCode || null);
       if (bp) {
         setForm((prev) => ({
           ...prev,
-          [`${prefix}_name`]:    bp.bp_name    || prev[`${prefix}_name`],
-          [`${prefix}_address`]: bp.bp_addres  || prev[`${prefix}_address`],
+          [`${prefix}_name`]: bp.bp_name || prev[`${prefix}_name`],
+          [`${prefix}_address`]: bp.bp_addres || prev[`${prefix}_address`],
           [`${prefix}_pincode`]: bp.bp_pincode || prev[`${prefix}_pincode`],
-          [`${prefix}_gstin`]:   bp.bp_gstin   || prev[`${prefix}_gstin`],
+          [`${prefix}_gstin`]: bp.bp_gstin || prev[`${prefix}_gstin`],
         }));
         setDirtyFields((prev) => {
           const s = new Set(prev);
@@ -342,18 +448,6 @@ export default function DocketPage() {
 
   const showFormOnClick = async () => {
     setShowForm((prev) => !prev);
-    // if (!showForm) {
-    //   console.log(ewbList);
-    //   const ewbLists = [...new Set(ewbList.filter(obj => obj.ewb_no).map(obj => obj.ewb_no))].map(Number);
-    //   await fetchData(ewbLists);
-    // }
-    // setShowForm((prev) => {
-    //   if (prev) {
-    //     setDocketNumberInput("");
-    //     setDocketId(null);
-    //   }
-    //   return !prev;
-    // });
   };
 
   // Save Form - POST for new, PUT for existing docket
@@ -361,48 +455,51 @@ export default function DocketPage() {
     try {
       // Map form field names → DB column names
       const formToDb = {
-        docket_no:      "docket_no",
-        docket_to_loc:    "docket_to_loc",
-        docket_loc:    "docket_loc",
-        act_wt:           "docket_act_wt",
-        chrg_wt:          "docket_chrg_wt",
-        no_cb:            "docket_crtns",
-        no_w_crate:       "docket_bndls",
-        no_w_cbox:        "docket_bags",
-        no_loose:         "docket_loose",
-        no_others:        "docket_other",
-        rate:             "docket_rate",
-        rate_uom:         "docket_rate_uom",
-        po_no:            "docket_po_no",
-        po_date:          "docket_po_date",
-        invoice_value:    "docket_inv_value",
-        risk:             "docket_risk",
-        insurance_company:   "docket_insurance_co",
+        docket_no: "docket_no",
+        docket_to_loc: "docket_to_loc",
+        docket_loc: "docket_loc",
+        act_wt: "docket_act_wt",
+        chrg_wt: "docket_chrg_wt",
+        no_cb: "docket_crtns",
+        no_w_crate: "docket_bndls",
+        no_w_cbox: "docket_bags",
+        no_loose: "docket_loose",
+        no_others: "docket_other",
+        rate: "docket_rate",
+        rate_uom: "docket_rate_uom",
+        po_no: "docket_po_no",
+        po_date: "docket_po_date",
+        invoice_value: "docket_inv_value",
+        risk: "docket_risk",
+        insurance_company: "docket_insurance_co",
         insurance_policy_no: "docket_insurance_no",
-        valid_upto:          "docket_insurance_date",
-        sum_insured:         "docket_insurance_amt",
-        goods_grp:        "docket_goods_grp",
-        goods_subgrp:     "docket_goods_subgrp",
-        goods_desc:       "docket_goods_desc",
-        remark:           "docket_remark",
-        tot_pkgs:         "docket_tot_pkgs", //docket_tot_pkgs
-        docket_date:     "docket_date",
+        valid_upto: "docket_insurance_date",
+        sum_insured: "docket_insurance_amt",
+        goods_grp: "docket_goods_grp",
+        goods_subgrp: "docket_goods_subgrp",
+        goods_desc: "docket_goods_desc",
+        remark: "docket_remark",
+        tot_pkgs: "docket_tot_pkgs",
+        docket_date: "docket_date",
       };
 
       const currentUser = JSON.parse(localStorage.getItem("current_user") || "null");
       const aud_user = currentUser?.rec_id ?? null;
 
       const payload = { aud_user };
+      const packageTotalValue =
+        (parseFloat(form.no_cb) || 0) +
+        (parseFloat(form.no_w_crate) || 0) +
+        (parseFloat(form.no_w_cbox) || 0) +
+        (parseFloat(form.no_loose) || 0) +
+        (parseFloat(form.no_others) || 0);
+
       dirtyFields.forEach((formKey) => {
         if (formToDb[formKey]) {
           payload[formToDb[formKey]] = form[formKey];
         }
       });
-      // tot_pkgs is derived — include if any "no_*" field is dirty
-      // const noFields = ["no_cb", "no_w_crate", "no_w_cbox", "no_loose", "no_others"];
-      // if (noFields.some((f) => dirtyFields.has(f))) {
-      //   payload.docket_tot_pkgs = tot_amt;
-      // }
+      payload[formToDb.tot_pkgs] = packageTotalValue;
 
       let result;
       if (docketExists && docketRecId != null) {
@@ -432,7 +529,6 @@ export default function DocketPage() {
   const handleEditView = async () => {
     const docketNo = docketNumberInput.trim();
 
-    // setIsFormEditMode(Boolean(docketNo));
     setIsFormEditMode(true);
     setShowForm(true);
 
@@ -446,44 +542,46 @@ export default function DocketPage() {
             return m.isValid() ? m.format("YYYY-MM-DD") : "";
           };
           const mapped = {
-            docket_no:           docketData.docket_no           || "",
-            docket_date:         toDate(docketData.docket_date),
-            docket_loc:          docketData.docket_loc          || "",
-            docket_to_loc:       docketData.docket_to_loc       || "",
-            cnor_name:           docketData.cnor_name           || "",
-            cnor_address:        docketData.cnor_address        || "",
-            cnor_pincode:        docketData.cnor_pincode        || "",
-            cnor_gstin:          docketData.cnor_gstin          || "",
-            cnee_name:           docketData.cnee_name           || "",
-            cnee_address:        docketData.cnee_address        || "",
-            cnee_pincode:        docketData.cnee_pincode        || "",
-            cnee_gstin:          docketData.cnee_gstin          || "",
-            act_wt:              docketData.docket_act_wt       ?? "",
-            chrg_wt:             docketData.docket_chrg_wt      ?? "",
-            no_cb:               docketData.docket_crtns        ?? 0,
-            no_w_crate:          docketData.docket_bndls        ?? 0,
-            no_w_cbox:           docketData.docket_bags         ?? 0,
-            no_loose:            docketData.docket_loose        ?? 0,
-            no_others:           docketData.docket_other        ?? 0,
-            tot_pkgs:            docketData.docket_tot_pkgs     ?? 0,
-            rate:                docketData.docket_rate         ?? "",
-            rate_uom:            docketData.docket_rate_uom     || "",
-            tot_amt:             docketData.docket_tot_amt      ?? "",
-            po_no:               docketData.docket_po_no        || "",
-            po_date:             toDate(docketData.docket_po_date),
-            invoice_no:          docketData.docket_inv_no       || "",
-            invoice_date:        toDate(docketData.docket_inv_date),
-            invoice_value:       docketData.docket_inv_value    ?? "",
-            risk:                docketData.docket_risk         || "",
-            insurance_company:   docketData.docket_insurance_co || "",
+            docket_no: docketData.docket_no || "",
+            docket_date: toDate(docketData.docket_date),
+            docket_from_town: docketData.docket_from_town || "",
+            docket_loc: docketData.docket_loc || "",
+            docket_to_town: docketData.docket_to_town || "",
+            docket_to_loc: docketData.docket_to_loc || "",
+            cnor_name: docketData.cnor_name || "",
+            cnor_address: docketData.cnor_address || "",
+            cnor_pincode: docketData.cnor_pincode || "",
+            cnor_gstin: docketData.cnor_gstin || "",
+            cnee_name: docketData.cnee_name || "",
+            cnee_address: docketData.cnee_address || "",
+            cnee_pincode: docketData.cnee_pincode || "",
+            cnee_gstin: docketData.cnee_gstin || "",
+            act_wt: docketData.docket_act_wt ?? "",
+            chrg_wt: docketData.docket_chrg_wt ?? "",
+            no_cb: docketData.docket_crtns ?? 0,
+            no_w_crate: docketData.docket_bndls ?? 0,
+            no_w_cbox: docketData.docket_bags ?? 0,
+            no_loose: docketData.docket_loose ?? 0,
+            no_others: docketData.docket_other ?? 0,
+            tot_pkgs: docketData.docket_tot_pkgs ?? 0,
+            rate: docketData.docket_rate ?? "",
+            rate_uom: docketData.docket_rate_uom || "",
+            tot_amt: docketData.docket_tot_amt ?? "",
+            po_no: docketData.docket_po_no || "",
+            po_date: toDate(docketData.docket_po_date),
+            invoice_no: docketData.docket_inv_no || "",
+            invoice_date: toDate(docketData.docket_inv_date),
+            invoice_value: docketData.docket_inv_value ?? "",
+            risk: docketData.docket_risk || "",
+            insurance_company: docketData.docket_insurance_co || "",
             insurance_policy_no: docketData.docket_insurance_no || "",
-            insurance_cert_no:   "",
-            sum_insured:         docketData.docket_insurance_amt ?? "",
-            valid_upto:          toDate(docketData.docket_insurance_date),
-            goods_grp:           docketData.docket_goods_grp    || "",
-            goods_subgrp:        docketData.docket_goods_subgrp || "",
-            goods_desc:          docketData.docket_goods_desc   || "",
-            remark:              docketData.docket_remark       || "",
+            insurance_cert_no: "",
+            sum_insured: docketData.docket_insurance_amt ?? "",
+            valid_upto: toDate(docketData.docket_insurance_date),
+            goods_grp: docketData.docket_goods_grp || "",
+            goods_subgrp: docketData.docket_goods_subgrp || "",
+            goods_desc: docketData.docket_goods_desc || "",
+            remark: docketData.docket_remark || "",
           };
           setDirtyFields(new Set());
           setForm(mapped);
@@ -580,11 +678,11 @@ export default function DocketPage() {
     const filteredFields =
       section.title === "Insurance Details"
         ? sectionFieldConfigs.filter((f) => {
-            if (insuranceFields.includes(f.name)) {
-              return form.risk === "Insured by Customer";
-            }
-            return true;
-          })
+          if (insuranceFields.includes(f.name)) {
+            return form.risk === "Insured by Customer";
+          }
+          return true;
+        })
         : sectionFieldConfigs;
 
     if (filteredFields.length === 0) return null;
@@ -592,6 +690,105 @@ export default function DocketPage() {
     const isCnor = section.title === "Consignor Details";
     const isCnee = section.title === "Consignee Details";
     const prefix = isCnor ? "cnor" : "cnee";
+    const isPackageDetails = section.title === "Package Details";
+
+    const renderFieldInput = (field) => {
+      const isTextarea = field.type === "textarea";
+      const fieldProps = field.isLocation
+        ? { ...field, options: locationOptions }
+        : field;
+      const isNameField = (isCnor || isCnee) && field.name === `${prefix}_name`;
+
+      if (isNameField) {
+        const suggestions = bpSuggestions[prefix] || [];
+        const isDisabled = !isFormEditMode;
+        return (
+          <div
+            key={field.name}
+            style={{ position: "relative", ...(field.fullWidth ? sectionCardStyles.fullWidthField : {}) }}
+          >
+            <div className="formFieldGroup">
+              <label>{field.label}</label>
+              <input
+                type="text"
+                value={form[`${prefix}_name`] || ""}
+                disabled={isDisabled}
+                onChange={(e) => handleBpNameChange(e.target.value, prefix)}
+                onBlur={() => handleBpNameBlur(prefix)}
+                placeholder={`Enter ${field.label}`}
+                style={{ width: "100%" }}
+              />
+            </div>
+            {suggestions.length > 0 && (
+              <ul
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: 0,
+                  right: 0,
+                  zIndex: 1000,
+                  background: "#fff",
+                  border: "1px solid #d0c5e0",
+                  borderRadius: 6,
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                  listStyle: "none",
+                  margin: 0,
+                  padding: "4px 0",
+                  maxHeight: 200,
+                  overflowY: "auto",
+                }}
+              >
+                {suggestions.map((bp, idx) => (
+                  <li
+                    key={bp.rec_id || idx}
+                    onClick={() => selectBpSuggestion(bp, prefix)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    style={{
+                      padding: "8px 2px",
+                      cursor: "pointer",
+                      background: idx % 2 === 0 ? "#faf9ff" : "#fff",
+                      color: "#333",
+                      fontSize: 12,
+                      borderBottom: "1px solid #f0ecf9",
+                    }}
+                  >
+                    {bp.bp_name}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      }
+
+      return (
+        <div
+          key={field.name}
+          style={isTextarea || field.fullWidth ? sectionCardStyles.fullWidthField : undefined}
+        >
+          <FormField
+            {...fieldProps}
+            form={form}
+            setForm={(updated) => {
+              setDirtyFields((prev) => new Set(prev).add(field.name));
+              setForm(updated);
+            }}
+            disabled={
+              field.name === "tot_pkgs" ||
+              !isFormEditMode ||
+              (["docket_no"].includes(field.name) && !isDocketNoEnabled)
+            }
+          />
+        </div>
+      );
+    };
+
+    const packageTopFields = isPackageDetails
+      ? filteredFields.filter((field) => ["act_wt", "chrg_wt"].includes(field.name))
+      : [];
+    const packageBottomFields = isPackageDetails
+      ? filteredFields.filter((field) => !["act_wt", "chrg_wt"].includes(field.name))
+      : filteredFields;
 
     return (
       <div key={section.title} style={{ ...sectionCardStyles.sectionCard, gridColumn: section.half ? undefined : "1 / -1" }}>
@@ -606,33 +803,17 @@ export default function DocketPage() {
             gap: 10,
           } : {}),
         }}>
-          {filteredFields.map((field) => {
-            const isTextarea = field.type === "textarea";
-            const fieldProps = field.isLocation
-              ? { ...field, options: locationOptions }
-              : field;
-            const isNameField = (isCnor || isCnee) && field.name === `${prefix}_name`;
-            return (
-              <div
-                key={field.name}
-                style={isTextarea || field.fullWidth ? sectionCardStyles.fullWidthField : undefined}
-              >
-                <FormField
-                  {...fieldProps}
-                  form={form}
-                  setForm={(updated) => {
-                    setDirtyFields((prev) => new Set(prev).add(field.name));
-                    setForm(updated);
-                  }}
-                  disabled={
-                    !isFormEditMode ||
-                    (["docket_no"].includes(field.name) && !isDocketNoEnabled)
-                  }
-                  onBlur={isNameField ? () => lookupBpByName(form[`${prefix}_name`], prefix) : undefined}
-                />
+          {isPackageDetails ? (
+            <>
+              <div style={{ gridColumn: "1 / -1", display: "grid", gap: 10, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+                {packageTopFields.map((field) => renderFieldInput(field))}
               </div>
-            );
-          })}
+              <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #ece7f4", margin: "4px 0 2px" }} />
+              {packageBottomFields.map((field) => renderFieldInput(field))}
+            </>
+          ) : (
+            filteredFields.map((field) => renderFieldInput(field))
+          )}
         </div>
       </div>
     );
@@ -795,15 +976,15 @@ export default function DocketPage() {
 
         {showCharges && (
           <div style={{ marginTop: 16 }}>
-          <ChargesSection
-            key="charges"
-            docketId={form.docket_no}
-            invoiceValue={form.invoice_value}
-            buttonStyle={sectionButtonStyle}
-            sectionHeaderStyle={sectionHeaderStyle}
-            sectionActionsStyle={sectionActionsStyle}
-            singleClick
-          />
+            <ChargesSection
+              key="charges"
+              docketId={form.docket_no}
+              invoiceValue={form.invoice_value}
+              buttonStyle={sectionButtonStyle}
+              sectionHeaderStyle={sectionHeaderStyle}
+              sectionActionsStyle={sectionActionsStyle}
+              singleClick
+            />
           </div>
         )}
 
