@@ -46,7 +46,7 @@ router.post('/login', async (req, res) => {
     if (!result) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Invalid credentials --> no result found'
       });
     }
 
