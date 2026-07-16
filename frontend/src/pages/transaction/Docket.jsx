@@ -359,11 +359,23 @@ export default function DocketPage() {
   // Save Form - POST for new, PUT for existing docket
   const handleFormSave = () => withLoading(async () => {
     try {
+      if (!form.docket_date) { showError("Docket Date is required"); return; }
+      if (!form.docket_loc)  { showError("From Location is required"); return; }
+      if (!form.docket_to_loc) { showError("To Location is required"); return; }
+
       // Map form field names → DB column names
       const formToDb = {
         docket_no:      "docket_no",
         docket_to_loc:    "docket_to_loc",
         docket_loc:    "docket_loc",
+        cnor_name:        "docket_cnor_name",
+        cnor_address:     "cnor_address",
+        cnor_pincode:     "cnor_pincode",
+        cnor_gstin:       "cnor_gstin",
+        cnee_name:        "docket_cnee_name",
+        cnee_address:     "cnee_address",
+        cnee_pincode:     "cnee_pincode",
+        cnee_gstin:       "cnee_gstin",
         act_wt:           "docket_act_wt",
         chrg_wt:          "docket_chrg_wt",
         no_cb:            "docket_crtns",
@@ -398,6 +410,8 @@ export default function DocketPage() {
           payload[formToDb[formKey]] = form[formKey];
         }
       });
+      if (payload.docket_act_wt  === undefined || payload.docket_act_wt  === "" || payload.docket_act_wt  === null) payload.docket_act_wt  = 0;
+      if (payload.docket_chrg_wt === undefined || payload.docket_chrg_wt === "" || payload.docket_chrg_wt === null) payload.docket_chrg_wt = 0;
       // tot_pkgs is derived — include if any "no_*" field is dirty
       // const noFields = ["no_cb", "no_w_crate", "no_w_cbox", "no_loose", "no_others"];
       // if (noFields.some((f) => dirtyFields.has(f))) {
@@ -450,11 +464,11 @@ export default function DocketPage() {
             docket_date:         toDate(docketData.docket_date),
             docket_loc:          docketData.docket_loc          || "",
             docket_to_loc:       docketData.docket_to_loc       || "",
-            cnor_name:           docketData.cnor_name           || "",
+            cnor_name:           docketData.docket_cnor_name    || "",
             cnor_address:        docketData.cnor_address        || "",
             cnor_pincode:        docketData.cnor_pincode        || "",
             cnor_gstin:          docketData.cnor_gstin          || "",
-            cnee_name:           docketData.cnee_name           || "",
+            cnee_name:           docketData.docket_cnee_name    || "",
             cnee_address:        docketData.cnee_address        || "",
             cnee_pincode:        docketData.cnee_pincode        || "",
             cnee_gstin:          docketData.cnee_gstin          || "",

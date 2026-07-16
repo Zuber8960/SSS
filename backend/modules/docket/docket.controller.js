@@ -217,10 +217,11 @@ const sanitizeDocketData = (data) => {
 /* ================= CREATE ================= */
 
 const createDocket = async (body, trx = db) => {
-  return trx('sss.sst_docket').insert({
+  let query = trx('sss.sst_docket').insert({
     ...sanitizeDocketData({ ...body }),
     aud_date: new Date()
   }).returning(['docket_no', 'docket_loc', 'docket_date', 'division_code']);
+  return query;
 };
 
 const createDocketDetails = async (details, trx = db) => {
