@@ -37,6 +37,8 @@ export default function TenantLoginPage() {
   const [loading, setLoading] = useState(false);
   const [divisions, setDivisions] = useState([]);
   const [selectedDivision, setSelectedDivision] = useState("");
+  const [locations, setLocations] = useState([]);
+  const [selectedLocation, setSelectedLocation] = useState("");
 
   useEffect(() => {
     if (!tenantVerified) return;
@@ -61,7 +63,26 @@ export default function TenantLoginPage() {
       }
     };
 
+    const loadLocations = async () => {
+      try {
+        const tenantToken = localStorage.getItem("tenantToken");
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_URL}/locationMaster`,
+          {
+            headers: tenantToken
+              ? { Authorization: `Bearer ${tenantToken}` }
+              : {},
+          }
+        );
+        setLocations(response.data?.data || []);
+      } catch (error) {
+        console.error("Failed to fetch locations:", error);
+        setLocations([]);
+      }
+    };
+
     loadDivisions();
+    loadLocations();
   }, [tenantVerified]);
 
   useEffect(() => {
@@ -99,12 +120,18 @@ export default function TenantLoginPage() {
     try {
       const response = await loginUser(userId, password);
       const selectedDiv = selectedDivision || response.user?.division_code;
-      const userToStore = { ...response.user, division_code: selectedDiv };
+      const selectedLoc = selectedLocation || response.user?.location_id;
+      const userToStore = { ...response.user, division_code: selectedDiv, location_id: selectedLoc };
       localStorage.setItem("current_user", JSON.stringify(userToStore));
 
-      // Save division_code to the user table in the backend
-      if (selectedDiv && response.user?.rec_id) {
-        await updateUser(response.user.rec_id, { division_code: selectedDiv });
+      // Save division_code and loc_code to the user table in the backend
+      if (response.user?.rec_id) {
+        const updatePayload = {};
+        if (selectedDiv) updatePayload.division_code = selectedDiv;
+        if (selectedLoc) updatePayload.loc_code = selectedLoc;
+        if (Object.keys(updatePayload).length) {
+          await updateUser(response.user.rec_id, updatePayload);
+        }
       }
 
       showSuccess("Login successful");
@@ -329,6 +356,32 @@ export default function TenantLoginPage() {
                     {divisions.map(div => (
                       <MenuItem key={div.division_code} value={div.division_code}>
                         {div.division_code} - {div.division_name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ fontSize: 13 }}>Location</InputLabel>
+                  <Select
+                    label="Location"
+                    value={selectedLocation}
+                    onChange={e => setSelectedLocation(e.target.value)}
+                    sx={{ fontSize: 13 }}
+                    MenuProps={{
+                      slotProps: {
+                        paper: {
+                          sx: {
+                            '& .MuiMenuItem-root': { fontSize: 13 },
+                          },
+                        },
+                      },
+                    }}
+                  >
+                    <MenuItem value=""><em>None</em></MenuItem>
+                    {locations.map(loc => (
+                      <MenuItem key={loc.loc_code} value={loc.loc_code}>
+                        {loc.loc_code} - {loc.loc_name}
                       </MenuItem>
                     ))}
                   </Select>
