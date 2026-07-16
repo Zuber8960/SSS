@@ -35,6 +35,7 @@ export default function MasterPortal() {
           state: { tenantVerified: true, config: result.config },
         });
       } else {
+        console.log(result);
         showError(result.message || "Invalid credentials");
       }
     } catch (err) {
