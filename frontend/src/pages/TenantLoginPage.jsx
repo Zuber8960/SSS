@@ -8,9 +8,10 @@ import {
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import axios from "axios";
 import { fetchAllTenants, tenantLogin } from "../utils/tenantService";
-import { fetchAllDivisionsApi } from "../utils/divisionMaster";
 import { loginUser } from "../utils/authService";
+import { updateUser } from "../utils/userAPI";
 import CommonAlertDialog from "../components/common/CommonAlertDialog";
 import useAlert from "../components/common/UseAlert";
 import Footer from "../layouts/Footer";
@@ -39,9 +40,28 @@ export default function TenantLoginPage() {
 
   useEffect(() => {
     if (!tenantVerified) return;
-    fetchAllDivisionsApi()
-      .then(setDivisions)
-      .catch(() => {});
+
+    const loadDivisions = async () => {
+      try {
+        // Use a dedicated axios instance with the tenant token
+        // to avoid issues with the main Api interceptor
+        const tenantToken = localStorage.getItem("tenantToken");
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_URL}/divisionMaster`,
+          {
+            headers: tenantToken
+              ? { Authorization: `Bearer ${tenantToken}` }
+              : {},
+          }
+        );
+        setDivisions(response.data?.data || []);
+      } catch (error) {
+        console.error("Failed to fetch divisions:", error);
+        setDivisions([]);
+      }
+    };
+
+    loadDivisions();
   }, [tenantVerified]);
 
   useEffect(() => {
@@ -78,8 +98,15 @@ export default function TenantLoginPage() {
     setLoading(true);
     try {
       const response = await loginUser(userId, password);
-      const userToStore = { ...response.user, division_code: selectedDivision || response.user?.division_code };
+      const selectedDiv = selectedDivision || response.user?.division_code;
+      const userToStore = { ...response.user, division_code: selectedDiv };
       localStorage.setItem("current_user", JSON.stringify(userToStore));
+
+      // Save division_code to the user table in the backend
+      if (selectedDiv && response.user?.rec_id) {
+        await updateUser(response.user.rec_id, { division_code: selectedDiv });
+      }
+
       showSuccess("Login successful");
       setTimeout(() => navigate(config?.dashboard_url || "/dashboard"), 1000);
     } catch (err) {
@@ -282,11 +309,21 @@ export default function TenantLoginPage() {
                 />
 
                 <FormControl fullWidth size="small">
-                  <InputLabel>Division</InputLabel>
+                  <InputLabel sx={{ fontSize: 13 }}>Division</InputLabel>
                   <Select
                     label="Division"
                     value={selectedDivision}
                     onChange={e => setSelectedDivision(e.target.value)}
+                    sx={{ fontSize: 13 }}
+                    MenuProps={{
+                      slotProps: {
+                        paper: {
+                          sx: {
+                            '& .MuiMenuItem-root': { fontSize: 13 },
+                          },
+                        },
+                      },
+                    }}
                   >
                     <MenuItem value=""><em>None</em></MenuItem>
                     {divisions.map(div => (

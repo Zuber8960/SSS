@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const TOKEN_KEY = 'authToken';
+const TENANT_TOKEN_KEY = 'tenantToken';
 
 const Api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -9,7 +10,7 @@ const Api = axios.create({
 
 // Attach token and company code to every request
 Api.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY) || localStorage.getItem(TENANT_TOKEN_KEY);
   if (token) config.headers.Authorization = `Bearer ${token}`;
   const currentUser = JSON.parse(localStorage.getItem('current_user') || 'null');
   if (currentUser?.company_code) config.headers['x-company-code'] = currentUser.company_code;
