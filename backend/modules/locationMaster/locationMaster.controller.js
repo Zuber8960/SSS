@@ -40,5 +40,12 @@ module.exports = {
         const query = db('sss.ssm_location').where({ record_id: recId });
         if (company_code) query.andWhere({ company_code });
         return query.del();
+    },
+
+    async getTownsByLocationCode(locCode, company_code) {
+        const query = db('sss.ssm_location_town').select('*');
+        if (locCode) query.where({ loc_code: locCode });
+        if (company_code) query.where({ company_code });
+        return query.orderBy('town_name', 'asc');
     }
 };

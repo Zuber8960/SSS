@@ -17,7 +17,7 @@ import {
   createDocket,
   updateDocketByRecId,
 } from "../../utils/docket";
-import { fetchAllLocations } from "../../utils/locationMaster";
+import { fetchAllLocations, fetchLocationTowns } from "../../utils/locationMaster";
 import { fetchBpByBpName } from "../../utils/businessPartner";
 import ChargesSection from "./docket/ChargesSection";
 import EwayBillSection from "./docket/EwayBillSection";
@@ -274,6 +274,7 @@ export default function DocketPage() {
 
   const [form, setForm] = useState(emptyForm);
   const [locations, setLocations] = useState([]);
+  const [townOptions, setTownOptions] = useState({ from: [], to: [] });
 
   const tot_amt = useMemo(
     () =>
@@ -446,6 +447,51 @@ export default function DocketPage() {
     value: loc.loc_code,
   }));
 
+  const townFieldOptions = useMemo(() => ({
+    from: townOptions.from.map((town) => ({
+      label: town.town_name || town.town_code || town.loc_code || town.name,
+      value: town.town_name || town.town_code || town.loc_code || town.name,
+    })),
+    to: townOptions.to.map((town) => ({
+      label: town.town_name || town.town_code || town.loc_code || town.name,
+      value: town.town_name || town.town_code || town.loc_code || town.name,
+    })),
+  }), [townOptions]);
+
+  useEffect(() => {
+    const loadTowns = async () => {
+      if (!form.docket_loc) {
+        setTownOptions((prev) => ({ ...prev, from: [] }));
+        return;
+      }
+      try {
+        const towns = await fetchLocationTowns(form.docket_loc);
+        setTownOptions((prev) => ({ ...prev, from: towns || [] }));
+      } catch (err) {
+        console.error('Failed to load from-town options:', err);
+        setTownOptions((prev) => ({ ...prev, from: [] }));
+      }
+    };
+    loadTowns();
+  }, [form.docket_loc]);
+
+  useEffect(() => {
+    const loadTowns = async () => {
+      if (!form.docket_to_loc) {
+        setTownOptions((prev) => ({ ...prev, to: [] }));
+        return;
+      }
+      try {
+        const towns = await fetchLocationTowns(form.docket_to_loc);
+        setTownOptions((prev) => ({ ...prev, to: towns || [] }));
+      } catch (err) {
+        console.error('Failed to load to-town options:', err);
+        setTownOptions((prev) => ({ ...prev, to: [] }));
+      }
+    };
+    loadTowns();
+  }, [form.docket_to_loc]);
+
   // Pay Location dropdown - only shows From/To locations selected by user
   const payLocOptions = useMemo(() => {
     const opts = [];
@@ -521,6 +567,8 @@ export default function DocketPage() {
         docket_no:      "docket_no",
         docket_to_loc:    "docket_to_loc",
         docket_loc:    "docket_loc",
+        docket_from_town: "docket_pickup_town",
+        docket_to_town: "docket_dly_town",
         transit_type: "docket_transit_type",
         load_type: "docket_load_type",
         pay_type: "docket_pay_type",
@@ -786,6 +834,10 @@ export default function DocketPage() {
         : field;
       if (field.name === "pay_loc") {
         fieldProps = { ...fieldProps, options: payLocOptions };
+      } else if (field.name === "docket_from_town") {
+        fieldProps = { ...fieldProps, options: townFieldOptions.from };
+      } else if (field.name === "docket_to_town") {
+        fieldProps = { ...fieldProps, options: townFieldOptions.to };
       }
       const isNameField = (isCnor || isCnee) && field.name === `${prefix}_name`;
 

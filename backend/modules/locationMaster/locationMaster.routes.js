@@ -59,4 +59,16 @@ router.delete('/:recId', async (req, res) => {
     }
 });
 
+router.get('/towns', async (req, res) => {
+    try {
+        const { loc_code } = req.query;
+        const { tenant_id } = req;
+        const data = await LocationMasterController.getTownsByLocationCode(loc_code, tenant_id);
+        res.status(200).json({ success: true, data });
+    } catch (error) {
+        console.error('Location Town error:', error);
+        res.status(500).json({ success: false, message: 'Error retrieving location towns' });
+    }
+});
+
 module.exports = router;
