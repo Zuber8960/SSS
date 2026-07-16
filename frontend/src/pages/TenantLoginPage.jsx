@@ -111,6 +111,7 @@ export default function TenantLoginPage() {
       if (result.success) { setTenantVerified(true); setConfig(result.config); }
       else showError(result.message || "Invalid tenant credentials");
     } catch (err) {
+      console.log(err);
       showError(err.message || "Invalid credentials");
     } finally { setLoading(false); }
   };
@@ -138,6 +139,7 @@ export default function TenantLoginPage() {
       showSuccess("Login successful");
       setTimeout(() => navigate(config?.dashboard_url || "/dashboard"), 1000);
     } catch (err) {
+      console.log(err);
       showError(err.message || "Invalid credentials");
     } finally { setLoading(false); }
   };
