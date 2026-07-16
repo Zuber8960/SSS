@@ -68,6 +68,6 @@ module.exports = {
             .whereRaw('LOWER(bp_name) LIKE LOWER(?)', [`%${bpName}%`])
             .where({ tenant_id });
         if (locCode) query.whereRaw('loc_code ILIKE ?', [locCode]);
-        return query.first();
+        return query;
     },
 };
