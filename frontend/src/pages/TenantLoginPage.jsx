@@ -9,6 +9,7 @@ import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import axios from "axios";
+import backgroundImage from "../images/tanent-img.png";
 import { fetchAllTenants, tenantLogin } from "../utils/tenantService";
 import { loginUser } from "../utils/authService";
 import { updateUser } from "../utils/userAPI";
@@ -161,6 +162,7 @@ export default function TenantLoginPage() {
 
   return (
     <>
+      <Box sx={{ minHeight: "100vh", backgroundImage: `url(${backgroundImage})`, backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat" }}>
       <Box className="loginContainer" sx={{ display: "flex", minHeight: "85vh" }}>
 
         {/* ── Left promo panel ── */}
@@ -171,12 +173,21 @@ export default function TenantLoginPage() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: gradient,
-            color: "#fff",
-            p: 3,
+            p: "10px 36px",
           }}
         >
-          <Box sx={{ width: "100%", maxWidth: 560 }}>
+          <Paper
+            elevation={3}
+            sx={{
+              width: "100%",
+              maxWidth: 560,
+              p: 4,
+              borderRadius: 3,
+              background: gradient,
+              color: "#fff",
+            }}
+          >
+          <Box sx={{ width: "100%" }}>
             {config?.logo_url && (
               <Box display="flex" justifyContent="center" mb={2}>
                 <Box
@@ -209,6 +220,7 @@ export default function TenantLoginPage() {
               ))}
             </Stack>
           </Box>
+          </Paper>
         </Box>
 
         {/* ── Right login panel ── */}
@@ -269,14 +281,16 @@ export default function TenantLoginPage() {
                   type={showTenantPwd ? "text" : "password"}
                   value={tenantPassword}
                   onChange={e => setTenantPassword(e.target.value)}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton size="small" onClick={() => setShowTenantPwd(s => !s)}>
-                          {showTenantPwd ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton size="small" onClick={() => setShowTenantPwd(s => !s)}>
+                            {showTenantPwd ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    },
                   }}
                 />
 
@@ -324,14 +338,16 @@ export default function TenantLoginPage() {
                   type={showPwd ? "text" : "password"}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton size="small" onClick={() => setShowPwd(s => !s)}>
-                          {showPwd ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton size="small" onClick={() => setShowPwd(s => !s)}>
+                            {showPwd ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    },
                   }}
                 />
 
@@ -411,6 +427,7 @@ export default function TenantLoginPage() {
       </Box>
 
       <Footer />
+      </Box>
       <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
     </>
   );
