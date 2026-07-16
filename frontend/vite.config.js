@@ -7,7 +7,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
-      port: parseInt(env.VITE_APP_PORT)
+      port: parseInt(env.VITE_APP_PORT),
+      allowedHosts: ['saralsamadhan.in']
     }
   }
 })
