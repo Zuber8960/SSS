@@ -17,6 +17,7 @@ import {
   deleteBusinessPartner as deleteBusinessPartnerApi,
 } from "../../utils/businessPartner";
 import { fetchAllDivisionsApi } from "../../utils/divisionMaster";
+import { fetchAllLocations } from "../../utils/locationMaster";
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 
@@ -46,6 +47,10 @@ const emptyForm = {
   bp_registration_no: "",
   bp_tan_no: "",
   bp_deals_with: "",
+  bp_addres: "",
+  bp_pincode: "",
+  bp_gstin: "",
+  loc_code: "",
   // KYC
   bp_ind_id_type_1: "", bp_ind_id_no_1: "",
   bp_ind_id_type_2: "", bp_ind_id_no_2: "",
@@ -112,6 +117,7 @@ export default function BusinessPartnerPage() {
   const [partners, setPartners] = useState([]);
   const [bpTypes, setBpTypes] = useState([]);
   const [divisions, setDivisions] = useState([]);
+  const [locations, setLocations] = useState([]);
   const { dialog, closeAlert, showSuccess, showError, showWarning } = useAlert();
   const [searchText, setSearchText] = useState("");
   const [form, setForm] = useState(emptyForm);
@@ -255,17 +261,24 @@ export default function BusinessPartnerPage() {
     label: `${div.division_code} - ${div.division_name}`,
   }));
 
+  const locationOptions = locations.map((loc) => ({
+    value: loc.loc_code,
+    label: `${loc.loc_code} - ${loc.loc_name}`,
+  }));
+
   useEffect(() => {
     (async () => {
       try {
-        const [partnerData, typeData, divisionData] = await Promise.all([
+        const [partnerData, typeData, divisionData, locationData] = await Promise.all([
           fetchAllBusinessPartners(),
           fetchBpTypes(),
           fetchAllDivisionsApi(),
+          fetchAllLocations(),
         ]);
         setPartners(partnerData);
         setBpTypes(typeData);
         setDivisions(divisionData);
+        setLocations(locationData);
       } catch (err) {
         showError(err.message || "Failed to load data");
         console.error("Load error:", err);
@@ -299,6 +312,10 @@ export default function BusinessPartnerPage() {
           <FormField label="TAN No" name="bp_tan_no" form={form} setForm={setFormTracked} />
           <SelectField label="Deals With" name="bp_deals_with" value={form.bp_deals_with} onChange={setField}
             options={["Service", "Item", "Both"]} />
+          <FormField label="Address" name="bp_addres" form={form} setForm={setFormTracked} />
+          <FormField label="Pincode" name="bp_pincode" form={form} setForm={setFormTracked} />
+          <FormField label="GSTIN" name="bp_gstin" form={form} setForm={setFormTracked} />
+          <FormField label="Location" name="loc_code" form={form} setForm={setFormTracked} options={locationOptions} />
         </FormPanel>
 
         {/* KYC */}

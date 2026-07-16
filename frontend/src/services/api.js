@@ -21,9 +21,10 @@ Api.interceptors.response.use(
   (response) => response,
   (error) => {
     const isLoginRequest = error.config?.url?.includes('/login');
-    if (error.response?.status === 401 && !isLoginRequest) {
+    const isOnLoginPage = window.location.pathname.includes('/login') || window.location.pathname === '/';
+    if (error.response?.status === 401 && !isLoginRequest && !isOnLoginPage) {
       localStorage.removeItem(TOKEN_KEY);
-      window.location.href = '/login';
+      window.location.href = '/';
     }
     const message = error.response?.data?.message || error.message;
     return Promise.reject(new Error(message));

@@ -6,3 +6,5 @@ export const fetchBpTypes              = ()               => Api.get('/businessP
 export const saveBusinessPartner       = (payload)        => Api.post('/businessPartner', payload).then(r => r.data.data || []);
 export const updateBusinessPartner     = (recId, payload) => Api.put(`/businessPartner/${encodeURIComponent(recId)}`, payload).then(r => r.data.data);
 export const deleteBusinessPartner     = (recId)          => Api.delete(`/businessPartner/${encodeURIComponent(recId)}`).then(r => r.data);
+export const fetchBpByPanName          = (panName)        => Api.get(`/businessPartner/byPanName/${encodeURIComponent(panName)}`).then(r => r.data.data);
+export const fetchBpByBpName           = (bpName, locCode) => Api.get(`/businessPartner/byBpName/${encodeURIComponent(bpName)}${locCode ? `?loc_code=${encodeURIComponent(locCode)}` : ''}`).then(r => r.data.data);

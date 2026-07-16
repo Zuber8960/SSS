@@ -30,7 +30,7 @@ module.exports = {
         return db('sss.ssm_business_partner').insert(record).returning('*');
     },
 
-    async updateBusinessPartnerData(recId, payload) {
+    async updateBusinessPartnerData({recId, tenant_id}, payload) {
         delete payload.record_id;
         delete payload.company_code;
         const DATE_FIELDS = ['bp_closed_on', 'bp_ind_doc_1_from', 'bp_ind_doc_1_to', 'bp_ind_doc_2_from', 'bp_ind_doc_2_to'];
@@ -40,7 +40,7 @@ module.exports = {
             }
         }
         const updates = { ...payload, record_updated_on: new Date() };
-        return db('sss.ssm_business_partner').where({ record_id: recId }).update(updates).returning('*');
+        return db('sss.ssm_business_partner').where({ record_id: recId, tenant_id }).update(updates).returning('*');
     },
 
     async deleteBusinessPartnerData(recId) {
@@ -52,5 +52,22 @@ module.exports = {
             .select('rec_id', 'rec_name')
             .where({ is_active: true })
             .orderBy('rec_name');
+    },
+
+    async getBusinessPartnerByPanName(panName, tenant_id) {
+        return db('sss.ssm_business_partner')
+            .select('bp_name', 'bp_addres', 'bp_pincode', 'bp_gstin')
+            .whereRaw('LOWER(bp_pan_name) = LOWER(?)', [panName])
+            .where({ tenant_id })
+            .first();
+    },
+
+    async getBusinessPartnerByBpName(bpName, locCode, tenant_id) {
+        const query = db('sss.ssm_business_partner')
+            .select('bp_name', 'bp_addres', 'bp_pincode', 'bp_gstin')
+            .whereRaw('LOWER(bp_name) = LOWER(?)', [bpName])
+            .where({ tenant_id });
+        if (locCode) query.whereRaw('loc_code ILIKE ?', [locCode]);
+        return query.first();
     },
 };

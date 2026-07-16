@@ -18,6 +18,7 @@ import {
   updateDocketByRecId,
 } from "../../utils/docket";
 import { fetchAllLocations } from "../../utils/locationMaster";
+import { fetchBpByBpName } from "../../utils/businessPartner";
 import ChargesSection from "./docket/ChargesSection";
 import EwayBillSection from "./docket/EwayBillSection";
 
@@ -255,6 +256,31 @@ export default function DocketPage() {
   const [ewbNoDisplay, setEwbNoDisplay] = useState("");
   const { isLoading, showLoading, hideLoading, withLoading } = useLoading();
   const [dirtyFields, setDirtyFields] = useState(new Set());
+  const lookupBpByName = async (bpName, prefix) => {
+    if (!bpName.trim()) return;
+    // docket_to_loc filters consignor (cnee), docket_loc filters consignee (cnor)
+    const locCode = prefix === "cnee" ? form.docket_to_loc : form.docket_loc;
+    try {
+      const bp = await fetchBpByBpName(bpName.trim(), locCode || null);
+      if (bp) {
+        setForm((prev) => ({
+          ...prev,
+          [`${prefix}_address`]: bp.bp_addres  || prev[`${prefix}_address`],
+          [`${prefix}_pincode`]: bp.bp_pincode || prev[`${prefix}_pincode`],
+          [`${prefix}_gstin`]:   bp.bp_gstin   || prev[`${prefix}_gstin`],
+        }));
+        setDirtyFields((prev) => {
+          const s = new Set(prev);
+          [`${prefix}_address`, `${prefix}_pincode`, `${prefix}_gstin`].forEach((k) => s.add(k));
+          return s;
+        });
+      } else {
+        showError("No business partner found for this name");
+      }
+    } catch {
+      showError("No business partner found for this name");
+    }
+  };
 
   // Build location dropdown options
   const locationOptions = locations.map((loc) => ({
@@ -562,6 +588,10 @@ export default function DocketPage() {
 
     if (filteredFields.length === 0) return null;
 
+    const isCnor = section.title === "Consignor Details";
+    const isCnee = section.title === "Consignee Details";
+    const prefix = isCnor ? "cnor" : "cnee";
+
     return (
       <div key={section.title} style={{ ...sectionCardStyles.sectionCard, gridColumn: section.half ? undefined : "1 / -1" }}>
         <div style={sectionCardStyles.sectionHeader}>
@@ -577,10 +607,10 @@ export default function DocketPage() {
         }}>
           {filteredFields.map((field) => {
             const isTextarea = field.type === "textarea";
-            // Inject location options for location fields
             const fieldProps = field.isLocation
               ? { ...field, options: locationOptions }
               : field;
+            const isNameField = (isCnor || isCnee) && field.name === `${prefix}_name`;
             return (
               <div
                 key={field.name}
@@ -597,6 +627,7 @@ export default function DocketPage() {
                     !isFormEditMode ||
                     (["docket_no"].includes(field.name) && !isDocketNoEnabled)
                   }
+                  onBlur={isNameField ? () => lookupBpByName(form[`${prefix}_name`], prefix) : undefined}
                 />
               </div>
             );

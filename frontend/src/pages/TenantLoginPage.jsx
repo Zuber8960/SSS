@@ -3,11 +3,13 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   Box, Stack, Typography, TextField, Button,
   Paper, CircularProgress, InputAdornment, IconButton,
+  FormControl, InputLabel, Select, MenuItem,
 } from "@mui/material";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { fetchAllTenants, tenantLogin } from "../utils/tenantService";
+import { fetchAllDivisionsApi } from "../utils/divisionMaster";
 import { loginUser } from "../utils/authService";
 import CommonAlertDialog from "../components/common/CommonAlertDialog";
 import useAlert from "../components/common/UseAlert";
@@ -32,6 +34,15 @@ export default function TenantLoginPage() {
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [divisions, setDivisions] = useState([]);
+  const [selectedDivision, setSelectedDivision] = useState("");
+
+  useEffect(() => {
+    if (!tenantVerified) return;
+    fetchAllDivisionsApi()
+      .then(setDivisions)
+      .catch(() => {});
+  }, [tenantVerified]);
 
   useEffect(() => {
     if (routeState?.config) return; // already received from MasterPortal
@@ -67,7 +78,8 @@ export default function TenantLoginPage() {
     setLoading(true);
     try {
       const response = await loginUser(userId, password);
-      localStorage.setItem("current_user", JSON.stringify(response.user));
+      const userToStore = { ...response.user, division_code: selectedDivision || response.user?.division_code };
+      localStorage.setItem("current_user", JSON.stringify(userToStore));
       showSuccess("Login successful");
       setTimeout(() => navigate(config?.dashboard_url || "/dashboard"), 1000);
     } catch (err) {
@@ -268,6 +280,22 @@ export default function TenantLoginPage() {
                     ),
                   }}
                 />
+
+                <FormControl fullWidth size="small">
+                  <InputLabel>Division</InputLabel>
+                  <Select
+                    label="Division"
+                    value={selectedDivision}
+                    onChange={e => setSelectedDivision(e.target.value)}
+                  >
+                    <MenuItem value=""><em>None</em></MenuItem>
+                    {divisions.map(div => (
+                      <MenuItem key={div.division_code} value={div.division_code}>
+                        {div.division_code} - {div.division_name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
 
                 <Button
                   variant="contained"
