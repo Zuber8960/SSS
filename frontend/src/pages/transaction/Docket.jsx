@@ -265,13 +265,14 @@ export default function DocketPage() {
       if (bp) {
         setForm((prev) => ({
           ...prev,
+          [`${prefix}_name`]:    bp.bp_name    || prev[`${prefix}_name`],
           [`${prefix}_address`]: bp.bp_addres  || prev[`${prefix}_address`],
           [`${prefix}_pincode`]: bp.bp_pincode || prev[`${prefix}_pincode`],
           [`${prefix}_gstin`]:   bp.bp_gstin   || prev[`${prefix}_gstin`],
         }));
         setDirtyFields((prev) => {
           const s = new Set(prev);
-          [`${prefix}_address`, `${prefix}_pincode`, `${prefix}_gstin`].forEach((k) => s.add(k));
+          [`${prefix}_name`, `${prefix}_address`, `${prefix}_pincode`, `${prefix}_gstin`].forEach((k) => s.add(k));
           return s;
         });
       } else {
