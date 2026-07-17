@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import MainLayout from "../../layouts/MainLayout";
-import moment from "moment";
 import { IconButton, Tooltip } from "@mui/material";
 import { NoteAddIcon, SaveIcon, ResetIcon, ViewIcon, AddRowIcon, DeleteIcon } from "../../components/common/icons";
 
@@ -20,10 +19,8 @@ import vocherimage from "../../images/loogo.PNG";
 
 import {
   createHireVoucher,
-  fetchHireVoucherByNo,
   fetchHireVoucherByVhvNo,
   updateHireVoucher,
-  fetchNextHireVoucherNo,
 } from "../../utils/hireVoucher";
 
 import { fetchManifestByNo } from "../../utils/manifest";
@@ -75,9 +72,6 @@ const sectionCardStyles = {
 
 // ------------------- HEADER FIELDS -------------------
 const headerFields = [
-  { label: "HV No", name: "hv_no" },
-  { label: "HV Date", name: "hv_date", type: "date" },
-
   // Vehicle Hire Voucher
   { label: "VHV No", name: "vhv_no" },
   { label: "Date", name: "vhv_date", type: "date" },
@@ -106,16 +100,15 @@ const formSections = [
   },
 ];
 
-// ------------------- DETAIL TABLE COLUMNS (Existing Vouchers) -------------------
+// ------------------- DETAIL TABLE COLUMNS (sst_vha_dtl - Manifest Docket Data) -------------------
 const detailColumns = [
-  { key: "vhv_no", label: "VHV No" },
-  { key: "date", label: "Date", type: "date" },
-  { key: "loc", label: "Loc" },
-  { key: "to", label: "To" },
-  { key: "city", label: "City" },
-  { key: "veh", label: "Veh" },
-  { key: "order", label: "Order" },
-  { key: "pickup", label: "Pickup" },
+  { key: "mnf_loc", label: "Mnf Loc" },
+  { key: "mnf_no", label: "Mnf No" },
+  { key: "mnf_date", label: "Mnf Date" },
+  { key: "mnf_act_weight", label: "Act Weight", type: "number" },
+  { key: "mnf_chrg_weight", label: "Chrg Weight", type: "number" },
+  { key: "mnf_pkgs_no", label: "Pkgs", type: "number" },
+  { key: "mnf_cns_no", label: "Cns No", type: "number" },
 ];
 
 // ------------------- MANIFEST DETAILS TABLE COLUMNS -------------------
@@ -129,14 +122,6 @@ const manifestColumns = [
 ];
 
 const emptyForm = {
-  hv_no: "",
-  hv_date: "",
-  from_loc: "",
-  to_loc: "",
-  lorry_hire_rate: "",
-  total_km: "",
-  total_amt: "",
-  remarks: "",
   vhv_no: "",
   vhv_date: "",
   vhv_loc: "",
@@ -241,40 +226,19 @@ export default function HireVoucherPage() {
 
   // Store original composite key for updates
   const originalKey = useRef(null);
-  const hasFetchedNextNo = useRef(false);
 
-
-  // ------------------- AUTO-FETCH NEXT HV NO ON CREATE -------------------
-  useEffect(() => {
-    if (mode === "create" && !hasFetchedNextNo.current) {
-      hasFetchedNextNo.current = true;
-      (async () => {
-        try {
-          const result = await fetchNextHireVoucherNo();
-          const nextNo = result?.next_no || result?.hv_no || "";
-          if (nextNo) {
-            setForm((prev) => ({ ...prev, hv_no: String(nextNo) }));
-          }
-        } catch (err) {
-          console.warn("Failed to fetch next HV no:", err);
-        }
-      })();
-    }
-  }, [mode]);
-
-  // ------------------- DETAIL ROW HANDLERS (Existing Vouchers) -------------------
+  // ------------------- DETAIL ROW HANDLERS (sst_vha_dtl) -------------------
   const addRow = () => {
     setDetails([
       ...details,
       {
-        vhv_no: "",
-        date: moment().format("YYYY-MM-DD"),
-        loc: "",
-        to: "",
-        city: "",
-        veh: "",
-        order: "",
-        pickup: "",
+        mnf_loc: "",
+        mnf_no: "",
+        mnf_date: "",
+        mnf_act_weight: "",
+        mnf_chrg_weight: "",
+        mnf_pkgs_no: "",
+        mnf_cns_no: "",
       },
     ]);
   };
@@ -330,23 +294,46 @@ export default function HireVoucherPage() {
           setManifestCache((prev) => ({ ...prev, [manifestNo]: manifestData }));
         }
       }
-      if (manifestData && manifestData.header) {
-        const hdr = manifestData.header;
-        setManifestDetails((prev) => {
-          const upd = [...prev];
-          if (upd[index]) {
-            upd[index] = {
-              ...upd[index],
-              manifest_date: hdr.mnf_date ? hdr.mnf_date.substring(0, 10) : "",
-              from_loc: hdr.mnf_loc || "",
-              to_loc: hdr.mnf_to_loc || "",
-              vehicle_no: hdr.desp_veh_no || "",
-              driver_name: hdr.loaded_by || "",
-            };
-          }
-          return upd;
-        });
+      if (!manifestData || !manifestData.header) {
+        showError("Manifest not found");
+        return;
       }
+      const hdr = manifestData.header;
+      setManifestDetails((prev) => {
+        const upd = [...prev];
+        if (upd[index]) {
+          upd[index] = {
+            ...upd[index],
+            manifest_date: hdr.mnf_date ? hdr.mnf_date.substring(0, 10) : "",
+            from_loc: hdr.mnf_loc || "",
+            to_loc: hdr.mnf_to_loc || "",
+            vehicle_no: hdr.desp_veh_no || "",
+            driver_name: hdr.loaded_by || "",
+          };
+        }
+        return upd;
+      });
+
+        // Populate a single aggregated row from all manifest docket rows
+        const dtls = manifestData.details || [];
+        if (dtls.length > 0) {
+          const totalActWeight = dtls.reduce((sum, dtl) => sum + (parseFloat(dtl?.dwb_actual_wt) || 0), 0);
+          const totalChrgWeight = dtls.reduce((sum, dtl) => sum + (parseFloat(dtl?.dwb_charged_wt) || 0), 0);
+          const totalPkgs = dtls.reduce((sum, dtl) => sum + (parseFloat(dtl?.dwb_pkgs) || 0), 0);
+          const totalCnsNo = dtls.reduce((sum, dtl) => sum + (parseFloat(dtl?.dwb_no) || 0), 0);
+          setDetails((prev) => [
+            ...prev,
+            {
+              mnf_loc: hdr.mnf_loc || "",
+              mnf_no: hdr.mnf_no || "",
+              mnf_date: hdr.mnf_date ? hdr.mnf_date.substring(0, 10) : "",
+              mnf_act_weight: totalActWeight || "",
+              mnf_chrg_weight: totalChrgWeight || "",
+              mnf_pkgs_no: totalPkgs || "",
+              mnf_cns_no: totalCnsNo || "",
+            },
+          ]);
+        }
     } catch (err) {
       showError(err.message || "Failed to fetch manifest details");
       console.error("Fetch manifest error:", err);
@@ -364,116 +351,61 @@ export default function HireVoucherPage() {
 
   // ------------------- MAP HELPERS -------------------
   const mapFormToHeader = () => ({
-    hv_no: form.hv_no,
-    hv_date: form.hv_date || null,
-    from_loc: form.from_loc,
-    to_loc: form.to_loc,
-    lorry_hire_rate: parseFloat(form.lorry_hire_rate) || 0,
-    total_km: parseFloat(form.total_km) || 0,
-    total_amt: parseFloat(form.total_amt) || 0,
-    remarks: form.remarks || "",
-    vhv_no: form.vhv_no,
-    vhv_date: form.vhv_date || null,
-    vhv_loc: form.vhv_loc,
-    vhv_to_loc: form.vhv_to_loc,
-    vhv_state: form.vhv_state,
-    vhv_city: form.vhv_city,
-    vhv_town: form.vhv_town,
-    vhv_pin: form.vhv_pin,
-    via1: form.via1,
-    via2: form.via2,
-    via3: form.via3,
-    via4: form.via4,
-    via5: form.via5,
-    via6: form.via6,
+    vha_no: form.vhv_no,
+    vha_date: form.vhv_date || null,
+    vha_loc: form.vhv_loc,
+    vha_to_loc: form.vhv_to_loc,
+    vha_to_loc_state: form.vhv_state,
+    vha_to_loc_city: form.vhv_city,
+    vha_to_loc_town: form.vhv_town,
+    vha_to_loc_pincode: form.vhv_pin,
+    vha_via_loc_1: form.via1,
+    vha_via_loc_2: form.via2,
+    vha_via_loc_3: form.via3,
+    vha_via_loc_4: form.via4,
+    vha_via_loc_5: form.via5,
+    vha_via_loc_6: form.via6,
   });
 
   const mapDetailsToDb = () =>
     details
-      .filter((row) => row.vhv_no)
+      .filter((row) => row.mnf_cns_no)
       .map((row) => ({
-        vhv_no: row.vhv_no,
-        date: row.date || null,
-        loc: row.loc,
-        to: row.to,
-        city: row.city,
-        veh: row.veh,
-        order: row.order,
-        pickup: row.pickup,
+        mnf_loc: row.mnf_loc || "",
+        mnf_no: row.mnf_no || "",
+        mnf_date: row.mnf_date || null,
+        mnf_act_weight: parseFloat(row.mnf_act_weight) || 0,
+        mnf_chrg_weight: parseFloat(row.mnf_chrg_weight) || 0,
+        mnf_pkgs_no: parseFloat(row.mnf_pkgs_no) || 0,
+        mnf_cns_no: row.mnf_cns_no || "",
       }));
 
   const mapHeaderToForm = (hdr) => ({
-    hv_no: hdr.hv_no || "",
-    hv_date: hdr.hv_date ? hdr.hv_date.substring(0, 10) : "",
-    from_loc: hdr.from_loc || "",
-    to_loc: hdr.to_loc || "",
-    lorry_hire_rate: hdr.lorry_hire_rate ?? "",
-    total_km: hdr.total_km ?? "",
-    total_amt: hdr.total_amt ?? "",
-    remarks: hdr.remarks || "",
-    vhv_no: hdr.vhv_no || "",
-    vhv_date: hdr.vhv_date ? hdr.vhv_date.substring(0, 10) : "",
-    vhv_loc: hdr.vhv_loc || "",
-    vhv_to_loc: hdr.vhv_to_loc || "",
-    vhv_state: hdr.vhv_state || "",
-    vhv_city: hdr.vhv_city || "",
-    vhv_town: hdr.vhv_town || "",
-    vhv_pin: hdr.vhv_pin || "",
-    via1: hdr.via1 || "",
-    via2: hdr.via2 || "",
-    via3: hdr.via3 || "",
-    via4: hdr.via4 || "",
-    via5: hdr.via5 || "",
-    via6: hdr.via6 || "",
+    vhv_no: hdr.vha_no || "",
+    vhv_date: hdr.vha_date ? hdr.vha_date.substring(0, 10) : "",
+    vhv_loc: hdr.vha_loc || "",
+    vhv_to_loc: hdr.vha_to_loc || "",
+    vhv_state: hdr.vha_to_loc_state || "",
+    vhv_city: hdr.vha_to_loc_city || "",
+    vhv_town: hdr.vha_to_loc_town || "",
+    vhv_pin: hdr.vha_to_loc_pincode || "",
+    via1: hdr.vha_via_loc_1 || "", 
+    via2: hdr.vha_via_loc_2 || "",
+    via3: hdr.vha_via_loc_3 || "",
+    via4: hdr.vha_via_loc_4 || "",
+    via5: hdr.vha_via_loc_5 || "",
+    via6: hdr.vha_via_loc_6 || "",
   });
 
   const mapDetailToForm = (dtl) => ({
-    vhv_no: dtl.vhv_no || "",
-    date: dtl.date ? dtl.date.substring(0, 10) : "",
-    loc: dtl.loc || "",
-    to: dtl.to || "",
-    city: dtl.city || "",
-    veh: dtl.veh || "",
-    order: dtl.order || "",
-    pickup: dtl.pickup || "",
+    mnf_loc: dtl.mnf_loc || "",
+    mnf_no: dtl.mnf_no || "",
+    mnf_date: dtl.mnf_date ? dtl.mnf_date.substring(0, 10) : "",
+    mnf_act_weight: dtl.mnf_act_weight ?? "",
+    mnf_chrg_weight: dtl.mnf_chrg_weight ?? "",
+    mnf_pkgs_no: dtl.mnf_pkgs_no ?? "",
+    mnf_cns_no: dtl.mnf_cns_no || "",
   });
-
-  // ------------------- FETCH & LOAD BY HV NO -------------------
-  const fetchAndLoadHireVoucher = async (hvNo) => {
-    try {
-      showLoading();
-      const data = await fetchHireVoucherByNo(hvNo);
-
-      if (!data || !data.header) {
-        showError("Hire Voucher not found");
-        return false;
-      }
-
-      const hdr = data.header;
-      const dtls = data.details || [];
-
-      setForm(mapHeaderToForm(hdr));
-      setDetails(dtls.map(mapDetailToForm));
-
-      originalKey.current = {
-        hv_no: hdr.hv_no,
-        hv_loc: hdr.from_loc,
-        hv_date: hdr.hv_date,
-      };
-
-      setMode("edit");
-      setSearchMode(false);
-      showInfo("Hire Voucher loaded successfully");
-      return true;
-    } catch (err) {
-      handleClear();
-      showError(err.message || "Failed to fetch hire voucher");
-      console.error("Fetch hire voucher error:", err);
-      return false;
-    } finally {
-      hideLoading();
-    }
-  };
 
   // ------------------- FETCH & LOAD BY VHV NO (for edit/view) -------------------
   const fetchAndLoadByVhvNo = async (vhvNo) => {
@@ -497,10 +429,30 @@ export default function HireVoucherPage() {
       setForm(mapHeaderToForm(hdr));
       setDetails(dtls.map(mapDetailToForm));
 
+      // Populate manifest details from saved detail rows
+      if (dtls.length > 0) {
+        const uniqueManifests = [];
+        const seen = new Set();
+        dtls.forEach((dtl) => {
+          const mnfNo = dtl.mnf_no || "";
+          if (mnfNo && !seen.has(mnfNo)) {
+            seen.add(mnfNo);
+            uniqueManifests.push({
+              manifest_no: mnfNo,
+              manifest_date: dtl.mnf_date ? dtl.mnf_date.substring(0, 10) : "",
+              from_loc: dtl.mnf_loc || "",
+              to_loc: "",
+              vehicle_no: "",
+              driver_name: "",
+            });
+          }
+        });
+        setManifestDetails(uniqueManifests);
+      }
+
       originalKey.current = {
-        hv_no: hdr.hv_no,
-        hv_loc: hdr.from_loc,
-        hv_date: hdr.hv_date,
+        hv_loc: hdr.vha_loc || hdr.from_loc || "",
+        hv_date: hdr.vha_date || hdr.hv_date || "",
       };
 
       setMode("edit");
@@ -529,7 +481,6 @@ export default function HireVoucherPage() {
     originalKey.current = null;
     setMode("create");
     setSearchMode(false);
-    hasFetchedNextNo.current = false;
     showInfo("New hire voucher form ready");
   };
 
@@ -540,15 +491,6 @@ export default function HireVoucherPage() {
       showInfo("Type the VHV No and press Enter or leave the field to search");
       return;
     }
-
-    // const vhvNo = (form.vhv_no || "").trim();
-
-    // if (!vhvNo) {
-    //   showError("Please enter a VHV No to search");
-    //   return;
-    // }
-
-    // await fetchAndLoadByVhvNo(vhvNo);
   };
 
   const handleVhvNoSearch = async (vhvNo) => {
@@ -584,13 +526,14 @@ export default function HireVoucherPage() {
     originalKey.current = null;
     setMode("create");
     setSearchMode(false);
-    hasFetchedNextNo.current = false;
     showInfo("Form cleared");
   };
 
   const handleSave = async () => {
-    if (!form.hv_date) {
-      showError("HV Date is required");
+    // Require at least one manifest detail row with a manifest number
+    const hasManifest = manifestDetails.some((row) => row.manifest_no && row.manifest_no.trim() !== "");
+    if (!hasManifest) {
+      showError("Please add at least one Manifest before saving");
       return;
     }
 
@@ -603,12 +546,9 @@ export default function HireVoucherPage() {
       if (mode === "create") {
         const response = await createHireVoucher(header, detailRows);
         if (response.success) {
-          const newHvNo = response.data?.hv_no;
-          showSuccess(`Hire Voucher #${form.hv_no} saved successfully`);
+          showSuccess("Hire Voucher saved successfully");
 
-          setForm((prev) => ({ ...prev, hv_no: newHvNo }));
           originalKey.current = {
-            hv_no: newHvNo || form.hv_no,
             hv_loc: header.from_loc,
             hv_date: header.hv_date,
           };
@@ -621,9 +561,9 @@ export default function HireVoucherPage() {
           showError("No hire voucher key found for update");
           return;
         }
-        const { hv_no, hv_loc, hv_date } = originalKey.current;
+        const { hv_loc, hv_date } = originalKey.current;
         const response = await updateHireVoucher(
-          hv_no,
+          "",
           hv_loc,
           hv_date,
           header,
@@ -689,7 +629,6 @@ export default function HireVoucherPage() {
                   form={form}
                   setForm={setForm}
                   disabled={
-                    (field.name === "hv_no" && mode === "create") ||
                     (field.name === "vhv_no" && mode === "create" && !searchMode)
                   }
                   onKeyDown={field.name === "vhv_no" ? handleVhvNoKeyDown : undefined}

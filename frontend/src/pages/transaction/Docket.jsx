@@ -26,11 +26,15 @@ import EwayBillSection from "./docket/EwayBillSection";
 const headerFields = [
   { label: "Cnor Name", name: "cnor_name" },
   { label: "Cnor Address", name: "cnor_address" },
+  { label: "Cnor City", name: "cnor_city" },
+  { label: "Cnor State", name: "cnor_state" },
   { label: "Cnor Pincode", name: "cnor_pincode" },
   { label: "Cnor GSTIN", name: "cnor_gstin" },
 
   { label: "Cnsee Name", name: "cnee_name" },
   { label: "Cnsee Address", name: "cnee_address" },
+  { label: "Cnsee City", name: "cnee_city" },
+  { label: "Cnsee State", name: "cnee_state" },
   { label: "Cnsee Pincode", name: "cnee_pincode" },
   { label: "Cnsee GSTIN", name: "cnee_gstin" },
 
@@ -138,14 +142,14 @@ const formSections = [
   {
     title: "Consignor Details",
     icon: SECTION_ICONS.consignor,
-    fields: ["cnor_name", "cnor_address", "cnor_pincode", "cnor_gstin"],
+    fields: ["cnor_name", "cnor_address", "cnor_city", "cnor_state", "cnor_pincode", "cnor_gstin"],
     half: true,
     columns: 2,
   },
   {
     title: "Consignee Details",
     icon: SECTION_ICONS.consignee,
-    fields: ["cnee_name", "cnee_address", "cnee_pincode", "cnee_gstin"],
+    fields: ["cnee_name", "cnee_address", "cnee_city", "cnee_state", "cnee_pincode", "cnee_gstin"],
     half: true,
     columns: 2,
   },
@@ -216,10 +220,14 @@ const emptyForm = {
   docket_to_loc: "",
   cnor_name: "",
   cnor_address: "",
+  cnor_city: "",
+  cnor_state: "",
   cnor_pincode: "",
   cnor_gstin: "",
   cnee_name: "",
   cnee_address: "",
+  cnee_city: "",
+  cnee_state: "",
   cnee_pincode: "",
   cnee_gstin: "",
   transit_type: "",
@@ -316,12 +324,16 @@ export default function DocketPage() {
     if (form.docket_loc !== prev.docket_loc) {
       updates.cnor_name = "";
       updates.cnor_address = "";
+      updates.cnor_city = "";
+      updates.cnor_state = "";
       updates.cnor_pincode = "";
       updates.cnor_gstin = "";
     }
     if (form.docket_to_loc !== prev.docket_to_loc) {
       updates.cnee_name = "";
       updates.cnee_address = "";
+      updates.cnee_city = "";
+      updates.cnee_state = "";
       updates.cnee_pincode = "";
       updates.cnee_gstin = "";
     }
@@ -383,6 +395,8 @@ export default function DocketPage() {
       ...prev,
       [`${prefix}_name`]: bp.bp_name || prev[`${prefix}_name`],
       [`${prefix}_address`]: bp.bp_addres || prev[`${prefix}_address`],
+      [`${prefix}_city`]: bp.bp_city || prev[`${prefix}_city`],
+      [`${prefix}_state`]: bp.bp_state || prev[`${prefix}_state`],
       [`${prefix}_pincode`]: bp.bp_pincode || prev[`${prefix}_pincode`],
       [`${prefix}_gstin`]: bp.bp_gstin || prev[`${prefix}_gstin`],
     }));
@@ -414,12 +428,14 @@ export default function DocketPage() {
           ...prev,
           [`${prefix}_name`]: bp.bp_name || prev[`${prefix}_name`],
           [`${prefix}_address`]: bp.bp_addres || prev[`${prefix}_address`],
+          [`${prefix}_city`]: bp.bp_city || prev[`${prefix}_city`],
+          [`${prefix}_state`]: bp.bp_state || prev[`${prefix}_state`],
           [`${prefix}_pincode`]: bp.bp_pincode || prev[`${prefix}_pincode`],
           [`${prefix}_gstin`]: bp.bp_gstin || prev[`${prefix}_gstin`],
         }));
         setDirtyFields((prev) => {
           const s = new Set(prev);
-          [`${prefix}_name`, `${prefix}_address`, `${prefix}_pincode`, `${prefix}_gstin`].forEach((k) => s.add(k));
+          [`${prefix}_name`, `${prefix}_address`, `${prefix}_city`, `${prefix}_state`, `${prefix}_pincode`, `${prefix}_gstin`].forEach((k) => s.add(k));
           return s;
         });
       } else {
@@ -572,10 +588,14 @@ export default function DocketPage() {
         cc: "docket_cc",
         cnor_name:        "docket_cnor_name",
         cnor_address:     "cnor_address",
+        cnor_city:        "cnor_city",
+        cnor_state:       "cnor_state",
         cnor_pincode:     "cnor_pincode",
         cnor_gstin:       "cnor_gstin",
         cnee_name:        "docket_cnee_name",
         cnee_address:     "cnee_address",
+        cnee_city:        "cnee_city",
+        cnee_state:       "cnee_state",
         cnee_pincode:     "cnee_pincode",
         cnee_gstin:       "cnee_gstin",
         act_wt:           "docket_act_wt",
@@ -674,10 +694,14 @@ export default function DocketPage() {
             docket_to_loc:       docketData.docket_to_loc       || "",
             cnor_name:           docketData.docket_cnor_name    || "",
             cnor_address:        docketData.cnor_address        || "",
+            cnor_city:           docketData.cnor_city           || "",
+            cnor_state:          docketData.cnor_state          || "",
             cnor_pincode:        docketData.cnor_pincode        || "",
             cnor_gstin:          docketData.cnor_gstin          || "",
             cnee_name:           docketData.docket_cnee_name    || "",
             cnee_address:        docketData.cnee_address        || "",
+            cnee_city:           docketData.cnee_city           || "",
+            cnee_state:          docketData.cnee_state          || "",
             cnee_pincode:        docketData.cnee_pincode        || "",
             cnee_gstin:          docketData.cnee_gstin          || "",
             transit_type: docketData.docket_transit_type || "",

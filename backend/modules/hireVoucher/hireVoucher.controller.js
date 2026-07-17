@@ -11,25 +11,25 @@ const getAllHireVouchers = async () => {
 
 /* ================= GET HIRE VOUCHER BY KEY (composite) ================= */
 
-const getHireVoucherByKey = async ({ hv_no, hv_loc, hv_date }) => {
+const getHireVoucherByKey = async ({ vha_no, vha_loc, vha_date }) => {
   return db('sss.sst_vha_hdr')
-    .where({ hv_no, hv_loc, hv_date, record_status: 0 })
+    .where({ vha_no, vha_loc, vha_date, record_status: 0 })
     .first();
 };
 
 /* ================= GET HIRE VOUCHER BY NO ONLY (for edit/view) ================= */
 
-const getHireVoucherByNo = async (hv_no) => {
+const getHireVoucherByNo = async (vha_no) => {
   return db('sss.sst_vha_hdr')
-    .where({ hv_no })
+    .where({ vha_no, record_status: 0 })
     .first();
 };
 
 /* ================= GET HIRE VOUCHER DETAILS ================= */
 
-const getHireVoucherDetails = async ({ hv_no, hv_loc, hv_date }) => {
+const getHireVoucherDetails = async ({ vha_no, vha_loc, vha_date }) => {
   return db('sss.sst_vha_dtl')
-    .where({ hv_no, hv_loc, hv_date })
+    .where({ vha_no, vha_loc, vha_date })
     .orderBy('vhv_srno');
 };
 
@@ -37,7 +37,7 @@ const getHireVoucherDetails = async ({ hv_no, hv_loc, hv_date }) => {
 
 const getNextHireVoucherNo = async () => {
   const result = await db.raw(
-    "SELECT COALESCE(MAX(CAST(hv_no AS INTEGER)), 0) + 1 AS next_no FROM sss.sst_vha_hdr"
+    "SELECT COALESCE(MAX(CAST(vha_no AS INTEGER)), 0) + 1 AS next_no FROM sss.sst_vha_hdr"
   );
   const nextNo = result.rows?.[0]?.next_no || 1;
   return String(nextNo);
@@ -46,45 +46,32 @@ const getNextHireVoucherNo = async () => {
 /* ================= CREATE HIRE VOUCHER (header + details in transaction) ================= */
 
 const createHireVoucher = async (headerData, detailsData) => {
+  // Generate next vha no BEFORE starting the transaction
+  const nextNo = await getNextHireVoucherNo();
+
   const trx = await db.transaction();
   try {
-    // Generate next hv no
-    const nextNo = await getNextHireVoucherNo();
-
     // Build header row
     const headerRow = {
       ...headerData,
-      hv_no: nextNo,
+      vha_no: nextNo,
       aud_date: new Date(),
     };
 
     // Insert header
     await trx('sss.sst_vha_hdr').insert(headerRow);
 
-    // Filter out detail rows with missing required fields
-    const validDetails = detailsData.filter(row =>
-      row.vhv_no && row.vhv_no.toString().trim() !== ''
-    );
-
     // Build detail rows with composite key
-    const detailRows = validDetails.map((row, index) => ({
+    const detailRows = detailsData.map((row, index) => ({
       company_code: headerData.company_code || null,
       division_code: headerData.division_code || null,
-      hv_no: nextNo,
-      hv_loc: headerData.hv_loc || headerData.from_loc,
-      hv_date: headerData.hv_date,
-      vhv_srno: index + 1,
-      vhv_no: row.vhv_no,
-      date: row.date || null,
-      loc: row.loc || '',
-      to: row.to || '',
-      city: row.city || '',
-      veh: row.veh || '',
-      order: row.order || '',
-      pickup: row.pickup || '',
+      vha_no: nextNo,
+      vha_loc: headerData.vha_loc || headerData.from_loc,
+      vha_date: headerData.vha_date,     
       aud_user: headerData.aud_user || '',
       aud_loc: headerData.aud_loc || '',
       aud_date: new Date(),
+      ...row
     }));
 
     // Insert details
@@ -93,7 +80,7 @@ const createHireVoucher = async (headerData, detailsData) => {
     }
 
     await trx.commit();
-    return { ...headerRow, hv_no: nextNo };
+    return { ...headerRow, vha_no: nextNo };
   } catch (err) {
     await trx.rollback();
     throw err;
@@ -121,18 +108,14 @@ const updateHireVoucherDetails = async (keys, detailsData) => {
       .where(keys)
       .del();
 
-    // Filter out detail rows with missing required fields
-    const validDetails = detailsData.filter(row =>
-      row.vhv_no && row.vhv_no.toString().trim() !== ''
-    );
-
+  
     // Insert new details
-    const detailRows = validDetails.map((row, index) => ({
+    const detailRows = detailsData.map((row, index) => ({
       company_code: row.company_code || null,
       division_code: row.division_code || null,
-      hv_no: keys.hv_no,
-      hv_loc: keys.hv_loc,
-      hv_date: keys.hv_date,
+      vha_no: keys.vha_no,
+      vha_loc: keys.vha_loc,
+      vha_date: keys.vha_date,
       vhv_srno: index + 1,
       vhv_no: row.vhv_no,
       date: row.date || null,
@@ -143,7 +126,7 @@ const updateHireVoucherDetails = async (keys, detailsData) => {
       order: row.order || '',
       pickup: row.pickup || '',
       aud_user: row.aud_user || '',
-      aud_loc: keys.hv_loc,
+      aud_loc: keys.vha_loc,
       aud_date: new Date(),
     }));
 
@@ -170,18 +153,17 @@ const deleteHireVoucher = async (keys, trx = db) => {
 
 const getHireVoucherByVhvNo = async (vhvNo) => {
   const header = await db('sss.sst_vha_hdr')
-    .where({ vhv_no: vhvNo, record_status: 0 })
+    .where({ vha_no: vhvNo })
     .first();
 
   if (!header) return null;
 
   const details = await db('sss.sst_vha_dtl')
     .where({
-      hv_no: header.hv_no,
-      hv_loc: header.hv_loc || header.from_loc,
-      hv_date: header.hv_date
+      vha_no: header.vha_no,
+      vha_loc: header.vha_loc || header.from_loc,
+      vha_date: header.vha_date
     })
-    .orderBy('vhv_srno');
 
   return { header, details };
 };
@@ -191,8 +173,7 @@ const getHireVoucherByVhvNo = async (vhvNo) => {
 const getVendorByLorryNo = async (lorryNo) => {
   return db('sss.sst_vha_hdr')
     .select('vendor_name', 'vendor_code')
-    .where({ vhv_no: lorryNo })
-    .orWhere({ hv_no: lorryNo })
+    .where({ vha_no: lorryNo })
     .first();
 };
 

@@ -164,7 +164,7 @@ export default function TenantLoginPage() {
 
   return (
     <>
-      <Box sx={{ minHeight: "100vh", backgroundImage: `url(${backgroundImage})`, backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat" }}>
+      <Box sx={{ minHeight: "100vh", backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat" }}>
       <Box className="loginContainer" sx={{ display: "flex", minHeight: "85vh" }}>
 
         {/* ── Left promo panel ── */}
