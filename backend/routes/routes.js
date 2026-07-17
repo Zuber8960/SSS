@@ -18,6 +18,7 @@ const TenantController = require('../modules/tenantMaster/tenant.controller');
 const manifestRoutes = require("../modules/manifest/manifest.routes");
 const lorryMasterRoutes = require("../modules/lorryMaster/lorryMaster.routes");
 const hireVoucherRoutes = require("../modules/hireVoucher/hireVoucher.routes");
+const materialGroupRoutes = require("../modules/materialGroup/materialGroup.routes");
 const axios = require('axios');
 
 router.post('/login', async (req, res) => {
@@ -159,5 +160,6 @@ router.use('/userRole', authMiddleware, userRoleRoutes);
 router.use('/manifest', authMiddleware, manifestRoutes);
 router.use('/lorryMaster', authMiddleware, lorryMasterRoutes);
 router.use('/hireVoucher', authMiddleware, hireVoucherRoutes);
+router.use('/materialGroup', authMiddleware, materialGroupRoutes);
 
 module.exports = router;

@@ -19,6 +19,7 @@ import {
 } from "../../utils/docket";
 import { fetchAllLocations } from "../../utils/locationMaster";
 import { fetchBpByBpName } from "../../utils/businessPartner";
+import { fetchAllMaterialGroups, fetchAllMaterialSubGroups } from "../../utils/materialGroup";
 import ChargesSection from "./docket/ChargesSection";
 import EwayBillSection from "./docket/EwayBillSection";
 
@@ -120,22 +121,8 @@ const headerFields = [
   { label: "Sum Insured", name: "sum_insured", type: "number" },
   { label: "Valid Upto", name: "valid_upto", type: "date" },
 
-  {
-    label: "Goods Group",
-    name: "goods_grp",
-    options: [
-      { label: "Group 1", value: "GRP1" },
-      { label: "Group 2", value: "GRP2" },
-    ],
-  },
-  {
-    label: "Goods Sub Group",
-    name: "goods_subgrp",
-    options: [
-      { label: "Sub Group 1", value: "SUB1" },
-      { label: "Sub Group 2", value: "SUB2" },
-    ],
-  },
+  { label: "Goods Group",     name: "goods_grp" },
+  { label: "Goods Sub Group", name: "goods_subgrp" },
   { label: "Goods Description", name: "goods_desc", fullWidth: true },
   { label: "Remarks", name: "remark", type: "textarea" },
 ];
@@ -274,6 +261,8 @@ export default function DocketPage() {
 
   const [form, setForm] = useState(emptyForm);
   const [locations, setLocations] = useState([]);
+  const [materialGroups, setMaterialGroups] = useState([]);
+  const [allSubGroups, setAllSubGroups] = useState([]);
 
   const tot_amt = useMemo(
     () =>
@@ -454,11 +443,17 @@ export default function DocketPage() {
     return opts;
   }, [form.docket_loc, form.docket_to_loc]);
 
-  // Load locations on mount
+  // Load locations and material groups on mount
   useEffect(() => {
     fetchAllLocations()
       .then((data) => setLocations(data))
       .catch((err) => console.error("Failed to load locations:", err));
+    fetchAllMaterialGroups()
+      .then((data) => setMaterialGroups(data))
+      .catch((err) => console.error("Failed to load material groups:", err));
+    fetchAllMaterialSubGroups()
+      .then((data) => setAllSubGroups(data))
+      .catch((err) => console.error("Failed to load sub groups:", err));
   }, []);
 
   const moveSectionToTop = (section) => {
@@ -786,6 +781,15 @@ export default function DocketPage() {
         : field;
       if (field.name === "pay_loc") {
         fieldProps = { ...fieldProps, options: payLocOptions };
+      }
+      if (field.name === "goods_grp") {
+        fieldProps = { ...fieldProps, options: materialGroups.map(g => ({ label: g.material_group_desc, value: g.material_group_code })) };
+      }
+      if (field.name === "goods_subgrp") {
+        const filtered = form.goods_grp
+          ? allSubGroups.filter(s => s.material_group_code === form.goods_grp)
+          : allSubGroups;
+        fieldProps = { ...fieldProps, options: filtered.map(s => ({ label: s.subgroup_desc, value: s.sub_group_code })) };
       }
       const isNameField = (isCnor || isCnee) && field.name === `${prefix}_name`;
 
