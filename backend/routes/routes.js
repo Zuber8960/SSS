@@ -61,7 +61,7 @@ router.post('/login', async (req, res) => {
 
 
       const authGet = await axios.get(
-        'https://api.whitebooks.in/ewaybillapi/v1.03/ewayapi/getewaybill',
+        'https://api.whitebooks.in/ewaybillapi/v1.03/authenticate',
         {
           params: {
             email: process.env.email,
