@@ -422,9 +422,10 @@ const saveEwayBillToDB = async (ewbDataArray, tenant_id) => {
     };
   });
 
-  const ewbResult = await db('sss.sst_docket_ewb')
+  let query = db('sss.sst_docket_ewb')
     .insert(rows)
     .returning('*');
+  const ewbResult = await query;
 
   // const docketRows = ewbDataArray.map(item => {
   //   const data = item.data || item;
