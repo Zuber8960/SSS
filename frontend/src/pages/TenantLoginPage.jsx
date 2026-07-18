@@ -417,10 +417,10 @@ export default function TenantLoginPage() {
 
                 <Button
                   startIcon={<ArrowBackIcon />}
-                  onClick={() => setTenantVerified(false)}
+                  onClick={() => navigate("/")}
                   sx={{ color: primaryColor, textTransform: "none", fontSize: 13 }}
                 >
-                  Back to organisation login
+                  Back to organisation selection
                 </Button>
               </Stack>
             )}

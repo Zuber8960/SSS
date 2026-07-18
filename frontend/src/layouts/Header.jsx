@@ -16,7 +16,11 @@ export default function Header({ onToggleSidebar, isMobileSidebarOpen }) {
 
   const logout = () => {
     logoutUser();
-    navigate("/", { replace: true });
+    const slug = tenantConfig?.tenant_slug;
+    navigate(
+      slug ? `/${slug}/login` : "/",
+      { replace: true, state: { tenantVerified: true, config: tenantConfig } }
+    );
   };
 
   const currentUser = (() => {
