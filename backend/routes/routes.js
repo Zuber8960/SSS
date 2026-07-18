@@ -23,7 +23,7 @@ const axios = require('axios');
 
 router.post('/login', async (req, res) => {
   try {
-    const { userId, password, tenantToken } = req.body;
+    const { userId, password, tenantToken, loc_id, division_code } = req.body;
 
     // Validate input
     if (!userId || !password) {
@@ -40,6 +40,12 @@ router.post('/login', async (req, res) => {
       const decoded = jwt.verify(tenantToken, secret);
       tenant_id = decoded.tenant_id ?? null;
     }
+    let locId,divisionId;
+    if (loc_id > 0) locId = loc_id;
+    else locId = '000';
+    if (division_code > 0)  divisionId = division_code;
+    else  divisionId = '0';
+
 
     // Authenticate user from database
     const user = await UserController.authenticateUser(userId, password, tenant_id);
@@ -53,7 +59,9 @@ router.post('/login', async (req, res) => {
           userId: user.user_id,
           userName: user.user_name,
           isAdmin: user.is_admin,
-          tenant_id: user.tenant_id
+          tenant_id: user.tenant_id,
+          locId,
+          divisionId
         },
         secret,
         { expiresIn: '24h' }

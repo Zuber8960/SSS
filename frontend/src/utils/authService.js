@@ -3,9 +3,15 @@ import { getTenantToken } from './tenantService';
 
 const TOKEN_KEY = 'authToken';
 
-export const loginUser = async (userId, password) => {
+export const loginUser = async (userId, password, loc_id, division_code) => {
   const tenantToken = getTenantToken();
-  const { data } = await Api.post('/login', { userId, password, ...(tenantToken && { tenantToken }) });
+  const { data } = await Api.post('/login', {
+    userId,
+    password,
+    ...(tenantToken && { tenantToken }),
+    ...(loc_id && { loc_id }),
+    ...(division_code && { division_code }),
+  });
   if (data.token) localStorage.setItem(TOKEN_KEY, data.token);
   return data;
 };

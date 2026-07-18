@@ -120,7 +120,7 @@ export default function TenantLoginPage() {
     if (!userId || !password) { showError("Username and Password are required"); return; }
     setLoading(true);
     try {
-      const response = await loginUser(userId, password);
+      const response = await loginUser(userId, password, selectedLocation, selectedDivision);
       const selectedDiv = selectedDivision || response.user?.division_code;
       const selectedLoc = selectedLocation || response.user?.location_id;
       const userToStore = { ...response.user, division_code: selectedDiv, location_id: selectedLoc };
@@ -398,7 +398,7 @@ export default function TenantLoginPage() {
                   >
                     <MenuItem value=""><em>None</em></MenuItem>
                     {locations.map(loc => (
-                      <MenuItem key={loc.loc_code} value={loc.loc_code}>
+                      <MenuItem key={loc.loc_id} value={loc.loc_id}>
                         {loc.loc_code} - {loc.loc_name}
                       </MenuItem>
                     ))}
