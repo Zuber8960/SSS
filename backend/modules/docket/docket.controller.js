@@ -344,12 +344,19 @@ const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
     ...(data.inv_no   !== undefined && { invoice_no: data.inv_no }),
     aud_date: new Date(),
   };
-  return trx('sss.sst_docket_ewb').where({ rec_id }).update(update);
+  const { tenant_id } = data;
+  delete update.rec_id;
+  const operation = await trx('sss.sst_docket_ewb').where({ ewb_no: update.ewb_no, tenant_id }).first() ? 'put' : 'post';
+  if (operation === 'post') {
+    return trx('sss.sst_docket_ewb').where({ ewb_no: update.ewb_no, tenant_id }).insert(update);
+  } else {
+    return trx('sss.sst_docket_ewb').where({ ewb_no: update.ewb_no, tenant_id }).update(update);
+  }
 };
 
 const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
   let apiCalls = false;
-  const query = db('sss.sst_docket_ewb').whereIn('ewb_no', ewbNumbers).select('*');
+  const query = db('sss.sst_ewb_hdr').whereIn('EWB_NO', ewbNumbers.map(String)).select('*');
   if (tenant_id) query.andWhere({ tenant_id });
   let results = await query;
   if (!results.length) {
@@ -361,7 +368,9 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
         ...data,
         ewb_date: data.ewb_date ? moment(data.ewb_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
         ewb_valid_upto: data.ewb_valid_upto ? moment(data.ewb_valid_upto, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
-        invoice_date: data.inv_date ? moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
+        invoice_date: data.inv_date ? 
+          moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') : 
+          data.invoice_date ? moment(data.invoice_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') : null   
       }));
     } else {
       apiResults = ewb.ewb_dummy_data;
@@ -376,9 +385,14 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
         }));
     }
     if (results.length) {
-      const ewbDbResult = await saveEwayBillToDB(results, tenant_id);
-      console.log('EWB saved to DB:', ewbDbResult);
-      results = ewbDbResult;
+      if (apiCalls) {
+        const ewbResult = await saveDataEwb(results, tenant_id);
+        results = ewbResult;
+      } else {
+        // const ewbDbResult = await saveEwayBillToDB(results, tenant_id);
+        // console.log('EWB saved to DB:', ewbDbResult);
+        // results = ewbDbResult;
+      }
     } else {
       console.log('No EWB data found from API for:', ewbNumbers);
     }
@@ -386,13 +400,162 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
   return {  results, apiCalls };
 }
 
+const saveDataEwb = async (apiResResult, tenant_id) => {
+  const ewbHdrRows = [];
+  const ewbDtlRows = [];
+  const ewbItemRows = [];
+  const ewbVehicleRows = [];
+
+  for (const item of apiResResult) {
+    const data = item.data || item;
+
+    const ewbDate = moment(data.ewayBillDate, ['DD/MM/YYYY hh:mm:ss A', 'DD/MM/YYYY', 'YYYY-MM-DD'], true);
+    const validUpto = moment(data.validUpto, ['DD/MM/YYYY hh:mm:ss A', 'DD/MM/YYYY', 'YYYY-MM-DD'], true);
+    const invDate = moment(data.docDate, ['DD/MM/YYYY', 'YYYY-MM-DD'], true);
+
+    const ewbNoStr = String(data.ewbNo || '');
+    const docketNo = data.docNo || '';
+    const ewbDateStr = ewbDate.isValid() ? ewbDate.format('YYYY-MM-DD') : null;
+    const invDateStr = invDate.isValid() ? invDate.format('YYYY-MM-DD') : null;
+
+    const vehicle = data.VehiclListDetails?.[0] || {};
+    const vehUpdDate = vehicle.enteredDate
+      ? moment(vehicle.enteredDate, ['DD/MM/YYYY hh:mm:ss A', 'DD/MM/YYYY'], true)
+      : null;
+
+    const totalQty = data.itemList?.reduce((sum, i) => sum + (i.quantity || 0), 0) || 0;
+    const productNames = data.itemList?.map(i => i.productDesc || i.productName).filter(Boolean).join(', ') || '';
+    const hsnCode = data.itemList?.[0]?.hsnCode || null;
+
+    ewbHdrRows.push({
+      company_code: data.company_code || null,
+      division_code: data.division_code || null,
+      LOC_GSTIN: data.fromGstin || '',
+      EWB_NO: ewbNoStr,
+      EWB_DATE: ewbDateStr,
+      EWB_VALID_UPTO: validUpto.isValid() ? validUpto.format('YYYY-MM-DD') : null,
+      EWB_GENERATED_BY: data.userGstin || null,
+      INV_NO: docketNo,
+      INV_DATE: invDateStr,
+      REJ_STATUS: data.rejectStatus || null,
+      AUD_DATE: new Date(),
+      BASE_VALUE: data.totalValue || 0,
+      SGST_VALUE: data.sgstValue || 0,
+      CGST_VALUE: data.cgstValue || 0,
+      IGST_VALUE: data.igstValue || 0,
+      TOTAL_INV_VALUE: data.totInvValue || 0,
+      aud_date: new Date(),
+      tenant_id
+    });
+
+    ewbDtlRows.push({
+      company_code: data.company_code || null,
+      division_code: data.division_code || null,
+      EWB_NO: ewbNoStr,
+      EWB_DATE: ewbDateStr,
+      CNOR_GSTIN: data.fromGstin || null,
+      FROM_PLACE: data.fromPlace || null,
+      FROM_STATE: String(data.fromStateCode || ''),
+      FROM_PINCODE: String(data.fromPincode || ''),
+      CNEE_GSTIN: data.toGstin || null,
+      TO_PLACE: data.toPlace || null,
+      TO_STATE: String(data.toStateCode || ''),
+      TO_PINCODE: String(data.toPincode || ''),
+      INV_NO: docketNo,
+      INV_DATE: invDateStr,
+      INV_VALUE: data.totInvValue || 0,
+      TRANS_GSTIN: data.transporterId || null,
+      ACT_DIST: data.actualDist || null,
+      ITEM_HSN_CODE: hsnCode,
+      ITEM_QTY: totalQty,
+      VEHICLE_NO: vehicle.vehicleNo || null,
+      VEHICLE_UPD_DATE: vehUpdDate?.isValid() ? vehUpdDate.format('YYYY-MM-DD') : null,
+      UPD_MODE: vehicle.updMode || null,
+      TAX_VALUE: data.totalValue || 0,
+      IGST: data.igstValue || 0,
+      SGST: data.sgstValue || 0,
+      CGST: data.cgstValue || 0,
+      CESS: data.cessValue || 0,
+      PRODUCT_NAME: productNames,
+      FROM_ADDRESS: ((data.fromAddr1 || '') + ' ' + (data.fromAddr2 || '')).trim(),
+      FROM_CUST_NAME: data.fromTrdName || null,
+      TO_ADDRESS: ((data.toAddr1 || '') + ' ' + (data.toAddr2 || '')).trim(),
+      TO_CUST_NAME: data.toTrdName || null,
+      AUD_DATE: new Date(),
+      tenant_id
+    });
+
+    for (const itemEntry of (data.itemList || [])) {
+      ewbItemRows.push({
+        iten_no: itemEntry.itemNo || null,
+        product_id: itemEntry.productId || null,
+        product_name: itemEntry.productName || null,
+        product_desc: itemEntry.productDesc || null,
+        hsn_code: itemEntry.hsnCode || null,
+        quantity: itemEntry.quantity || null,
+        qty_unit: itemEntry.qtyUnit || null,
+        cgst_rate: itemEntry.cgstRate || null,
+        sgst_rate: itemEntry.sgstRate || null,
+        igst_rate: itemEntry.igstRate || null,
+        cess_rate: itemEntry.cessRate || null,
+        cess_non_advol: itemEntry.cessNonAdvol || null,
+        taxableamount: itemEntry.taxableAmount || null,
+        docket_no: docketNo,
+        ewb_no: ewbNoStr,
+        tenant_id
+      });
+    }
+
+    for (const veh of (data.VehiclListDetails || [])) {
+      ewbVehicleRows.push({
+        vehicle_no: veh.vehicleNo || null,
+        upd_mode: veh.updMode || null,
+        from_place: veh.fromPlace || null,
+        from_state: veh.fromState || null,
+        tripsht_no: veh.tripshtNo || null,
+        user_gstin_transin: veh.userGSTINTransin || null,
+        entered_date: veh.enteredDate || null,
+        trans_mode: veh.transMode || null,
+        trans_doc_no: veh.transDocNo || null,
+        trans_doc_date: veh.transDocDate || null,
+        groupno: veh.groupNo || null,
+        docket_no: docketNo,
+        ewb_no: ewbNoStr,
+        tenant_id
+      });
+    }
+  }
+
+  const [ewbResult] = await Promise.all([
+    db('sss.sst_ewb_hdr')
+      .insert(ewbHdrRows)
+      .onConflict(['LOC_GSTIN', 'EWB_NO', 'EWB_DATE'])
+      .merge()
+      .returning('*'),
+    db('sss.sst_ewb_dtl')
+      .insert(ewbDtlRows),
+    db('sss.ewb_items')
+      .insert(ewbItemRows)
+      .onConflict(['docket_no', 'ewb_no', 'iten_no'])
+      .merge(),
+    db('sss.ewb_vehicles')
+      .insert(ewbVehicleRows)
+      .onConflict(['docket_no', 'ewb_no'])
+      .merge(),
+  ]);
+
+  return ewbResult;
+};
+
 const saveEwayBillToDB = async (ewbDataArray, tenant_id) => {
   const rows = ewbDataArray.map(item => {
     const data = item.data || item; // DD/MM/YYYY hh:mm:ss A
     
     const ewb_date = moment(data.ewb_date || data.ewayBillDate , ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') || null;
     const ewb_valid_upto = moment(data.ewb_valid ||  data.validUpto, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') || null;
-    const invoice_date = data.inv_date ? moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') : null;
+    const invoice_date = data.inv_date ? 
+      moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') : 
+      data.invoice_date ? moment(data.invoice_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') : null;
     return {
       ewb_no: String(data.ewbNo || ''),
       ewb_date,

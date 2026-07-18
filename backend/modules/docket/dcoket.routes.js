@@ -59,9 +59,10 @@ router.get('/ewayfile/db/:ewbNumbers', async (req, res) => {
 
 router.put('/ewayfile/db/:recId', async (req, res) => {
   try {
+    const { tenant_id } = req;
     const recId = Number(req.params.recId);
     if (isNaN(recId)) return res.status(400).json({ success: false, message: 'Invalid rec_id' });
-    await DocketController.updateEwayBillByRecId(recId, req.body);
+    await DocketController.updateEwayBillByRecId(recId, {...req.body, tenant_id});
     res.json({ success: true, message: 'EWB updated successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

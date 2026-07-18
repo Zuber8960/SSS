@@ -65,8 +65,8 @@ router.post('/login', async (req, res) => {
         {
           params: {
             email: process.env.email,
-            username: process.env.username,
-            password: process.env.password,
+            username: 'cargoyaan1_API_HAR',
+            password: 'CYsss@221274',
           },
           headers: {
             accept: '*/*',

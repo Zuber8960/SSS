@@ -78,16 +78,16 @@ export default function EwayBillSection({
         r = records.find((r) => !r.docket_no);
       }
       const toDate = (val) =>
-        val ? moment(val, ["DD/MM/YYYY HH:mm:ss A", "YYYY-MM-DD"]).format("MM/DD/YYYY") : "";
+        val ? moment(val, ["DD/MM/YYYY HH:mm:ss A", "YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD"]).format("MM/DD/YYYY") : "";
 
       const populated = {
         ...newRow,
         rec_id: r.rec_id ?? null,
-        ewb_no: r.ewb_no || ewbNo,
-        ewb_date: toDate(r.ewb_date),
-        ewb_valid: toDate(r.ewb_valid_upto),
-        inv_no: r.invoice_no || "",
-        inv_date: toDate(r.invoice_date),
+        ewb_no: r.EWB_NO || r.ewb_no || ewbNo,
+        ewb_date: toDate(r.EWB_DATE || r.ewb_date),
+        ewb_valid: toDate(r.EWB_VALID_UPTO || r.ewb_valid_upto),
+        inv_no: r.INV_NO || r.invoice_no || "",
+        inv_date: toDate(r.INV_DATE || r.invoice_date),
       };
 
       if (onEwbListUpdate) onEwbListUpdate(newRow.id, populated);
