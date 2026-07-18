@@ -5,6 +5,7 @@ import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
+import StatusGrid from "../../components/common/StatusGrid";
 import "../../styles/MasterPage.css";
 
 // ----------------------------------------------------------------
@@ -111,32 +112,36 @@ function generateSampleDockets(count) {
   return rows;
 }
 
+
 const statusOptions = ["OK", "Short", "Excess", "Damage", "Leakage", "Missing", "Returned", "Hold"];
 
-const detailColumns = [
-  { key: "sr", label: "Sr", minWidth: 40 },
-  { key: "docket_no", label: "Docket No", minWidth: 130 },
-  { key: "booking_date", label: "Booking Date", minWidth: 110 },
-  { key: "consignor", label: "Consignor", minWidth: 150 },
-  { key: "consignee", label: "Consignee", minWidth: 150 },
-  { key: "destination", label: "Destination", minWidth: 100 },
-  { key: "booked_pkgs", label: "Booked Pkgs", minWidth: 90, type: "number" },
-  { key: "received_pkgs", label: "Received Pkgs", minWidth: 100, type: "number", editable: true },
-  { key: "short_qty", label: "Short", minWidth: 70, type: "number" },
-  { key: "excess_qty", label: "Excess", minWidth: 70, type: "number" },
-  { key: "damage_qty", label: "Damage", minWidth: 70, type: "number" },
-  { key: "leak_qty", label: "Leakage", minWidth: 70, type: "number" },
-  { key: "weight", label: "Weight", minWidth: 80, type: "number" },
-  {
-    key: "status",
-    label: "Status",
-    minWidth: 100,
-    options: statusOptions,
-    editable: true,
-  },
-  { key: "remarks", label: "Remarks", minWidth: 140, editable: true },
-  { key: "updated_by", label: "Updated By", minWidth: 100 },
-  { key: "updated_time", label: "Updated Time", minWidth: 100 },
+const ROW_COLORS = {
+  OK: "#c8e6c9",
+  Short: "#fff9c4",
+  Damage: "#ffcdd2",
+  Leakage: "#ffe0b2",
+  Missing: "#f8bbd0",
+  Excess: "#d1c4e9",
+};
+
+const docketColumns = [
+  { key: "sr",            label: "Sr",           minWidth: 40 },
+  { key: "docket_no",     label: "Docket No",    minWidth: 130, type: "link" },
+  { key: "booking_date",  label: "Booking Date", minWidth: 110 },
+  { key: "consignor",     label: "Consignor",    minWidth: 150 },
+  { key: "consignee",     label: "Consignee",    minWidth: 150 },
+  { key: "destination",   label: "Destination",  minWidth: 100 },
+  { key: "booked_pkgs",   label: "Booked Pkgs",  minWidth: 90,  align: "center" },
+  { key: "received_pkgs", label: "Received Pkgs",minWidth: 100, type: "number", width: 70 },
+  { key: "short_qty",     label: "Short",        minWidth: 70,  type: "readonly_number", width: 60 },
+  { key: "excess_qty",    label: "Excess",       minWidth: 70,  type: "readonly_number", width: 60 },
+  { key: "damage_qty",    label: "Damage",       minWidth: 70,  type: "readonly_number", width: 60 },
+  { key: "leak_qty",      label: "Leakage",      minWidth: 70,  type: "readonly_number", width: 60 },
+  { key: "weight",        label: "Weight",       minWidth: 80,  align: "right" },
+  { key: "status",        label: "Status",       minWidth: 100, type: "select", options: statusOptions },
+  { key: "remarks",       label: "Remarks",      minWidth: 140, type: "text", placeholder: "Remarks" },
+  { key: "updated_by",    label: "Updated By",   minWidth: 100 },
+  { key: "updated_time",  label: "Updated Time", minWidth: 100 },
 ];
 
 // Styles matching the HTML theme
@@ -267,7 +272,7 @@ const styles = {
 
 export default function ManifestUnloading() {
   const { dialog, closeAlert, showSuccess, showError, showInfo, showWarning } = useAlert();
-  const { isLoading, showLoading, hideLoading } = useLoading();
+  const { isLoading } = useLoading();
 
   const [header, setHeader] = useState({ ...emptyHeader });
   const [dockets, setDockets] = useState([]);
@@ -371,11 +376,8 @@ export default function ManifestUnloading() {
       prev.map((d) => {
         if (d.id !== rowId) return d;
         let remarks = d.remarks;
-        if (newStatus === "OK") {
-          remarks = "";
-        } else if (!remarks) {
-          remarks = newStatus + " reported during unloading";
-        }
+        if (newStatus === "OK") remarks = "";
+        else if (!remarks) remarks = newStatus + " reported during unloading";
         return { ...d, status: newStatus, remarks };
       })
     );
@@ -387,21 +389,12 @@ export default function ManifestUnloading() {
     );
   }, []);
 
-  // DataTable cell change
-  const handleCellChange = useCallback(
-    (rowIndex, field, value) => {
-      const row = filteredDockets[rowIndex];
-      if (!row) return;
-      if (field === "received_pkgs") {
-        handleReceivedChange(row.id, value);
-      } else if (field === "status") {
-        handleStatusChange(row.id, value);
-      } else if (field === "remarks") {
-        handleRemarksChange(row.id, value);
-      }
-    },
-    [filteredDockets, handleReceivedChange, handleStatusChange, handleRemarksChange]
-  );
+  const handleCellChange = useCallback((rowId, key, value) => {
+    if (key === "received_pkgs") handleReceivedChange(rowId, value);
+    else if (key === "status")   handleStatusChange(rowId, value);
+    else if (key === "remarks")  handleRemarksChange(rowId, value);
+  }, [handleReceivedChange, handleStatusChange, handleRemarksChange]);
+
 
   // Mark All OK
   const markAllOK = () => {
@@ -466,6 +459,17 @@ export default function ManifestUnloading() {
       }
     );
   };
+
+  const handleSelectRow = useCallback((rowId) => {
+    setDockets((prev) =>
+      prev.map((x) => (x.id === rowId ? { ...x, selected: !x.selected } : x))
+    );
+  }, []);
+
+  const handleSelectAll = useCallback((e) => {
+    const checked = e.target.checked;
+    setDockets((prev) => prev.map((x) => ({ ...x, selected: checked })));
+  }, []);
 
   // Clear filter
   const clearFilter = () => {
@@ -852,156 +856,15 @@ export default function ManifestUnloading() {
         <div style={styles.panel}>
           <div style={styles.panelTitle}>Manifest Docket Details</div>
           <div style={styles.panelBody}>
-            <div style={{ overflow: "auto", maxHeight: 600, border: "1px solid #d9dfe8" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 2100, fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: "#0d47a1", color: "#fff", position: "sticky", top: 0, zIndex: 10 }}>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>
-                      <input type="checkbox" />
-                    </th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Sr</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Docket No</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Booking Date</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Consignor</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Consignee</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Destination</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Booked Pkgs</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Received Pkgs</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Short</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Excess</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Damage</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Leakage</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Weight</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Status</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Remarks</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Updated By</th>
-                    <th style={{ padding: 10, border: "1px solid #ccc", whiteSpace: "nowrap" }}>Updated Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredDockets.map((d, index) => (
-                    <tr
-                      key={d.id}
-                      style={{
-                        background: index % 2 === 0
-                          ? d.status === "OK"
-                            ? "#c8e6c9"
-                            : d.status === "Short"
-                            ? "#fff9c4"
-                            : d.status === "Damage"
-                            ? "#ffcdd2"
-                            : d.status === "Leakage"
-                            ? "#ffe0b2"
-                            : d.status === "Missing"
-                            ? "#f8bbd0"
-                            : d.status === "Excess"
-                            ? "#d1c4e9"
-                            : "#fafafa"
-                          : "#fff",
-                      }}
-                    >
-                      <td align="center" style={{ padding: 6, border: "1px solid #ddd" }}>
-                        <input
-                          type="checkbox"
-                          checked={d.selected || false}
-                          onChange={() => {
-                            setDockets((prev) =>
-                              prev.map((x) =>
-                                x.id === d.id ? { ...x, selected: !x.selected } : x
-                              )
-                            );
-                          }}
-                        />
-                      </td>
-                      <td style={{ padding: 6, border: "1px solid #ddd" }}>{d.sr}</td>
-                      <td style={{ padding: 6, border: "1px solid #ddd" }}>
-                        <a href="#" style={{ textDecoration: "none", color: "#1565c0", fontWeight: "bold" }}>
-                          {d.docket_no}
-                        </a>
-                      </td>
-                      <td style={{ padding: 6, border: "1px solid #ddd" }}>{d.booking_date}</td>
-                      <td style={{ padding: 6, border: "1px solid #ddd" }}>{d.consignor}</td>
-                      <td style={{ padding: 6, border: "1px solid #ddd" }}>{d.consignee}</td>
-                      <td style={{ padding: 6, border: "1px solid #ddd" }}>{d.destination}</td>
-                      <td align="center" style={{ padding: 6, border: "1px solid #ddd" }}>
-                        {d.booked_pkgs}
-                      </td>
-                      <td style={{ padding: 6, border: "1px solid #ddd" }}>
-                        <input
-                          type="number"
-                          value={d.received_pkgs}
-                          min={0}
-                          max={d.booked_pkgs + 5}
-                          style={{ width: 70, padding: "4px 6px", border: "1px solid #d9dfe8", borderRadius: 4 }}
-                          onChange={(e) => handleReceivedChange(d.id, e.target.value)}
-                        />
-                      </td>
-                      <td style={{ padding: 6, border: "1px solid #ddd" }}>
-                        <input
-                          type="number"
-                          value={d.short_qty}
-                          min={0}
-                          readOnly
-                          style={{ width: 60, padding: "4px 6px", border: "1px solid #d9dfe8", borderRadius: 4, background: "#f5f5f5" }}
-                        />
-                      </td>
-                      <td style={{ padding: 6, border: "1px solid #ddd" }}>
-                        <input
-                          type="number"
-                          value={d.excess_qty}
-                          min={0}
-                          readOnly
-                          style={{ width: 60, padding: "4px 6px", border: "1px solid #d9dfe8", borderRadius: 4, background: "#f5f5f5" }}
-                        />
-                      </td>
-                      <td style={{ padding: 6, border: "1px solid #ddd" }}>
-                        <input
-                          type="number"
-                          value={d.damage_qty}
-                          min={0}
-                          readOnly
-                          style={{ width: 60, padding: "4px 6px", border: "1px solid #d9dfe8", borderRadius: 4, background: "#f5f5f5" }}
-                        />
-                      </td>
-                      <td style={{ padding: 6, border: "1px solid #ddd" }}>
-                        <input
-                          type="number"
-                          value={d.leak_qty}
-                          min={0}
-                          readOnly
-                          style={{ width: 60, padding: "4px 6px", border: "1px solid #d9dfe8", borderRadius: 4, background: "#f5f5f5" }}
-                        />
-                      </td>
-                      <td align="right" style={{ padding: 6, border: "1px solid #ddd" }}>
-                        {d.weight}
-                      </td>
-                      <td style={{ padding: 6, border: "1px solid #ddd" }}>
-                        <select
-                          value={d.status}
-                          onChange={(e) => handleStatusChange(d.id, e.target.value)}
-                          style={{ padding: "4px 6px", border: "1px solid #d9dfe8", borderRadius: 4, fontSize: 12 }}
-                        >
-                          {statusOptions.map((s) => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td style={{ padding: 6, border: "1px solid #ddd" }}>
-                        <input
-                          type="text"
-                          value={d.remarks}
-                          placeholder="Remarks"
-                          onChange={(e) => handleRemarksChange(d.id, e.target.value)}
-                          style={{ width: "100%", padding: "4px 6px", border: "1px solid #d9dfe8", borderRadius: 4 }}
-                        />
-                      </td>
-                      <td style={{ padding: 6, border: "1px solid #ddd" }}>{d.updated_by}</td>
-                      <td style={{ padding: 6, border: "1px solid #ddd" }}>{d.updated_time}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <StatusGrid
+              columns={docketColumns}
+              rows={filteredDockets}
+              rowColors={ROW_COLORS}
+              onCellChange={handleCellChange}
+              onSelectAll={handleSelectAll}
+              onSelectRow={handleSelectRow}
+              minWidth={2100}
+            />
           </div>
         </div>
 
