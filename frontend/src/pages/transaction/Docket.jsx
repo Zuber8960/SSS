@@ -218,12 +218,14 @@ const emptyForm = {
   docket_loc: "",
   docket_to_town: "",
   docket_to_loc: "",
+  cnor_id: null,
   cnor_name: "",
   cnor_address: "",
   cnor_city: "",
   cnor_state: "",
   cnor_pincode: "",
   cnor_gstin: "",
+  cnee_id: null,
   cnee_name: "",
   cnee_address: "",
   cnee_city: "",
@@ -322,6 +324,7 @@ export default function DocketPage() {
     const prev = prevLocRef.current;
     const updates = {};
     if (form.docket_loc !== prev.docket_loc) {
+      updates.cnor_id = null;
       updates.cnor_name = "";
       updates.cnor_address = "";
       updates.cnor_city = "";
@@ -330,6 +333,7 @@ export default function DocketPage() {
       updates.cnor_gstin = "";
     }
     if (form.docket_to_loc !== prev.docket_to_loc) {
+      updates.cnee_id = null;
       updates.cnee_name = "";
       updates.cnee_address = "";
       updates.cnee_city = "";
@@ -381,7 +385,7 @@ export default function DocketPage() {
   };
 
   const handleBpNameChange = (value, prefix) => {
-    setForm((prev) => ({ ...prev, [`${prefix}_name`]: value }));
+    setForm((prev) => ({ ...prev, [`${prefix}_name`]: value, [`${prefix}_id`]: null }));
     setDirtyFields((prev) => new Set(prev).add(`${prefix}_name`));
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => {
@@ -389,61 +393,33 @@ export default function DocketPage() {
     }, 300);
   };
 
-  const selectBpSuggestion = (bp, prefix) => {
-    // First set the name immediately
+  const applyBpToForm = (bp, prefix) => {
     setForm((prev) => ({
       ...prev,
-      [`${prefix}_name`]: bp.bp_name || prev[`${prefix}_name`],
-      [`${prefix}_address`]: bp.bp_addres || prev[`${prefix}_address`],
-      [`${prefix}_city`]: bp.bp_city || prev[`${prefix}_city`],
-      [`${prefix}_state`]: bp.bp_state || prev[`${prefix}_state`],
-      [`${prefix}_pincode`]: bp.bp_pincode || prev[`${prefix}_pincode`],
-      [`${prefix}_gstin`]: bp.bp_gstin || prev[`${prefix}_gstin`],
+      [`${prefix}_id`]:      bp.record_id   ?? prev[`${prefix}_id`],
+      [`${prefix}_name`]:    bp.bp_name     || prev[`${prefix}_name`],
+      [`${prefix}_address`]: bp.bp_addres   || prev[`${prefix}_address`],
+      [`${prefix}_city`]:    bp.bp_city     || prev[`${prefix}_city`],
+      [`${prefix}_state`]:   bp.bp_state    || prev[`${prefix}_state`],
+      [`${prefix}_pincode`]: bp.bp_pincode  || prev[`${prefix}_pincode`],
+      [`${prefix}_gstin`]:   bp.bp_gstin    || prev[`${prefix}_gstin`],
     }));
-    setDirtyFields((prev) => new Set(prev).add(`${prefix}_name`));
+    setDirtyFields((prev) => {
+      const s = new Set(prev);
+      [`${prefix}_id`, `${prefix}_name`, `${prefix}_address`, `${prefix}_city`, `${prefix}_state`, `${prefix}_pincode`, `${prefix}_gstin`].forEach((k) => s.add(k));
+      return s;
+    });
+  };
+
+  const selectBpSuggestion = (bp, prefix) => {
+    applyBpToForm(bp, prefix);
     setBpSuggestions((prev) => ({ ...prev, [prefix]: [] }));
-    // Then do a full lookup to get all details (address, pincode, gstin)
-    if (bp.bp_name) {
-      lookupBpByName(bp.bp_name, prefix);
-    }
   };
 
   const handleBpNameBlur = (prefix) => {
     setTimeout(() => {
       setBpSuggestions((prev) => ({ ...prev, [prefix]: [] }));
-      const bpName = form[`${prefix}_name`];
-      if (bpName && bpName.trim().length >= 3) {
-        lookupBpByName(bpName, prefix);
-      }
     }, 200);
-  };
-
-  const lookupBpByName = async (bpName, prefix) => {
-    if (!bpName.trim()) return;
-    const locCode = prefix === "cnee" ? form.docket_to_loc : form.docket_loc;
-    try {
-      const bp = await fetchBpByBpName(bpName.trim(), locCode || null);
-      if (bp) {
-        setForm((prev) => ({
-          ...prev,
-          [`${prefix}_name`]: bp.bp_name || prev[`${prefix}_name`],
-          [`${prefix}_address`]: bp.bp_addres || prev[`${prefix}_address`],
-          [`${prefix}_city`]: bp.bp_city || prev[`${prefix}_city`],
-          [`${prefix}_state`]: bp.bp_state || prev[`${prefix}_state`],
-          [`${prefix}_pincode`]: bp.bp_pincode || prev[`${prefix}_pincode`],
-          [`${prefix}_gstin`]: bp.bp_gstin || prev[`${prefix}_gstin`],
-        }));
-        setDirtyFields((prev) => {
-          const s = new Set(prev);
-          [`${prefix}_name`, `${prefix}_address`, `${prefix}_city`, `${prefix}_state`, `${prefix}_pincode`, `${prefix}_gstin`].forEach((k) => s.add(k));
-          return s;
-        });
-      } else {
-        showError("No business partner found for this name");
-      }
-    } catch {
-      showError("No business partner found for this name");
-    }
   };
 
   // Build location dropdown options
@@ -575,52 +551,42 @@ export default function DocketPage() {
 
       // Map form field names → DB column names
       const formToDb = {
-        docket_no:      "docket_no",
-        docket_to_loc:    "docket_to_loc",
-        docket_loc:    "docket_loc",
-        docket_from_town: "docket_pickup_town",
-        docket_to_town: "docket_dly_town",
-        transit_type: "docket_transit_type",
-        load_type: "docket_load_type",
-        pay_type: "docket_pay_type",
-        pay_loc: "docket_pay_loc",
-        dly_type: "docket_dly_type",
-        cc: "docket_cc",
-        cnor_name:        "docket_cnor_name",
-        cnor_address:     "cnor_address",
-        cnor_city:        "cnor_city",
-        cnor_state:       "cnor_state",
-        cnor_pincode:     "cnor_pincode",
-        cnor_gstin:       "cnor_gstin",
-        cnee_name:        "docket_cnee_name",
-        cnee_address:     "cnee_address",
-        cnee_city:        "cnee_city",
-        cnee_state:       "cnee_state",
-        cnee_pincode:     "cnee_pincode",
-        cnee_gstin:       "cnee_gstin",
-        act_wt:           "docket_act_wt",
-        chrg_wt:          "docket_chrg_wt",
-        no_cb:            "docket_crtns",
-        no_w_crate:       "docket_bndls",
-        no_w_cbox:        "docket_bags",
-        no_loose:         "docket_loose",
-        no_others:        "docket_other",
-        rate:             "docket_rate",
-        rate_uom:         "docket_rate_uom",
-        po_no:            "docket_po_no",
-        po_date:          "docket_po_date",
-        invoice_value:    "docket_inv_value",
-        risk:             "docket_risk",
+        docket_no:           "docket_no",
+        docket_to_loc:       "docket_to_loc",
+        docket_loc:          "docket_loc",
+        docket_from_town:    "docket_pickup_town",
+        docket_to_town:      "docket_dly_town",
+        transit_type:        "docket_transit_type",
+        load_type:           "docket_load_type",
+        pay_type:            "docket_pay_type",
+        pay_loc:             "docket_pay_loc",
+        dly_type:            "docket_dly_type",
+        cc:                  "docket_cc",
+        cnor_id:             "cnor_id",
+        cnee_id:             "cnee_id",
+        act_wt:              "docket_act_wt",
+        chrg_wt:             "docket_chrg_wt",
+        no_cb:               "docket_crtns",
+        no_w_crate:          "docket_bndls",
+        no_w_cbox:           "docket_bags",
+        no_loose:            "docket_loose",
+        no_others:           "docket_other",
+        rate:                "docket_rate",
+        rate_uom:            "docket_rate_uom",
+        po_no:               "docket_po_no",
+        po_date:             "docket_po_date",
+        invoice_value:       "docket_inv_value",
+        risk:                "docket_risk",
         insurance_company:   "docket_insurance_co",
         insurance_policy_no: "docket_insurance_no",
-        valid_upto: "docket_insurance_date",
-        sum_insured: "docket_insurance_amt",
-        goods_grp: "docket_goods_grp",
-        goods_subgrp: "docket_goods_subgrp",
-        goods_desc: "docket_goods_desc",
-        remark: "docket_remark",
-        tot_pkgs: "docket_tot_pkgs",
-        docket_date: "docket_date",
+        valid_upto:          "docket_insurance_date",
+        sum_insured:         "docket_insurance_amt",
+        goods_grp:           "docket_goods_grp",
+        goods_subgrp:        "docket_goods_subgrp",
+        goods_desc:          "docket_goods_desc",
+        remark:              "docket_remark",
+        tot_pkgs:            "docket_tot_pkgs",
+        docket_date:         "docket_date",
       };
 
       const currentUser = JSON.parse(localStorage.getItem("current_user") || "null");
@@ -692,24 +658,27 @@ export default function DocketPage() {
             docket_date:         toDate(docketData.docket_date),
             docket_loc:          docketData.docket_loc          || "",
             docket_to_loc:       docketData.docket_to_loc       || "",
-            cnor_name:           docketData.docket_cnor_name    || "",
+            // cnor/cnee: IDs come from docket, display fields come from BP join
+            cnor_id:             docketData.cnor_id             ?? null,
+            cnor_name:           docketData.cnor_name           || "",
             cnor_address:        docketData.cnor_address        || "",
             cnor_city:           docketData.cnor_city           || "",
             cnor_state:          docketData.cnor_state          || "",
             cnor_pincode:        docketData.cnor_pincode        || "",
             cnor_gstin:          docketData.cnor_gstin          || "",
-            cnee_name:           docketData.docket_cnee_name    || "",
+            cnee_id:             docketData.cnee_id             ?? null,
+            cnee_name:           docketData.cnee_name           || "",
             cnee_address:        docketData.cnee_address        || "",
             cnee_city:           docketData.cnee_city           || "",
             cnee_state:          docketData.cnee_state          || "",
             cnee_pincode:        docketData.cnee_pincode        || "",
             cnee_gstin:          docketData.cnee_gstin          || "",
-            transit_type: docketData.docket_transit_type || "",
-            load_type: docketData.docket_load_type || "",
-            pay_type: docketData.docket_pay_type || "",
-            pay_loc: docketData.docket_pay_loc || "",
-            dly_type: docketData.docket_dly_type || "",
-            cc: docketData.docket_cc || "",
+            transit_type:        docketData.docket_transit_type || "",
+            load_type:           docketData.docket_load_type    || "",
+            pay_type:            docketData.docket_pay_type     || "",
+            pay_loc:             docketData.docket_pay_loc      || "",
+            dly_type:            docketData.docket_dly_type     || "",
+            cc:                  docketData.docket_cc           || "",
             act_wt:              docketData.docket_act_wt       ?? "",
             chrg_wt:             docketData.docket_chrg_wt      ?? "",
             no_cb:               docketData.docket_crtns        ?? 0,
@@ -729,15 +698,21 @@ export default function DocketPage() {
             risk:                docketData.docket_risk         || "",
             insurance_company:   docketData.docket_insurance_co || "",
             insurance_policy_no: docketData.docket_insurance_no || "",
-            insurance_cert_no: "",
-            sum_insured: docketData.docket_insurance_amt ?? "",
-            valid_upto: toDate(docketData.docket_insurance_date),
-            goods_grp: docketData.docket_goods_grp || "",
-            goods_subgrp: docketData.docket_goods_subgrp || "",
-            goods_desc: docketData.docket_goods_desc || "",
-            remark: docketData.docket_remark || "",
+            insurance_cert_no:   "",
+            sum_insured:         docketData.docket_insurance_amt ?? "",
+            valid_upto:          toDate(docketData.docket_insurance_date),
+            goods_grp:           docketData.docket_goods_grp    || "",
+            goods_subgrp:        docketData.docket_goods_subgrp || "",
+            goods_desc:          docketData.docket_goods_desc   || "",
+            remark:              docketData.docket_remark       || "",
           };
           setDirtyFields(new Set());
+          // Update prevLocRef before setForm so the location-change effect
+          // doesn't treat the loaded locations as a "change" and wipe cnor/cnee fields.
+          prevLocRef.current = {
+            docket_loc: mapped.docket_loc,
+            docket_to_loc: mapped.docket_to_loc,
+          };
           setForm(mapped);
           setDocketExists(true);
           setDocketRecId(docketData.rec_id ?? null);
@@ -931,6 +906,11 @@ export default function DocketPage() {
         );
       }
 
+      // cnor/cnee detail fields (address, city, state, pincode, gstin) are always read-only
+      const isCnorCneeDetail =
+        (isCnor || isCnee) &&
+        [`${prefix}_address`, `${prefix}_city`, `${prefix}_state`, `${prefix}_pincode`, `${prefix}_gstin`].includes(field.name);
+
       return (
         <div
           key={field.name}
@@ -945,6 +925,7 @@ export default function DocketPage() {
             }}
             disabled={
               field.name === "tot_pkgs" ||
+              isCnorCneeDetail ||
               !isFormEditMode ||
               (["docket_no"].includes(field.name) && !isDocketNoEnabled)
             }

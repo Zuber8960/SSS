@@ -56,7 +56,7 @@ module.exports = {
 
     async getBusinessPartnerByPanName(panName, tenant_id) {
         return db('sss.ssm_business_partner')
-            .select('bp_name', 'bp_addres', 'bp_pincode', 'bp_gstin')
+            .select('record_id', 'bp_name', 'bp_addres', 'bp_city', 'bp_state', 'bp_pincode', 'bp_gstin')
             .whereRaw('LOWER(bp_pan_name) = LOWER(?)', [panName])
             .where({ tenant_id })
             .first();
@@ -64,7 +64,7 @@ module.exports = {
 
     async getBusinessPartnerByBpName(bpName, locCode, tenant_id) {
         const query = db('sss.ssm_business_partner')
-            .select('bp_name', 'bp_addres', 'bp_pincode', 'bp_gstin')
+            .select('record_id', 'bp_name', 'bp_addres', 'bp_city', 'bp_state', 'bp_pincode', 'bp_gstin')
             .whereRaw('LOWER(bp_name) LIKE LOWER(?)', [`%${bpName}%`])
             .where({ tenant_id });
         if (locCode) query.whereRaw('loc_code ILIKE ?', [locCode]);

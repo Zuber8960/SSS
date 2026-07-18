@@ -45,12 +45,12 @@ fs.readdirSync(normalizedPath).forEach((file) => {
   }
 });
 
-fs.readdirSync(normalizedPath).forEach((file) => {
-  if (file.endsWith("api.route.js")) {
-    const route = require(path.join(normalizedPath, file));
-    app.use('/api',route);
-  }
-});
+// fs.readdirSync(normalizedPath).forEach((file) => {
+//   if (file.endsWith("api.route.js")) {
+//     const route = require(path.join(normalizedPath, file));
+//     app.use('/api',route);
+//   }
+// });
 
 
 app.use('/', (req, res) => {

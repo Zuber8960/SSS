@@ -157,11 +157,25 @@ const getDocketById = async ({ docket_no, docket_loc, docket_date }, tenant_id) 
 const getDocketByRecId = async (rec_id, tenant_id) => {
   const query = db('sss.sst_docket as d')
     .leftJoin('sss.sst_docket_ewb as e', 'd.docket_no', 'e.docket_no')
+    .leftJoin('sss.ssm_business_partner as cnor', 'd.cnor_id', 'cnor.record_id')
+    .leftJoin('sss.ssm_business_partner as cnee', 'd.cnee_id', 'cnee.record_id')
     .where({ 'd.rec_id': rec_id, 'd.record_status': 0 })
     .select(
       'd.*', 'e.ewb_no',
-      'e.cnor_name', 'e.cnor_address', 'e.cnor_pincode', 'e.cnor_gstin',
-      'e.cnee_name', 'e.cnee_address', 'e.cnee_pincode', 'e.cnee_gstin'
+      'cnor.record_id as cnor_id',
+      'cnor.bp_name as cnor_name',
+      'cnor.bp_addres as cnor_address',
+      'cnor.bp_city as cnor_city',
+      'cnor.bp_state as cnor_state',
+      'cnor.bp_pincode as cnor_pincode',
+      'cnor.bp_gstin as cnor_gstin',
+      'cnee.record_id as cnee_id',
+      'cnee.bp_name as cnee_name',
+      'cnee.bp_addres as cnee_address',
+      'cnee.bp_city as cnee_city',
+      'cnee.bp_state as cnee_state',
+      'cnee.bp_pincode as cnee_pincode',
+      'cnee.bp_gstin as cnee_gstin'
     );
   if (tenant_id) query.andWhere({ 'd.tenant_id': tenant_id });
   return query.first();
@@ -170,11 +184,25 @@ const getDocketByRecId = async (rec_id, tenant_id) => {
 const getDocketByNo = async (docket_no, tenant_id) => {
   const query = db('sss.sst_docket as d')
     .leftJoin('sss.sst_docket_ewb as e', 'd.docket_no', 'e.docket_no')
+    .leftJoin('sss.ssm_business_partner as cnor', 'd.cnor_id', 'cnor.record_id')
+    .leftJoin('sss.ssm_business_partner as cnee', 'd.cnee_id', 'cnee.record_id')
     .where({ 'd.docket_no': docket_no, 'd.record_status': 0 })
     .select(
       'd.*', 'e.ewb_no',
-      'e.cnor_name', 'e.cnor_address', 'e.cnor_pincode', 'e.cnor_gstin',
-      'e.cnee_name', 'e.cnee_address', 'e.cnee_pincode', 'e.cnee_gstin'
+      'cnor.record_id as cnor_id',
+      'cnor.bp_name as cnor_name',
+      'cnor.bp_addres as cnor_address',
+      'cnor.bp_city as cnor_city',
+      'cnor.bp_state as cnor_state',
+      'cnor.bp_pincode as cnor_pincode',
+      'cnor.bp_gstin as cnor_gstin',
+      'cnee.record_id as cnee_id',
+      'cnee.bp_name as cnee_name',
+      'cnee.bp_addres as cnee_address',
+      'cnee.bp_city as cnee_city',
+      'cnee.bp_state as cnee_state',
+      'cnee.bp_pincode as cnee_pincode',
+      'cnee.bp_gstin as cnee_gstin'
     );
   if (tenant_id) query.andWhere({ 'd.tenant_id': tenant_id });
   return query.first();
@@ -211,6 +239,18 @@ const sanitizeDocketData = (data) => {
   }
   if ('docket_act_wt' in sanitized && sanitized.docket_act_wt === null) sanitized.docket_act_wt = 0;
   if ('docket_chrg_wt' in sanitized && sanitized.docket_chrg_wt === null) sanitized.docket_chrg_wt = 0;
+  // Coerce FK id fields to integer or null
+  for (const field of ['cnor_id', 'cnee_id']) {
+    if (field in sanitized) {
+      const val = sanitized[field];
+      if (val === '' || val === undefined || val === null) {
+        sanitized[field] = null;
+      } else {
+        const num = parseInt(val, 10);
+        sanitized[field] = isNaN(num) ? null : num;
+      }
+    }
+  }
   return sanitized;
 };
 
