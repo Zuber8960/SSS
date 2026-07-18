@@ -26,6 +26,7 @@ import DescriptionIcon from "@mui/icons-material/Description";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import AccountTreeSharp from "@mui/icons-material/TireRepair";
 import AccessTime from "@mui/icons-material/ManageHistory";
+import UnarchiveIcon from "@mui/icons-material/Unarchive";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import Tooltip from "@mui/material/Tooltip";
@@ -111,6 +112,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/transaction/trip-sheet",       label: "Trip Sheet",      icon: <AccountTreeSharp /> },
         { path: "/transaction/manifest-entry",   label: "Manifest Entry",  icon: <AccessTime /> },
         { path: "/transaction/hire-voucher",     label: "Hire Voucher",    icon: <ReceiptLongIcon /> },
+        { path: "/transaction/manifest-unloading", label: "Manifest Unloading", icon: <UnarchiveIcon /> },
       ],
     },
   ];
