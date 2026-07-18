@@ -396,8 +396,13 @@ const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
 
 const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
   let apiCalls = false;
-  const query = db('sss.sst_ewb_hdr').whereIn('EWB_NO', ewbNumbers.map(String)).select('*');
-  if (tenant_id) query.andWhere({ tenant_id });
+  const query = db('sss.sst_ewb_hdr as hdr')
+    .whereIn('hdr.EWB_NO', ewbNumbers.map(String))
+    .select(
+      'hdr.*',
+      db.raw('(SELECT JSON_AGG(d.*) FROM sss.sst_ewb_dtl d WHERE d."EWB_NO" = hdr."EWB_NO") AS dtl_rows')
+    );
+  if (tenant_id) query.andWhere({ 'hdr.tenant_id': tenant_id });
   let results = await query;
   if (!results.length) {
     // If not found in DB, fetch from API
