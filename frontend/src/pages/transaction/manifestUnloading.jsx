@@ -584,7 +584,7 @@ export default function ManifestUnloading() {
     <MainLayout>
       <PageBody title="Manifest Unloading">
         {/* ---- Header Bar ---- */}
-        <div style={styles.headerBar}>
+        {/* <div style={styles.headerBar}>
           <div>
             <div style={styles.headerBarTitle}>
               🚚 Logistics ERP - Manifest Unloading
@@ -600,7 +600,7 @@ export default function ManifestUnloading() {
             </div>
             <div>{new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</div>
           </div>
-        </div>
+        </div> */}
 
         {/* ---- Manifest Information ---- */}
         <div style={styles.panel}>
@@ -635,12 +635,12 @@ export default function ManifestUnloading() {
                 </label>
                 <input type="text" value={header.origin_branch} readOnly style={styles.searchInput} />
               </div>
-              <div>
+              {/* <div>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
                   Destination Branch
                 </label>
                 <input type="text" value={header.dest_branch} readOnly style={styles.searchInput} />
-              </div>
+              </div> */}
               <div>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
                   Vehicle No
@@ -764,7 +764,7 @@ export default function ManifestUnloading() {
         </div>
 
         {/* ---- Dashboard Cards ---- */}
-        <div style={styles.cardsContainer}>
+        {/* <div style={styles.cardsContainer}>
           <div style={{ ...styles.card, ...cardColor("total") }}>
             <div style={styles.cardNumber}>{summary.total}</div>
             <div style={styles.cardLabel}>Total Dockets</div>
@@ -797,10 +797,10 @@ export default function ManifestUnloading() {
             <div style={styles.cardNumber}>{summary.pending}</div>
             <div style={styles.cardLabel}>Pending</div>
           </div>
-        </div>
+        </div> */}
 
         {/* ---- Toolbar ---- */}
-        <div style={styles.panel}>
+        {/* <div style={styles.panel}>
           <div style={styles.panelTitle}>Search / Barcode / Actions</div>
           <div style={styles.panelBody}>
             <div style={styles.toolbar}>
@@ -850,7 +850,7 @@ export default function ManifestUnloading() {
               </button>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* ---- Grid ---- */}
         <div style={styles.panel}>
