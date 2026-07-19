@@ -13,7 +13,7 @@ import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
 import { fetchDocketByDocketNo } from "../../utils/docket";
-import { fetchAllLocations } from "../../utils/locationMaster";
+import { fetchAllLocations, fetchLocationTowns } from "../../utils/locationMaster";
 import { AddIcon, DeleteIcon, EditIcon, SaveIcon, NoteAddIcon, ResetIcon } from "../../components/common/icons";
 import { IconButton, Tooltip } from "@mui/material";
 import {
@@ -25,13 +25,28 @@ import {
 // ✅ Header Fields
 const manifestFields = [
   { label: "Manifest No", name: "manifest_no" },
+  {
+    label: "Manifest Type",
+    name: "manifest_type",
+    options: [
+      { label: "local pickup", value: "lp" },
+      { label: "local delivery", value: "ld" },
+      { label: "local hole", value: "lh" }
+    ],
+  },
+
   { label: "Manifest Date", name: "manifest_date", type: "date" },
   { label: "From Location", name: "from_loc", isLocation: true },
+  { label: "From Town", name: "from_town" },
   { label: "To Location", name: "to_loc", isLocation: true },
+  { label: "To Town", name: "to_town" },
 
   { label: "Vehicle No", name: "vehicle_no" },
   { label: "Driver Name", name: "driver_name" },
+  { label: "Driver Mobile", name: "driver_mobile" },
 
+  
+  { label: "No of Packages", name: "no_of_packages", type: "number" },
   { label: "Total Weight", name: "total_wt", type: "number", disabled: true },
   { label: "Total Packages", name: "total_pkgs", type: "number", disabled: true },
 
@@ -51,9 +66,14 @@ const emptyForm = {
   manifest_no: "",
   manifest_date: "",
   from_loc: "",
+  from_town: "",
   to_loc: "",
+  to_town: "",
   vehicle_no: "",
   driver_name: "",
+  driver_mobile: "",
+  manifest_type: "",
+  no_of_packages: "",
   consignor: "",
   consignee: "",
   total_wt: "",
@@ -70,6 +90,7 @@ export default function ManifestPage() {
   const [docketCache, setDocketCache] = useState({});
   const [selectedRows, setSelectedRows] = useState([]);
   const [locations, setLocations] = useState([]);
+  const [townOptions, setTownOptions] = useState({ from: [], to: [] });
 
   // Build location dropdown options
   const locationOptions = locations.map((loc) => ({
@@ -77,12 +98,60 @@ export default function ManifestPage() {
     value: loc.loc_code,
   }));
 
+  // Build town dropdown options
+  const townFieldOptions = useMemo(() => ({
+    from: townOptions.from.map((town) => ({
+      label: town.town_name || town.town_code || town.loc_code || town.name,
+      value: town.town_name || town.town_code || town.loc_code || town.name,
+    })),
+    to: townOptions.to.map((town) => ({
+      label: town.town_name || town.town_code || town.loc_code || town.name,
+      value: town.town_name || town.town_code || town.loc_code || town.name,
+    })),
+  }), [townOptions]);
+
   // Load locations on mount
   useEffect(() => {
     fetchAllLocations()
       .then((data) => setLocations(data))
       .catch((err) => console.error("Failed to load locations:", err));
   }, []);
+
+  // Load towns when from_loc changes
+  useEffect(() => {
+    const loadTowns = async () => {
+      if (!form.from_loc) {
+        setTownOptions((prev) => ({ ...prev, from: [] }));
+        return;
+      }
+      try {
+        const towns = await fetchLocationTowns(form.from_loc);
+        setTownOptions((prev) => ({ ...prev, from: towns || [] }));
+      } catch (err) {
+        console.error("Failed to load from towns:", err);
+        setTownOptions((prev) => ({ ...prev, from: [] }));
+      }
+    };
+    loadTowns();
+  }, [form.from_loc]);
+
+  // Load towns when to_loc changes
+  useEffect(() => {
+    const loadTowns = async () => {
+      if (!form.to_loc) {
+        setTownOptions((prev) => ({ ...prev, to: [] }));
+        return;
+      }
+      try {
+        const towns = await fetchLocationTowns(form.to_loc);
+        setTownOptions((prev) => ({ ...prev, to: towns || [] }));
+      } catch (err) {
+        console.error("Failed to load to towns:", err);
+        setTownOptions((prev) => ({ ...prev, to: [] }));
+      }
+    };
+    loadTowns();
+  }, [form.to_loc]);
 
   // Mode: "create" | "edit"
   const [mode, setMode] = useState("create");
@@ -191,8 +260,13 @@ export default function ManifestPage() {
     mnf_loc: form.from_loc,
     mnf_date: form.manifest_date || null,
     mnf_to_loc: form.to_loc,
+    mnf_from_town: form.from_town || "",
+    mnf_to_town: form.to_town || "",
     desp_veh_no: form.vehicle_no,
     loaded_by: form.driver_name,
+    driver_mobile: form.driver_mobile || "",
+    mnf_type: form.manifest_type || "",
+    mnf_no_of_pkgs: form.no_of_packages ? parseFloat(form.no_of_packages) : 0,
     mnf_actual_wt: computedTotals.total_wt,
     mnf_no_of_dwb: computedTotals.total_pkgs,
     aud_user: form.remarks || "",
@@ -219,9 +293,14 @@ export default function ManifestPage() {
     manifest_no: hdr.mnf_no || "",
     manifest_date: hdr.mnf_date ? hdr.mnf_date.substring(0, 10) : "",
     from_loc: hdr.mnf_loc || "",
+    from_town: hdr.mnf_from_town || "",
     to_loc: hdr.mnf_to_loc || "",
+    to_town: hdr.mnf_to_town || "",
     vehicle_no: hdr.desp_veh_no || "",
     driver_name: hdr.loaded_by || "",
+    driver_mobile: hdr.driver_mobile || "",
+    manifest_type: hdr.mnf_type || "",
+    no_of_packages: hdr.mnf_no_of_pkgs ?? "",
     total_wt: hdr.mnf_actual_wt ?? "",
     total_pkgs: hdr.mnf_no_of_dwb ?? "",
     remarks: hdr.aud_user || "",
@@ -388,10 +467,16 @@ export default function ManifestPage() {
     flexWrap: "wrap",
   };
 
-  // Inject location options for location fields in FormPanel
+  // Inject location/town options for fields in FormPanel
   const getFieldWithOptions = (field) => {
     if (field.isLocation) {
       return { ...field, options: locationOptions };
+    }
+    if (field.name === "from_town") {
+      return { ...field, options: townFieldOptions.from };
+    }
+    if (field.name === "to_town") {
+      return { ...field, options: townFieldOptions.to };
     }
     return field;
   };
