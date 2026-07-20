@@ -17,6 +17,7 @@ import TripSheet from "./pages/transaction/TripSheet";
 import ManifestEntry from "./pages/transaction/ManifestEntry";
 import HireVoucherPage from "./pages/transaction/Hire_voucher";
 import ManifestUnloading from "./pages/transaction/manifestUnloading";
+import DocketEnquiry from "./pages/transaction/DocketEnquiry";
 import { isAuthenticated } from "./utils/authService";
 
 const appRoutes = [
@@ -39,6 +40,7 @@ const appRoutes = [
   { path: "/transaction/manifest-entry", element: <ManifestEntry />, protected: true },
   { path: "/transaction/hire-voucher", element: <HireVoucherPage />, protected: true },
   { path: "/transaction/manifest-unloading", element: <ManifestUnloading />, protected: true },
+  { path: "/transaction/docket-enquiry", element: <DocketEnquiry />, protected: true },
 ];
 
 function ProtectedRoute({ children }) {

@@ -50,6 +50,18 @@ router.get('/by-no/:no', async (req, res) => {
   }
 });
 
+/* ================= GET MANIFESTS BY DOCKET NO ================= */
+
+router.get('/by-docket/:docketNo', async (req, res) => {
+  try {
+    const { docketNo } = req.params;
+    const data = await ManifestController.getManifestsByDocketNo(docketNo);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 /* ================= GET NEXT MANIFEST NO ================= */
 
 router.get('/next-no', async (req, res) => {
@@ -65,6 +77,7 @@ router.get('/next-no', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
+    const { tenant_id } = req;
     const { header, details } = req.body;
     if (!header) {
       return res.status(400).json({ success: false, message: 'Header data is required' });
@@ -72,7 +85,7 @@ router.post('/', async (req, res) => {
     if (!details || !details.length) {
       return res.status(400).json({ success: false, message: 'At least one docket detail is required' });
     }
-    const result = await ManifestController.createManifest(header, details);
+    const result = await ManifestController.createManifest({ ...header, tenant_id }, details);
     res.status(201).json({
       success: true,
       message: 'Manifest saved successfully',

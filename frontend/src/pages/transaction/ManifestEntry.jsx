@@ -45,7 +45,7 @@ const manifestFields = [
   { label: "Driver Name", name: "driver_name" },
   { label: "Driver Mobile", name: "driver_mobile" },
 
-  
+
   { label: "No of Packages", name: "no_of_packages", type: "number" },
   { label: "Total Weight", name: "total_wt", type: "number", disabled: true },
   { label: "Total Packages", name: "total_pkgs", type: "number", disabled: true },
@@ -257,6 +257,7 @@ export default function ManifestPage() {
 
   // ✅ Map form fields to DB header columns
   const mapFormToHeader = () => ({
+    division_code: localStorage.getItem("division_code") || "",
     mnf_loc: form.from_loc,
     mnf_date: form.manifest_date || null,
     mnf_to_loc: form.to_loc,

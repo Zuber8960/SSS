@@ -27,3 +27,7 @@ export const updateManifest = (mnfNo, mnfLoc, mnfDate, header, details) =>
 // Delete manifest (soft)
 export const deleteManifest = (mnfNo, mnfLoc, mnfDate) =>
   Api.delete(`/manifest/${encodeURIComponent(mnfNo)}/${encodeURIComponent(mnfLoc)}/${encodeURIComponent(mnfDate)}`).then(r => r.data);
+
+// Fetch manifests by docket number (for Docket Enquiry)
+export const fetchManifestsByDocketNo = (docketNo) =>
+  Api.get(`/manifest/by-docket/${encodeURIComponent(docketNo)}`).then(r => r.data.data || r.data || []);

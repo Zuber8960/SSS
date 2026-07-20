@@ -100,7 +100,7 @@ export default function TenantLoginPage() {
       })
       .catch(() => showError("Failed to load tenant config"))
       .finally(() => setLoadingConfig(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantSlug]);
 
   const handleTenantLogin = async () => {
@@ -125,6 +125,14 @@ export default function TenantLoginPage() {
       const selectedLoc = selectedLocation || response.user?.location_id;
       const userToStore = { ...response.user, division_code: selectedDiv, location_id: selectedLoc };
       localStorage.setItem("current_user", JSON.stringify(userToStore));
+
+      // Store company_code and division_code separately (used by manifests etc.)
+      if (selectedLoc) {
+        localStorage.setItem("loc_code", selectedLoc);
+      }
+      if (selectedDiv) {
+        localStorage.setItem("division_code", selectedDiv);
+      }
 
       // Save division_code and loc_code to the user table in the backend
       if (response.user?.rec_id) {
@@ -165,270 +173,270 @@ export default function TenantLoginPage() {
   return (
     <>
       <Box sx={{ minHeight: "100vh", backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat" }}>
-      <Box className="loginContainer" sx={{ display: "flex", minHeight: "85vh" }}>
+        <Box className="loginContainer" sx={{ display: "flex", minHeight: "85vh" }}>
 
-        {/* ── Left promo panel ── */}
-        <Box
-          className="loginPromoColumn"
-          sx={{
-            flex: "1 1 420px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            p: "10px 36px",
-          }}
-        >
-          <Paper
-            elevation={3}
+          {/* ── Left promo panel ── */}
+          <Box
+            className="loginPromoColumn"
             sx={{
-              width: "100%",
-              maxWidth: 560,
-              p: 4,
-              borderRadius: 3,
-              background: gradient,
-              color: "#fff",
+              flex: "1 1 420px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              p: "10px 36px",
             }}
           >
-          <Box sx={{ width: "100%" }}>
-            {config?.logo_url && (
-              <Box display="flex" justifyContent="center" mb={2}>
-                <Box
-                  component="img"
-                  src={config.logo_url}
-                  alt={config.tenant_name}
-                  sx={{ height: 126, width: 300, objectFit: "contain" }}
-                  onError={e => { e.target.style.display = "none"; }}
-                />
+            <Paper
+              elevation={3}
+              sx={{
+                width: "100%",
+                maxWidth: 560,
+                p: 4,
+                borderRadius: 3,
+                background: gradient,
+                color: "#fff",
+              }}
+            >
+              <Box sx={{ width: "100%" }}>
+                {config?.logo_url && (
+                  <Box display="flex" justifyContent="center" mb={2}>
+                    <Box
+                      component="img"
+                      src={config.logo_url}
+                      alt={config.tenant_name}
+                      sx={{ height: 126, width: 300, objectFit: "contain" }}
+                      onError={e => { e.target.style.display = "none"; }}
+                    />
+                  </Box>
+                )}
+
+                <Typography variant="h3" fontWeight={700} textAlign="center" mb={1}>
+                  {config?.tenant_name || tenantSlug}
+                </Typography>
+                <Typography textAlign="center" sx={{ opacity: 0.9, mb: 3 }}>
+                  {config?.tagline || "Enterprise Resource Planning System"}
+                </Typography>
+
+                <Stack spacing={2}>
+                  {promoCards.map((card, i) => (
+                    <Paper
+                      key={i}
+                      elevation={0}
+                      sx={{ background: "rgba(255,255,255,0.1)", p: 2, borderRadius: 2 }}
+                    >
+                      <Typography fontWeight={700}>{card.title}</Typography>
+                      <Typography sx={{ opacity: 0.9, fontSize: 14 }}>{card.body}</Typography>
+                    </Paper>
+                  ))}
+                </Stack>
               </Box>
-            )}
-
-            <Typography variant="h3" fontWeight={700} textAlign="center" mb={1}>
-              {config?.tenant_name || tenantSlug}
-            </Typography>
-            <Typography textAlign="center" sx={{ opacity: 0.9, mb: 3 }}>
-              {config?.tagline || "Enterprise Resource Planning System"}
-            </Typography>
-
-            <Stack spacing={2}>
-              {promoCards.map((card, i) => (
-                <Paper
-                  key={i}
-                  elevation={0}
-                  sx={{ background: "rgba(255,255,255,0.1)", p: 2, borderRadius: 2 }}
-                >
-                  <Typography fontWeight={700}>{card.title}</Typography>
-                  <Typography sx={{ opacity: 0.9, fontSize: 14 }}>{card.body}</Typography>
-                </Paper>
-              ))}
-            </Stack>
+            </Paper>
           </Box>
-          </Paper>
-        </Box>
 
-        {/* ── Right login panel ── */}
-        <Box
-          sx={{
-            flex: "1 1 420px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            p: "10px 36px",
-          }}
-        >
-          <Paper
-            elevation={3}
+          {/* ── Right login panel ── */}
+          <Box
             sx={{
-              width: "100%",
-              maxWidth: 420,
-              p: 4,
-              borderRadius: 3,
-              border: `2px solid ${primaryColor}44`,
+              flex: "1 1 420px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              p: "10px 36px",
             }}
           >
-            {config?.logo_url && (
-              <Box display="flex" justifyContent="center" mb={2}>
-                <Box
-                  component="img"
-                  src={config.logo_url}
-                  alt={config.tenant_name}
-                  sx={{ width: 200, maxWidth: "65%", height: "auto" }}
-                  onError={e => { e.target.style.display = "none"; }}
-                />
-              </Box>
-            )}
-
-            {!tenantVerified ? (
-              <Stack spacing={2} onKeyDown={handleKeyDown}>
-                <Box>
-                  <Typography fontWeight={700} fontSize={16} color="#203040">
-                    {config?.tenant_name} — Organisation Login
-                  </Typography>
-                  <Typography fontSize={13} color="text.secondary">
-                    Enter your organisation credentials to continue
-                  </Typography>
+            <Paper
+              elevation={3}
+              sx={{
+                width: "100%",
+                maxWidth: 420,
+                p: 4,
+                borderRadius: 3,
+                border: `2px solid ${primaryColor}44`,
+              }}
+            >
+              {config?.logo_url && (
+                <Box display="flex" justifyContent="center" mb={2}>
+                  <Box
+                    component="img"
+                    src={config.logo_url}
+                    alt={config.tenant_name}
+                    sx={{ width: 200, maxWidth: "65%", height: "auto" }}
+                    onError={e => { e.target.style.display = "none"; }}
+                  />
                 </Box>
+              )}
 
-                <TextField
-                  label="User ID"
-                  fullWidth
-                  size="small"
-                  value={tenantUserId}
-                  onChange={e => setTenantUserId(e.target.value)}
-                />
+              {!tenantVerified ? (
+                <Stack spacing={2} onKeyDown={handleKeyDown}>
+                  <Box>
+                    <Typography fontWeight={700} fontSize={16} color="#203040">
+                      {config?.tenant_name} — Organisation Login
+                    </Typography>
+                    <Typography fontSize={13} color="text.secondary">
+                      Enter your organisation credentials to continue
+                    </Typography>
+                  </Box>
 
-                <TextField
-                  label="Password"
-                  fullWidth
-                  size="small"
-                  type={showTenantPwd ? "text" : "password"}
-                  value={tenantPassword}
-                  onChange={e => setTenantPassword(e.target.value)}
-                  slotProps={{
-                    input: {
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton size="small" onClick={() => setShowTenantPwd(s => !s)}>
-                            {showTenantPwd ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
+                  <TextField
+                    label="User ID"
+                    fullWidth
+                    size="small"
+                    value={tenantUserId}
+                    onChange={e => setTenantUserId(e.target.value)}
+                  />
 
-                <Button
-                  variant="contained"
-                  fullWidth
-                  onClick={handleTenantLogin}
-                  disabled={loading}
-                  sx={{ py: 1.4, fontWeight: 700, background: buttonColor, "&:hover": { background: buttonColor, filter: "brightness(0.9)" }, textTransform: "none", fontSize: 15 }}
-                >
-                  {loading ? <CircularProgress size={20} color="inherit" /> : "Continue"}
-                </Button>
-
-                <Button
-                  startIcon={<ArrowBackIcon />}
-                  onClick={() => navigate("/")}
-                  sx={{ color: primaryColor, textTransform: "none", fontSize: 13 }}
-                >
-                  Back to organisation selection
-                </Button>
-              </Stack>
-            ) : (
-              <Stack spacing={2} onKeyDown={handleKeyDown}>
-                <Box>
-                  <Typography fontWeight={700} fontSize={16} color="#203040">
-                    Sign in to {config?.tenant_name}
-                  </Typography>
-                  <Typography fontSize={13} color="text.secondary">
-                    Enter your account credentials
-                  </Typography>
-                </Box>
-
-                <TextField
-                  label="Username"
-                  fullWidth
-                  size="small"
-                  value={userId}
-                  onChange={e => setUserId(e.target.value)}
-                />
-
-                <TextField
-                  label="Password"
-                  fullWidth
-                  size="small"
-                  type={showPwd ? "text" : "password"}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  slotProps={{
-                    input: {
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton size="small" onClick={() => setShowPwd(s => !s)}>
-                            {showPwd ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
-
-                <FormControl fullWidth size="small">
-                  <InputLabel sx={{ fontSize: 13 }}>Division</InputLabel>
-                  <Select
-                    label="Division"
-                    value={selectedDivision}
-                    onChange={e => setSelectedDivision(e.target.value)}
-                    sx={{ fontSize: 13 }}
-                    MenuProps={{
-                      slotProps: {
-                        paper: {
-                          sx: {
-                            '& .MuiMenuItem-root': { fontSize: 13 },
-                          },
-                        },
+                  <TextField
+                    label="Password"
+                    fullWidth
+                    size="small"
+                    type={showTenantPwd ? "text" : "password"}
+                    value={tenantPassword}
+                    onChange={e => setTenantPassword(e.target.value)}
+                    slotProps={{
+                      input: {
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton size="small" onClick={() => setShowTenantPwd(s => !s)}>
+                              {showTenantPwd ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
                       },
                     }}
-                  >
-                    <MenuItem value=""><em>None</em></MenuItem>
-                    {divisions.map(div => (
-                      <MenuItem key={div.division_code} value={div.division_code}>
-                        {div.division_code} - {div.division_name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                  />
 
-                <FormControl fullWidth size="small">
-                  <InputLabel sx={{ fontSize: 13 }}>Location</InputLabel>
-                  <Select
-                    label="Location"
-                    value={selectedLocation}
-                    onChange={e => setSelectedLocation(e.target.value)}
-                    sx={{ fontSize: 13 }}
-                    MenuProps={{
-                      slotProps: {
-                        paper: {
-                          sx: {
-                            '& .MuiMenuItem-root': { fontSize: 13 },
-                          },
-                        },
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    onClick={handleTenantLogin}
+                    disabled={loading}
+                    sx={{ py: 1.4, fontWeight: 700, background: buttonColor, "&:hover": { background: buttonColor, filter: "brightness(0.9)" }, textTransform: "none", fontSize: 15 }}
+                  >
+                    {loading ? <CircularProgress size={20} color="inherit" /> : "Continue"}
+                  </Button>
+
+                  <Button
+                    startIcon={<ArrowBackIcon />}
+                    onClick={() => navigate("/")}
+                    sx={{ color: primaryColor, textTransform: "none", fontSize: 13 }}
+                  >
+                    Back to organisation selection
+                  </Button>
+                </Stack>
+              ) : (
+                <Stack spacing={2} onKeyDown={handleKeyDown}>
+                  <Box>
+                    <Typography fontWeight={700} fontSize={16} color="#203040">
+                      Sign in to {config?.tenant_name}
+                    </Typography>
+                    <Typography fontSize={13} color="text.secondary">
+                      Enter your account credentials
+                    </Typography>
+                  </Box>
+
+                  <TextField
+                    label="Username"
+                    fullWidth
+                    size="small"
+                    value={userId}
+                    onChange={e => setUserId(e.target.value)}
+                  />
+
+                  <TextField
+                    label="Password"
+                    fullWidth
+                    size="small"
+                    type={showPwd ? "text" : "password"}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    slotProps={{
+                      input: {
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton size="small" onClick={() => setShowPwd(s => !s)}>
+                              {showPwd ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
                       },
                     }}
+                  />
+
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ fontSize: 13 }}>Division</InputLabel>
+                    <Select
+                      label="Division"
+                      value={selectedDivision}
+                      onChange={e => setSelectedDivision(e.target.value)}
+                      sx={{ fontSize: 13 }}
+                      MenuProps={{
+                        slotProps: {
+                          paper: {
+                            sx: {
+                              '& .MuiMenuItem-root': { fontSize: 13 },
+                            },
+                          },
+                        },
+                      }}
+                    >
+                      <MenuItem value=""><em>None</em></MenuItem>
+                      {divisions.map(div => (
+                        <MenuItem key={div.division_code} value={div.division_code}>
+                          {div.division_code} - {div.division_name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ fontSize: 13 }}>Location</InputLabel>
+                    <Select
+                      label="Location"
+                      value={selectedLocation}
+                      onChange={e => setSelectedLocation(e.target.value)}
+                      sx={{ fontSize: 13 }}
+                      MenuProps={{
+                        slotProps: {
+                          paper: {
+                            sx: {
+                              '& .MuiMenuItem-root': { fontSize: 13 },
+                            },
+                          },
+                        },
+                      }}
+                    >
+                      <MenuItem value=""><em>None</em></MenuItem>
+                      {locations.map(loc => (
+                        <MenuItem key={loc.loc_id} value={loc.loc_id}>
+                          {loc.loc_code} - {loc.loc_name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    onClick={handleAppLogin}
+                    disabled={loading}
+                    sx={{ py: 1.4, fontWeight: 700, background: buttonColor, "&:hover": { background: buttonColor, filter: "brightness(0.9)" }, textTransform: "none", fontSize: 15 }}
                   >
-                    <MenuItem value=""><em>None</em></MenuItem>
-                    {locations.map(loc => (
-                      <MenuItem key={loc.loc_id} value={loc.loc_id}>
-                        {loc.loc_code} - {loc.loc_name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                    {loading ? <CircularProgress size={20} color="inherit" /> : "Sign In"}
+                  </Button>
 
-                <Button
-                  variant="contained"
-                  fullWidth
-                  onClick={handleAppLogin}
-                  disabled={loading}
-                  sx={{ py: 1.4, fontWeight: 700, background: buttonColor, "&:hover": { background: buttonColor, filter: "brightness(0.9)" }, textTransform: "none", fontSize: 15 }}
-                >
-                  {loading ? <CircularProgress size={20} color="inherit" /> : "Sign In"}
-                </Button>
-
-                <Button
-                  startIcon={<ArrowBackIcon />}
-                  onClick={() => navigate("/")}
-                  sx={{ color: primaryColor, textTransform: "none", fontSize: 13 }}
-                >
-                  Back to organisation selection
-                </Button>
-              </Stack>
-            )}
-          </Paper>
+                  <Button
+                    startIcon={<ArrowBackIcon />}
+                    onClick={() => navigate("/")}
+                    sx={{ color: primaryColor, textTransform: "none", fontSize: 13 }}
+                  >
+                    Back to organisation selection
+                  </Button>
+                </Stack>
+              )}
+            </Paper>
+          </Box>
         </Box>
-      </Box>
 
-      <Footer />
+        <Footer />
       </Box>
       <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
     </>
