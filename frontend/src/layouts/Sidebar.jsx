@@ -24,6 +24,7 @@ import AssignmentIcon from "@mui/icons-material/Assignment";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import DescriptionIcon from "@mui/icons-material/Description";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import FindInPageIcon from "@mui/icons-material/FindInPage";
 import AccountTreeSharp from "@mui/icons-material/TireRepair";
 import AccessTime from "@mui/icons-material/ManageHistory";
 import UnarchiveIcon from "@mui/icons-material/Unarchive";
@@ -113,6 +114,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/transaction/manifest-entry",   label: "Manifest Entry",  icon: <AccessTime /> },
         { path: "/transaction/hire-voucher",     label: "Hire Voucher",    icon: <ReceiptLongIcon /> },
         { path: "/transaction/manifest-unloading", label: "Manifest Unloading", icon: <UnarchiveIcon /> },
+        { path: "/transaction/docket-enquiry", label: "Docket Enquiry", icon: <FindInPageIcon /> },
       ],
     },
   ];

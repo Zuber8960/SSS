@@ -39,3 +39,11 @@ export const getCompanyCode = () => {
   const user = JSON.parse(localStorage.getItem('current_user') || 'null');
   return user?.company_code ?? null;
 };
+
+export const getDivisionCode = () => {
+  return localStorage.getItem('division_code');
+};
+
+export const getStoredCompanyCode = () => {
+  return localStorage.getItem('company_code');
+};

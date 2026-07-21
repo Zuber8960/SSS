@@ -63,7 +63,7 @@ const createManifest = async (headerData, detailsData) => {
     await trx('sss.sst_mnf_hdr').insert(headerRow);
 
     // Filter out detail rows with missing required fields (NOT NULL columns)
-    const validDetails = detailsData.filter(row => 
+    const validDetails = detailsData.filter(row =>
       row.dwb_no && row.dwb_no.toString().trim() !== '' &&
       row.dwb_date && row.dwb_date.toString().trim() !== '' &&
       row.dwb_loc && row.dwb_loc.toString().trim() !== '' &&
@@ -126,7 +126,7 @@ const updateManifestDetails = async (keys, detailsData) => {
       .del();
 
     // Filter out detail rows with missing required fields (NOT NULL columns)
-    const validDetails = detailsData.filter(row => 
+    const validDetails = detailsData.filter(row =>
       row.dwb_no && row.dwb_no.toString().trim() !== '' &&
       row.dwb_date && row.dwb_date.toString().trim() !== '' &&
       row.dwb_loc && row.dwb_loc.toString().trim() !== '' &&
@@ -165,6 +165,22 @@ const updateManifestDetails = async (keys, detailsData) => {
   }
 };
 
+/* ================= GET MANIFESTS BY DOCKET NO (search in mnf_dtl + join with mnf_hdr) ================= */
+
+const getManifestsByDocketNo = async (docketNo) => {
+  return db('sss.sst_mnf_dtl as dtl')
+    .join('sss.sst_mnf_hdr as hdr', function () {
+      this.on('dtl.mnf_no', '=', 'hdr.mnf_no')
+        .andOn('dtl.mnf_loc', '=', 'hdr.mnf_loc')
+        .andOn('dtl.mnf_date', '=', 'hdr.mnf_date');
+    })
+    .where({ 'dtl.dwb_no': docketNo})
+    .select(
+      'hdr.*'
+    )
+    .orderBy('hdr.aud_date', 'desc');
+};
+
 /* ================= DELETE MANIFEST (soft) ================= */
 
 const deleteManifest = async (keys, trx = db) => {
@@ -182,5 +198,6 @@ module.exports = {
   createManifest,
   updateManifest,
   updateManifestDetails,
+  getManifestsByDocketNo,
   deleteManifest
 };
