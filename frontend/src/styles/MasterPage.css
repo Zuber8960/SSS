@@ -380,15 +380,16 @@
 
 /* Data Table */
 .dataTableWrapper {
-  background: #ffffff;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #ffffff 0%, #fcfbff 100%);
+  border-radius: 18px;
+  border: 1px solid #e9d5ff;
   overflow-x: auto;
   overflow-y: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 16px 40px rgba(109, 40, 217, 0.08);
   transition: all 0.2s ease;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  /* padding: 6px; */
 }
 
 .dataTableWrapper::-webkit-scrollbar {
@@ -397,6 +398,12 @@
 
 .dataTableWrapper .MuiDataGrid-root {
   min-width: 760px;
+  border: none;
+  background: transparent;
+}
+
+.dataTableWrapper .MuiDataGrid-virtualScroller {
+  background: transparent;
 }
 
 /* Force all column headers and cells to align left */
@@ -415,19 +422,38 @@
   text-align: left !important;
 }
 
-/* Hide MUI DataGrid's internal horizontal scrollbar on laptop/desktop */
-.dataTableWrapper .MuiDataGrid-scrollbar--horizontal,
-.dataTableWrapper .MuiDataGrid-virtualScroller::-webkit-scrollbar {
+/* Show a themed vertical scrollbar inside the DataGrid scroller */
+.dataTableWrapper .MuiDataGrid-scrollbar--horizontal {
   display: none;
 }
 
-.dataTableWrapper .MuiDataGrid-virtualScroller {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+/* .dataTableWrapper .MuiDataGrid-virtualScroller {
+  scrollbar-width: thin;
+  scrollbar-color: #b4b4b4 #f3e8ff;
+} */
+
+.dataTableWrapper .MuiDataGrid-virtualScroller::-webkit-scrollbar {
+  width: 10px;
+}
+
+.dataTableWrapper .MuiDataGrid-virtualScroller::-webkit-scrollbar-track {
+  background: #f3e8ff;
+  border-radius: 999px;
+}
+
+.dataTableWrapper .MuiDataGrid-virtualScroller::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.9);
+  border-radius: 999px;
+  border: 2px solid #f3e8ff;
+}
+
+.dataTableWrapper .MuiDataGrid-virtualScroller::-webkit-scrollbar-thumb:hover {
+  background: #7c3aed;
 }
 
 .dataTableWrapper:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 20px 44px rgba(109, 40, 217, 0.12);
+  transform: translateY(-1px);
 }
 
 .dataTable {

@@ -256,8 +256,27 @@ export function DataTable({
       headerAlign: "center",
       align: "center",
 
-      renderCell: (params) =>
-        col.render ? col.render(params.row) : params.value,
+      renderCell: (params) => {
+        const value = col.render ? col.render(params.row) : params.value;
+        const displayValue = value ?? "";
+        const textValue = typeof displayValue === "string" ? displayValue : String(displayValue ?? "");
+
+        return (
+          <Tooltip title={textValue || ""} placement="top" enterDelay={200} arrow>
+            <span
+              style={{
+                display: "block",
+                width: "100%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {value}
+            </span>
+          </Tooltip>
+        );
+      },
 
       // Commit immediately when user picks from a dropdown — no blur required
       ...(col.options && (col.editable ?? editable)
@@ -315,17 +334,94 @@ export function DataTable({
     ...row,
   }));
 
+  const tableSx = {
+    border: "none",
+    borderRadius: "16px",
+    overflow: "hidden",
+    background: "linear-gradient(180deg, #ffffff 0%, #fcfbff 100%)",
+    boxShadow: "none",
+    "& .MuiDataGrid-main": {
+      background: "transparent",
+    },
+    height: 320,
+    "& .MuiDataGrid-columnHeaders": {
+      background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
+      borderBottom: "none",
+      color: "#fff",
+      minHeight: "42px !important",
+    },
+    "& .MuiDataGrid-columnHeader": {
+      borderRight: "1px solid rgba(255,255,255,0.18)",
+    },
+    "& .MuiDataGrid-columnHeader:last-of-type": {
+      borderRight: "none",
+    },
+    "& .MuiDataGrid-columnHeaderTitle": {
+      fontWeight: 700,
+      fontSize: "12px",
+      letterSpacing: "0.04em",
+      textTransform: "uppercase",
+      color: "#0f0b0b",
+    },
+    "& .MuiDataGrid-columnSeparator": {
+      display: "none",
+    },
+    "& .MuiDataGrid-cell": {
+      borderBottom: "1px solid #f3e8ff",
+      borderRight: "1px solid #f3e8ff",
+      color: "#334155",
+      padding: "6px 12px",
+      fontSize: "13px",
+      minHeight: "unset",
+      lineHeight: 1.3,
+      backgroundColor: "transparent",
+    },
+    "& .MuiDataGrid-cell:last-of-type": {
+      borderRight: "none",
+    },
+    "& .MuiDataGrid-row": {
+      transition: "all 0.2s ease",
+      backgroundColor: "#ffffff",
+      margin: 0,
+      minHeight: "36px !important",
+      "&:hover": {
+        backgroundColor: "#f8f5ff !important",
+      },
+    },
+    "& .MuiDataGrid-row:nth-of-type(even)": {
+      backgroundColor: "#fcfbff",
+    },
+    "& .MuiDataGrid-footerContainer": {
+      borderTop: "1px solid #f3e8ff",
+      background: "#faf7ff",
+      // minHeight: "12px",
+    },
+    "& .MuiTablePagination-root": {
+      color: "#6d28d9",
+    },
+    "& .MuiDataGrid-cell:focus, & .MuiDataGrid-columnHeader:focus": {
+      outline: "none",
+    },
+  };
+
   return (
     <div className="dataTableWrapper" style={{ width: "100%", marginBottom: 24, overflowX: "auto" }}>
       <DataGrid
         rows={muiRows}
         columns={muiColumns}
-        paginationModel={effectivePaginationModel}
-        onPaginationModelChange={setPaginationModel}
-        pageSizeOptions={[5]}
         disableRowSelectionOnClick
-        pagination
-        autoHeight
+        disableColumnMenu
+        density="compact"
+        rowHeight={55}
+        headerHeight={42}
+        autoHeight={false}
+        hideFooter
+        disableVirtualization={false}
+        rowSelection={false}
+        sx={{
+          height: 320,
+          overflowY: "auto",
+        }}
         {...(singleClick ? {
           apiRef,
           onCellClick: (params) => {
@@ -356,17 +452,7 @@ export function DataTable({
           console.error("DataTable edit error:", error);
         }}
 
-        sx={{
-          "& .MuiDataGrid-columnHeaders": {
-            backgroundColor: "#f5f5f5",
-          },
-          "& .MuiDataGrid-columnHeaderTitle": {
-            fontWeight: "bold",
-            fontSize: "14px",
-          },
-        }}
-
-
+        sx={tableSx}
       />
     </div>
   );
