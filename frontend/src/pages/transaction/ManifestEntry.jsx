@@ -21,6 +21,7 @@ import {
   fetchManifestByNo,
   updateManifest,
 } from "../../utils/manifest";
+import { fetchLorryByVehicleNo } from "../../utils/lorryMaster";
 
 // ✅ Header Fields
 const manifestFields = [
@@ -248,6 +249,34 @@ export default function ManifestPage() {
       console.error("Fetch docket error:", err);
     } finally {
       hideLoading();
+    }
+  };
+
+  // ✅ Validate vehicle number against Lorry Master
+  const validateVehicleNo = async (vehicleNo) => {
+    if (!vehicleNo) return;
+    try {
+      const lorryData = await fetchLorryByVehicleNo(vehicleNo);
+      if (!lorryData) {
+        showError(`Vehicle No "${vehicleNo}" not found in Lorry Master`);
+      }
+    } catch (err) {
+      showError(err.message || "Failed to validate vehicle number");
+      console.error("Validate vehicle no error:", err);
+    }
+  };
+
+  // ✅ Handle vehicle_no field change – convert to uppercase
+  const handleVehicleNoChange = (value) => {
+    const upperValue = value.toUpperCase();
+    setForm((prev) => ({ ...prev, vehicle_no: upperValue }));
+  };
+
+  // ✅ Handle vehicle_no field blur/Enter – validate against Lorry Master
+  const handleVehicleNoValidate = () => {
+    const vno = form.vehicle_no?.trim();
+    if (vno) {
+      validateVehicleNo(vno);
     }
   };
 
@@ -534,6 +563,26 @@ export default function ManifestPage() {
         <FormPanel>
           {manifestFields.map((field) => {
             // Special: when search is active, render manifest_no as plain input with Enter/Blur handlers
+            // Vehicle No: auto-uppercase + validate against Lorry Master
+            if (field.name === "vehicle_no") {
+              return (
+                <div key={field.name} className="formFieldGroup">
+                  <label>Vehicle No</label>
+                  <input
+                    type="text"
+                    value={form.vehicle_no}
+                    onChange={(e) => handleVehicleNoChange(e.target.value)}
+                    onBlur={handleVehicleNoValidate}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleVehicleNoValidate();
+                      }
+                    }}
+                    placeholder="Enter Vehicle No"
+                  />
+                </div>
+              );
+            }
             if (field.name === "manifest_no" && isSearchActive) {
               return (
                 <div key={field.name} className="formFieldGroup">
