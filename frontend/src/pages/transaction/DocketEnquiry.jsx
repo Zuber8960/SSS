@@ -10,7 +10,7 @@ import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
-import { fetchDocketByDocketNo } from "../../utils/docket";
+import { getDocketByRecId } from "../../utils/docket";
 import { fetchManifestsByDocketNo } from "../../utils/manifest";
 import { SearchIcon, ResetIcon } from "../../components/common/icons";
 import { IconButton, Tooltip } from "@mui/material";
@@ -85,21 +85,21 @@ export default function DocketEnquiry() {
       showLoading();
 
       // Fetch docket details
-      const docketData = await fetchDocketByDocketNo(docketNo);
+      const docketData = await getDocketByRecId(null, docketNo);
 
       if (docketData && docketData.docket_no) {
         setForm({
           docket_no: docketData.docket_no || "",
           docket_date: docketData.docket_date ? docketData.docket_date.substring(0, 10) : "",
-          from_loc: docketData.docket_loc ||"",
+          from_loc: docketData.docket_loc || "",
           from_town: docketData.docket_dly_town || "",
           to_loc: docketData.docket_to_loc || docketData.to_loc || "",
           to_town: docketData.docket_pickup_town || "",
-          consignor: docketData.consignor_name || docketData.consignor || "",
-          consignee: docketData.consignee_name || docketData.consignee || "",
+          consignor: docketData.cnor_name || "",
+          consignee: docketData.cnee_name || "",
           total_pkgs: docketData.docket_tot_pkgs ?? docketData.total_pkgs ?? "",
           actual_wt: docketData.docket_act_wt ?? docketData.actual_wt ?? "",
-          charged_wt: docketData.docket_chrg_wt ||  "",
+          charged_wt: docketData.docket_chrg_wt || "",
           eway_bill_no: docketData.eway_bill_no || docketData.ewb_no || "",
           remarks: docketData.docket_remark || "",
         });

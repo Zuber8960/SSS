@@ -123,6 +123,23 @@ router.put('/:no/:loc/:date', async (req, res) => {
   }
 });
 
+/* ================= UNLOADING (save to unloading_dtl table) ================= */
+
+const UnloadingController = require('./unloading.controller');
+
+router.post('/unloading', async (req, res) => {
+  try {
+    const body = req.body;
+    if (!body.dockets || !body.dockets.length) {
+      return res.status(400).json({ success: false, message: 'No docket data provided for unloading' });
+    }
+    const result = await UnloadingController.saveUnloading(body);
+    res.status(201).json({ success: true, message: 'Unloading saved successfully', data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 /* ================= DELETE ================= */
 
 router.delete('/:no/:loc/:date', async (req, res) => {

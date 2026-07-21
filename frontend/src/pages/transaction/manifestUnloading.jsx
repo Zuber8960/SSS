@@ -1,118 +1,44 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import MainLayout from "../../layouts/MainLayout";
-import { PageBody } from "../../components/common/MasterPage";
+import { IconButton, Tooltip } from "@mui/material";
+import { SaveIcon, ResetIcon } from "../../components/common/icons";
+
+import {
+  FormField,
+  PageBody,
+} from "../../components/common/MasterPage";
+
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
 import StatusGrid from "../../components/common/StatusGrid";
-import "../../styles/MasterPage.css";
 
-// ----------------------------------------------------------------
-// Manifest Unloading Page
-// Matches the design from mnf_unload.html
-// ----------------------------------------------------------------
+import { fetchManifestByNo } from "../../utils/manifest";
+import { fetchDocketByDocketNo } from "../../utils/docket";
 
-const emptyHeader = {
-  manifest_no: "MF260700001",
-  manifest_date: "",
-  origin_branch: "DELHI",
-  dest_branch: "MUMBAI",
-  vehicle_no: "MH12AB4589",
-  vehicle_type: "20 FT",
-  driver_name: "Ramesh Kumar",
-  driver_mobile: "9876543210",
-  arrival_date: "",
-  arrival_time: "",
-  seal_no: "SL458965",
-  dock_no: "DOCK-04",
-  total_dockets: 100,
-  total_packages: 850,
-  total_weight: 16250,
-  manifest_status: "Open",
-  arrival_remarks: "",
-};
-
-const staticConsignors = [
-  "ABC Industries", "Tata Steel", "Reliance Industries", "Asian Paints",
-  "ITC Ltd", "HUL", "JSW Steel", "ACC Cement", "UltraTech Cement",
-  "Pidilite", "Adani Wilmar", "Dabur", "Parle", "Amul", "Nestle India", "Britannia",
+// ------------------- HEADER FIELDS -------------------
+const headerFields = [
+  { label: "Manifest No", name: "manifest_no" },
+  { label: "Manifest Date", name: "manifest_date", type: "date" },
+  { label: "Origin Branch", name: "origin_branch" },
+  { label: "Destination Branch", name: "dest_branch" },
+  { label: "Vehicle No", name: "vehicle_no" },
+  { label: "Vehicle Type", name: "vehicle_type" },
+  { label: "Driver Name", name: "driver_name" },
+  { label: "Driver Mobile", name: "driver_mobile" },
+  { label: "Arrival Date", name: "arrival_date", type: "date" },
+  { label: "Arrival Time", name: "arrival_time", type: "time" },
+  { label: "Seal No", name: "seal_no" },
+  { label: "Dock No", name: "dock_no" },
+  { label: "Total Dockets", name: "total_dockets", type: "number", disabled: true },
+  { label: "Total Packages", name: "total_packages", type: "number", disabled: true },
+  { label: "Total Weight", name: "total_weight", type: "number", disabled: true },
+  { label: "Manifest Status", name: "manifest_status" },
+  { label: "Arrival Remarks", name: "arrival_remarks", type: "textarea" },
 ];
 
-const staticConsignees = [
-  "XYZ Traders", "Metro Cash & Carry", "D-Mart", "Reliance Retail",
-  "Vijay Sales", "Big Bazaar", "More Retail", "Spencer",
-  "Local Distributor", "Wholesale Dealer", "Regional Warehouse", "C&F Agent",
-];
-
-const staticDestinations = [
-  "Mumbai", "Pune", "Nagpur", "Nashik", "Aurangabad",
-  "Surat", "Ahmedabad", "Indore", "Bhopal", "Jaipur",
-];
-
-function generateSampleDockets(count) {
-  const rows = [];
-  for (let i = 1; i <= count; i++) {
-    const booked = Math.floor(Math.random() * 20) + 1;
-    let received = booked;
-    let shortQty = 0;
-    let excessQty = 0;
-    let damageQty = 0;
-    let leakQty = 0;
-    let status = "OK";
-    let remarks = "";
-
-    const r = Math.random();
-    if (r < 0.07) {
-      status = "Short";
-      shortQty = 1;
-      received = booked - 1;
-      remarks = "Package Short";
-    } else if (r < 0.10) {
-      status = "Damage";
-      damageQty = 1;
-      remarks = "Package Damaged";
-    } else if (r < 0.12) {
-      status = "Leakage";
-      leakQty = 1;
-      remarks = "Leakage Found";
-    } else if (r < 0.14) {
-      status = "Missing";
-      received = 0;
-      remarks = "Not Received";
-    } else if (r < 0.16) {
-      status = "Excess";
-      excessQty = 1;
-      received = booked + 1;
-      remarks = "Extra Package";
-    }
-
-    rows.push({
-      id: i,
-      sr: i,
-      docket_no: `DKT2607${String(i).padStart(5, "0")}`,
-      booking_date: "17-Jul-2026",
-      consignor: staticConsignors[Math.floor(Math.random() * staticConsignors.length)],
-      consignee: staticConsignees[Math.floor(Math.random() * staticConsignees.length)],
-      destination: staticDestinations[Math.floor(Math.random() * staticDestinations.length)],
-      booked_pkgs: booked,
-      received_pkgs: received,
-      short_qty: shortQty,
-      excess_qty: excessQty,
-      damage_qty: damageQty,
-      leak_qty: leakQty,
-      weight: booked * 42,
-      status,
-      remarks,
-      updated_by: "ADMIN",
-      updated_time: "--",
-      selected: false,
-    });
-  }
-  return rows;
-}
-
-
+// ------------------- DOCKET COLUMNS (original) -------------------
 const statusOptions = ["OK", "Short", "Excess", "Damage", "Leakage", "Missing", "Returned", "Hold"];
 
 const ROW_COLORS = {
@@ -125,204 +51,55 @@ const ROW_COLORS = {
 };
 
 const docketColumns = [
-  { key: "sr",            label: "Sr",           minWidth: 40 },
-  { key: "docket_no",     label: "Docket No",    minWidth: 130, type: "link" },
-  { key: "booking_date",  label: "Booking Date", minWidth: 110 },
-  { key: "consignor",     label: "Consignor",    minWidth: 150 },
-  { key: "consignee",     label: "Consignee",    minWidth: 150 },
-  { key: "destination",   label: "Destination",  minWidth: 100 },
-  { key: "booked_pkgs",   label: "Booked Pkgs",  minWidth: 90,  align: "center" },
-  { key: "received_pkgs", label: "Received Pkgs",minWidth: 100, type: "number", width: 70 },
-  { key: "short_qty",     label: "Short",        minWidth: 70,  type: "readonly_number", width: 60 },
-  { key: "excess_qty",    label: "Excess",       minWidth: 70,  type: "readonly_number", width: 60 },
-  { key: "damage_qty",    label: "Damage",       minWidth: 70,  type: "readonly_number", width: 60 },
-  { key: "leak_qty",      label: "Leakage",      minWidth: 70,  type: "readonly_number", width: 60 },
-  { key: "weight",        label: "Weight",       minWidth: 80,  align: "right" },
-  { key: "status",        label: "Status",       minWidth: 100, type: "select", options: statusOptions },
-  { key: "remarks",       label: "Remarks",      minWidth: 140, type: "text", placeholder: "Remarks" },
-  { key: "updated_by",    label: "Updated By",   minWidth: 100 },
-  { key: "updated_time",  label: "Updated Time", minWidth: 100 },
+  { key: "sr", label: "Sr", minWidth: 40 },
+  { key: "docket_no", label: "Docket No", minWidth: 130, type: "link" },
+  { key: "booking_date", label: "Booking Date", minWidth: 110 },
+  { key: "consignor", label: "Consignor", minWidth: 150 },
+  { key: "consignee", label: "Consignee", minWidth: 150 },
+  { key: "destination", label: "Destination", minWidth: 100 },
+  { key: "booked_pkgs", label: "Booked Pkgs", minWidth: 90, align: "center" },
+  { key: "received_pkgs", label: "Received Pkgs", minWidth: 100, type: "number", width: 70 },
+  { key: "short_qty", label: "Short", minWidth: 70, type: "readonly_number", width: 60 },
+  { key: "excess_qty", label: "Excess", minWidth: 70, type: "readonly_number", width: 60 },
+  { key: "damage_qty", label: "Damage", minWidth: 70, type: "readonly_number", width: 60 },
+  { key: "leak_qty", label: "Leakage", minWidth: 70, type: "readonly_number", width: 60 },
+  { key: "weight", label: "Weight", minWidth: 80, align: "right" },
+  { key: "status", label: "Status", minWidth: 100, type: "select", options: statusOptions },
+  { key: "remarks", label: "Remarks", minWidth: 140, type: "text", placeholder: "Remarks" },
+  { key: "updated_by", label: "Updated By", minWidth: 100 },
+  { key: "updated_time", label: "Updated Time", minWidth: 100 },
 ];
 
-// Styles matching the HTML theme
-const styles = {
-  headerBar: {
-    background: "#0d47a1",
-    color: "#fff",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "10px 25px",
-    boxShadow: "0 2px 8px rgba(0,0,0,.25)",
-    borderRadius: "8px 8px 0 0",
-    marginBottom: 15,
-  },
-  headerBarTitle: {
-    fontSize: 20,
-    fontWeight: 600,
-  },
-  headerBarSubtitle: {
-    fontSize: 13,
-    opacity: 0.85,
-  },
-  headerBarRight: {
-    textAlign: "right",
-    fontSize: 13,
-  },
-  panel: {
-    background: "#fff",
-    borderRadius: 8,
-    boxShadow: "0 2px 8px rgba(0,0,0,.08)",
-    marginBottom: 15,
-    overflow: "hidden",
-  },
-  panelTitle: {
-    background: "#1565c0",
-    color: "#fff",
-    padding: "10px 15px",
-    fontSize: 16,
-    fontWeight: 600,
-  },
-  panelBody: {
-    padding: 15,
-  },
-  cardsContainer: {
-    display: "grid",
-    gridTemplateColumns: "repeat(8, 1fr)",
-    gap: 12,
-    marginBottom: 15,
-  },
-  card: {
-    background: "#fff",
-    borderRadius: 8,
-    padding: 15,
-    textAlign: "center",
-    boxShadow: "0 2px 6px rgba(0,0,0,.08)",
-    borderTop: "5px solid #1976d2",
-  },
-  cardNumber: {
-    fontSize: 28,
-    marginBottom: 5,
-    fontWeight: "bold",
-  },
-  cardLabel: {
-    fontSize: 12,
-    fontWeight: 600,
-    color: "#666",
-  },
-  toolbar: {
-    display: "flex",
-    gap: 10,
-    flexWrap: "wrap",
-    alignItems: "center",
-  },
-  searchInput: {
-    width: 280,
-    padding: "8px 10px",
-    border: "1px solid #d9dfe8",
-    borderRadius: 4,
-    fontSize: 13,
-  },
-  select: {
-    padding: "8px 10px",
-    border: "1px solid #d9dfe8",
-    borderRadius: 4,
-    fontSize: 13,
-  },
-  btn: {
-    border: "none",
-    padding: "10px 18px",
-    borderRadius: 5,
-    cursor: "pointer",
-    fontWeight: 600,
-    color: "#fff",
-    fontSize: 13,
-  },
-  btnPrimary: { background: "#1565c0" },
-  btnSuccess: { background: "#2e7d32" },
-  btnWarning: { background: "#ef6c00" },
-  btnDanger: { background: "#c62828" },
-  btnPurple: { background: "#6a1b9a" },
-  btnDark: { background: "#455a64" },
-  footer: {
-    background: "#fff",
-    padding: 15,
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    boxShadow: "0 -2px 8px rgba(0,0,0,.08)",
-    borderRadius: "0 0 8px 8px",
-    marginTop: 15,
-  },
-  footerBold: { color: "#1565c0", fontWeight: "bold" },
-  gridContainer: {
-    display: "grid",
-    gridTemplateColumns: "repeat(6, 1fr)",
-    gap: 12,
-  },
-  textarea: {
-    width: "100%",
-    padding: "8px 10px",
-    border: "1px solid #d9dfe8",
-    borderRadius: 4,
-    fontSize: 13,
-    fontFamily: "inherit",
-  },
+const emptyForm = {
+  manifest_no: "",
+  manifest_date: "",
+  origin_branch: "",
+  dest_branch: "",
+  vehicle_no: "",
+  vehicle_type: "",
+  driver_name: "",
+  driver_mobile: "",
+  arrival_date: "",
+  arrival_time: "",
+  seal_no: "",
+  dock_no: "",
+  total_dockets: 0,
+  total_packages: 0,
+  total_weight: 0,
+  manifest_status: "Open",
+  arrival_remarks: "",
 };
 
+// ------------------- COMPONENT -------------------
 export default function ManifestUnloading() {
-  const { dialog, closeAlert, showSuccess, showError, showInfo, showWarning } = useAlert();
-  const { isLoading } = useLoading();
+  const { dialog, closeAlert, showSuccess, showError, showInfo } = useAlert();
+  const { isLoading, showLoading, hideLoading } = useLoading();
 
-  const [header, setHeader] = useState({ ...emptyHeader });
+  const [form, setForm] = useState({ ...emptyForm });
   const [dockets, setDockets] = useState([]);
-  const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [searchMode, setSearchMode] = useState(true);
 
-  // Generate sample data on mount
-  useEffect(() => {
-    const sample = generateSampleDockets(100);
-    setDockets(sample);
-  }, []);
-
-  // ---- Derived summary counts ----
-  const summary = useMemo(() => {
-    let total = dockets.length;
-    let ok = 0,
-      short = 0,
-      damage = 0,
-      leak = 0,
-      excess = 0,
-      missing = 0,
-      pending = 0;
-    dockets.forEach((d) => {
-      switch (d.status) {
-        case "OK":
-          ok++;
-          break;
-        case "Short":
-          short++;
-          break;
-        case "Damage":
-          damage++;
-          break;
-        case "Leakage":
-          leak++;
-          break;
-        case "Excess":
-          excess++;
-          break;
-        case "Missing":
-          missing++;
-          break;
-        default:
-          pending++;
-      }
-    });
-    return { total, ok, short, damage, leak, excess, missing, pending };
-  }, [dockets]);
-
-  // ---- Footer totals ----
+  // ---- Footer totals (original) ----
   const footerTotals = useMemo(() => {
     let totalPackages = 0;
     let totalWeight = 0;
@@ -333,18 +110,183 @@ export default function ManifestUnloading() {
     return { totalPackages, totalWeight };
   }, [dockets]);
 
-  // ---- Filtered dockets for display ----
-  const filteredDockets = useMemo(() => {
-    return dockets.filter((d) => {
-      const matchSearch =
-        !searchText ||
-        d.docket_no.toUpperCase().includes(searchText.toUpperCase());
-      const matchStatus = !statusFilter || d.status === statusFilter;
-      return matchSearch && matchStatus;
-    });
-  }, [dockets, searchText, statusFilter]);
+  // ------------------- MAP HELPERS -------------------
+  const mapHeaderToForm = (hdr) => ({
+    manifest_no: hdr.mnf_no || hdr.manifest_no || "",
+    manifest_date: (hdr.mnf_date || hdr.manifest_date || "").substring(0, 10),
+    origin_branch: hdr.mnf_loc || "",
+    dest_branch: hdr.mnf_to_loc || "",
+    vehicle_no: hdr.desp_veh_no || "",
+    vehicle_type: hdr.vehicle_type || "",
+    driver_name: hdr.loaded_by || "",
+    driver_mobile: hdr.driver_mobile || "",
+    arrival_date: hdr.arrival_date || "",
+    arrival_time: hdr.mnf_arrival_time || hdr.arrival_time || "",
+    seal_no: hdr.seal_no || "",
+    dock_no: hdr.dock_no || "",
+    total_dockets: parseInt(hdr.mnf_no_of_dwb) || 0,
+    total_packages: parseInt(hdr.mnf_no_of_pkgs) || parseInt(hdr.total_pkgs) || parseInt(hdr.no_of_packages) || 0,
+    total_weight: parseFloat(hdr.mnf_charged_wt) || parseFloat(hdr.total_wt) || parseFloat(hdr.total_weight) || 0,
+    manifest_status: hdr.manifest_status || "Open",
+    arrival_remarks: hdr.arrival_remarks || "",
+  });
 
-  // ---- Handlers ----
+  const mapDocketToRow = (docket, index) => {
+    const booked = parseInt(docket.mnf_pkgs) || parseInt(docket.packages) || parseInt(docket.booked_pkgs) || parseInt(docket.dwb_pkgs) || 0;
+    return {
+      id: docket.rec_id || docket.id || index + 1,
+      sr: index + 1,
+      docket_no: docket.dwb_no || docket.docket_no || "",
+      booking_date: docket.dwb_date || docket.booking_date || docket.date || "",
+      consignor: docket.consignor || docket.from_party || docket.dwb_loc || "",
+      consignee: docket.consignee || docket.to_party || "",
+      destination: docket.docket_to_loc || "",
+      booked_pkgs: booked,
+      received_pkgs: docket.received_pkgs != null ? docket.received_pkgs : booked,
+      short_qty: docket.short_qty || 0,
+      excess_qty: docket.excess_qty || 0,
+      damage_qty: docket.damage_qty || 0,
+      leak_qty: docket.leak_qty || 0,
+      weight: parseFloat(docket.dwb_actual_wt) || parseFloat(docket.weight) || 0,
+      status: docket.unloading_status || docket.status || "OK",
+      remarks: docket.unloading_remarks || docket.remarks || "",
+      updated_by: docket.updated_by || "",
+      updated_time: docket.updated_time || docket.updated_on || "",
+      selected: false,
+    };
+  };
+
+  // ------------------- FETCH & LOAD BY MANIFEST NO -------------------
+  const fetchAndLoadByManifestNo = async (mnfNo) => {
+    if (!mnfNo) {
+      showError("Please enter a Manifest Number");
+      return;
+    }
+
+    try {
+      showLoading();
+      const response = await fetchManifestByNo(mnfNo);
+
+      if (!response) {
+        showError("Manifest not found");
+        return;
+      }
+
+      const manifestHeader = response.header || response;
+      const manifestDetails = response.details || response.dockets || [];
+
+      setForm(mapHeaderToForm(manifestHeader));
+
+      if (manifestDetails.length > 0) {
+        const fetchedDockets = [];
+        for (let i = 0; i < manifestDetails.length; i++) {
+          const detail = manifestDetails[i];
+          const docketNo = detail.dwb_no || detail.docket_no || detail.docketId || "";
+          if (!docketNo) continue;
+
+          try {
+            const docketData = await fetchDocketByDocketNo(docketNo);
+            if (docketData) {
+              fetchedDockets.push(mapDocketToRow(docketData, fetchedDockets.length));
+            } else {
+              fetchedDockets.push(mapDocketToRow(detail, fetchedDockets.length));
+            }
+          } catch (err) {
+            fetchedDockets.push(mapDocketToRow(detail, fetchedDockets.length));
+          }
+        }
+
+        if (fetchedDockets.length > 0) {
+          setDockets(fetchedDockets);
+        } else {
+          setDockets(manifestDetails.map((d, i) => mapDocketToRow(d, i)));
+        }
+
+        setForm((prev) => ({
+          ...prev,
+          total_dockets: fetchedDockets.length > 0 ? fetchedDockets.length : manifestDetails.length,
+        }));
+      }
+
+      // setSearchMode(false);
+      showInfo(`Manifest ${mnfNo} loaded successfully with ${manifestDetails.length} dockets`);
+    } catch (err) {
+      showError(err.message || "Failed to load manifest");
+    } finally {
+      hideLoading();
+    }
+  };
+
+  // ------------------- BUTTON HANDLERS -------------------
+  const handleClear = () => {
+    setForm({ ...emptyForm });
+    setDockets([]);
+    // setSearchMode(false);
+    showInfo("Form cleared");
+  };
+
+  const handleSave = async () => {
+    if (!form.manifest_no) {
+      showError("No manifest loaded. Please search and load a manifest first.");
+      return;
+    }
+    if (dockets.length === 0) {
+      showError("No dockets to save");
+      return;
+    }
+
+    for (const d of dockets) {
+      if (d.status !== "OK" && !d.remarks?.trim()) {
+        showError(`Remarks are mandatory for Docket ${d.docket_no} with status: ${d.status}`);
+        return;
+      }
+    }
+
+    try {
+      showLoading();
+      const payload = {
+        mnf_no: form.manifest_no,
+        mnf_date: form.manifest_date,
+        mnf_loc: form.origin_branch,
+        mnf_from_loc: form.origin_branch,
+        mnf_to_loc: form.dest_branch,
+        dest_branch: form.dest_branch,
+        arrival_date: form.arrival_date,
+        arrival_remarks: form.arrival_remarks,
+        dock_no: form.dock_no,
+        company_code: null,
+        division_code: "1",
+        record_created_by: "ADMIN",
+        dockets: dockets.map((d) => ({
+          docket_no: d.docket_no,
+          dwb_loc: d.consignor || d.dwb_loc || form.origin_branch,
+          dwb_to_loc: d.destination || d.dwb_to_loc || form.dest_branch,
+          dwb_date: d.booking_date || d.dwb_date || form.manifest_date,
+          dwb_actual_wt: d.weight,
+          dwb_charged_wt: d.weight,
+          booked_pkgs: d.booked_pkgs,
+          received_pkgs: d.received_pkgs,
+          short_qty: d.short_qty,
+          excess_qty: d.excess_qty,
+          damage_qty: d.damage_qty,
+          weight: d.weight,
+          unloading_status: d.status,
+          unloading_remarks: d.remarks,
+        })),
+      };
+
+      const Api = (await import("../../services/api")).default;
+      await Api.post("/manifest/unloading", payload);
+
+      showSuccess(`Manifest ${form.manifest_no} unloading saved successfully.`);
+    } catch (err) {
+      showError(err.message || "Failed to save");
+    } finally {
+      hideLoading();
+    }
+  };
+
+  // ------------------- CELL CHANGE HANDLERS (original) -------------------
   const handleReceivedChange = useCallback(
     (rowId, newVal) => {
       setDockets((prev) =>
@@ -362,8 +304,8 @@ export default function ManifestUnloading() {
               shortQty > 0
                 ? shortQty + " Packages Short"
                 : d.status === "Short" && shortQty === 0
-                ? ""
-                : d.remarks,
+                  ? ""
+                  : d.remarks,
           };
         })
       );
@@ -391,500 +333,226 @@ export default function ManifestUnloading() {
 
   const handleCellChange = useCallback((rowId, key, value) => {
     if (key === "received_pkgs") handleReceivedChange(rowId, value);
-    else if (key === "status")   handleStatusChange(rowId, value);
-    else if (key === "remarks")  handleRemarksChange(rowId, value);
+    else if (key === "status") handleStatusChange(rowId, value);
+    else if (key === "remarks") handleRemarksChange(rowId, value);
   }, [handleReceivedChange, handleStatusChange, handleRemarksChange]);
 
-
-  // Mark All OK
-  const markAllOK = () => {
-    setDockets((prev) =>
-      prev.map((d) => ({
-        ...d,
-        status: "OK",
-        short_qty: 0,
-        excess_qty: 0,
-        damage_qty: 0,
-        leak_qty: 0,
-        remarks: "",
-      }))
-    );
-    showInfo("All dockets marked as OK");
+  // ------------------- MANIFEST NO SEARCH HANDLERS -------------------
+  const handleManifestNoSearch = async (mnfNo) => {
+    const trimmed = (mnfNo || "").trim();
+    if (!trimmed) return;
+    // if (!searchMode) setSearchMode(true);
+    await fetchAndLoadByManifestNo(trimmed);
   };
 
-  // Mark Selected OK
-  const markSelected = () => {
-    const selectedIds = new Set(
-      dockets.filter((d) => d.selected).map((d) => d.id)
-    );
-    if (selectedIds.size === 0) {
-      showError("Please select at least one docket");
-      return;
+  const handleManifestNoKeyDown = async (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      await handleManifestNoSearch(form.manifest_no);
     }
-    setDockets((prev) =>
-      prev.map((d) =>
-        selectedIds.has(d.id)
-          ? { ...d, status: "OK", short_qty: 0, excess_qty: 0, damage_qty: 0, leak_qty: 0, remarks: "" }
-          : d
-      )
-    );
-    showInfo("Selected dockets marked as OK");
   };
 
-  // Validate
-  const validate = () => {
-    for (const d of dockets) {
-      if (d.status !== "OK" && !d.remarks.trim()) {
-        showError(`Remarks are mandatory for Docket ${d.docket_no} with status: ${d.status}`);
-        return false;
-      }
-    }
-    return true;
+  const handleManifestNoBlur = async () => {
+    await handleManifestNoSearch(form.manifest_no);
   };
 
-  // Save
-  const handleSave = () => {
-    if (!validate()) return;
-    showSuccess("Manifest saved successfully.");
+  // ------------------- RENDER SECTION CARD -------------------
+  const fieldMap = {};
+  headerFields.forEach((f) => {
+    fieldMap[f.name] = f;
+  });
+
+  const sectionCardStyles = {
+    sectionCard: {
+      background: "#fffefe",
+      borderRadius: 12,
+      border: "1px solid #e9e5f0",
+      boxShadow: "0 2px 12px rgba(126, 34, 206, 0.06)",
+      overflow: "hidden",
+      marginBottom: 16,
+    },
+    sectionHeader: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "14px 20px",
+      background: "linear-gradient(135deg, #f6f3ff 0%, #f0ecf9 100%)",
+      borderBottom: "1px solid #e9e5f0",
+    },
+    sectionIcon: { fontSize: 18, lineHeight: 1 },
+    sectionTitle: {
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#4a3466",
+      textTransform: "uppercase",
+      letterSpacing: 0.1,
+      margin: 0,
+    },
   };
 
-  // Finalize
-  const handleFinalize = () => {
-    if (!validate()) return;
-    showWarning(
-      "Finalize Manifest",
-      "Do you want to Finalize Manifest?",
-      () => {
-        showSuccess("Manifest finalized successfully.");
-      }
-    );
-  };
+  const renderFormSection = () => {
+    const sectionFieldConfigs = headerFields.filter(Boolean);
+    if (sectionFieldConfigs.length === 0) return null;
 
-  const handleSelectRow = useCallback((rowId) => {
-    setDockets((prev) =>
-      prev.map((x) => (x.id === rowId ? { ...x, selected: !x.selected } : x))
-    );
-  }, []);
-
-  const handleSelectAll = useCallback((e) => {
-    const checked = e.target.checked;
-    setDockets((prev) => prev.map((x) => ({ ...x, selected: checked })));
-  }, []);
-
-  // Clear filter
-  const clearFilter = () => {
-    setSearchText("");
-    setStatusFilter("");
-  };
-
-  // Refresh
-  const handleRefresh = () => {
-    const sample = generateSampleDockets(100);
-    setDockets(sample);
-    clearFilter();
-    showInfo("Data refreshed");
-  };
-
-  // Export CSV
-  const exportCSV = () => {
-    const headers = [
-      "Sr", "Docket No", "Booking Date", "Consignor", "Consignee",
-      "Destination", "Booked Pkgs", "Received Pkgs", "Short", "Excess",
-      "Damage", "Leakage", "Weight", "Status", "Remarks", "Updated By", "Updated Time",
-    ];
-    const csvRows = [headers.join(",")];
-    dockets.forEach((d) => {
-      csvRows.push(
-        [
-          d.sr, d.docket_no, d.booking_date, `"${d.consignor}"`, `"${d.consignee}"`,
-          d.destination, d.booked_pkgs, d.received_pkgs, d.short_qty, d.excess_qty,
-          d.damage_qty, d.leak_qty, d.weight, d.status, `"${d.remarks}"`, d.updated_by, d.updated_time,
-        ].join(",")
-      );
-    });
-    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "Manifest_Unloading.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-    showInfo("CSV exported");
-  };
-
-  // Print Exceptions
-  const printExceptions = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      showError("Please allow pop-ups for printing");
-      return;
-    }
-    const exceptions = dockets.filter((d) => d.status !== "OK");
-    const rowsHtml = exceptions
-      .map(
-        (d) => `
-      <tr>
-        <td>${d.sr}</td>
-        <td>${d.docket_no}</td>
-        <td>${d.booking_date}</td>
-        <td>${d.consignor}</td>
-        <td>${d.consignee}</td>
-        <td>${d.destination}</td>
-        <td>${d.booked_pkgs}</td>
-        <td>${d.received_pkgs}</td>
-        <td>${d.short_qty}</td>
-        <td>${d.excess_qty}</td>
-        <td>${d.damage_qty}</td>
-        <td>${d.leak_qty}</td>
-        <td>${d.weight}</td>
-        <td>${d.status}</td>
-        <td>${d.remarks}</td>
-      </tr>`
-      )
-      .join("");
-
-    printWindow.document.write(`
-      <html><head><title>Manifest Exceptions</title>
-      <style>
-        body { font-family:Segoe UI,Tahoma,sans-serif; padding:20px; }
-        h2 { color:#0d47a1; }
-        table { width:100%; border-collapse:collapse; margin-top:15px; }
-        th,td { border:1px solid #ccc; padding:8px; font-size:12px; text-align:left; }
-        th { background:#0d47a1; color:#fff; }
-        @media print { body { -webkit-print-color-adjust:exact; } }
-      </style></head><body>
-      <h2>Manifest Unloading - Exception Report</h2>
-      <p><b>Manifest No:</b> ${header.manifest_no} | <b>Vehicle:</b> ${header.vehicle_no}</p>
-      <table><thead><tr>
-        <th>Sr</th><th>Docket No</th><th>Date</th><th>Consignor</th><th>Consignee</th>
-        <th>Destination</th><th>Booked</th><th>Received</th><th>Short</th><th>Excess</th>
-        <th>Damage</th><th>Leakage</th><th>Weight</th><th>Status</th><th>Remarks</th>
-      </tr></thead><tbody>${rowsHtml}</tbody></table></body></html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
-  };
-
-  // ---- Card colors ----
-  const cardColor = (type) => {
-    const colors = {
-      total: "#0277bd",
-      ok: "#2e7d32",
-      short: "#f57c00",
-      damage: "#d32f2f",
-      leak: "#f57c00",
-      excess: "#0277bd",
-      missing: "#d32f2f",
-      pending: "#2e7d32",
+    const horizontalStyle = {
+      padding: "14px 16px",
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 10,
+      alignItems: "flex-start",
     };
-    return { borderTop: `5px solid ${colors[type] || "#1976d2"}` };
+
+    return (
+      <div style={{ ...sectionCardStyles.sectionCard, gridColumn: "1 / -1" }}>
+        <div style={sectionCardStyles.sectionHeader}>
+          <span style={sectionCardStyles.sectionIcon}>📋</span>
+          <h4 style={sectionCardStyles.sectionTitle}>Manifest Information</h4>
+        </div>
+        <div style={horizontalStyle}>
+          {sectionFieldConfigs.map((field) => {
+            const isTextarea = field.type === "textarea";
+            const fieldStyle = {
+              minWidth: 130,
+              flex: "0 1 auto",
+              ...(isTextarea || field.fullWidth ? { flex: "1 1 100%" } : {}),
+            };
+            return (
+              <div key={field.name} style={fieldStyle}>
+                <FormField
+                  {...field}
+                  form={form}
+                  setForm={setForm}
+                  disabled={
+                    (field.name === "manifest_no" && !searchMode)
+                  }
+                  onKeyDown={field.name === "manifest_no" ? handleManifestNoKeyDown : undefined}
+                  onBlur={field.name === "manifest_no" ? handleManifestNoBlur : undefined}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // ------------------- RENDER -------------------
+  const styles = {
+    panel: {
+      background: "#fff",
+      borderRadius: 8,
+      boxShadow: "0 2px 8px rgba(0,0,0,.08)",
+      marginBottom: 15,
+      overflow: "hidden",
+    },
+    panelTitle: {
+      background: "#1565c0",
+      color: "#fff",
+      padding: "10px 15px",
+      fontSize: 16,
+      fontWeight: 600,
+    },
+    panelBody: { padding: 15 },
+    footer: {
+      background: "#fff",
+      padding: 15,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      boxShadow: "0 -2px 8px rgba(0,0,0,.08)",
+      borderRadius: "0 0 8px 8px",
+      marginTop: 15,
+    },
+    footerBold: { color: "#1565c0", fontWeight: "bold" },
   };
 
   return (
     <MainLayout>
       <PageBody title="Manifest Unloading">
-        {/* ---- Header Bar ---- */}
-        {/* <div style={styles.headerBar}>
-          <div>
-            <div style={styles.headerBarTitle}>
-              🚚 Logistics ERP - Manifest Unloading
-            </div>
-            <div style={styles.headerBarSubtitle}>
-              Destination Branch Unloading Management
-            </div>
-          </div>
-          <div style={styles.headerBarRight}>
-           
-            <div>
-              <b>Branch :</b> MUMBAI
-            </div>
-            <div>{new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</div>
-          </div>
-        </div> */}
-
-        {/* ---- Manifest Information ---- */}
-        <div style={styles.panel}>
-          <div style={styles.panelTitle}>Manifest Information</div>
-          <div style={styles.panelBody}>
-            <div style={styles.gridContainer}>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Manifest No
-                </label>
-                <input
-                  type="text"
-                  value={header.manifest_no}
-                  onChange={(e) => setHeader({ ...header, manifest_no: e.target.value })}
-                  style={styles.searchInput}
-                />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Manifest Date
-                </label>
-                <input
-                  type="date"
-                  value={header.manifest_date}
-                  onChange={(e) => setHeader({ ...header, manifest_date: e.target.value })}
-                  style={styles.searchInput}
-                />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Origin Branch
-                </label>
-                <input type="text" value={header.origin_branch} readOnly style={styles.searchInput} />
-              </div>
-              {/* <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Destination Branch
-                </label>
-                <input type="text" value={header.dest_branch} readOnly style={styles.searchInput} />
-              </div> */}
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Vehicle No
-                </label>
-                <input type="text" value={header.vehicle_no} readOnly style={styles.searchInput} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Vehicle Type
-                </label>
-                <select value={header.vehicle_type} style={{ ...styles.select, width: "100%" }}>
-                  <option>20 FT</option>
-                  <option>32 FT</option>
-                  <option>Trailer</option>
-                  <option>LCV</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Driver Name
-                </label>
-                <input type="text" value={header.driver_name} readOnly style={styles.searchInput} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Driver Mobile
-                </label>
-                <input type="text" value={header.driver_mobile} readOnly style={styles.searchInput} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Arrival Date
-                </label>
-                <input
-                  type="date"
-                  value={header.arrival_date}
-                  onChange={(e) => setHeader({ ...header, arrival_date: e.target.value })}
-                  style={styles.searchInput}
-                />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Arrival Time
-                </label>
-                <input
-                  type="time"
-                  value={header.arrival_time}
-                  onChange={(e) => setHeader({ ...header, arrival_time: e.target.value })}
-                  style={styles.searchInput}
-                />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Seal No
-                </label>
-                <input type="text" value={header.seal_no} readOnly style={styles.searchInput} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Dock No
-                </label>
-                <input type="text" value={header.dock_no} readOnly style={styles.searchInput} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Total Dockets
-                </label>
-                <input
-                  type="number"
-                  value={dockets.length}
-                  readOnly
-                  style={{ ...styles.searchInput, background: "#f5f5f5" }}
-                />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Total Packages
-                </label>
-                <input
-                  type="number"
-                  value={footerTotals.totalPackages}
-                  readOnly
-                  style={{ ...styles.searchInput, background: "#f5f5f5" }}
-                />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Total Weight (KG)
-                </label>
-                <input
-                  type="number"
-                  value={footerTotals.totalWeight}
-                  readOnly
-                  style={{ ...styles.searchInput, background: "#f5f5f5" }}
-                />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Manifest Status
-                </label>
-                <select value={header.manifest_status} style={{ ...styles.select, width: "100%" }}>
-                  <option>Open</option>
-                  <option>Finalized</option>
-                  <option>Closed</option>
-                </select>
-              </div>
-              <div style={{ gridColumn: "span 6" }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                  Arrival Remarks
-                </label>
-                <textarea
-                  rows={2}
-                  value={header.arrival_remarks}
-                  onChange={(e) => setHeader({ ...header, arrival_remarks: e.target.value })}
-                  style={styles.textarea}
-                  placeholder="Vehicle arrived in good condition..."
-                />
-              </div>
-            </div>
-          </div>
+        {/* ✅ TOOLBAR */}
+        <div className="pageToolbar" style={{ alignItems: "center" }}>
+          <Tooltip title="Clear">
+            <IconButton onClick={handleClear} size="small" sx={{ color: "#dc2626", "&:hover": { background: "#fee2e2" } }}>
+              <ResetIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Save">
+            <IconButton onClick={handleSave} size="small" sx={{ color: "#16a34a", "&:hover": { background: "#dcfce7" } }}>
+              <SaveIcon />
+            </IconButton>
+          </Tooltip>
         </div>
 
-        {/* ---- Dashboard Cards ---- */}
-        {/* <div style={styles.cardsContainer}>
-          <div style={{ ...styles.card, ...cardColor("total") }}>
-            <div style={styles.cardNumber}>{summary.total}</div>
-            <div style={styles.cardLabel}>Total Dockets</div>
-          </div>
-          <div style={{ ...styles.card, ...cardColor("ok") }}>
-            <div style={styles.cardNumber}>{summary.ok}</div>
-            <div style={styles.cardLabel}>OK</div>
-          </div>
-          <div style={{ ...styles.card, ...cardColor("short") }}>
-            <div style={styles.cardNumber}>{summary.short}</div>
-            <div style={styles.cardLabel}>Short</div>
-          </div>
-          <div style={{ ...styles.card, ...cardColor("damage") }}>
-            <div style={styles.cardNumber}>{summary.damage}</div>
-            <div style={styles.cardLabel}>Damage</div>
-          </div>
-          <div style={{ ...styles.card, ...cardColor("leak") }}>
-            <div style={styles.cardNumber}>{summary.leak}</div>
-            <div style={styles.cardLabel}>Leakage</div>
-          </div>
-          <div style={{ ...styles.card, ...cardColor("excess") }}>
-            <div style={styles.cardNumber}>{summary.excess}</div>
-            <div style={styles.cardLabel}>Excess</div>
-          </div>
-          <div style={{ ...styles.card, ...cardColor("missing") }}>
-            <div style={styles.cardNumber}>{summary.missing}</div>
-            <div style={styles.cardLabel}>Missing</div>
-          </div>
-          <div style={{ ...styles.card, ...cardColor("pending") }}>
-            <div style={styles.cardNumber}>{summary.pending}</div>
-            <div style={styles.cardLabel}>Pending</div>
-          </div>
-        </div> */}
+        {/* ✅ HEADER FORM (Card Layout like HireVoucher) */}
+        <div
+          style={{
+            background: "#f8f6ff",
+            borderRadius: 14,
+            border: "1px solid #e9e5f0",
+            padding: "1px",
+            boxShadow: "0 2px 12px rgba(126, 34, 206, 0.06)",
+          }}
+        >
+          {renderFormSection()}
+        </div>
 
-        {/* ---- Toolbar ---- */}
-        {/* <div style={styles.panel}>
-          <div style={styles.panelTitle}>Search / Barcode / Actions</div>
+        {/* ✅ DOCKET GRID (original StatusGrid with row colors) */}
+        <div style={styles.panel}>
+          <div style={styles.panelTitle}>
+            Manifest Docket Details
+            {dockets.length > 0 && (
+              <span style={{ marginLeft: 10, fontSize: 13, opacity: 0.8 }}>
+                ({dockets.length} dockets)
+              </span>
+            )}
+          </div>
           <div style={styles.panelBody}>
-            <div style={styles.toolbar}>
-              <input
-                type="text"
-                placeholder="Search Docket No / Scan Barcode"
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                style={styles.searchInput}
+            {dockets.length > 0 ? (
+              <StatusGrid
+                columns={docketColumns}
+                rows={dockets}
+                rowColors={ROW_COLORS}
+                onCellChange={handleCellChange}
+                onSelectAll={(e) => {
+                  const checked = e.target.checked;
+                  setDockets((prev) => prev.map((x) => ({ ...x, selected: checked })));
+                }}
+                onSelectRow={(rowId) => {
+                  setDockets((prev) =>
+                    prev.map((x) => (x.id === rowId ? { ...x, selected: !x.selected } : x))
+                  );
+                }}
+                minWidth={2100}
               />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                style={styles.select}
-              >
-                <option value="">All Status</option>
-                {statusOptions.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-              <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={() => {}}>
-                🔍 Search
-              </button>
-              <button style={{ ...styles.btn, ...styles.btnSuccess }} onClick={markAllOK}>
-                ✔ Mark All OK
-              </button>
-              <button style={{ ...styles.btn, ...styles.btnWarning }} onClick={markSelected}>
-                ✔ Mark Selected
-              </button>
-              <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={handleRefresh}>
-                🔄 Refresh
-              </button>
-              <button style={{ ...styles.btn, ...styles.btnDanger }} onClick={clearFilter}>
-                ❌ Clear
-              </button>
-              <button style={{ ...styles.btn, ...styles.btnPurple }} onClick={printExceptions}>
-                🖨 Print Exceptions
-              </button>
-              <button style={{ ...styles.btn, ...styles.btnSuccess }} onClick={handleSave}>
-                💾 Save
-              </button>
-              <button style={{ ...styles.btn, ...styles.btnWarning }} onClick={handleFinalize}>
-                📦 Finalize Manifest
-              </button>
-              <button style={{ ...styles.btn, ...styles.btnDark }} onClick={exportCSV}>
-                📊 Export Excel
-              </button>
+            ) : (
+              <div style={{ textAlign: "center", padding: 40, color: "#999" }}>
+                {form.manifest_no
+                  ? "No dockets found for this manifest."
+                  : "Enter a Manifest Number and press Enter to load dockets."}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ✅ FOOTER (original) */}
+        {dockets.length > 0 && (
+          <div style={styles.footer}>
+            <div>
+              <b style={styles.footerBold}>Total Packages :</b>{" "}
+              <span>{footerTotals.totalPackages}</span>
+            </div>
+            <div>
+              <b style={styles.footerBold}>Total Weight :</b>{" "}
+              <span>{footerTotals.totalWeight}</span> KG
+            </div>
+            <div>
+              <b style={styles.footerBold}>Updated By :</b> ADMIN
+            </div>
+            <div>
+              <b style={styles.footerBold}>Status :</b> {form.manifest_status}
             </div>
           </div>
-        </div> */}
-
-        {/* ---- Grid ---- */}
-        <div style={styles.panel}>
-          <div style={styles.panelTitle}>Manifest Docket Details</div>
-          <div style={styles.panelBody}>
-            <StatusGrid
-              columns={docketColumns}
-              rows={filteredDockets}
-              rowColors={ROW_COLORS}
-              onCellChange={handleCellChange}
-              onSelectAll={handleSelectAll}
-              onSelectRow={handleSelectRow}
-              minWidth={2100}
-            />
-          </div>
-        </div>
-
-        {/* ---- Footer ---- */}
-        <div style={styles.footer}>
-          <div>
-            <b style={styles.footerBold}>Total Packages :</b>{" "}
-            <span>{footerTotals.totalPackages}</span>
-          </div>
-          <div>
-            <b style={styles.footerBold}>Total Weight :</b>{" "}
-            <span>{footerTotals.totalWeight}</span> KG
-          </div>
-          <div>
-            <b style={styles.footerBold}>Updated By :</b> ADMIN
-          </div>
-          <div>
-            <b style={styles.footerBold}>Status :</b> OPEN
-          </div>
-        </div>
+        )}
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
         <LoadingOverlay isLoading={isLoading} message="Please wait..." />

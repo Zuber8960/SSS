@@ -51,7 +51,7 @@ router.get('/ewayfile/db/:ewbNumbers', async (req, res) => {
       return res.json({ success: true, data: [] });
     }
     const { tenant_id } = req;
-    const {results, apiCalls} = await DocketController.getEwayBillFromDB(ewbNumbers, tenant_id);
+    const { results, apiCalls } = await DocketController.getEwayBillFromDB(ewbNumbers, tenant_id);
     res.json({ success: true, data: results, apiCalls });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -63,7 +63,7 @@ router.put('/ewayfile/db/:recId', async (req, res) => {
     const { tenant_id } = req;
     const recId = Number(req.params.recId);
     if (isNaN(recId)) return res.status(400).json({ success: false, message: 'Invalid rec_id' });
-    await DocketController.updateEwayBillByRecId(recId, {...req.body, tenant_id});
+    await DocketController.updateEwayBillByRecId(recId, { ...req.body, tenant_id });
     res.json({ success: true, message: 'EWB updated successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -161,7 +161,8 @@ router.get('/rec/:recId', async (req, res) => {
   try {
     const { recId } = req.params;
     const { tenant_id } = req;
-    const data = await DocketController.getDocketByRecId(Number(recId), tenant_id);
+    const docketNo = req.query.docketNo; // Optional query parameter for docket number
+    const data = await DocketController.getDocketByRecId(Number(recId), tenant_id, docketNo);
     if (data) res.json({ success: true, data });
     else res.status(404).json({ success: false, message: 'Docket not found' });
   } catch (err) {
@@ -215,7 +216,7 @@ router.get('/:no/:loc/:date', async (req, res) => {
 router.post('/', async (req, res) => {
   const trx = await db.transaction();
   try {
-    const { tenant_id, divisionId , locId  } = req;
+    const { tenant_id, divisionId, locId } = req;
     const firstDigit = String(Math.floor(Math.random() * 10));
     const [updatedRow] = await trx('sss.ssm_stn_control')
       .where({ stn_no: trx.raw('(SELECT MAX(stn_no) FROM sss.ssm_stn_control)') })
@@ -223,7 +224,7 @@ router.post('/', async (req, res) => {
       .returning('stn_no');
 
     const nextId = updatedRow.stn_no;
-    const docket_no = String(moment().format('YY'))+firstDigit+locId+divisionId+nextId
+    const docket_no = String(moment().format('YY')) + firstDigit + locId + divisionId + nextId
     // const rest = require('crypto').randomBytes(7).toString('hex').toUpperCase().slice(0, 13);
     // const docket_no = firstDigit + rest;
     const body = { ...req.body, docket_no, tenant_id };

@@ -5,7 +5,7 @@ const ewb = require('../../config/ewb');
 
 /* ================= GET ================= */
 
-const getEwaybillDetails = async (ewbNo=process.env.ewbNo) => {
+const getEwaybillDetails = async (ewbNo = process.env.ewbNo) => {
   try {
     // email=connectwithlogipod%40gmail.com&username=cargoyaan1_API_HAR&password=CYsss%40221274
     const authGet = await axios.get(
@@ -45,20 +45,20 @@ const getEwaybillDetails = async (ewbNo=process.env.ewbNo) => {
       }
     );
 
-  //    const response = await axios.get(
-  //   `https://api.whitebooks.in/ewayapi/GetEwayBill`,
-  //   {
-  //     params: { ewbNo },
-  //     headers: {
-  //       'client-id': 'EWBP42c05bd4-f7a7-456d-b5b2-b043c79d7b74' || process.env.CLIENT_ID,
-  //       'client-secret': 'EWBPba531f90-bae9-420e-9a5b-7f4a87e73f03' || process.env.CLIENT_SECRET,
-  //       'gstin': '06AADCT6685Q1ZG' || process.env.GSTIN,
-  //       'authtoken': process.env.AUTH_TOKEN
-  //     }
-  //   }
-  // );
+    //    const response = await axios.get(
+    //   `https://api.whitebooks.in/ewayapi/GetEwayBill`,
+    //   {
+    //     params: { ewbNo },
+    //     headers: {
+    //       'client-id': 'EWBP42c05bd4-f7a7-456d-b5b2-b043c79d7b74' || process.env.CLIENT_ID,
+    //       'client-secret': 'EWBPba531f90-bae9-420e-9a5b-7f4a87e73f03' || process.env.CLIENT_SECRET,
+    //       'gstin': '06AADCT6685Q1ZG' || process.env.GSTIN,
+    //       'authtoken': process.env.AUTH_TOKEN
+    //     }
+    //   }
+    // );
 
-   console.log(response);
+    console.log(response);
 
     return response.data;
   } catch (error) {
@@ -120,18 +120,18 @@ const getListEwayDetails = async (ewbLists) => {
     return result;
 
 
-  //    const response = await axios.get(
-  //   `https://api.whitebooks.in/ewayapi/GetEwayBill`,
-  //   {
-  //     params: { ewbNo },
-  //     headers: {
-  //       'client-id': 'EWBP42c05bd4-f7a7-456d-b5b2-b043c79d7b74' || process.env.CLIENT_ID,
-  //       'client-secret': 'EWBPba531f90-bae9-420e-9a5b-7f4a87e73f03' || process.env.CLIENT_SECRET,
-  //       'gstin': '06AADCT6685Q1ZG' || process.env.GSTIN,
-  //       'authtoken': process.env.AUTH_TOKEN
-  //     }
-  //   }
-  // );
+    //    const response = await axios.get(
+    //   `https://api.whitebooks.in/ewayapi/GetEwayBill`,
+    //   {
+    //     params: { ewbNo },
+    //     headers: {
+    //       'client-id': 'EWBP42c05bd4-f7a7-456d-b5b2-b043c79d7b74' || process.env.CLIENT_ID,
+    //       'client-secret': 'EWBPba531f90-bae9-420e-9a5b-7f4a87e73f03' || process.env.CLIENT_SECRET,
+    //       'gstin': '06AADCT6685Q1ZG' || process.env.GSTIN,
+    //       'authtoken': process.env.AUTH_TOKEN
+    //     }
+    //   }
+    // );
 
   } catch (error) {
     console.error(
@@ -154,12 +154,11 @@ const getDocketById = async ({ docket_no, docket_loc, docket_date }, tenant_id) 
   return query.first();
 };
 
-const getDocketByRecId = async (rec_id, tenant_id) => {
+const getDocketByRecId = async (rec_id, tenant_id, docketNo) => {
   const query = db('sss.sst_docket as d')
     .leftJoin('sss.sst_docket_ewb as e', 'd.docket_no', 'e.docket_no')
     .leftJoin('sss.ssm_business_partner as cnor', 'd.cnor_id', 'cnor.record_id')
     .leftJoin('sss.ssm_business_partner as cnee', 'd.cnee_id', 'cnee.record_id')
-    .where({ 'd.rec_id': rec_id, 'd.record_status': 0 })
     .select(
       'd.*', 'e.ewb_no',
       'cnor.record_id as cnor_id',
@@ -177,6 +176,8 @@ const getDocketByRecId = async (rec_id, tenant_id) => {
       'cnee.bp_pincode as cnee_pincode',
       'cnee.bp_gstin as cnee_gstin'
     );
+  if (rec_id) query.andWhere({ 'd.rec_id': rec_id, 'd.record_status': 0 })
+  if (docketNo) query.andWhere({ 'd.docket_no': docketNo });
   if (tenant_id) query.andWhere({ 'd.tenant_id': tenant_id });
   return query.first();
 };
@@ -298,8 +299,8 @@ const updateDocketByRecId = async (rec_id, data, trx = db) => {
 
   // Update shared fields in dtl rows (no delete)
   const dtlUpdate = {};
-  if (data.docket_loc !== undefined)    dtlUpdate.docket_loc    = data.docket_loc;
-  if (data.docket_date !== undefined)   dtlUpdate.docket_date   = data.docket_date;
+  if (data.docket_loc !== undefined) dtlUpdate.docket_loc = data.docket_loc;
+  if (data.docket_date !== undefined) dtlUpdate.docket_date = data.docket_date;
   // if (data.company_code !== undefined)  dtlUpdate.company_code  = data.company_code;
   if (data.division_code !== undefined) dtlUpdate.division_code = data.division_code;
   if (data.docket_no !== undefined) dtlUpdate.docket_no = data.docket_no;
@@ -307,11 +308,11 @@ const updateDocketByRecId = async (rec_id, data, trx = db) => {
   if (Object.keys(dtlUpdate).length > 0) {
     await trx('sss.sst_docket_dtl')
       .where({
-        docket_no:   current.docket_no,
-        docket_loc:  current.docket_loc,
+        docket_no: current.docket_no,
+        docket_loc: current.docket_loc,
         docket_date: current.docket_date
       })
-      .update({ ...dtlUpdate, aud_date: new Date(), aud_user : data.aud_user});
+      .update({ ...dtlUpdate, aud_date: new Date(), aud_user: data.aud_user });
   }
 };
 
@@ -329,7 +330,7 @@ const deleteDocket = async (keys, trx = db) => {
 
   return trx('sss.sst_docket')
     .where(keys)
-    .update({record_status: 1})
+    .update({ record_status: 1 })
 };
 
 /* ================= CHARGES ================= */
@@ -377,11 +378,11 @@ const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
   const ewb_valid_upto = data.ewb_valid ? moment(data.ewb_valid, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : undefined;
   const invoice_date = data.inv_date ? moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : undefined;
   const update = {
-    ...(data.ewb_no   !== undefined && { ewb_no: String(data.ewb_no) }),
-    ...(ewb_date      !== undefined && { ewb_date }),
+    ...(data.ewb_no !== undefined && { ewb_no: String(data.ewb_no) }),
+    ...(ewb_date !== undefined && { ewb_date }),
     ...(ewb_valid_upto !== undefined && { ewb_valid_upto }),
-    ...(invoice_date  !== undefined && { invoice_date }),
-    ...(data.inv_no   !== undefined && { invoice_no: data.inv_no }),
+    ...(invoice_date !== undefined && { invoice_date }),
+    ...(data.inv_no !== undefined && { invoice_no: data.inv_no }),
     aud_date: new Date(),
   };
   const { tenant_id } = data;
@@ -409,20 +410,20 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
     apiCalls = true;
     let apiResults = await getListEwayDetails(ewbNumbers);
     if (apiResults.find(d => d.data)) {
-      results = apiResults.map(({data}) => ({
+      results = apiResults.map(({ data }) => ({
         ...data,
         ewb_date: data.ewb_date ? moment(data.ewb_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
         ewb_valid_upto: data.ewb_valid_upto ? moment(data.ewb_valid_upto, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
-        invoice_date: data.inv_date ? 
-          moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') : 
-          data.invoice_date ? moment(data.invoice_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') : null   
+        invoice_date: data.inv_date ?
+          moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') :
+          data.invoice_date ? moment(data.invoice_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') : null
       }));
     } else {
       apiResults = ewb.ewb_dummy_data;
       results = apiResults
-      .map(({data}) => data)
-      .filter(d => d.ewbNo && ewbNumbers.includes(d.ewbNo))
-      .map((ewbRes) => ({
+        .map(({ data }) => data)
+        .filter(d => d.ewbNo && ewbNumbers.includes(d.ewbNo))
+        .map((ewbRes) => ({
           ...ewbRes,
           ewb_date: ewbRes.ewb_date ? moment(ewbRes.ewb_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
           ewb_valid_upto: ewbRes.ewb_valid_upto ? moment(ewbRes.ewb_valid_upto, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
@@ -442,7 +443,7 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
       console.log('No EWB data found from API for:', ewbNumbers);
     }
   };
-  return {  results, apiCalls };
+  return { results, apiCalls };
 }
 
 const saveDataEwb = async (apiResResult, tenant_id) => {
@@ -595,11 +596,11 @@ const saveDataEwb = async (apiResResult, tenant_id) => {
 const saveEwayBillToDB = async (ewbDataArray, tenant_id) => {
   const rows = ewbDataArray.map(item => {
     const data = item.data || item; // DD/MM/YYYY hh:mm:ss A
-    
-    const ewb_date = moment(data.ewb_date || data.ewayBillDate , ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') || null;
-    const ewb_valid_upto = moment(data.ewb_valid ||  data.validUpto, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') || null;
-    const invoice_date = data.inv_date ? 
-      moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') : 
+
+    const ewb_date = moment(data.ewb_date || data.ewayBillDate, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') || null;
+    const ewb_valid_upto = moment(data.ewb_valid || data.validUpto, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') || null;
+    const invoice_date = data.inv_date ?
+      moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') :
       data.invoice_date ? moment(data.invoice_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') : null;
     return {
       ewb_no: String(data.ewbNo || ''),

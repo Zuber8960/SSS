@@ -46,7 +46,7 @@ const manifestFields = [
   { label: "Driver Mobile", name: "driver_mobile" },
 
 
-  { label: "No of Packages", name: "no_of_packages", type: "number" },
+  { label: "No of Dockets", name: "no_of_docket", type: "number" ,disabled: true},
   { label: "Total Weight", name: "total_wt", type: "number", disabled: true },
   { label: "Total Packages", name: "total_pkgs", type: "number", disabled: true },
 
@@ -73,7 +73,7 @@ const emptyForm = {
   driver_name: "",
   driver_mobile: "",
   manifest_type: "",
-  no_of_packages: "",
+  no_of_docket: "",
   consignor: "",
   consignee: "",
   total_wt: "",
@@ -165,11 +165,15 @@ export default function ManifestPage() {
   const computedTotals = useMemo(() => {
     let totalWt = 0;
     let totalPkgs = 0;
+    let totalDockets = 0;
     details.forEach((row) => {
       totalWt += parseFloat(row.weight) || 0;
       totalPkgs += parseFloat(row.packages) || 0;
+      if (row.docket_no && row.docket_no.trim() !== "") {
+        totalDockets++;
+      }
     });
-    return { total_wt: totalWt, total_pkgs: totalPkgs };
+    return { total_wt: totalWt, total_pkgs: totalPkgs, total_dockets: totalDockets };
   }, [details]);
 
 
@@ -267,9 +271,9 @@ export default function ManifestPage() {
     loaded_by: form.driver_name,
     driver_mobile: form.driver_mobile || "",
     mnf_type: form.manifest_type || "",
-    mnf_no_of_pkgs: form.no_of_packages ? parseFloat(form.no_of_packages) : 0,
+    mnf_no_of_pkgs: computedTotals.total_pkgs,
     mnf_actual_wt: computedTotals.total_wt,
-    mnf_no_of_dwb: computedTotals.total_pkgs,
+    mnf_no_of_dwb: computedTotals.total_dockets,
     aud_user: form.remarks || "",
     aud_loc: form.from_loc || "",
   });
@@ -301,9 +305,9 @@ export default function ManifestPage() {
     driver_name: hdr.loaded_by || "",
     driver_mobile: hdr.driver_mobile || "",
     manifest_type: hdr.mnf_type || "",
-    no_of_packages: hdr.mnf_no_of_pkgs ?? "",
+    no_of_docket: hdr.mnf_no_of_dwb ?? "",
     total_wt: hdr.mnf_actual_wt ?? "",
-    total_pkgs: hdr.mnf_no_of_dwb ?? "",
+    total_pkgs: hdr.mnf_no_of_pkgs ?? "",
     remarks: hdr.aud_user || "",
   });
 
@@ -556,6 +560,7 @@ export default function ManifestPage() {
             }
             const displayForm = {
               ...form,
+              no_of_docket: computedTotals.total_dockets,
               total_wt: computedTotals.total_wt,
               total_pkgs: computedTotals.total_pkgs,
             };
