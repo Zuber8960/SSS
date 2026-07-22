@@ -3,7 +3,6 @@ import moment from "moment";
 import {
   Box,
   Button,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -14,7 +13,8 @@ import {
   useTheme,
 } from "@mui/material";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
-import { jsQR } from "jsqr";
+import jsqrLib from "jsqr";
+const jsQR = jsqrLib.jsQR || jsqrLib.default || jsqrLib;
 import { AddIcon, DeleteIcon, SaveIcon } from "../../../components/common/icons";
 import { DataTable } from "../../../components/common/MasterPage";
 import { fetchEwayBillFromDB, saveEwayBillToDB, updateEwayBillByRecId } from "../../../utils/docket";
@@ -33,12 +33,10 @@ export default function EwayBillSection({
   showSuccess,
 }) {
   const [selectedRows, setSelectedRows] = useState([]);
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [scannerError, setScannerError] = useState("");
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
-  const scanFrameRef = useRef(null);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [isDecoding, setIsDecoding] = useState(false);
+  const fileInputRef = useRef(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -57,115 +55,89 @@ export default function EwayBillSection({
     { key: "inv_date", label: "Invoice Date", editable: true, isDate: true, render: (row) => fmtDate(row.inv_date) },
   ];
 
-  useEffect(() => {
-    return () => {
-      if (scanFrameRef.current) {
-        cancelAnimationFrame(scanFrameRef.current);
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
-      streamRef.current = null;
-      scanFrameRef.current = null;
-    };
-  }, []);
-
-  const stopScanner = async () => {
-    if (scanFrameRef.current) {
-      cancelAnimationFrame(scanFrameRef.current);
-      scanFrameRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    setIsScanning(false);
+  const handleOpenUpload = () => {
+    setUploadError("");
+    setIsUploadOpen(true);
   };
 
-  const handleOpenScanner = () => {
-    setScannerError("");
-    setIsScannerOpen(true);
+  const handleCloseUpload = () => {
+    setIsUploadOpen(false);
+    setUploadError("");
   };
 
-  const handleCloseScanner = async () => {
-    await stopScanner();
-    setIsScannerOpen(false);
-  };
-
-  useEffect(() => {
-    if (isScannerOpen) {
-      const timer = setTimeout(() => {
-        void startScanner();
-      }, 300);
-      return () => clearTimeout(timer);
-    } else {
-      void stopScanner();
-    }
-  }, [isScannerOpen]);
-
-  const startScanner = async () => {
-    setScannerError("");
-
-    if (!window.isSecureContext) {
-      setScannerError("Please open this page over localhost or HTTPS so the camera can be used.");
-      return;
-    }
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setScannerError("Camera access is not available in this browser.");
-      return;
-    }
-
-    try {
-      await stopScanner();
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+  const decodeImageFile = (file) => {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith("image/")) {
+        reject(new Error("Please select a valid image file (PNG, JPEG, etc.)"));
+        return;
       }
 
-      setIsScanning(true);
+      const img = new Image();
+      const reader = new FileReader();
 
-      const scanLoop = async () => {
-        if (!videoRef.current || !streamRef.current) return;
+      reader.onload = (e) => {
+        img.onload = () => {
+          const maxDim = 1920;
+          let w = img.naturalWidth;
+          let h = img.naturalHeight;
+          if (w > maxDim || h > maxDim) {
+            const scale = Math.min(maxDim / w, maxDim / h);
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+          }
 
-        const video = videoRef.current;
-        const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth || 320;
-        canvas.height = video.videoHeight || 240;
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            reject(new Error("Could not read image"));
+            return;
+          }
 
-        const context = canvas.getContext("2d");
-        if (context && video.readyState >= 2) {
-          context.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, w, h);
+          const imageData = ctx.getImageData(0, 0, w, h);
           const code = jsQR(imageData.data, imageData.width, imageData.height);
 
           if (code) {
-            const cleaned = String(code.data || "").trim();
-            const match = cleaned.match(/\d+/);
-            const ewbNo = match ? match[0] : cleaned;
-            if (ewbNo) {
-              await stopScanner();
-              setIsScannerOpen(false);
-              await applyScannedEwb(ewbNo);
-              return;
-            }
+            resolve(String(code.data || "").trim());
+          } else {
+            reject(new Error("No QR code found in the image. Please try a clearer image."));
           }
-        }
+        };
 
-        scanFrameRef.current = requestAnimationFrame(() => {
-          void scanLoop();
-        });
+        img.onerror = () => reject(new Error("Failed to load the image"));
+        img.src = e.target.result;
       };
 
-      scanFrameRef.current = requestAnimationFrame(() => {
-        void scanLoop();
-      });
+      reader.onerror = () => reject(new Error("Failed to read the file"));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsDecoding(true);
+    setUploadError("");
+
+    try {
+      const qrData = await decodeImageFile(file);
+      const match = qrData.match(/\d+/);
+      const ewbNo = match ? match[0] : qrData;
+
+      if (ewbNo) {
+        setIsUploadOpen(false);
+        await applyScannedEwb(ewbNo);
+      }
     } catch (err) {
-      await stopScanner();
-      setScannerError(err?.message || "Unable to access the camera");
+      setUploadError(err.message);
+    } finally {
+      setIsDecoding(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -194,7 +166,6 @@ export default function EwayBillSection({
 
   const handleRowUpdate = async (newRow, oldRow) => {
     if (newRow.ewb_no === oldRow.ewb_no) {
-      // ewb_no unchanged — handle edits to other columns (e.g. docket_no)
       Object.keys(newRow).forEach((key) => {
         if (key !== "id" && newRow[key] !== oldRow[key]) {
           handleCellChange(newRow.id, key, newRow[key]);
@@ -327,17 +298,15 @@ export default function EwayBillSection({
       <div style={sectionHeaderStyle}>
         <h3>EWB Details</h3>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          {isMobile && (
-            <Tooltip title="Scan EWB QR">
-              <IconButton
-                onClick={handleOpenScanner}
-                size="small"
-                sx={{ color: "#0f766e", "&:hover": { background: "#ccfbf1" } }}
-              >
-                <QrCodeScannerIcon />
-              </IconButton>
-            </Tooltip>
-          )}
+          <Tooltip title="Upload QR Image">
+            <IconButton
+              onClick={handleOpenUpload}
+              size="small"
+              sx={{ color: "#0f766e", "&:hover": { background: "#ccfbf1" } }}
+            >
+              <QrCodeScannerIcon />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Add EWB">
             <IconButton
               onClick={onAdd}
@@ -378,44 +347,62 @@ export default function EwayBillSection({
         onCellChange={handleCellChange}
         onRowUpdate={handleRowUpdate}
         onRowSelectionModelChange={(model) => {
-          // MUI DataGrid v7+ returns { type, ids: Set<GridRowId> }
           const ids = model?.ids instanceof Set ? model.ids : new Set(Array.isArray(model) ? model : []);
           setSelectedRows(ids);
         }}
       />
 
       <Dialog
-        open={isScannerOpen}
-        onClose={handleCloseScanner}
+        open={isUploadOpen}
+        onClose={handleCloseUpload}
         fullScreen={isMobile}
         fullWidth
         maxWidth="sm"
       >
         <DialogContent sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, pt: 3 }}>
-          <Typography variant="h6">Scan EWB QR Code</Typography>
+          <Typography variant="h6">Upload EWB QR Code Image</Typography>
           <Typography variant="body2" color="text.secondary" textAlign="center">
-            Point your camera at the EWB QR code to auto-fill the EWB number.
+            Take a screenshot of the EWB QR code and upload it here. Works on HTTP and HTTPS.
           </Typography>
+
           <Box
-            sx={{ width: "100%", minHeight: 280, borderRadius: 2, overflow: "hidden", background: "#111", display: "flex", alignItems: "center", justifyContent: "center" }}
+            sx={{
+              width: "100%",
+              minHeight: 200,
+              borderRadius: 2,
+              border: "2px dashed #ccc",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 2,
+              p: 3,
+              cursor: "pointer",
+              "&:hover": { borderColor: "#0f766e", background: "#f0fdfa" },
+            }}
+            onClick={() => fileInputRef.current?.click()}
           >
-            <video
-              ref={videoRef}
-              id="ewb-qr-reader"
-              playsInline
-              muted
-              style={{ width: "100%", height: 280, objectFit: "cover" }}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              style={{ display: "none" }}
             />
+            <QrCodeScannerIcon sx={{ fontSize: 48, color: "#0f766e" }} />
+            <Typography variant="body1" color="text.secondary">
+              {isDecoding ? "Decoding QR code..." : "Click to select a QR image"}
+            </Typography>
           </Box>
-          {isScanning && <CircularProgress size={24} />}
-          {scannerError && (
+
+          {uploadError && (
             <Typography color="error" textAlign="center">
-              {scannerError}
+              {uploadError}
             </Typography>
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={handleCloseScanner}>Cancel</Button>
+          <Button onClick={handleCloseUpload}>Cancel</Button>
         </DialogActions>
       </Dialog>
     </div>
