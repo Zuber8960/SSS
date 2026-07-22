@@ -8,13 +8,13 @@ import {
   DialogActions,
   DialogContent,
   IconButton,
-  TextField,
   Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
+import { jsQR } from "jsqr";
 import { AddIcon, DeleteIcon, SaveIcon } from "../../../components/common/icons";
 import { DataTable } from "../../../components/common/MasterPage";
 import { fetchEwayBillFromDB, saveEwayBillToDB, updateEwayBillByRecId } from "../../../utils/docket";
@@ -85,9 +85,6 @@ export default function EwayBillSection({
   const handleOpenScanner = () => {
     setScannerError("");
     setIsScannerOpen(true);
-    window.requestAnimationFrame(() => {
-      void startScanner();
-    });
   };
 
   const handleCloseScanner = async () => {
@@ -95,11 +92,27 @@ export default function EwayBillSection({
     setIsScannerOpen(false);
   };
 
+  useEffect(() => {
+    if (isScannerOpen) {
+      const timer = setTimeout(() => {
+        void startScanner();
+      }, 300);
+      return () => clearTimeout(timer);
+    } else {
+      void stopScanner();
+    }
+  }, [isScannerOpen]);
+
   const startScanner = async () => {
     setScannerError("");
 
-    if (!("BarcodeDetector" in window) || !navigator.mediaDevices?.getUserMedia) {
-      setScannerError("Camera QR scanning is not supported in this browser. Enter the EWB number manually instead.");
+    if (!window.isSecureContext) {
+      setScannerError("Please open this page over localhost or HTTPS so the camera can be used.");
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setScannerError("Camera access is not available in this browser.");
       return;
     }
 
@@ -113,16 +126,24 @@ export default function EwayBillSection({
         await videoRef.current.play();
       }
 
-      const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
       setIsScanning(true);
 
       const scanLoop = async () => {
         if (!videoRef.current || !streamRef.current) return;
 
-        try {
-          const barcodes = await detector.detect(videoRef.current);
-          if (barcodes?.length) {
-            const cleaned = String(barcodes[0].rawValue || "").trim();
+        const video = videoRef.current;
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 320;
+        canvas.height = video.videoHeight || 240;
+
+        const context = canvas.getContext("2d");
+        if (context && video.readyState >= 2) {
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+          if (code) {
+            const cleaned = String(code.data || "").trim();
             const match = cleaned.match(/\d+/);
             const ewbNo = match ? match[0] : cleaned;
             if (ewbNo) {
@@ -132,8 +153,6 @@ export default function EwayBillSection({
               return;
             }
           }
-        } catch {
-          // Ignore transient detection errors and continue scanning
         }
 
         scanFrameRef.current = requestAnimationFrame(() => {
@@ -161,21 +180,15 @@ export default function EwayBillSection({
       inv_date: "",
     };
 
-    let nextList = ewbList;
     if (targetIndex < 0) {
       onAdd?.();
-      nextList = [...ewbList, { ewb_no: "", ewb_date: "", ewb_valid: "", inv_no: "", inv_date: "" }];
     }
 
-    const newRow = { ...baseRow, ewb_no: ewbNo };
+    const newRow = { ...baseRow, id: fallbackIndex, ewb_no: ewbNo };
     const updatedRow = await handleRowUpdate(newRow, baseRow);
 
     if (updatedRow && onEwbListUpdate) {
       onEwbListUpdate(fallbackIndex, updatedRow);
-    }
-
-    if (updatedRow && targetIndex < 0 && nextList !== ewbList) {
-      onEwbListUpdate?.(fallbackIndex, updatedRow);
     }
   };
 
