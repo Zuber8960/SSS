@@ -434,13 +434,77 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
     if (results.length) {
       if (apiCalls) {
         const rawFirst = results[0];
+
+        // Resolve consignor BP — find by GSTIN then name, create if missing
+        const bpWarnings = [];
+        let cnorBp = null;
+        if (rawFirst.fromGstin) {
+          cnorBp = await db('sss.ssm_business_partner')
+            .where({ bp_gstin: rawFirst.fromGstin, tenant_id })
+            .select('record_id', 'bp_name')
+            .first();
+        }
+        if (!cnorBp && rawFirst.fromTrdName) {
+          cnorBp = await db('sss.ssm_business_partner')
+            .whereRaw('LOWER(bp_name) = LOWER(?)', [rawFirst.fromTrdName])
+            .where({ tenant_id })
+            .select('record_id', 'bp_name')
+            .first();
+        }
+        if (!cnorBp && (rawFirst.fromTrdName || rawFirst.fromGstin)) {
+          [cnorBp] = await db('sss.ssm_business_partner')
+            .insert({
+              bp_name:    rawFirst.fromTrdName || '',
+              bp_gstin:   rawFirst.fromGstin   || null,
+              bp_addres:  ((rawFirst.fromAddr1 || '') + ' ' + (rawFirst.fromAddr2 || '')).trim() || null,
+              bp_city:    rawFirst.fromPlace   || null,
+              bp_pincode: rawFirst.fromPincode ? String(rawFirst.fromPincode) : null,
+              tenant_id,
+              record_created_on: new Date(),
+            })
+            .returning(['record_id', 'bp_name']);
+          bpWarnings.push(`Consignor "${rawFirst.fromTrdName}" details are missing in BP master table. A new entry has been auto-created (ID: ${cnorBp.record_id}).`);
+        }
+
+        // Resolve consignee BP — find by GSTIN then name, create if missing
+        let cneeBp = null;
+        if (rawFirst.toGstin) {
+          cneeBp = await db('sss.ssm_business_partner')
+            .where({ bp_gstin: rawFirst.toGstin, tenant_id })
+            .select('record_id', 'bp_name')
+            .first();
+        }
+        if (!cneeBp && rawFirst.toTrdName) {
+          cneeBp = await db('sss.ssm_business_partner')
+            .whereRaw('LOWER(bp_name) = LOWER(?)', [rawFirst.toTrdName])
+            .where({ tenant_id })
+            .select('record_id', 'bp_name')
+            .first();
+        }
+        if (!cneeBp && (rawFirst.toTrdName || rawFirst.toGstin)) {
+          [cneeBp] = await db('sss.ssm_business_partner')
+            .insert({
+              bp_name:    rawFirst.toTrdName || '',
+              bp_gstin:   rawFirst.toGstin   || null,
+              bp_addres:  ((rawFirst.toAddr1 || '') + ' ' + (rawFirst.toAddr2 || '')).trim() || null,
+              bp_city:    rawFirst.toPlace   || null,
+              bp_pincode: rawFirst.toPincode ? String(rawFirst.toPincode) : null,
+              tenant_id,
+              record_created_on: new Date(),
+            })
+            .returning(['record_id', 'bp_name']);
+          bpWarnings.push(`Consignee "${rawFirst.toTrdName}" details are missing in BP master table. A new entry has been auto-created (ID: ${cneeBp.record_id}).`);
+        }
+
         docketData = {
           ewb_no:       rawFirst.ewbNo ? String(rawFirst.ewbNo) : null,
+          cnor_id:      cnorBp?.record_id || null,
           cnor_name:    rawFirst.fromTrdName    || null,
           cnor_address: ((rawFirst.fromAddr1 || '') + ' ' + (rawFirst.fromAddr2 || '')).trim() || null,
           cnor_gstin:   rawFirst.fromGstin      || null,
           cnor_pincode: rawFirst.fromPincode ? String(rawFirst.fromPincode) : null,
           cnor_city:    rawFirst.fromPlace      || null,
+          cnee_id:      cneeBp?.record_id || null,
           cnee_name:    rawFirst.toTrdName      || null,
           cnee_address: ((rawFirst.toAddr1 || '') + ' ' + (rawFirst.toAddr2 || '')).trim() || null,
           cnee_gstin:   rawFirst.toGstin        || null,
@@ -451,6 +515,7 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
           invoice_no:   rawFirst.docNo          || null,
           invoice_date: rawFirst.docDate        || null,
           invoice_value: rawFirst.totInvValue   || null,
+          bpWarnings:   bpWarnings.length ? bpWarnings : null,
         };
         const ewbResult = await saveDataEwb(results, tenant_id);
         results = ewbResult.map(obj => {
