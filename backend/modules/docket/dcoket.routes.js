@@ -51,8 +51,8 @@ router.get('/ewayfile/db/:ewbNumbers', async (req, res) => {
       return res.json({ success: true, data: [] });
     }
     const { tenant_id } = req;
-    const { results, apiCalls } = await DocketController.getEwayBillFromDB(ewbNumbers, tenant_id);
-    res.json({ success: true, data: results, apiCalls });
+    const { results, apiCalls, docketData } = await DocketController.getEwayBillFromDB(ewbNumbers, tenant_id);
+    res.json({ success: true, data: results, apiCalls, docketData });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -138,6 +138,22 @@ router.post('/:docketId/charges', async (req, res) => {
     const chargeData = { ...req.body, tenant_id };
     const data = await DocketController.createCharge(docketId, chargeData);
     res.status(201).json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/* ================= BP FIND-OR-CREATE ================= */
+
+router.post('/bp/find-or-create', async (req, res) => {
+  try {
+    const { tenant_id } = req;
+    const { cnor, cnee } = req.body;
+    const [cnorBp, cneeBp] = await Promise.all([
+      cnor ? DocketController.findOrCreateBp({ ...cnor, tenant_id }) : null,
+      cnee ? DocketController.findOrCreateBp({ ...cnee, tenant_id }) : null,
+    ]);
+    res.json({ success: true, cnor: cnorBp, cnee: cneeBp });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

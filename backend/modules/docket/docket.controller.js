@@ -396,7 +396,7 @@ const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
 };
 
 const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
-  let apiCalls = false;
+  let apiCalls = false, docketData = null;
   const query = db('sss.sst_ewb_hdr as hdr')
     .whereIn('hdr.EWB_NO', ewbNumbers.map(String))
     .select(
@@ -430,10 +430,33 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
           invoice_date: ewbRes.inv_date ? moment(ewbRes.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
         }));
     }
+    docketData = null;
     if (results.length) {
       if (apiCalls) {
+        const rawFirst = results[0];
+        docketData = {
+          ewb_no:       rawFirst.ewbNo ? String(rawFirst.ewbNo) : null,
+          cnor_name:    rawFirst.fromTrdName    || null,
+          cnor_address: ((rawFirst.fromAddr1 || '') + ' ' + (rawFirst.fromAddr2 || '')).trim() || null,
+          cnor_gstin:   rawFirst.fromGstin      || null,
+          cnor_pincode: rawFirst.fromPincode ? String(rawFirst.fromPincode) : null,
+          cnor_city:    rawFirst.fromPlace      || null,
+          cnee_name:    rawFirst.toTrdName      || null,
+          cnee_address: ((rawFirst.toAddr1 || '') + ' ' + (rawFirst.toAddr2 || '')).trim() || null,
+          cnee_gstin:   rawFirst.toGstin        || null,
+          cnee_pincode: rawFirst.toPincode ? String(rawFirst.toPincode) : null,
+          cnee_city:    rawFirst.toPlace        || null,
+          docket_no:     rawFirst.docNo          || null,
+          docket_date:   rawFirst.docDate        || null,
+          invoice_no:   rawFirst.docNo          || null,
+          invoice_date: rawFirst.docDate        || null,
+          invoice_value: rawFirst.totInvValue   || null,
+        };
         const ewbResult = await saveDataEwb(results, tenant_id);
-        results = ewbResult;
+        results = ewbResult.map(obj => {
+          delete obj.rec_id;
+          return obj;
+        });
       } else {
         // const ewbDbResult = await saveEwayBillToDB(results, tenant_id);
         // console.log('EWB saved to DB:', ewbDbResult);
@@ -443,7 +466,7 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
       console.log('No EWB data found from API for:', ewbNumbers);
     }
   };
-  return { results, apiCalls };
+  return { results, apiCalls, docketData };
 }
 
 const saveDataEwb = async (apiResResult, tenant_id) => {
@@ -586,7 +609,7 @@ const saveDataEwb = async (apiResResult, tenant_id) => {
       .merge(),
     db('sss.ewb_vehicles')
       .insert(ewbVehicleRows)
-      .onConflict(['docket_no', 'ewb_no'])
+      .onConflict(['docket_no', 'ewb_no', 'entered_date'])
       .merge(),
   ]);
 
@@ -594,81 +617,92 @@ const saveDataEwb = async (apiResResult, tenant_id) => {
 };
 
 const saveEwayBillToDB = async (ewbDataArray, tenant_id) => {
-  const rows = ewbDataArray.map(item => {
-    const data = item.data || item; // DD/MM/YYYY hh:mm:ss A
+  const parseDate = (val) => {
+    if (!val) return null;
+    const m = moment(val, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true);
+    return m.isValid() ? m.format('YYYY-MM-DD') : null;
+  };
 
-    const ewb_date = moment(data.ewb_date || data.ewayBillDate, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') || null;
-    const ewb_valid_upto = moment(data.ewb_valid || data.validUpto, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') || null;
-    const invoice_date = data.inv_date ?
-      moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') :
-      data.invoice_date ? moment(data.invoice_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') : null;
+  const rows = ewbDataArray.map(item => {
+    const data = item.data || item;
     return {
-      ewb_no: String(data.ewbNo || ''),
-      ewb_date,
-      ewb_valid_upto,
-      invoice_no: data.inv_no,
-      docket_no: data.docNo || '',
-      invoice_date,
-      cnor_name: data.fromTrdName || '',
-      cnor_address: (data.fromAddr1 || '') + ' ' + (data.fromAddr2 || ''),
-      cnor_gstin: data.fromGstin || '',
-      cnor_pincode: data.fromPincode || null,
-      cnee_name: data.toTrdName || '',
-      cnee_address: (data.toAddr1 || '') + ' ' + (data.toAddr2 || ''),
-      cnee_gstin: data.toGstin || '',
-      cnee_pincode: data.toPincode || null,
-      // taxble_value: data.taxableAmount || data.totalValue || 0,
-      cgst: data.cgstValue || 0,
-      sgst: data.sgstValue || 0,
-      igst: data.igstValue || 0,
-      cess: data.cessValue || 0,
-      invoice_total: data.totInvValue || 0,
-      product_name: data.itemList?.map(i => i.productName || i.productDesc).filter(Boolean).join(', ') || '',
-      hsn_code: data.itemList?.map(i => i.hsnCode).filter(Boolean).join(', ') || '',
-      quantity: data.itemList?.reduce((sum, i) => sum + (i.quantity || 0), 0) || 0,
+      ewb_no: String(data.ewb_no || data.ewbNo || ''),
+      ewb_date: parseDate(data.ewb_date || data.ewayBillDate),
+      ewb_valid_upto: parseDate(data.ewb_valid || data.ewb_valid_upto || data.validUpto),
+      invoice_no: data.inv_no || data.invoice_no || null,
+      docket_no: data.docket_no || data.docNo || null,
+      invoice_date: parseDate(data.inv_date || data.invoice_date),
+      cnor_name: data.cnor_name || data.fromTrdName || '',
+      cnor_address: data.cnor_address || ((data.fromAddr1 || '') + ' ' + (data.fromAddr2 || '')).trim() || '',
+      cnor_gstin: data.cnor_gstin || data.fromGstin || '',
+      cnor_pincode: data.cnor_pincode || data.fromPincode || null,
+      cnee_name: data.cnee_name || data.toTrdName || '',
+      cnee_address: data.cnee_address || ((data.toAddr1 || '') + ' ' + (data.toAddr2 || '')).trim() || '',
+      cnee_gstin: data.cnee_gstin || data.toGstin || '',
+      cnee_pincode: data.cnee_pincode || data.toPincode || null,
+      cgst: data.cgst || data.cgstValue || 0,
+      sgst: data.sgst || data.sgstValue || 0,
+      igst: data.igst || data.igstValue || 0,
+      cess: data.cess || data.cessValue || 0,
+      invoice_total: data.invoice_total || data.totInvValue || 0,
+      product_name: data.product_name || data.itemList?.map(i => i.productName || i.productDesc).filter(Boolean).join(', ') || '',
+      hsn_code: data.hsn_code || data.itemList?.map(i => i.hsnCode).filter(Boolean).join(', ') || '',
+      quantity: data.quantity || data.itemList?.reduce((sum, i) => sum + (i.quantity || 0), 0) || 0,
       tenant_id: tenant_id || null,
       aud_date: new Date()
     };
   });
 
-  let query = db('sss.sst_docket_ewb')
-    .insert(rows)
-    .returning('*');
-  const ewbResult = await query;
+  const results = [];
+  for (const row of rows) {
+    if (!row.ewb_no) continue;
+    const existing = await db('sss.sst_docket_ewb')
+      .where({ ewb_no: row.ewb_no, tenant_id: row.tenant_id })
+      .first();
+    if (existing) {
+      await db('sss.sst_docket_ewb')
+        .where({ ewb_no: row.ewb_no, tenant_id: row.tenant_id })
+        .update(row);
+      results.push({ ...existing, ...row });
+    } else {
+      const [inserted] = await db('sss.sst_docket_ewb').insert(row).returning('*');
+      results.push(inserted);
+    }
+  }
+  return results;
+};
 
-  // const docketRows = ewbDataArray.map(item => {
-  //   const data = item.data || item;
-  //   const docket_date = data.docDate ? moment(data.docDate, 'DD/MM/YYYY').format('YYYY-MM-DD') : null;
-  //   const totalQty = data.itemList?.reduce((sum, i) => sum + (i.quantity || 0), 0) || 0;
-  //   const goodsDesc = data.itemList?.map(i => i.productDesc || i.productName).filter(Boolean).join(', ') || '';
-  //   const hsnCode = data.itemList?.[0]?.hsnCode ? String(data.itemList[0].hsnCode) : '';
-
-  //   return {
-  //     docket_loc: (data.fromPlace || '').toUpperCase(),
-  //     docket_no: data.docNo || '',
-  //     docket_date,
-  //     docket_to_loc: (data.toPlace || '').toUpperCase(),
-  //     docket_cnor_name: data.fromTrdName || '',
-  //     docket_cnee_name: data.toTrdName || '',
-  //     docket_dly_town: data.toPlace || '',
-  //     docket_act_wt: totalQty,
-  //     docket_chrg_wt: totalQty,
-  //     docket_inv_value: data.totalValue || 0,
-  //     docket_tot_amt: data.totInvValue || 0,
-  //     docket_goods_desc: goodsDesc,
-  //     hsn_code: hsnCode,
-  //     tenant_id: tenant_id || null,
-  //     aud_date: new Date(),
-  //     record_status: 0
-  //   };
-  // });
-
-  // await db('sss.sst_docket')
-  //   .insert(docketRows)
-  //   .onConflict(['docket_no', 'docket_loc', 'docket_date'])
-  //   .ignore();
-
-  return ewbResult;
+const findOrCreateBp = async ({ bp_name, bp_gstin, bp_addres, bp_city, bp_pincode, tenant_id }) => {
+  // 1. Try to find by GSTIN first (most unique)
+  if (bp_gstin) {
+    const existing = await db('sss.ssm_business_partner')
+      .where({ bp_gstin, tenant_id })
+      .select('record_id', 'bp_name', 'bp_addres', 'bp_city', 'bp_pincode', 'bp_gstin')
+      .first();
+    if (existing) return existing;
+  }
+  // 2. Fall back to exact name match
+  if (bp_name) {
+    const existing = await db('sss.ssm_business_partner')
+      .whereRaw('LOWER(bp_name) = LOWER(?)', [bp_name])
+      .where({ tenant_id })
+      .select('record_id', 'bp_name', 'bp_addres', 'bp_city', 'bp_pincode', 'bp_gstin')
+      .first();
+    if (existing) return existing;
+  }
+  // 3. Create new BP
+  const [created] = await db('sss.ssm_business_partner')
+    .insert({
+      bp_name:    bp_name    || '',
+      bp_gstin:   bp_gstin   || null,
+      bp_addres:  bp_addres  || null,
+      bp_city:    bp_city    || null,
+      bp_pincode: bp_pincode || null,
+      tenant_id,
+      record_created_on: new Date(),
+    })
+    .returning(['record_id', 'bp_name', 'bp_addres', 'bp_city', 'bp_pincode', 'bp_gstin']);
+  return created;
 };
 
 module.exports = {
@@ -692,4 +726,5 @@ module.exports = {
   getEwayBillFromDB,
   saveEwayBillToDB,
   updateEwayBillByRecId,
+  findOrCreateBp,
 };

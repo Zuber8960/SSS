@@ -16,6 +16,9 @@ import {
   fetchDocketByDocketNo,
   createDocket,
   updateDocketByRecId,
+  saveEwayBillToDB,
+  updateEwayBillByRecId,
+  findOrCreateBp,
 } from "../../utils/docket";
 import { fetchAllLocations, fetchLocationTowns } from "../../utils/locationMaster";
 import { fetchBpByBpName } from "../../utils/businessPartner";
@@ -592,7 +595,37 @@ export default function DocketPage() {
       const currentUser = JSON.parse(localStorage.getItem("current_user") || "null");
       const aud_user = currentUser?.rec_id ?? null;
 
-      const payload = { aud_user };
+      // If cnor/cnee came from EWB API (no rec_id yet), find or create them in BP master now
+      let resolvedCnorId = form.cnor_id;
+      let resolvedCneeId = form.cnee_id;
+      if (form.cnor_name && !form.cnor_id || form.cnee_name && !form.cnee_id) {
+        const bpResult = await findOrCreateBp({
+          cnor: (!form.cnor_id && form.cnor_name) ? {
+            bp_name:    form.cnor_name,
+            bp_gstin:   form.cnor_gstin   || null,
+            bp_addres:  form.cnor_address || null,
+            bp_city:    form.cnor_city    || null,
+            bp_pincode: form.cnor_pincode || null,
+          } : null,
+          cnee: (!form.cnee_id && form.cnee_name) ? {
+            bp_name:    form.cnee_name,
+            bp_gstin:   form.cnee_gstin   || null,
+            bp_addres:  form.cnee_address || null,
+            bp_city:    form.cnee_city    || null,
+            bp_pincode: form.cnee_pincode || null,
+          } : null,
+        });
+        if (bpResult.cnor?.record_id) {
+          resolvedCnorId = bpResult.cnor.record_id;
+          setForm((prev) => ({ ...prev, cnor_id: resolvedCnorId }));
+        }
+        if (bpResult.cnee?.record_id) {
+          resolvedCneeId = bpResult.cnee.record_id;
+          setForm((prev) => ({ ...prev, cnee_id: resolvedCneeId }));
+        }
+      }
+
+      const payload = { aud_user, cnor_id: resolvedCnorId, cnee_id: resolvedCneeId };
       const packageTotalValue =
         (parseFloat(form.no_cb) || 0) +
         (parseFloat(form.no_w_crate) || 0) +
@@ -614,6 +647,7 @@ export default function DocketPage() {
       // }
 
       let result;
+      let savedDocketNo;
       if (docketExists && docketRecId != null) {
         if (Object.keys(payload).length <= 1) {
           showInfo("No changes to save");
@@ -621,14 +655,42 @@ export default function DocketPage() {
         }
         result = await updateDocketByRecId(docketRecId, payload);
         setDirtyFields(new Set());
+        savedDocketNo = payload.docket_no || docketNumberInput;
         if (payload.docket_no) setDocketNumberInput(payload.docket_no);
         showSuccess("Docket updated successfully");
       } else {
         // Create new docket (POST) — backend strips rec_id: -1
         result = await createDocket(payload);
         setDocketExists(true);
+        savedDocketNo = result?.docket_no;
         if (result?.docket_no) setDocketNumberInput(result.docket_no);
         showSuccess("Docket created successfully");
+      }
+
+      // Save EWB list if withEWB is on and there are rows
+      if (withEWB && ewbList.length > 0 && savedDocketNo) {
+        const toDbDate = (val) => {
+          if (!val) return null;
+          const m = moment(val, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"], true);
+          return m.isValid() ? m.format("YYYY-MM-DD") : null;
+        };
+        const normalized = ewbList
+          .filter((r) => r.ewb_no)
+          .map((row) => ({
+            ...row,
+            docket_no: savedDocketNo,
+            ewb_date: toDbDate(row.ewb_date),
+            ewb_valid: toDbDate(row.ewb_valid),
+            inv_date: toDbDate(row.inv_date),
+          }));
+        const existing = normalized.filter((r) => r.rec_id);
+        const newRows  = normalized.filter((r) => !r.rec_id);
+        await Promise.all([
+          ...existing.map((r) => updateEwayBillByRecId(r.rec_id, r)),
+          ...(newRows.length ? [saveEwayBillToDB(newRows)] : []),
+        ]);
+        // Stamp docket_no back onto local state
+        setEwbList((prev) => prev.map((r) => ({ ...r, docket_no: savedDocketNo })));
       }
 
       console.log("Save result:", result);
@@ -1019,9 +1081,44 @@ export default function DocketPage() {
                     return updated;
                   })
                 }
+                onShowForm={() => setShowForm(true)}
+                onDocketPopulate={(docketData) => {
+                  setIsFormEditMode(true);
+                  setShowForm(true);
+                  if (docketData.ewb_no) setEwbNoDisplay(docketData.ewb_no);
+                  setForm((prev) => {
+                    const updates = {};
+                    if (docketData.docket_no   && !prev.docket_no) {
+                      updates.docket_no = docketData.docket_no;
+                      setDocketNumberInput(docketData.docket_no);
+                    }
+                    if (docketData.docket_date && !prev.docket_date) {
+                      const m = moment(docketData.docket_date, ["DD/MM/YYYY", "YYYY-MM-DD"], true);
+                      updates.docket_date = m.isValid() ? m.format("YYYY-MM-DD") : docketData.docket_date;
+                    }
+                    if (docketData.cnor_name    && !prev.cnor_name)    updates.cnor_name    = docketData.cnor_name;
+                    if (docketData.cnor_address && !prev.cnor_address) updates.cnor_address = docketData.cnor_address;
+                    if (docketData.cnor_gstin   && !prev.cnor_gstin)   updates.cnor_gstin   = docketData.cnor_gstin;
+                    if (docketData.cnor_pincode && !prev.cnor_pincode) updates.cnor_pincode = docketData.cnor_pincode;
+                    if (docketData.cnor_city    && !prev.cnor_city)    updates.cnor_city    = docketData.cnor_city;
+                    if (docketData.cnee_name    && !prev.cnee_name)    updates.cnee_name    = docketData.cnee_name;
+                    if (docketData.cnee_address && !prev.cnee_address) updates.cnee_address = docketData.cnee_address;
+                    if (docketData.cnee_gstin   && !prev.cnee_gstin)   updates.cnee_gstin   = docketData.cnee_gstin;
+                    if (docketData.cnee_pincode && !prev.cnee_pincode) updates.cnee_pincode = docketData.cnee_pincode;
+                    if (docketData.cnee_city    && !prev.cnee_city)    updates.cnee_city    = docketData.cnee_city;
+                    if (docketData.invoice_no   && !prev.invoice_no)   updates.invoice_no   = docketData.invoice_no;
+                    if (docketData.invoice_date && !prev.invoice_date) updates.invoice_date = docketData.invoice_date;
+                    if (docketData.invoice_value != null && !prev.invoice_value) updates.invoice_value = docketData.invoice_value;
+                    return Object.keys(updates).length ? { ...prev, ...updates } : prev;
+                  });
+                  setDirtyFields((prev) => {
+                    const s = new Set(prev);
+                    ['docket_no','docket_date','cnor_name','cnor_address','cnor_gstin','cnor_pincode','cnor_city','cnee_name','cnee_address','cnee_gstin','cnee_pincode','cnee_city','invoice_no','invoice_date','invoice_value'].forEach(k => s.add(k));
+                    return s;
+                  });
+                }}
                 showError={showError}
                 showWarning={showWarning}
-                showSuccess={showSuccess}
                 sectionHeaderStyle={sectionHeaderStyle}
                 withEWB={withEWB}
               />

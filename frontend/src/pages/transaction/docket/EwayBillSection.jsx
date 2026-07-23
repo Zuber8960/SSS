@@ -17,7 +17,7 @@ import jsqrLib from "jsqr";
 const jsQR = jsqrLib.jsQR || jsqrLib.default || jsqrLib;
 import { AddIcon, DeleteIcon, SaveIcon } from "../../../components/common/icons";
 import { DataTable } from "../../../components/common/MasterPage";
-import { fetchEwayBillFromDB, saveEwayBillToDB, updateEwayBillByRecId } from "../../../utils/docket";
+import { fetchEwayBillFromDB } from "../../../utils/docket";
 import { getDateFormat } from "../../../utils/tenantService";
 
 export default function EwayBillSection({
@@ -26,11 +26,11 @@ export default function EwayBillSection({
   onDelete,
   onCellChange,
   onEwbListUpdate,
-  onSave,
+  onDocketPopulate,
+  onShowForm,
   sectionHeaderStyle,
   showError,
   showWarning,
-  showSuccess,
 }) {
   const [selectedRows, setSelectedRows] = useState([]);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -53,6 +53,7 @@ export default function EwayBillSection({
     { key: "ewb_valid", label: "Valid Upto", editable: true, isDate: true, render: (row) => fmtDate(row.ewb_valid) },
     { key: "inv_no", label: "Invoice No" },
     { key: "inv_date", label: "Invoice Date", editable: true, isDate: true, render: (row) => fmtDate(row.inv_date) },
+     { key: "invoice_total", label: "Inv Value" },
   ];
 
   const handleOpenUpload = () => {
@@ -187,7 +188,7 @@ export default function EwayBillSection({
 
     try {
       let ewbApi = (await fetchEwayBillFromDB([Number(ewbNo)]))?.data;
-      const { apiCalls } = ewbApi || false;
+      const { apiCalls, docketData } = ewbApi || {};
       let records = ewbApi?.data || ewbApi || [];
       if (!records || records.length === 0) {
         showError(`EWB number ${ewbNo} does not exist`);
@@ -195,11 +196,11 @@ export default function EwayBillSection({
       }
 
       if (records.length && !apiCalls) {
-        let docketCount = records.filter((r) => r.docket_no).length;
+        const docketCount = records.filter((r) => r.docket_no).length;
         if (docketCount === records.length) {
           showError(`EWB number ${ewbNo} is already attached to docket ${records[0].docket_no}`);
           return oldRow;
-        };
+        }
       }
       let r = records[0];
       if (!apiCalls) {
@@ -216,9 +217,42 @@ export default function EwayBillSection({
         ewb_valid: toDate(r.EWB_VALID_UPTO || r.ewb_valid_upto),
         inv_no: r.INV_NO || r.invoice_no || "",
         inv_date: toDate(r.INV_DATE || r.invoice_date),
+        cnor_name: r.FROM_CUST_NAME || r.cnor_name || "",
+        cnee_name: r.TO_CUST_NAME || r.cnee_name || "",
+        cnor_address: r.FROM_ADDRESS || r.cnor_address || "",
+        cnee_address: r.TO_ADDRESS || r.cnee_address || "",
+        cnor_gstin: r.CNOR_GSTIN || r.cnor_gstin || "",
+        cnee_gstin: r.CNEE_GSTIN || r.cnee_gstin || "",
+        cnor_pincode: r.FROM_PINCODE || r.cnor_pincode || "",
+        cnee_pincode: r.TO_PINCODE || r.cnee_pincode || "",
+        invoice_total: r.TOTAL_INV_VALUE || r.invoice_total || 0,
+        cgst: r.CGST_VALUE || r.cgst || 0,
+        sgst: r.SGST_VALUE || r.sgst || 0,
+        igst: r.IGST_VALUE || r.igst || 0,
+        cess: r.cess || 0,
+        product_name: r.PRODUCT_NAME || r.product_name || "",
+        hsn_code: r.ITEM_HSN_CODE || r.hsn_code || "",
+        quantity: r.ITEM_QTY || r.quantity || 0,
       };
 
       if (onEwbListUpdate) onEwbListUpdate(newRow.id, populated);
+      if (onDocketPopulate) {
+        const docketPayload = apiCalls && docketData ? docketData : {
+          cnor_name:     populated.cnor_name,
+          cnor_address:  populated.cnor_address,
+          cnor_gstin:    populated.cnor_gstin,
+          cnor_pincode:  populated.cnor_pincode,
+          cnee_name:     populated.cnee_name,
+          cnee_address:  populated.cnee_address,
+          cnee_gstin:    populated.cnee_gstin,
+          cnee_pincode:  populated.cnee_pincode,
+          invoice_no:    populated.inv_no,
+          invoice_date:  populated.inv_date,
+          invoice_value: populated.invoice_total,
+        };
+        onDocketPopulate(docketPayload);
+      }
+      if (onShowForm) onShowForm();
       return populated;
     } catch (err) {
       showError(err.message || `Failed to fetch EWB ${ewbNo}`);
@@ -237,37 +271,6 @@ export default function EwayBillSection({
       }
     }
     onCellChange(rowIndex, key, value);
-  };
-
-  const toDbDate = (val) => {
-    if (!val) return null;
-    const m = moment(val, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"], true);
-    return m.isValid() ? m.format("YYYY-MM-DD") : null;
-  };
-
-  const handleSave = async () => {
-    const normalized = ewbList.map((row) => ({
-      ...row,
-      ewb_date: toDbDate(row.ewb_date),
-      ewb_valid: toDbDate(row.ewb_valid),
-      inv_date: toDbDate(row.inv_date),
-    }));
-    if (onSave) {
-      onSave(normalized);
-      return;
-    }
-    try {
-      const existing = normalized.filter((r) => r.rec_id);
-      const newRows  = normalized.filter((r) => !r.rec_id);
-
-      await Promise.all([
-        ...existing.map((r) => updateEwayBillByRecId(r.rec_id, r)),
-        ...(newRows.length ? [saveEwayBillToDB(newRows)] : []),
-      ]);
-      showSuccess("EWB list saved successfully");
-    } catch (err) {
-      showError(err.message || "Failed to save EWB list");
-    }
   };
 
   const handleDelete = () => {
@@ -323,15 +326,6 @@ export default function EwayBillSection({
               sx={{ color: "#dc2626", "&:hover": { background: "#fee2e2" } }}
             >
               <DeleteIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Save EWB">
-            <IconButton
-              onClick={handleSave}
-              size="small"
-              sx={{ color: "#16a34a", "&:hover": { background: "#dcfce7" } }}
-            >
-              <SaveIcon />
             </IconButton>
           </Tooltip>
         </div>
