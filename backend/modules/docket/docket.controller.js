@@ -405,6 +405,20 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
     );
   if (tenant_id) query.andWhere({ 'hdr.tenant_id': tenant_id });
   let results = await query;
+  if (results.length) {
+    const ewbNos = results.map(r => String(r.EWB_NO));
+    const docketRows = await db('sss.sst_docket_ewb as de')
+      .join('sss.sst_docket as dk', 'de.docket_no', 'dk.docket_no')
+      .whereIn('de.ewb_no', ewbNos)
+      .select(
+        'de.ewb_no',
+        'dk.*',
+        db.raw(`(SELECT JSON_AGG(dtl.*) FROM sss.sst_docket_dtl dtl WHERE dtl.docket_no = dk.docket_no) AS dtl_rows`)
+      );
+    const docketByEwb = {};
+    for (const row of docketRows) docketByEwb[String(row.ewb_no)] = row;
+    results = results.map(r => ({ ...r, docket: docketByEwb[String(r.EWB_NO)] || null }));
+  }
   if (!results.length) {
     // If not found in DB, fetch from API
     apiCalls = true;

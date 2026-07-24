@@ -648,6 +648,7 @@ export default function DocketPage() {
 
       let result;
       let savedDocketNo;
+      let isNewDocket = false;
       if (docketExists && docketRecId != null) {
         if (Object.keys(payload).length <= 1) {
           showInfo("No changes to save");
@@ -661,10 +662,8 @@ export default function DocketPage() {
       } else {
         // Create new docket (POST) — backend strips rec_id: -1
         result = await createDocket(payload);
-        setDocketExists(true);
         savedDocketNo = result?.docket_no;
-        if (result?.docket_no) setDocketNumberInput(result.docket_no);
-        showSuccess("Docket created successfully");
+        isNewDocket = true;
       }
 
       // Save EWB list if withEWB is on and there are rows
@@ -691,6 +690,19 @@ export default function DocketPage() {
         ]);
         // Stamp docket_no back onto local state
         setEwbList((prev) => prev.map((r) => ({ ...r, docket_no: savedDocketNo })));
+      }
+
+      if (isNewDocket) {
+        prevLocRef.current = { docket_loc: "", docket_to_loc: "" };
+        setForm(emptyForm);
+        setDocketNumberInput("");
+        setDocketExists(false);
+        setDocketRecId(null);
+        setDirtyFields(new Set());
+        setEwbList([]);
+        setEwbNoDisplay("");
+        setIsFormEditMode(false);
+        showSuccess(`Docket ${savedDocketNo} created successfully`);
       }
 
       console.log("Save result:", result);
