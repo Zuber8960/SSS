@@ -409,7 +409,7 @@ export function DataTable({
       <DataGrid
         rows={muiRows}
         columns={muiColumns}
-        disableRowSelectionOnClick={false}
+        disableRowSelectionOnClick={true}
         disableColumnMenu={false}
         density="compact"
         rowHeight={55}
