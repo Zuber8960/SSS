@@ -42,18 +42,18 @@ export default function useAlert() {
 
  
 
-const showSuccess = (message, title = "Success") => {
+const showSuccess = (message, title = "Success", duration = 2000) => {
   showAlert({
     title,
     message,
     severity: "success",
     showCancel: false,
-    onConfirm: null   // ✅ ensures no button
+    onConfirm: null
   });
-  
+
   setTimeout(() => {
     closeAlert();
-  }, 2000);
+  }, duration);
 };
 
 

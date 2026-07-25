@@ -409,15 +409,60 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
     const ewbNos = results.map(r => String(r.EWB_NO));
     const docketRows = await db('sss.sst_docket_ewb as de')
       .join('sss.sst_docket as dk', 'de.docket_no', 'dk.docket_no')
+      .leftJoin('sss.ssm_business_partner as cnor', 'dk.cnor_id', 'cnor.record_id')
+      .leftJoin('sss.ssm_business_partner as cnee', 'dk.cnee_id', 'cnee.record_id')
       .whereIn('de.ewb_no', ewbNos)
       .select(
         'de.ewb_no',
         'dk.*',
-        db.raw(`(SELECT JSON_AGG(dtl.*) FROM sss.sst_docket_dtl dtl WHERE dtl.docket_no = dk.docket_no) AS dtl_rows`)
+        'cnor.record_id as cnor_id',
+        'cnor.bp_name as cnor_name',
+        'cnor.bp_addres as cnor_address',
+        'cnor.bp_city as cnor_city',
+        'cnor.bp_state as cnor_state',
+        'cnor.bp_pincode as cnor_pincode',
+        'cnor.bp_gstin as cnor_gstin',
+        'cnee.record_id as cnee_id',
+        'cnee.bp_name as cnee_name',
+        'cnee.bp_addres as cnee_address',
+        'cnee.bp_city as cnee_city',
+        'cnee.bp_state as cnee_state',
+        'cnee.bp_pincode as cnee_pincode',
+        'cnee.bp_gstin as cnee_gstin',
+        db.raw(`(SELECT JSON_AGG(dtl.*) FROM sss.sst_docket_dtl dtl WHERE dtl.docket_no = dk.docket_no) AS docket_data`)
       );
     const docketByEwb = {};
     for (const row of docketRows) docketByEwb[String(row.ewb_no)] = row;
     results = results.map(r => ({ ...r, docket: docketByEwb[String(r.EWB_NO)] || null }));
+
+    // Build docketData from the first EWB that has a linked docket
+    const firstWithDocket = results.find(r => r.docket);
+    if (firstWithDocket) {
+      const dk = firstWithDocket.docket;
+      const ewbDtl = Array.isArray(firstWithDocket.dtl_rows) ? firstWithDocket.dtl_rows[0] : null;
+      docketData = {
+        ewb_no:        String(firstWithDocket.EWB_NO),
+        docket_no:     dk.docket_no                  || null,
+        docket_date:   dk.docket_date                || null,
+        cnor_id:       dk.cnor_id                    ?? null,
+        cnor_name:     dk.cnor_name                  || null,
+        cnor_address:  dk.cnor_address               || null,
+        cnor_city:     dk.cnor_city                  || null,
+        cnor_state:    dk.cnor_state                 || null,
+        cnor_pincode:  dk.cnor_pincode               || null,
+        cnor_gstin:    dk.cnor_gstin                 || null,
+        cnee_id:       dk.cnee_id                    ?? null,
+        cnee_name:     dk.cnee_name                  || null,
+        cnee_address:  dk.cnee_address               || null,
+        cnee_city:     dk.cnee_city                  || null,
+        cnee_state:    dk.cnee_state                 || null,
+        cnee_pincode:  dk.cnee_pincode               || null,
+        cnee_gstin:    dk.cnee_gstin                 || null,
+        invoice_no:    dk.docket_inv_no              || ewbDtl?.INV_NO || null,
+        invoice_date:  dk.docket_inv_date            || ewbDtl?.INV_DATE || null,
+        invoice_value: dk.docket_inv_value           ?? null,
+      };
+    }
   }
   if (!results.length) {
     // If not found in DB, fetch from API

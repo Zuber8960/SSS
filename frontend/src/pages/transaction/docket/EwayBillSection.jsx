@@ -204,10 +204,13 @@ export default function EwayBillSection({
       }
       let r = records[0];
       if (!apiCalls) {
-        r = records.find((r) => !r.docket_no);
+        r = records.find((r) => !r.docket_no) || records[0];
       }
       const toDate = (val) =>
         val ? moment(val, ["DD/MM/YYYY HH:mm:ss A", "YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD"]).format("MM/DD/YYYY") : "";
+
+      // dtl_rows holds EWB detail (FROM_PLACE, TO_PLACE, etc.)
+      const dtl = Array.isArray(r.dtl_rows) ? r.dtl_rows[0] : null;
 
       const populated = {
         ...newRow,
@@ -217,39 +220,73 @@ export default function EwayBillSection({
         ewb_valid: toDate(r.EWB_VALID_UPTO || r.ewb_valid_upto),
         inv_no: r.INV_NO || r.invoice_no || "",
         inv_date: toDate(r.INV_DATE || r.invoice_date),
-        cnor_name: r.FROM_CUST_NAME || r.cnor_name || "",
-        cnee_name: r.TO_CUST_NAME || r.cnee_name || "",
-        cnor_address: r.FROM_ADDRESS || r.cnor_address || "",
-        cnee_address: r.TO_ADDRESS || r.cnee_address || "",
-        cnor_gstin: r.CNOR_GSTIN || r.cnor_gstin || "",
-        cnee_gstin: r.CNEE_GSTIN || r.cnee_gstin || "",
-        cnor_pincode: r.FROM_PINCODE || r.cnor_pincode || "",
-        cnee_pincode: r.TO_PINCODE || r.cnee_pincode || "",
+        cnor_name: dtl?.FROM_CUST_NAME || r.FROM_CUST_NAME || r.cnor_name || "",
+        cnee_name: dtl?.TO_CUST_NAME || r.TO_CUST_NAME || r.cnee_name || "",
+        cnor_address: dtl?.FROM_ADDRESS || r.FROM_ADDRESS || r.cnor_address || "",
+        cnee_address: dtl?.TO_ADDRESS || r.TO_ADDRESS || r.cnee_address || "",
+        cnor_gstin: dtl?.CNOR_GSTIN || r.CNOR_GSTIN || r.cnor_gstin || "",
+        cnee_gstin: dtl?.CNEE_GSTIN || r.CNEE_GSTIN || r.cnee_gstin || "",
+        cnor_pincode: dtl?.FROM_PINCODE || r.FROM_PINCODE || r.cnor_pincode || "",
+        cnee_pincode: dtl?.TO_PINCODE || r.TO_PINCODE || r.cnee_pincode || "",
+        cnor_city: dtl?.FROM_PLACE || r.FROM_PLACE || r.cnor_city || "",
+        cnee_city: dtl?.TO_PLACE || r.TO_PLACE || r.cnee_city || "",
         invoice_total: r.TOTAL_INV_VALUE || r.invoice_total || 0,
         cgst: r.CGST_VALUE || r.cgst || 0,
         sgst: r.SGST_VALUE || r.sgst || 0,
         igst: r.IGST_VALUE || r.igst || 0,
         cess: r.cess || 0,
-        product_name: r.PRODUCT_NAME || r.product_name || "",
-        hsn_code: r.ITEM_HSN_CODE || r.hsn_code || "",
-        quantity: r.ITEM_QTY || r.quantity || 0,
+        product_name: dtl?.PRODUCT_NAME || r.PRODUCT_NAME || r.product_name || "",
+        hsn_code: dtl?.ITEM_HSN_CODE || r.ITEM_HSN_CODE || r.hsn_code || "",
+        quantity: dtl?.ITEM_QTY || r.ITEM_QTY || r.quantity || 0,
       };
 
       if (onEwbListUpdate) onEwbListUpdate(newRow.id, populated);
       if (onDocketPopulate) {
-        const docketPayload = apiCalls && docketData ? docketData : {
-          cnor_name:     populated.cnor_name,
-          cnor_address:  populated.cnor_address,
-          cnor_gstin:    populated.cnor_gstin,
-          cnor_pincode:  populated.cnor_pincode,
-          cnee_name:     populated.cnee_name,
-          cnee_address:  populated.cnee_address,
-          cnee_gstin:    populated.cnee_gstin,
-          cnee_pincode:  populated.cnee_pincode,
-          invoice_no:    populated.inv_no,
-          invoice_date:  populated.inv_date,
-          invoice_value: populated.invoice_total,
-        };
+        let docketPayload;
+        if (docketData) {
+          docketPayload = { ...docketData, ewb_no: docketData.ewb_no || populated.ewb_no };
+        } else if (r.docket) {
+          const dk = r.docket;
+          docketPayload = {
+            ewb_no:        populated.ewb_no,
+            docket_no:     dk.docket_no     || null,
+            docket_date:   dk.docket_date   || null,
+            cnor_id:       dk.cnor_id       ?? null,
+            cnor_name:     dk.cnor_name     || populated.cnor_name,
+            cnor_address:  dk.cnor_address  || populated.cnor_address,
+            cnor_gstin:    dk.cnor_gstin    || populated.cnor_gstin,
+            cnor_pincode:  dk.cnor_pincode  || populated.cnor_pincode,
+            cnor_city:     dk.cnor_city     || populated.cnor_city,
+            cnor_state:    dk.cnor_state    || "",
+            cnee_id:       dk.cnee_id       ?? null,
+            cnee_name:     dk.cnee_name     || populated.cnee_name,
+            cnee_address:  dk.cnee_address  || populated.cnee_address,
+            cnee_gstin:    dk.cnee_gstin    || populated.cnee_gstin,
+            cnee_pincode:  dk.cnee_pincode  || populated.cnee_pincode,
+            cnee_city:     dk.cnee_city     || populated.cnee_city,
+            cnee_state:    dk.cnee_state    || "",
+            invoice_no:    dk.docket_inv_no || populated.inv_no,
+            invoice_date:  dk.docket_inv_date ? toDate(dk.docket_inv_date) : populated.inv_date,
+            invoice_value: dk.docket_inv_value ?? populated.invoice_total,
+          };
+        } else {
+          docketPayload = {
+            ewb_no:        populated.ewb_no,
+            cnor_name:     populated.cnor_name,
+            cnor_address:  populated.cnor_address,
+            cnor_gstin:    populated.cnor_gstin,
+            cnor_pincode:  populated.cnor_pincode,
+            cnor_city:     populated.cnor_city,
+            cnee_name:     populated.cnee_name,
+            cnee_address:  populated.cnee_address,
+            cnee_gstin:    populated.cnee_gstin,
+            cnee_pincode:  populated.cnee_pincode,
+            cnee_city:     populated.cnee_city,
+            invoice_no:    populated.inv_no,
+            invoice_date:  populated.inv_date,
+            invoice_value: populated.invoice_total,
+          };
+        }
         onDocketPopulate(docketPayload);
       }
       if (onShowForm) onShowForm();

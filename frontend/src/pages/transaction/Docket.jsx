@@ -274,7 +274,7 @@ export default function DocketPage() {
 
   const [form, setForm] = useState(emptyForm);
   const [locations, setLocations] = useState([]);
-  const [townOptions, setTownOptions] = useState({ from: [], to: [] });
+  const [townOptions, setTownOptions] = useState({ from: [], to: [], byLoc: {} });
   const [materialGroups, setMaterialGroups] = useState([]);
   const [allSubGroups, setAllSubGroups] = useState([]);
 
@@ -321,28 +321,34 @@ export default function DocketPage() {
   const [bpSuggestions, setBpSuggestions] = useState({});
   const searchTimeoutRef = useRef(null);
   const prevLocRef = useRef({ docket_loc: "", docket_to_loc: "" });
+  const ewbPopulatedRef = useRef({ cnor: false, cnee: false });
 
-  // Clear consignor/consignee data when location changes
+  // Clear consignor/consignee data when location changes,
+  // but skip if that data was populated from EWB details
   useEffect(() => {
     const prev = prevLocRef.current;
     const updates = {};
     if (form.docket_loc !== prev.docket_loc) {
-      updates.cnor_id = null;
-      updates.cnor_name = "";
-      updates.cnor_address = "";
-      updates.cnor_city = "";
-      updates.cnor_state = "";
-      updates.cnor_pincode = "";
-      updates.cnor_gstin = "";
+      if (!ewbPopulatedRef.current.cnor) {
+        updates.cnor_id = null;
+        updates.cnor_name = "";
+        updates.cnor_address = "";
+        updates.cnor_city = "";
+        updates.cnor_state = "";
+        updates.cnor_pincode = "";
+        updates.cnor_gstin = "";
+      }
     }
     if (form.docket_to_loc !== prev.docket_to_loc) {
-      updates.cnee_id = null;
-      updates.cnee_name = "";
-      updates.cnee_address = "";
-      updates.cnee_city = "";
-      updates.cnee_state = "";
-      updates.cnee_pincode = "";
-      updates.cnee_gstin = "";
+      if (!ewbPopulatedRef.current.cnee) {
+        updates.cnee_id = null;
+        updates.cnee_name = "";
+        updates.cnee_address = "";
+        updates.cnee_city = "";
+        updates.cnee_state = "";
+        updates.cnee_pincode = "";
+        updates.cnee_gstin = "";
+      }
     }
     prevLocRef.current = { docket_loc: form.docket_loc, docket_to_loc: form.docket_to_loc };
     const keys = Object.keys(updates);
@@ -450,7 +456,12 @@ export default function DocketPage() {
       }
       try {
         const towns = await fetchLocationTowns(form.docket_loc);
-        setTownOptions((prev) => ({ ...prev, from: towns || [] }));
+        const list = towns || [];
+        setTownOptions((prev) => ({
+          ...prev,
+          from: list,
+          byLoc: { ...prev.byLoc, [form.docket_loc]: list },
+        }));
       } catch (err) {
         console.error('Failed to load from-town options:', err);
         setTownOptions((prev) => ({ ...prev, from: [] }));
@@ -467,7 +478,12 @@ export default function DocketPage() {
       }
       try {
         const towns = await fetchLocationTowns(form.docket_to_loc);
-        setTownOptions((prev) => ({ ...prev, to: towns || [] }));
+        const list = towns || [];
+        setTownOptions((prev) => ({
+          ...prev,
+          to: list,
+          byLoc: { ...prev.byLoc, [form.docket_to_loc]: list },
+        }));
       } catch (err) {
         console.error('Failed to load to-town options:', err);
         setTownOptions((prev) => ({ ...prev, to: [] }));
@@ -496,6 +512,28 @@ export default function DocketPage() {
       .then((data) => setAllSubGroups(data))
       .catch((err) => console.error("Failed to load sub groups:", err));
   }, []);
+
+  // Pre-fetch towns for all locations so byLoc is populated before first EWB load
+  useEffect(() => {
+    if (!locations.length) return;
+    const fetchAll = async () => {
+      const entries = await Promise.all(
+        locations.map(async (loc) => {
+          try {
+            const towns = (await fetchLocationTowns(loc.loc_code)) || [];
+            return [loc.loc_code, towns];
+          } catch {
+            return [loc.loc_code, []];
+          }
+        })
+      );
+      setTownOptions((prev) => ({
+        ...prev,
+        byLoc: Object.fromEntries(entries),
+      }));
+    };
+    fetchAll();
+  }, [locations]);
 
   const moveSectionToTop = (section) => {
     setSectionOrder((prev) => [section, ...prev.filter((item) => item !== section)]);
@@ -660,6 +698,11 @@ export default function DocketPage() {
         if (payload.docket_no) setDocketNumberInput(payload.docket_no);
         showSuccess("Docket updated successfully");
       } else {
+        // When EWB grid populated the form and auto-num stationary is selected,
+        // omit docket_no so the backend generates it
+        if (withEWB && ewbList.length > 0 && !prePrinted) {
+          delete payload.docket_no;
+        }
         // Create new docket (POST) — backend strips rec_id: -1
         result = await createDocket(payload);
         savedDocketNo = result?.docket_no;
@@ -694,6 +737,7 @@ export default function DocketPage() {
 
       if (isNewDocket) {
         prevLocRef.current = { docket_loc: "", docket_to_loc: "" };
+        ewbPopulatedRef.current = { cnor: false, cnee: false };
         setForm(emptyForm);
         setDocketNumberInput("");
         setDocketExists(false);
@@ -702,7 +746,7 @@ export default function DocketPage() {
         setEwbList([]);
         setEwbNoDisplay("");
         setIsFormEditMode(false);
-        showSuccess(`Docket ${savedDocketNo} created successfully`);
+        showSuccess(`Docket ${savedDocketNo} created successfully`, "Success", 5000);
       }
 
       console.log("Save result:", result);
@@ -711,6 +755,12 @@ export default function DocketPage() {
       console.error("Save docket error:", err);
     }
   });
+
+  const toDate = (val) => {
+    if (!val) return "";
+    const m = moment(val);
+    return m.isValid() ? m.format("YYYY-MM-DD") : "";
+  };
 
   const handleEditView = async () => {
     const docketNo = docketNumberInput.trim();
@@ -808,6 +858,7 @@ export default function DocketPage() {
       setDocketExists(false);
       setDocketRecId(null);
       setDirtyFields(new Set());
+      ewbPopulatedRef.current = { cnor: false, cnee: false };
       setForm(emptyForm);
       setEwbNoDisplay("");
     }
@@ -1044,6 +1095,127 @@ export default function DocketPage() {
     );
   };
 
+  const onDocketPopulate = (docketData) => {
+      const eq = (a, b) => (a ?? "").toString().trim().toLowerCase() === (b ?? "").toString().trim().toLowerCase();
+
+      // 2nd+ EWB: validate cnor/cnee name and town match existing form values
+      if (ewbList.length > 0) {
+        const mismatches = [];
+        if (form.cnor_name && !eq(docketData.cnor_name, form.cnor_name))
+          mismatches.push(`Consignor Name: expected "${form.cnor_name}", got "${docketData.cnor_name}"`);
+        if (form.docket_from_town && !eq(docketData.cnor_city, form.docket_from_town))
+          mismatches.push(`Consignor Town: expected "${form.docket_from_town}", got "${docketData.cnor_city}"`);
+        if (form.cnee_name && !eq(docketData.cnee_name, form.cnee_name))
+          mismatches.push(`Consignee Name: expected "${form.cnee_name}", got "${docketData.cnee_name}"`);
+        if (form.docket_to_town && !eq(docketData.cnee_city, form.docket_to_town))
+          mismatches.push(`Consignee Town: expected "${form.docket_to_town}", got "${docketData.cnee_city}"`);
+
+        if (mismatches.length > 0) {
+          showError(mismatches.join("\n"), "Consignor / Consignee Mismatch");
+          return;
+        }
+      }
+
+      setIsFormEditMode(true);
+      setShowForm(true);
+      if (docketData.ewb_no) setEwbNoDisplay(String(docketData.ewb_no));
+      if (docketData.docket_no) setDocketNumberInput(docketData.docket_no);
+      if (docketData.cnor_name) ewbPopulatedRef.current.cnor = true;
+      if (docketData.cnee_name) ewbPopulatedRef.current.cnee = true;
+
+      // cnor_city = docket_from_town, cnee_city = docket_to_town
+      // Find the location by searching byLoc: which locCode has a town matching the city value
+      // Returns { loc, townName } where townName is the exact cased value from byLoc
+      const findLocByTown = (townName) => {
+        if (!townName) return null;
+        const normalized = townName.toLowerCase();
+        for (const [locCode, towns] of Object.entries(townOptions.byLoc)) {
+          const hit = towns.find(t =>
+            (t.town_name || t.town_code || t.name || "").toLowerCase() === normalized
+          );
+          if (hit) {
+            const loc = locations.find(l => l.loc_code === locCode) || null;
+            const exactTownName = t => t.town_name || t.town_code || t.name || townName;
+            return loc ? { loc, townName: exactTownName(hit) } : null;
+          }
+        }
+        return null;
+      };
+      const cnorMatch = findLocByTown(docketData.cnor_city);
+      const cneMatch  = findLocByTown(docketData.cnee_city);
+      const cnorLoc   = cnorMatch?.loc;
+      const cneeLoc   = cneMatch?.loc;
+      const cnorTown  = cnorMatch?.townName;
+      const cneeTown  = cneMatch?.townName;
+
+      // Pre-update prevLocRef so the location-change effect doesn't
+      // treat these as manual changes and wipe cnor/cnee fields
+      if (cnorLoc) prevLocRef.current = { ...prevLocRef.current, docket_loc: cnorLoc.loc_code };
+      if (cneeLoc) prevLocRef.current = { ...prevLocRef.current, docket_to_loc: cneeLoc.loc_code };
+
+      // Populate town dropdowns: read from byLoc cache if available, else fetch and cache
+      const loadTownForLoc = async (locCode, side) => {
+        if (!locCode) return;
+        const cached = townOptions.byLoc[locCode];
+        if (cached) {
+          setTownOptions((prev) => ({ ...prev, [side]: cached }));
+        } else {
+          try {
+            const list = (await fetchLocationTowns(locCode)) || [];
+            setTownOptions((p) => ({
+              ...p,
+              [side]: list,
+              byLoc: { ...p.byLoc, [locCode]: list },
+            }));
+          } catch {}
+        }
+      };
+      if (cnorLoc) loadTownForLoc(cnorLoc.loc_code, "from");
+      if (cneeLoc) loadTownForLoc(cneeLoc.loc_code, "to");
+
+      setForm((prev) => {
+        const updates = {};
+        if (docketData.docket_no) {
+          updates.docket_no = docketData.docket_no;
+        }
+        if (docketData.docket_date) {
+          const m = moment(docketData.docket_date, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DDTHH:mm:ssZ", "YYYY-MM-DD", "DD/MM/YYYY"], true);
+          updates.docket_date = m.isValid() ? m.format("YYYY-MM-DD") : docketData.docket_date;
+        }
+        updates.cnor_id      = docketData.cnor_id      ?? prev.cnor_id;
+        updates.cnor_name    = docketData.cnor_name    || "";
+        updates.cnor_address = docketData.cnor_address || "";
+        updates.cnor_gstin   = docketData.cnor_gstin   || "";
+        updates.cnor_pincode = docketData.cnor_pincode || "";
+        updates.cnor_city    = docketData.cnor_city    ? docketData.cnor_city.toUpperCase() : "";
+        updates.cnor_state   = docketData.cnor_state   || "";
+        if (cnorLoc) {
+          updates.docket_loc       = cnorLoc.loc_code;
+          updates.docket_from_town = cnorTown || docketData.cnor_city;
+        }
+        updates.cnee_id      = docketData.cnee_id      ?? prev.cnee_id;
+        updates.cnee_name    = docketData.cnee_name    || "";
+        updates.cnee_address = docketData.cnee_address || "";
+        updates.cnee_gstin   = docketData.cnee_gstin   || "";
+        updates.cnee_pincode = docketData.cnee_pincode || "";
+        updates.cnee_city    = docketData.cnee_city    ? docketData.cnee_city.toUpperCase() : "";
+        updates.cnee_state   = docketData.cnee_state   || "";
+        if (cneeLoc) {
+          updates.docket_to_loc  = cneeLoc.loc_code;
+          updates.docket_to_town = cneeTown || docketData.cnee_city;
+        }
+        updates.invoice_no    = docketData.invoice_no    || "";
+        updates.invoice_date  = docketData.invoice_date  ? toDate(docketData.invoice_date) : "";
+        updates.invoice_value = docketData.invoice_value ?? "";
+        return { ...prev, ...updates };
+      });
+      setDirtyFields((prev) => {
+        const s = new Set(prev);
+        ['docket_no','docket_date','docket_loc','docket_from_town','docket_to_loc','docket_to_town','cnor_id','cnor_name','cnor_address','cnor_gstin','cnor_pincode','cnor_city','cnor_state','cnee_id','cnee_name','cnee_address','cnee_gstin','cnee_pincode','cnee_city','cnee_state','invoice_no','invoice_date','invoice_value'].forEach(k => s.add(k));
+        return s;
+      });
+    }
+
   return (
     <MainLayout>
       <PageBody title="Docket Entry">
@@ -1094,41 +1266,7 @@ export default function DocketPage() {
                   })
                 }
                 onShowForm={() => setShowForm(true)}
-                onDocketPopulate={(docketData) => {
-                  setIsFormEditMode(true);
-                  setShowForm(true);
-                  if (docketData.ewb_no) setEwbNoDisplay(docketData.ewb_no);
-                  setForm((prev) => {
-                    const updates = {};
-                    if (docketData.docket_no   && !prev.docket_no) {
-                      updates.docket_no = docketData.docket_no;
-                      setDocketNumberInput(docketData.docket_no);
-                    }
-                    if (docketData.docket_date && !prev.docket_date) {
-                      const m = moment(docketData.docket_date, ["DD/MM/YYYY", "YYYY-MM-DD"], true);
-                      updates.docket_date = m.isValid() ? m.format("YYYY-MM-DD") : docketData.docket_date;
-                    }
-                    if (docketData.cnor_name    && !prev.cnor_name)    updates.cnor_name    = docketData.cnor_name;
-                    if (docketData.cnor_address && !prev.cnor_address) updates.cnor_address = docketData.cnor_address;
-                    if (docketData.cnor_gstin   && !prev.cnor_gstin)   updates.cnor_gstin   = docketData.cnor_gstin;
-                    if (docketData.cnor_pincode && !prev.cnor_pincode) updates.cnor_pincode = docketData.cnor_pincode;
-                    if (docketData.cnor_city    && !prev.cnor_city)    updates.cnor_city    = docketData.cnor_city;
-                    if (docketData.cnee_name    && !prev.cnee_name)    updates.cnee_name    = docketData.cnee_name;
-                    if (docketData.cnee_address && !prev.cnee_address) updates.cnee_address = docketData.cnee_address;
-                    if (docketData.cnee_gstin   && !prev.cnee_gstin)   updates.cnee_gstin   = docketData.cnee_gstin;
-                    if (docketData.cnee_pincode && !prev.cnee_pincode) updates.cnee_pincode = docketData.cnee_pincode;
-                    if (docketData.cnee_city    && !prev.cnee_city)    updates.cnee_city    = docketData.cnee_city;
-                    if (docketData.invoice_no   && !prev.invoice_no)   updates.invoice_no   = docketData.invoice_no;
-                    if (docketData.invoice_date && !prev.invoice_date) updates.invoice_date = docketData.invoice_date;
-                    if (docketData.invoice_value != null && !prev.invoice_value) updates.invoice_value = docketData.invoice_value;
-                    return Object.keys(updates).length ? { ...prev, ...updates } : prev;
-                  });
-                  setDirtyFields((prev) => {
-                    const s = new Set(prev);
-                    ['docket_no','docket_date','cnor_name','cnor_address','cnor_gstin','cnor_pincode','cnor_city','cnee_name','cnee_address','cnee_gstin','cnee_pincode','cnee_city','invoice_no','invoice_date','invoice_value'].forEach(k => s.add(k));
-                    return s;
-                  });
-                }}
+                onDocketPopulate={onDocketPopulate}
                 showError={showError}
                 showWarning={showWarning}
                 sectionHeaderStyle={sectionHeaderStyle}
