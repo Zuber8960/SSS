@@ -409,15 +409,15 @@ export function DataTable({
       <DataGrid
         rows={muiRows}
         columns={muiColumns}
-        disableRowSelectionOnClick
-        disableColumnMenu
+        disableRowSelectionOnClick={false}
+        disableColumnMenu={false}
         density="compact"
         rowHeight={55}
         headerHeight={42}
         autoHeight={false}
         hideFooter
         disableVirtualization={false}
-        rowSelection={false}
+        rowSelection={true}
         sx={{
           height: 320,
           overflowY: "auto",
