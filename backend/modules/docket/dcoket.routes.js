@@ -232,14 +232,14 @@ router.get('/:no/:loc/:date', async (req, res) => {
 router.post('/', async (req, res) => {
   const trx = await db.transaction();
   try {
-    const { tenant_id, divisionId, locId } = req;
+    const { tenant_id, divisionId, locId, loc_code } = req;
     const firstDigit = String(Math.floor(Math.random() * 10));
-    const [updatedRow] = await trx('sss.ssm_stn_control')
-      .where({ stn_no: trx.raw('(SELECT MAX(stn_no) FROM sss.ssm_stn_control)') })
-      .update({ stn_no: trx.raw('stn_no + 1') })
-      .returning('stn_no');
+    const [updatedRow] = await trx('sss.ssm_doc_control')
+      .where({ last_upd_no: trx.raw('(SELECT MAX(last_upd_no) FROM sss.ssm_doc_control)'), doc_type: 'DKT', loc_code })
+      .update({ last_upd_no: trx.raw('last_upd_no + 1') })
+      .returning('last_upd_no');
 
-    const nextId = updatedRow.stn_no;
+    const nextId = updatedRow.last_upd_no ;
     const docket_no = String(moment().format('YY')) + firstDigit + locId + divisionId + nextId
     // const rest = require('crypto').randomBytes(7).toString('hex').toUpperCase().slice(0, 13);
     // const docket_no = firstDigit + rest;

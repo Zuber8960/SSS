@@ -20,6 +20,7 @@ const lorryMasterRoutes = require("../modules/lorryMaster/lorryMaster.routes");
 const hireVoucherRoutes = require("../modules/hireVoucher/hireVoucher.routes");
 const materialGroupRoutes = require("../modules/materialGroup/materialGroup.routes");
 const axios = require('axios');
+const db = require('../config/db');
 
 router.post('/login', async (req, res) => {
   try {
@@ -51,6 +52,16 @@ router.post('/login', async (req, res) => {
     const user = await UserController.authenticateUser(userId, password, tenant_id);
 
     if (user) {
+      // Fetch first loc_code for this tenant from ssm_location
+      let query = db('sss.ssm_location')
+        .where({ tenant_id: user.tenant_id })
+        .orderBy('record_id', 'asc')
+        .select('loc_code')
+        .first();
+      if (locId>0) query.where({loc_id: locId})
+      const locRow = await query;
+      const loc_code = locRow?.loc_code || null;
+
       // Generate JWT token
       const secret = process.env.JWT_SECRET || 'your_jwt_secret_key';
       const token = jwt.sign(
@@ -61,7 +72,8 @@ router.post('/login', async (req, res) => {
           isAdmin: user.is_admin,
           tenant_id: user.tenant_id,
           locId,
-          divisionId
+          divisionId,
+          loc_code,
         },
         secret,
         { expiresIn: '24h' }
@@ -99,7 +111,8 @@ router.post('/login', async (req, res) => {
           email_id: user.email_id,
           mobile_no: user.mobile_no,
           is_admin: user.is_admin,
-          tenant_id: user.tenant_id
+          tenant_id: user.tenant_id,
+          loc_code,
         }
       });
     } else {

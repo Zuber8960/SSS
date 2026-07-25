@@ -700,7 +700,7 @@ export default function DocketPage() {
       } else {
         // When EWB grid populated the form and auto-num stationary is selected,
         // omit docket_no so the backend generates it
-        if (withEWB && ewbList.length > 0 && !prePrinted) {
+        if (!prePrinted) {
           delete payload.docket_no;
         }
         // Create new docket (POST) — backend strips rec_id: -1

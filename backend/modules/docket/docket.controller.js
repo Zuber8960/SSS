@@ -593,6 +593,31 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
   return { results, apiCalls, docketData };
 }
 
+const resolveBpGstin = async (gstin, name, address, city, pincode, tenant_id) => {
+  if (!gstin && !name) return null;
+  if (gstin) {
+    const existing = await db('sss.ssm_business_partner')
+      .where({ bp_gstin: gstin, tenant_id })
+      .select('bp_gstin')
+      .first();
+    if (existing) return existing.bp_gstin;
+  }
+  // Not found — insert into BP master and return the gstin
+  await db('sss.ssm_business_partner')
+    .insert({
+      bp_name:    name    || '',
+      bp_gstin:   gstin   || null,
+      bp_addres:  address || null,
+      bp_city:    city    || null,
+      bp_pincode: pincode ? String(pincode) : null,
+      tenant_id,
+      record_created_on: new Date(),
+    })
+    .onConflict(['bp_gstin', 'tenant_id'])
+    .ignore();
+  return gstin || null;
+};
+
 const saveDataEwb = async (apiResResult, tenant_id) => {
   const ewbHdrRows = [];
   const ewbDtlRows = [];
@@ -620,6 +645,26 @@ const saveDataEwb = async (apiResResult, tenant_id) => {
     const productNames = data.itemList?.map(i => i.productDesc || i.productName).filter(Boolean).join(', ') || '';
     const hsnCode = data.itemList?.[0]?.hsnCode || null;
 
+    // Resolve CNOR and CNEE GSTINs — use existing BP value if found, otherwise insert
+    const [cnorGstin, cneeGstin] = await Promise.all([
+      resolveBpGstin(
+        data.fromGstin || null,
+        data.fromTrdName || null,
+        ((data.fromAddr1 || '') + ' ' + (data.fromAddr2 || '')).trim() || null,
+        data.fromPlace || null,
+        data.fromPincode || null,
+        tenant_id
+      ),
+      resolveBpGstin(
+        data.toGstin || null,
+        data.toTrdName || null,
+        ((data.toAddr1 || '') + ' ' + (data.toAddr2 || '')).trim() || null,
+        data.toPlace || null,
+        data.toPincode || null,
+        tenant_id
+      ),
+    ]);
+
     ewbHdrRows.push({
       company_code: data.company_code || null,
       division_code: data.division_code || null,
@@ -646,11 +691,11 @@ const saveDataEwb = async (apiResResult, tenant_id) => {
       division_code: data.division_code || null,
       EWB_NO: ewbNoStr,
       EWB_DATE: ewbDateStr,
-      CNOR_GSTIN: data.fromGstin || null,
+      CNOR_GSTIN: cnorGstin,
       FROM_PLACE: data.fromPlace || null,
       FROM_STATE: String(data.fromStateCode || ''),
       FROM_PINCODE: String(data.fromPincode || ''),
-      CNEE_GSTIN: data.toGstin || null,
+      CNEE_GSTIN: cneeGstin,
       TO_PLACE: data.toPlace || null,
       TO_STATE: String(data.toStateCode || ''),
       TO_PINCODE: String(data.toPincode || ''),
