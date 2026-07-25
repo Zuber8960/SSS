@@ -118,6 +118,8 @@ export default function TenantLoginPage() {
 
   const handleAppLogin = async () => {
     if (!userId || !password) { showError("Username and Password are required"); return; }
+    if (!selectedDivision) { showError("Please select a Division"); return; }
+    if (!selectedLocation) { showError("Please select a Location"); return; }
     setLoading(true);
     try {
       const response = await loginUser(userId, password, selectedLocation, selectedDivision);
@@ -378,7 +380,6 @@ export default function TenantLoginPage() {
                         },
                       }}
                     >
-                      <MenuItem value=""><em>None</em></MenuItem>
                       {divisions.map(div => (
                         <MenuItem key={div.division_code} value={div.division_code}>
                           {div.division_code} - {div.division_name}
@@ -404,7 +405,6 @@ export default function TenantLoginPage() {
                         },
                       }}
                     >
-                      <MenuItem value=""><em>None</em></MenuItem>
                       {locations.map(loc => (
                         <MenuItem key={loc.loc_id} value={loc.loc_id}>
                           {loc.loc_code} - {loc.loc_name}
