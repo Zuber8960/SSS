@@ -395,7 +395,7 @@ const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
   }
 };
 
-const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
+const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
   let apiCalls = false, docketData = null;
   const query = db('sss.sst_ewb_hdr as hdr')
     .whereIn('hdr.EWB_NO', ewbNumbers.map(String))
@@ -519,6 +519,7 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
               bp_city:    rawFirst.fromPlace   || null,
               bp_pincode: rawFirst.fromPincode ? String(rawFirst.fromPincode) : null,
               tenant_id,
+              division_code: division_code || null,
               record_created_on: new Date(),
             })
             .returning(['record_id', 'bp_name']);
@@ -549,6 +550,7 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id) => {
               bp_city:    rawFirst.toPlace   || null,
               bp_pincode: rawFirst.toPincode ? String(rawFirst.toPincode) : null,
               tenant_id,
+              division_code: division_code || null,
               record_created_on: new Date(),
             })
             .returning(['record_id', 'bp_name']);

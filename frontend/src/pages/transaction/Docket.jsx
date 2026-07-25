@@ -1267,6 +1267,16 @@ export default function DocketPage() {
                 }
                 onShowForm={() => setShowForm(true)}
                 onDocketPopulate={onDocketPopulate}
+                onClearAll={() => {
+                  setEwbList([]);
+                  setForm(emptyForm);
+                  setDocketNumberInput("");
+                  setEwbNoDisplay("");
+                  setIsFormEditMode(false);
+                  setDirtyFields(new Set());
+                  prevLocRef.current = { docket_loc: "", docket_to_loc: "" };
+                  ewbPopulatedRef.current = { cnor: false, cnee: false };
+                }}
                 showError={showError}
                 showWarning={showWarning}
                 sectionHeaderStyle={sectionHeaderStyle}

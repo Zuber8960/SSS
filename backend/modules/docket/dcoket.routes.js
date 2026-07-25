@@ -50,8 +50,8 @@ router.get('/ewayfile/db/:ewbNumbers', async (req, res) => {
     if (!ewbNumbers?.length) {
       return res.json({ success: true, data: [] });
     }
-    const { tenant_id } = req;
-    const { results, apiCalls, docketData } = await DocketController.getEwayBillFromDB(ewbNumbers, tenant_id);
+    const { tenant_id, divisionId } = req;
+    const { results, apiCalls, docketData } = await DocketController.getEwayBillFromDB(ewbNumbers, tenant_id, divisionId);
     res.json({ success: true, data: results, apiCalls, docketData });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -234,13 +234,16 @@ router.post('/', async (req, res) => {
   try {
     const { tenant_id, divisionId, locId, loc_code } = req;
     const firstDigit = String(Math.floor(Math.random() * 10));
-    const [updatedRow] = await trx('sss.ssm_doc_control')
-      .where({ last_upd_no: trx.raw('(SELECT MAX(last_upd_no) FROM sss.ssm_doc_control)'), doc_type: 'DKT', loc_code })
-      .update({ last_upd_no: trx.raw('last_upd_no + 1') })
-      .returning('last_upd_no');
-
-    const nextId = updatedRow.last_upd_no ;
-    const docket_no = String(moment().format('YY')) + firstDigit + locId + divisionId + nextId
+    let docket_no = req.body.docket_no?.length>0 ? req.body.docket_no : null;
+    if (!docket_no) {
+      const [updatedRow] = await trx('sss.ssm_doc_control')
+        .where({ last_upd_no: trx.raw('(SELECT MAX(last_upd_no) FROM sss.ssm_doc_control)'), doc_type: 'DKT', loc_code })
+        .update({ last_upd_no: trx.raw('last_upd_no + 1') })
+        .returning('last_upd_no');
+  
+      const nextId = updatedRow.last_upd_no ;
+      docket_no = String(moment().format('YY')) + firstDigit + locId + divisionId + nextId
+    }
     // const rest = require('crypto').randomBytes(7).toString('hex').toUpperCase().slice(0, 13);
     // const docket_no = firstDigit + rest;
     const body = { ...req.body, docket_no, tenant_id };
