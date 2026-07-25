@@ -31,6 +31,7 @@ export default function EwayBillSection({
   sectionHeaderStyle,
   showError,
   showWarning,
+  showInfo,
 }) {
   const [selectedRows, setSelectedRows] = useState([]);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -240,7 +241,10 @@ export default function EwayBillSection({
         quantity: dtl?.ITEM_QTY || r.ITEM_QTY || r.quantity || 0,
       };
 
-      if (onEwbListUpdate) onEwbListUpdate(newRow.id, populated);
+      if (docketData?.bpWarnings?.length && showInfo) {
+        showInfo(docketData.bpWarnings.join("\n"), "Business Partner Warning");
+      }
+
       if (onDocketPopulate) {
         let docketPayload;
         if (docketData) {
@@ -287,8 +291,10 @@ export default function EwayBillSection({
             invoice_value: populated.invoice_total,
           };
         }
-        onDocketPopulate(docketPayload);
+        const result = onDocketPopulate(docketPayload);
+        if (result === false) return oldRow;
       }
+      if (onEwbListUpdate) onEwbListUpdate(newRow.id, populated);
       if (onShowForm) onShowForm();
       return populated;
     } catch (err) {

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { ToggleSwitch } from "../../components/common/MasterPage";
 import { IconButton, Tooltip } from "@mui/material";
-import { EditIcon, SaveIcon, SECTION_ICONS } from "../../components/common/icons";
+import { EditIcon, SaveIcon, ResetIcon, SECTION_ICONS } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import moment from "moment";
 import {
@@ -1112,7 +1112,7 @@ export default function DocketPage() {
 
         if (mismatches.length > 0) {
           showError(mismatches.join("\n"), "Consignor / Consignee Mismatch");
-          return;
+          return false;
         }
       }
 
@@ -1279,6 +1279,7 @@ export default function DocketPage() {
                 }}
                 showError={showError}
                 showWarning={showWarning}
+                showInfo={showInfo}
                 sectionHeaderStyle={sectionHeaderStyle}
                 withEWB={withEWB}
               />
@@ -1354,6 +1355,25 @@ export default function DocketPage() {
                     labelOff="Docket No Off"
                   />
                 )}
+                <Tooltip title="Reset Form">
+                  <IconButton
+                    onClick={() => {
+                      setForm(emptyForm);
+                      setDocketNumberInput("");
+                      setEwbNoDisplay("");
+                      setIsFormEditMode(false);
+                      setDirtyFields(new Set());
+                      setDocketExists(false);
+                      setDocketRecId(null);
+                      prevLocRef.current = { docket_loc: "", docket_to_loc: "" };
+                      ewbPopulatedRef.current = { cnor: false, cnee: false };
+                    }}
+                    size="small"
+                    sx={{ color: "#b45309", "&:hover": { background: "#fef3c7" } }}
+                  >
+                    <ResetIcon />
+                  </IconButton>
+                </Tooltip>
                 <Tooltip title="Save">
                   <IconButton
                     onClick={handleFormSave}

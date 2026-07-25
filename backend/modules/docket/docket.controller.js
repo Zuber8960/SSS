@@ -396,6 +396,8 @@ const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
 };
 
 const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
+  let xyz = await getListEwayDetails(ewbNumbers);
+  
   let apiCalls = false, docketData = null;
   const query = db('sss.sst_ewb_hdr as hdr')
     .whereIn('hdr.EWB_NO', ewbNumbers.map(String))
@@ -440,6 +442,57 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
     if (firstWithDocket) {
       const dk = firstWithDocket.docket;
       const ewbDtl = Array.isArray(firstWithDocket.dtl_rows) ? firstWithDocket.dtl_rows[0] : null;
+
+      const bpWarnings = [];
+
+      if (!dk.cnor_id) {
+        const cnorGstin = ewbDtl?.CNOR_GSTIN || null;
+        const cnorName  = ewbDtl?.FROM_CUST_NAME || null;
+        if (cnorGstin || cnorName) {
+          let cnorBp = null;
+          if (cnorGstin) {
+            cnorBp = await db('sss.ssm_business_partner')
+              .where({ bp_gstin: cnorGstin, tenant_id })
+              .select('record_id')
+              .first();
+          }
+          if (!cnorBp && cnorName) {
+            cnorBp = await db('sss.ssm_business_partner')
+              .whereRaw('LOWER(bp_name) = LOWER(?)', [cnorName])
+              .where({ tenant_id })
+              .select('record_id')
+              .first();
+          }
+          if (!cnorBp) {
+            bpWarnings.push(`Consignor with GSTIN/Name "${cnorGstin || cnorName}" is not present in BP master table.`);
+          }
+        }
+      }
+
+      if (!dk.cnee_id) {
+        const cneeGstin = ewbDtl?.CNEE_GSTIN || null;
+        const cneeName  = ewbDtl?.TO_CUST_NAME || null;
+        if (cneeGstin || cneeName) {
+          let cneeBp = null;
+          if (cneeGstin) {
+            cneeBp = await db('sss.ssm_business_partner')
+              .where({ bp_gstin: cneeGstin, tenant_id })
+              .select('record_id')
+              .first();
+          }
+          if (!cneeBp && cneeName) {
+            cneeBp = await db('sss.ssm_business_partner')
+              .whereRaw('LOWER(bp_name) = LOWER(?)', [cneeName])
+              .where({ tenant_id })
+              .select('record_id')
+              .first();
+          }
+          if (!cneeBp) {
+            bpWarnings.push(`Consignee with GSTIN/Name "${cneeGstin || cneeName}" is not present in BP master table.`);
+          }
+        }
+      }
+
       docketData = {
         ewb_no:        String(firstWithDocket.EWB_NO),
         docket_no:     dk.docket_no                  || null,
@@ -461,6 +514,7 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
         invoice_no:    dk.docket_inv_no              || ewbDtl?.INV_NO || null,
         invoice_date:  dk.docket_inv_date            || ewbDtl?.INV_DATE || null,
         invoice_value: dk.docket_inv_value           ?? null,
+        bpWarnings:    bpWarnings.length ? bpWarnings : null,
       };
     }
   }
@@ -511,19 +565,8 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
             .first();
         }
         if (!cnorBp && (rawFirst.fromTrdName || rawFirst.fromGstin)) {
-          [cnorBp] = await db('sss.ssm_business_partner')
-            .insert({
-              bp_name:    rawFirst.fromTrdName || '',
-              bp_gstin:   rawFirst.fromGstin   || null,
-              bp_addres:  ((rawFirst.fromAddr1 || '') + ' ' + (rawFirst.fromAddr2 || '')).trim() || null,
-              bp_city:    rawFirst.fromPlace   || null,
-              bp_pincode: rawFirst.fromPincode ? String(rawFirst.fromPincode) : null,
-              tenant_id,
-              division_code: division_code || null,
-              record_created_on: new Date(),
-            })
-            .returning(['record_id', 'bp_name']);
-          bpWarnings.push(`Consignor "${rawFirst.fromTrdName}" details are missing in BP master table. A new entry has been auto-created (ID: ${cnorBp.record_id}).`);
+          const identifier = rawFirst.fromGstin || rawFirst.fromTrdName;
+          bpWarnings.push(`Consignor with GSTIN/Name "${identifier}" is not present in BP master table, Please insert.`);
         }
 
         // Resolve consignee BP — find by GSTIN then name, create if missing
@@ -542,19 +585,8 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
             .first();
         }
         if (!cneeBp && (rawFirst.toTrdName || rawFirst.toGstin)) {
-          [cneeBp] = await db('sss.ssm_business_partner')
-            .insert({
-              bp_name:    rawFirst.toTrdName || '',
-              bp_gstin:   rawFirst.toGstin   || null,
-              bp_addres:  ((rawFirst.toAddr1 || '') + ' ' + (rawFirst.toAddr2 || '')).trim() || null,
-              bp_city:    rawFirst.toPlace   || null,
-              bp_pincode: rawFirst.toPincode ? String(rawFirst.toPincode) : null,
-              tenant_id,
-              division_code: division_code || null,
-              record_created_on: new Date(),
-            })
-            .returning(['record_id', 'bp_name']);
-          bpWarnings.push(`Consignee "${rawFirst.toTrdName}" details are missing in BP master table. A new entry has been auto-created (ID: ${cneeBp.record_id}).`);
+          const identifier = rawFirst.toGstin || rawFirst.toTrdName;
+          bpWarnings.push(`Consignee with GSTIN/Name "${identifier}" is not present in BP master table, Please insert.`);
         }
 
         docketData = {
@@ -592,10 +624,12 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
       console.log('No EWB data found from API for:', ewbNumbers);
     }
   };
-  return { results, apiCalls, docketData };
+  const returnObj = { results, apiCalls, docketData };
+  
+  return returnObj;
 }
 
-const resolveBpGstin = async (gstin, name, address, city, pincode, tenant_id) => {
+const resolveBpGstin = async (gstin, name, tenant_id) => {
   if (!gstin && !name) return null;
   if (gstin) {
     const existing = await db('sss.ssm_business_partner')
@@ -604,20 +638,7 @@ const resolveBpGstin = async (gstin, name, address, city, pincode, tenant_id) =>
       .first();
     if (existing) return existing.bp_gstin;
   }
-  // Not found — insert into BP master and return the gstin
-  await db('sss.ssm_business_partner')
-    .insert({
-      bp_name:    name    || '',
-      bp_gstin:   gstin   || null,
-      bp_addres:  address || null,
-      bp_city:    city    || null,
-      bp_pincode: pincode ? String(pincode) : null,
-      tenant_id,
-      record_created_on: new Date(),
-    })
-    .onConflict(['bp_gstin', 'tenant_id'])
-    .ignore();
-  return gstin || null;
+  return null;
 };
 
 const saveDataEwb = async (apiResResult, tenant_id) => {
@@ -647,24 +668,10 @@ const saveDataEwb = async (apiResResult, tenant_id) => {
     const productNames = data.itemList?.map(i => i.productDesc || i.productName).filter(Boolean).join(', ') || '';
     const hsnCode = data.itemList?.[0]?.hsnCode || null;
 
-    // Resolve CNOR and CNEE GSTINs — use existing BP value if found, otherwise insert
+    // Resolve CNOR and CNEE GSTINs — look up existing BP only, no insert
     const [cnorGstin, cneeGstin] = await Promise.all([
-      resolveBpGstin(
-        data.fromGstin || null,
-        data.fromTrdName || null,
-        ((data.fromAddr1 || '') + ' ' + (data.fromAddr2 || '')).trim() || null,
-        data.fromPlace || null,
-        data.fromPincode || null,
-        tenant_id
-      ),
-      resolveBpGstin(
-        data.toGstin || null,
-        data.toTrdName || null,
-        ((data.toAddr1 || '') + ' ' + (data.toAddr2 || '')).trim() || null,
-        data.toPlace || null,
-        data.toPincode || null,
-        tenant_id
-      ),
+      resolveBpGstin(data.fromGstin || null, data.fromTrdName || null, tenant_id),
+      resolveBpGstin(data.toGstin || null, data.toTrdName || null, tenant_id),
     ]);
 
     ewbHdrRows.push({
