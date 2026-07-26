@@ -42,41 +42,41 @@ const headerFields = [
   { label: "Cnsee GSTIN", name: "cnee_gstin" },
 
   { label: "Docket No", name: "docket_no" },
-  { label: "Docket Date", name: "docket_date", type: "date" },
-  { label: "From Location", name: "docket_loc", isLocation: true },
-  { label: "From Town", name: "docket_from_town" },
-  { label: "To Location", name: "docket_to_loc", isLocation: true },
-  { label: "To Town", name: "docket_to_town" },
+  { label: "Docket Date", name: "docket_date", type: "date", required: true },
+  { label: "From Location", name: "docket_loc", isLocation: true, required: true },
+  { label: "From Town", name: "docket_from_town", required: true },
+  { label: "To Location", name: "docket_to_loc", isLocation: true, required: true },
+  { label: "To Town", name: "docket_to_town", required: true },
 
   {
-    label: "Transit Type", name: "transit_type", options: [
+    label: "Transit Type", name: "transit_type", required: true, options: [
       { label: "ROAD", value: "ROAD" },
       { label: "MULTIMODAL", value: "MULTIMODAL" },
     ]
   },
   {
-    label: "Load Type", name: "load_type", options: [
+    label: "Load Type", name: "load_type", required: true, options: [
       { label: "FTL", value: "FTL" },
       { label: "LTL", value: "LTL" },
       { label: "SUNDRY", value: "SUNDRY" },
     ]
   },
   {
-    label: "Pay Type", name: "pay_type", options: [
+    label: "Pay Type", name: "pay_type", required: true, options: [
       { label: "TBB", value: "TBB" },
       { label: "PAID", value: "PAID" },
       { label: "TO PAY", value: "TO PAY" },
     ]
   },
-  { label: "Pay Location", name: "pay_loc" },
+  { label: "Pay Location", name: "pay_loc", required: true },
   {
-    label: "Delivery Type", name: "dly_type", options: [
+    label: "Delivery Type", name: "dly_type", required: true, options: [
       { label: "Door Delivery", value: "door delivery" },
       { label: "Godown Delivery", value: "godown delivery" },
     ]
   },
   {
-    label: "CC Attached", name: "cc", options: [
+    label: "CC Attached", name: "cc", required: true, options: [
       { label: "YES", value: "YES" },
       { label: "NO", value: "NO" },
     ]
@@ -90,12 +90,13 @@ const headerFields = [
   { label: "No of W. CBox", name: "no_w_cbox", type: "number" },
   { label: "No of Loose", name: "no_loose", type: "number" },
   { label: "No of Others", name: "no_others", type: "number" },
-  { label: "Total Pkgs", name: "tot_pkgs", type: "number" },
+  { label: "Total Pkgs", name: "tot_pkgs", type: "number", required: true },
 
-  { label: "Rate", name: "rate", type: "number" },
+  { label: "Rate", name: "rate", type: "number", required: true },
   {
     label: "Rate UOM",
     name: "rate_uom",
+    required: true,
     options: [
       { label: "Fixed", value: "Fixed" },
       { label: "Per Trip", value: "Per Trip" },
@@ -115,6 +116,7 @@ const headerFields = [
   {
     label: "RISK",
     name: "risk",
+    required: true,
     options: [
       { label: "Insured by Transporter", value: "Insured by Transporter" },
       { label: "Insured by Customer", value: "Insured by Customer" },
@@ -128,9 +130,9 @@ const headerFields = [
   { label: "Sum Insured", name: "sum_insured", type: "number" },
   { label: "Valid Upto", name: "valid_upto", type: "date" },
 
-  { label: "Goods Group",     name: "goods_grp" },
-  { label: "Goods Sub Group", name: "goods_subgrp" },
-  { label: "Goods Description", name: "goods_desc", fullWidth: true },
+  { label: "Goods Group",     name: "goods_grp",  required: true },
+  { label: "Goods Sub Group", name: "goods_subgrp", required: true },
+  { label: "Goods Description", name: "goods_desc", fullWidth: true, required: true },
   { label: "Remarks", name: "remark", type: "textarea" },
 ];
 
@@ -590,6 +592,32 @@ export default function DocketPage() {
       if (!form.docket_loc)  { showError("From Location is required"); return; }
       if (!form.docket_to_loc) { showError("To Location is required"); return; }
 
+      const packageTotalValue =
+        (parseFloat(form.no_cb) || 0) +
+        (parseFloat(form.no_w_crate) || 0) +
+        (parseFloat(form.no_w_cbox) || 0) +
+        (parseFloat(form.no_loose) || 0) +
+        (parseFloat(form.no_others) || 0);
+
+      const isNew = !(docketExists && docketRecId != null);
+      if (isNew) {
+        if (!form.docket_from_town && !form.docket_pickup_town) { showError("Pickup Town is required"); return; }
+        if (!form.docket_to_town   && !form.docket_dly_town)    { showError("Delivery Town is required"); return; }
+        if (!form.transit_type)    { showError("Transit Type is required"); return; }
+        if (!form.load_type)       { showError("Load Type is required"); return; }
+        if (!form.pay_type)        { showError("Pay Type is required"); return; }
+        if (!form.pay_loc)         { showError("Pay Location is required"); return; }
+        if (!form.dly_type)        { showError("Delivery Type is required"); return; }
+        if (!form.cc)              { showError("CC Attached is required"); return; }
+        if (!form.rate_uom)        { showError("Rate UOM is required"); return; }
+        if (form.rate === undefined || form.rate === null || form.rate === "") { showError("Rate is required"); return; }
+        if (!form.risk)            { showError("Risk is required"); return; }
+        if (packageTotalValue <= 0) { showError("At least one package quantity (No of CB / Crate / CBox / Loose / Others) is required"); return; }
+        if (!form.goods_grp)       { showError("Goods Group is required"); return; }
+        if (!form.goods_subgrp)    { showError("Goods Sub-Group is required"); return; }
+        if (!form.goods_desc)      { showError("Goods Description is required"); return; }
+      }
+
       // Map form field names → DB column names
       const formToDb = {
         docket_no:           "docket_no",
@@ -664,12 +692,6 @@ export default function DocketPage() {
       }
 
       const payload = { aud_user, cnor_id: resolvedCnorId, cnee_id: resolvedCneeId };
-      const packageTotalValue =
-        (parseFloat(form.no_cb) || 0) +
-        (parseFloat(form.no_w_crate) || 0) +
-        (parseFloat(form.no_w_cbox) || 0) +
-        (parseFloat(form.no_loose) || 0) +
-        (parseFloat(form.no_others) || 0);
 
       dirtyFields.forEach((formKey) => {
         if (formToDb[formKey]) {
@@ -678,11 +700,7 @@ export default function DocketPage() {
       });
       if (payload.docket_act_wt  === undefined || payload.docket_act_wt  === "" || payload.docket_act_wt  === null) payload.docket_act_wt  = 0;
       if (payload.docket_chrg_wt === undefined || payload.docket_chrg_wt === "" || payload.docket_chrg_wt === null) payload.docket_chrg_wt = 0;
-      // tot_pkgs is derived — include if any "no_*" field is dirty
-      // const noFields = ["no_cb", "no_w_crate", "no_w_cbox", "no_loose", "no_others"];
-      // if (noFields.some((f) => dirtyFields.has(f))) {
-      //   payload.docket_tot_pkgs = tot_amt;
-      // }
+      payload.docket_tot_pkgs = packageTotalValue;
 
       let result;
       let savedDocketNo;

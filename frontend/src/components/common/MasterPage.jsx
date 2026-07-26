@@ -175,12 +175,16 @@ export function FormField({
   disabled = false,
   onKeyDown,
   onBlur,
+  required = false,
 }) {
   const updateField = (value) => setForm({ ...form, [name]: value });
 
   return (
     <div className="formFieldGroup">
-      <label>{label}</label>
+      <label>
+        {label}
+        {required && <span style={{ color: "#e53935", marginLeft: 2 }}>*</span>}
+      </label>
       {options ? (
         <select
           value={form[name]}

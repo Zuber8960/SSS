@@ -244,7 +244,17 @@ router.post('/', async (req, res) => {
     }
     // const rest = require('crypto').randomBytes(7).toString('hex').toUpperCase().slice(0, 13);
     // const docket_no = firstDigit + rest;
-    const body = { ...req.body, docket_no, tenant_id, division_code: divisionId };
+    const rate     = parseFloat(req.body.docket_rate)    || 0;
+    const chrgWt   = parseFloat(req.body.docket_chrg_wt) || 0;
+    const body = {
+      ...req.body,
+      docket_no,
+      tenant_id,
+      division_code: divisionId,
+      aud_loc: loc_code || req.body.docket_loc,
+      docket_insurance: req.body.docket_insurance || req.body.docket_risk || 'N',
+      docket_tot_amt: req.body.docket_tot_amt ?? (rate * chrgWt),
+    };
 
     let docket = await DocketController.createDocket(body, trx);
 

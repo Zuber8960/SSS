@@ -218,7 +218,7 @@ const getDocketDetails = async ({ docket_no, docket_loc, docket_date }, tenant_i
 /* ================= HELPERS ================= */
 
 const NUMERIC_DOCKET_FIELDS = [
-  'docket_act_wt', 'docket_chrg_wt', 'docket_pay_type',
+  'docket_act_wt', 'docket_chrg_wt',
   'docket_rate', 'docket_tot_amt', 'docket_inv_value',
   'docket_insurance_amt', 'docket_po_amt', 'docket_transit_days',
   'docket_crtns', 'docket_bndls', 'docket_bags',
