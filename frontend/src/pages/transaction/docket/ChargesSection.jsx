@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from "react";
-import { FormControl, InputLabel, Select, MenuItem, Typography, Stack, Box, IconButton, Tooltip } from "@mui/material";
-import { AddIcon, SaveIcon, DeleteIcon } from "../../../components/common/icons";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import { Typography, Box, IconButton, Tooltip } from "@mui/material";
+import { AddIcon, DeleteIcon } from "../../../components/common/icons";
 import { DataTable } from "../../../components/common/MasterPage";
 import {
-  fetchAllDockets,
   fetchCharges,
   createCharge,
   updateCharge,
@@ -23,7 +22,7 @@ const chargeDefaults = {
 
 const chargeColumns = [
   { key: "charge_code", label: "Charge Desc", options: chargeDescOptions },
-  { key: "user_code", label: "User Desc", type: "number" },
+  { key: "user_code", label: "Rate", type: "number" },
   { key: "charge_amt", label: "Charge Amount", editable: false },
 ];
 
@@ -63,42 +62,68 @@ const calculateChargeRow = (row, rows, invValue) => {
 const recalculateChargeList = (rows, invValue) =>
   rows.map((row) => calculateChargeRow(row, rows, invValue));
 
-export default function ChargesSection({
+const ChargesSection = forwardRef(function ChargesSection({
   docketId,
   invoiceValue,
   sectionHeaderStyle,
   onChargesChange,
   singleClick = false,
-}) {
+}, ref) {
   const { dialog, closeAlert, showSuccess, showError, showWarning } = useAlert();
   const [chargeList, setChargeList] = useState([]);
   const [dirtyRecIds, setDirtyRecIds] = useState(new Set());
   const tempIdCounter = useRef(-1);
   const chargesLoaded = useRef(false);
 
-  // All docket options for the selector dropdown
-  const [docketOptions, setDocketOptions] = useState([]);
-  // null means "user hasn't picked yet" — fall back to the prop in that case
-  const [userPickedDocketId, setUserPickedDocketId] = useState(null);
-  const selectedDocketId = userPickedDocketId ?? docketId ?? "";
+  // Expose saveCharges and getChargeList to parent via ref
+  useImperativeHandle(ref, () => ({
+    getChargeList: () => chargeList,
+    saveCharges: async (docketIdOverride) => {
+      const targetDocketId = docketIdOverride || docketId;
+      if (!targetDocketId) return;
 
-  // Load all dockets once for the dropdown
-  useEffect(() => {
-    fetchAllDockets()
-      .then((dockets) => {
-        setDocketOptions(dockets.map((d) => ({
-          value: d.docket_no,
-          label: d.docket_no,
-        })));
-      })
-      .catch(console.error);
-  }, []);
+      let added = 0;
+      let updated = 0;
 
-  // Fetch charges whenever the effective docket selection changes
+      for (const charge of chargeList) {
+        if (charge.rec_id < 0) {
+          await createCharge(targetDocketId, {
+            charge_code: charge.charge_code,
+            user_code: charge.user_code,
+            charge_amt: charge.charge_amt,
+          });
+          added++;
+        } else if (dirtyRecIds.has(charge.rec_id)) {
+          await updateCharge(charge.rec_id, {
+            charge_code: charge.charge_code,
+            user_code: charge.user_code,
+            charge_amt: charge.charge_amt,
+          });
+          updated++;
+        }
+      }
+
+      const updatedCharges = await fetchCharges(targetDocketId);
+      setChargeList(updatedCharges);
+      setDirtyRecIds(new Set());
+      tempIdCounter.current = -1;
+
+      if (added > 0) showSuccess(`${added} charge${added > 1 ? "s" : ""} added successfully`);
+      if (updated > 0) showSuccess(`${updated} charge${updated > 1 ? "s" : ""} updated successfully`);
+    },
+  }), [chargeList, dirtyRecIds, docketId, showSuccess]);
+
+  // Fetch charges whenever docketId changes
   useEffect(() => {
-    if (!selectedDocketId) return;
+    if (!docketId) {
+      chargesLoaded.current = false;
+      setChargeList([]);
+      setDirtyRecIds(new Set());
+      tempIdCounter.current = -1;
+      return;
+    }
     chargesLoaded.current = false;
-    fetchCharges(selectedDocketId)
+    fetchCharges(docketId)
       .then((charges) => {
         chargesLoaded.current = true;
         setChargeList(charges);
@@ -106,7 +131,7 @@ export default function ChargesSection({
         tempIdCounter.current = -1;
       })
       .catch(console.error);
-  }, [selectedDocketId]);
+  }, [docketId]);
 
   // When invoiceValue changes after charges are loaded, recalculate all rows
   useEffect(() => {
@@ -166,48 +191,6 @@ export default function ChargesSection({
     });
   };
 
-  const handleSave = async () => {
-    if (!selectedDocketId) {
-      showError("Please select a docket first.");
-      return;
-    }
-
-    try {
-      let added = 0;
-      let updated = 0;
-
-      for (const charge of chargeList) {
-        if (charge.rec_id < 0) {
-          await createCharge(selectedDocketId, {
-            charge_code: charge.charge_code,
-            user_code: charge.user_code,
-            charge_amt: charge.charge_amt,
-          });
-          added++;
-        } else if (dirtyRecIds.has(charge.rec_id)) {
-          await updateCharge(charge.rec_id, {
-            charge_code: charge.charge_code,
-            user_code: charge.user_code,
-            charge_amt: charge.charge_amt,
-          });
-          updated++;
-        }
-      }
-
-      const updatedCharges = await fetchCharges(selectedDocketId);
-      setChargeList(updatedCharges);
-      setDirtyRecIds(new Set());
-      tempIdCounter.current = -1;
-
-      if (added > 0) showSuccess(`${added} charge${added > 1 ? "s" : ""} added successfully`);
-      if (updated > 0) showSuccess(`${updated} charge${updated > 1 ? "s" : ""} updated successfully`);
-      if (added === 0 && updated === 0) showSuccess("No changes to save");
-    } catch (err) {
-      console.error("Failed to save charges:", err);
-      showError(err.message || "Failed to save charges");
-    }
-  };
-
   const updateChargeRow = (recId, field, value) => {
     const idx = chargeList.findIndex((r) => r.rec_id === recId);
     if (idx === -1) return null;
@@ -231,32 +214,11 @@ export default function ChargesSection({
     <div>
       <Box sx={{ ...sectionHeaderStyle, marginBottom: 1.5 }}>
         <Typography variant="h6" fontWeight={600}>Charges</Typography>
-        <Stack direction="row" alignItems="center" spacing={1.5}>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Docket ID</InputLabel>
-            <Select
-              label="Docket ID"
-              value={selectedDocketId}
-              onChange={(e) => {
-                const val = e.target.value;
-                setUserPickedDocketId(val);
-                if (!val) {
-                  chargesLoaded.current = false;
-                  setChargeList([]);
-                  setDirtyRecIds(new Set());
-                  tempIdCounter.current = -1;
-                }
-              }}
-            >
-              <MenuItem value=""><em>-- Select Docket --</em></MenuItem>
-              {docketOptions.map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Tooltip title="Add Charge"><IconButton size="small" onClick={addChargeRow} disabled={!selectedDocketId} sx={{ color: "#7e22ce", opacity: selectedDocketId ? 1 : 0.45, "&:hover": { background: "#f3e8ff" } }}><AddIcon /></IconButton></Tooltip>
-          <Tooltip title="Save"><IconButton size="small" onClick={handleSave} disabled={!selectedDocketId} sx={{ color: "#16a34a", opacity: selectedDocketId ? 1 : 0.45, "&:hover": { background: "#dcfce7" } }}><SaveIcon /></IconButton></Tooltip>
-        </Stack>
+        <Tooltip title="Add Charge">
+          <IconButton size="small" onClick={addChargeRow} sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
+            <AddIcon />
+          </IconButton>
+        </Tooltip>
       </Box>
 
       <DataTable
@@ -278,4 +240,6 @@ export default function ChargesSection({
       />
     </div>
   );
-}
+});
+
+export default ChargesSection;

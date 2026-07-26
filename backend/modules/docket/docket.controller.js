@@ -868,19 +868,7 @@ const findOrCreateBp = async ({ bp_name, bp_gstin, bp_addres, bp_city, bp_pincod
       .first();
     if (existing) return existing;
   }
-  // 3. Create new BP
-  const [created] = await db('sss.ssm_business_partner')
-    .insert({
-      bp_name:    bp_name    || '',
-      bp_gstin:   bp_gstin   || null,
-      bp_addres:  bp_addres  || null,
-      bp_city:    bp_city    || null,
-      bp_pincode: bp_pincode || null,
-      tenant_id,
-      record_created_on: new Date(),
-    })
-    .returning(['record_id', 'bp_name', 'bp_addres', 'bp_city', 'bp_pincode', 'bp_gstin']);
-  return created;
+  return null;
 };
 
 module.exports = {

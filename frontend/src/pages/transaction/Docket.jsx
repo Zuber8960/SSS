@@ -324,6 +324,7 @@ export default function DocketPage() {
   const searchTimeoutRef = useRef(null);
   const prevLocRef = useRef({ docket_loc: "", docket_to_loc: "" });
   const ewbPopulatedRef = useRef({ cnor: false, cnee: false });
+  const chargesRef = useRef(null);
 
   // Clear consignor/consignee data when location changes,
   // but skip if that data was populated from EWB details
@@ -616,6 +617,11 @@ export default function DocketPage() {
         if (!form.goods_grp)       { showError("Goods Group is required"); return; }
         if (!form.goods_subgrp)    { showError("Goods Sub-Group is required"); return; }
         if (!form.goods_desc)      { showError("Goods Description is required"); return; }
+        const currentCharges = chargesRef.current?.getChargeList() ?? [];
+        if (currentCharges.length === 0) { 
+          showError("Charges Grid is blank, please fill Charges");
+          return;
+        }
       }
 
       // Map form field names → DB column names
@@ -661,7 +667,7 @@ export default function DocketPage() {
       const currentUser = JSON.parse(localStorage.getItem("current_user") || "null");
       const aud_user = currentUser?.rec_id ?? null;
 
-      // If cnor/cnee came from EWB API (no rec_id yet), find or create them in BP master now
+      // If cnor/cnee came from EWB API (no rec_id yet), try to find them in BP master; if not found, pass null
       let resolvedCnorId = form.cnor_id;
       let resolvedCneeId = form.cnee_id;
       if (form.cnor_name && !form.cnor_id || form.cnee_name && !form.cnee_id) {
@@ -725,6 +731,11 @@ export default function DocketPage() {
         result = await createDocket(payload);
         savedDocketNo = result?.docket_no;
         isNewDocket = true;
+      }
+
+      // Save charges after docket is persisted
+      if (savedDocketNo && chargesRef.current) {
+        await chargesRef.current.saveCharges(savedDocketNo);
       }
 
       // Save EWB list if withEWB is on and there are rows
@@ -1424,6 +1435,7 @@ export default function DocketPage() {
           <div style={{ marginTop: 16 }}>
             <ChargesSection
               key="charges"
+              ref={chargesRef}
               docketId={form.docket_no}
               invoiceValue={form.invoice_value}
               buttonStyle={sectionButtonStyle}
