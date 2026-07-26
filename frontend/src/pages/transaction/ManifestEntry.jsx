@@ -22,6 +22,11 @@ import {
   updateManifest,
 } from "../../utils/manifest";
 import { fetchLorryByVehicleNo } from "../../utils/lorryMaster";
+import {
+  validateLocalPickup,
+  validateLongHaul,
+  validateLocalDelivery,
+} from "../../utils/cnsValidation";
 
 // ✅ Header Fields
 const manifestFields = [
@@ -31,8 +36,8 @@ const manifestFields = [
     name: "manifest_type",
     options: [
       { label: "local pickup", value: "lp" },
-      { label: "local delivery", value: "ld" },
-      { label: "local hole", value: "lh" }
+      { label: "long haul", value: "lh" },
+      { label: "local delivery", value: "ld" }
     ],
   },
 
@@ -216,7 +221,72 @@ export default function ManifestPage() {
     setDetails(updated);
   };
 
-  // ✅ When docket_no changes, fetch details from API and auto-fill the row
+  // ✅ CNS Validation: check if docket can be added to this manifest based on manifest type
+  const validateDocketForManifest = async (docketNo, docketData) => {
+    const manifestType = form.manifest_type;
+    if (!manifestType) {
+      showError("Please select Manifest Type before adding dockets");
+      return false;
+    }
+
+    const fromLoc = form.from_loc;
+    const fromTown = form.from_town;
+    const toLoc = form.to_loc;
+    const toTown = form.to_town;
+
+    if (!fromLoc) {
+      showError("Please select From Location before adding dockets");
+      return false;
+    }
+
+    try {
+      if (manifestType === "lp") {
+        // LOCAL PICKUP: Check from sst_docket
+        // DOCKET FROM LOC = MANIFEST FROM LOC
+        // DOCKET FROM TOWN = MANIFEST FROM TOWN
+        // AND (TOT_PKGS - DESP_PKGS) > 0
+        const result = await validateLocalPickup(docketNo, fromLoc, fromTown);
+        if (!result?.valid) {
+          showError(result?.message || `Docket ${docketNo} is not valid for Local Pickup at location ${fromLoc}`);
+          return false;
+        }
+        return true;
+      } else if (manifestType === "lh") {
+        // LONG HAUL:
+        // a) Check from sst_docket: DOCKET FROM LOC = MANIFEST FROM LOC, DOCKET FROM TOWN = MANIFEST FROM TOWN, (TOT_PKGS - DESP_PKGS) > 0
+        // b) Check from sst_unloading_dtl: unld_loc_code = MANIFEST FROM LOC and (pkgs_received - desp_pkgs) > 0
+        const result = await validateLongHaul(docketNo, fromLoc, fromTown);
+        if (!result?.valid) {
+          showError(result?.message || `Docket ${docketNo} is not valid for Long Haul at location ${fromLoc}`);
+          return false;
+        }
+        return true;
+      } else if (manifestType === "ld") {
+        // LOCAL DELIVERY: Check from sst_unloading_dtl
+        // unld_loc_code = MANIFEST FROM LOC and (pkgs_received - desp_pkgs) > 0
+        // docket_to_loc = manifest_from_loc and manifest_to_town = docket_to_town
+        if (!toLoc || !toTown) {
+          showError("Please select To Location and To Town for Local Delivery validation");
+          return false;
+        }
+        const result = await validateLocalDelivery(docketNo, fromLoc, toLoc, toTown);
+        if (!result?.valid) {
+          showError(result?.message || `Docket ${docketNo} is not valid for Local Delivery at location ${fromLoc}`);
+          return false;
+        }
+        return true;
+      } else {
+        // No manifest type selected or unknown type - skip CNS validation
+        return true;
+      }
+    } catch (err) {
+      showError(`CNS Validation failed: ${err.message || "Unknown error"}`);
+      console.error("CNS Validation error:", err);
+      return false;
+    }
+  };
+
+  // ✅ When docket_no changes, fetch details from API, validate CNS, and auto-fill the row
   const fetchAndFillDocket = async (index, docketNo) => {
     if (!docketNo) return;
     try {
@@ -229,6 +299,12 @@ export default function ManifestPage() {
         }
       }
       if (docketData) {
+        // ✅ Run CNS validation before filling the row
+        const isValid = await validateDocketForManifest(docketNo, docketData);
+        if (!isValid) {
+          return;
+        }
+
         setDetails((prev) => {
           const upd = [...prev];
           if (upd[index]) {

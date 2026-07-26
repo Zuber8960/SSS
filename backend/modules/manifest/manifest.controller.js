@@ -25,6 +25,11 @@ const getManifestByNo = async (mnf_no) => {
     .first();
 };
 
+const getManifestByLocation = async (loc) => {
+  return db('sss.sst_mnf_hdr')
+    .where({ mnf_loc: loc });
+};
+
 /* ================= GET MANIFEST DETAILS ================= */
 
 const getManifestDetails = async ({ mnf_no, mnf_loc, mnf_date }) => {
@@ -199,5 +204,6 @@ module.exports = {
   updateManifest,
   updateManifestDetails,
   getManifestsByDocketNo,
-  deleteManifest
+  deleteManifest,
+  getManifestByLocation
 };

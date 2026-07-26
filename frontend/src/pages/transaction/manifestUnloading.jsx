@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import MainLayout from "../../layouts/MainLayout";
 import { IconButton, Tooltip } from "@mui/material";
 import { SaveIcon, ResetIcon } from "../../components/common/icons";
@@ -14,7 +14,7 @@ import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
 import StatusGrid from "../../components/common/StatusGrid";
 
-import { fetchManifestByNo } from "../../utils/manifest";
+import { fetchManifestByNo, fetchManifestsByLocation } from "../../utils/manifest";
 import { fetchDocketByDocketNo } from "../../utils/docket";
 
 // ------------------- HEADER FIELDS -------------------
@@ -70,6 +70,21 @@ const docketColumns = [
   { key: "updated_time", label: "Updated Time", minWidth: 100 },
 ];
 
+// ------------------- MANIFEST LIST (top grid) COLUMNS -------------------
+const manifestListColumns = [
+  { key: "sr", label: "Sr", minWidth: 40 },
+  { key: "manifest_no", label: "Manifest No", minWidth: 130, type: "link" },
+  { key: "manifest_date", label: "Manifest Date", minWidth: 110 },
+  { key: "origin_branch", label: "Origin Branch", minWidth: 120 },
+  { key: "dest_branch", label: "Dest Branch", minWidth: 120 },
+  { key: "vehicle_no", label: "Vehicle No", minWidth: 120 },
+  { key: "driver_name", label: "Driver Name", minWidth: 130 },
+  { key: "total_dockets", label: "Dockets", minWidth: 70, align: "center" },
+  { key: "total_packages", label: "Packages", minWidth: 80, align: "center" },
+  { key: "manifest_status", label: "Status", minWidth: 100 },
+  { key: "arrival_date", label: "Arrival Date", minWidth: 110 },
+];
+
 const emptyForm = {
   manifest_no: "",
   manifest_date: "",
@@ -98,6 +113,58 @@ export default function ManifestUnloading() {
   const [form, setForm] = useState({ ...emptyForm });
   const [dockets, setDockets] = useState([]);
   const [searchMode, setSearchMode] = useState(true);
+
+  // State for the location-based manifest list grid on top
+  const [locationManifests, setLocationManifests] = useState([]);
+  const [loadingManifests, setLoadingManifests] = useState(false);
+
+  // ------------------- GET USER LOCATION ON MOUNT & FETCH MANIFESTS -------------------
+  useEffect(() => {
+    const fetchManifestsForLocation = async () => {
+      try {
+        // Get location from current_user or loc_code stored during login
+        const currentUser = JSON.parse(localStorage.getItem("current_user") || "{}");
+        const locId = currentUser?.location_id || localStorage.getItem("loc_code");
+
+        if (!locId) {
+          showInfo("No location found for the logged-in user. Please login again.");
+          return;
+        }
+
+        setLoadingManifests(true);
+        const data = await fetchManifestsByLocation(locId);
+
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped = data.map((m, i) => ({
+            id: m.rec_id || m.mnf_no || i,
+            sr: i + 1,
+            manifest_no: m.mnf_no || m.manifest_no || "",
+            manifest_date: (m.mnf_date || m.manifest_date || "").substring(0, 10),
+            origin_branch: m.mnf_loc || m.origin_branch || "",
+            dest_branch: m.mnf_to_loc || m.dest_branch || "",
+            vehicle_no: m.desp_veh_no || m.vehicle_no || "",
+            driver_name: m.loaded_by || m.driver_name || "",
+            total_dockets: parseInt(m.mnf_no_of_dwb) || parseInt(m.total_dockets) || 0,
+            total_packages: parseInt(m.mnf_no_of_pkgs) || parseInt(m.total_packages) || parseInt(m.no_of_packages) || 0,
+            manifest_status: m.manifest_status || "Open",
+            arrival_date: m.arrival_date || "",
+            selected: false,
+          }));
+          setLocationManifests(mapped);
+        } else {
+          setLocationManifests([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch manifests by location:", err);
+        setLocationManifests([]);
+      } finally {
+        setLoadingManifests(false);
+      }
+    };
+
+    fetchManifestsForLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ---- Footer totals (original) ----
   const footerTotals = useMemo(() => {
@@ -208,7 +275,6 @@ export default function ManifestUnloading() {
         }));
       }
 
-      // setSearchMode(false);
       showInfo(`Manifest ${mnfNo} loaded successfully with ${manifestDetails.length} dockets`);
     } catch (err) {
       showError(err.message || "Failed to load manifest");
@@ -217,11 +283,16 @@ export default function ManifestUnloading() {
     }
   };
 
+  // ------------------- LOAD MANIFEST FROM LOCATION GRID CLICK -------------------
+  const handleLoadFromGrid = async (manifestNo) => {
+    if (!manifestNo) return;
+    await fetchAndLoadByManifestNo(manifestNo);
+  };
+
   // ------------------- BUTTON HANDLERS -------------------
   const handleClear = () => {
     setForm({ ...emptyForm });
     setDockets([]);
-    // setSearchMode(false);
     showInfo("Form cleared");
   };
 
@@ -341,7 +412,6 @@ export default function ManifestUnloading() {
   const handleManifestNoSearch = async (mnfNo) => {
     const trimmed = (mnfNo || "").trim();
     if (!trimmed) return;
-    // if (!searchMode) setSearchMode(true);
     await fetchAndLoadByManifestNo(trimmed);
   };
 
@@ -483,6 +553,51 @@ export default function ManifestUnloading() {
           </Tooltip>
         </div>
 
+        {/* ✅ LOCATION-BASED MANIFEST LIST GRID (TOP) */}
+        <div style={styles.panel}>
+          <div style={styles.panelTitle}>
+            📦 Manifests for Your Location
+            {locationManifests.length > 0 && (
+              <span style={{ marginLeft: 10, fontSize: 13, opacity: 0.8 }}>
+                ({locationManifests.length} manifests)
+              </span>
+            )}
+          </div>
+          <div style={styles.panelBody}>
+            {loadingManifests ? (
+              <div style={{ textAlign: "center", padding: 20, color: "#999" }}>
+                Loading manifests...
+              </div>
+            ) : locationManifests.length > 0 ? (
+              <StatusGrid
+                columns={manifestListColumns}
+                rows={locationManifests}
+                checkboxSelection={true}
+                maxHeight={350}
+                headerColor="#7b1fa2"
+                minWidth={1200}
+                onSelectRow={(rowId) => {
+                  // Toggle selection: select the clicked row, deselect others
+                  setLocationManifests((prev) =>
+                    prev.map((m) => ({
+                      ...m,
+                      selected: m.id === rowId,
+                    }))
+                  );
+                  const manifest = locationManifests.find((m) => m.id === rowId);
+                  if (manifest && manifest.manifest_no) {
+                    handleLoadFromGrid(manifest.manifest_no);
+                  }
+                }}
+              />
+            ) : (
+              <div style={{ textAlign: "center", padding: 20, color: "#999" }}>
+                No manifests found for your location.
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* ✅ HEADER FORM (Card Layout like HireVoucher) */}
         <div
           style={{
@@ -528,7 +643,7 @@ export default function ManifestUnloading() {
               <div style={{ textAlign: "center", padding: 40, color: "#999" }}>
                 {form.manifest_no
                   ? "No dockets found for this manifest."
-                  : "Enter a Manifest Number and press Enter to load dockets."}
+                  : "Select a manifest from the top grid or enter a Manifest Number and press Enter to load dockets."}
               </div>
             )}
           </div>

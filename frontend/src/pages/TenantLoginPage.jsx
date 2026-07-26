@@ -406,7 +406,7 @@ export default function TenantLoginPage() {
                       }}
                     >
                       {locations.map(loc => (
-                        <MenuItem key={loc.loc_id} value={loc.loc_id}>
+                        <MenuItem key={loc.loc_id} value={loc.loc_code}>
                           {loc.loc_code} - {loc.loc_name}
                         </MenuItem>
                       ))}
