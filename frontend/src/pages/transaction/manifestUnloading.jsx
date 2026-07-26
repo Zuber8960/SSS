@@ -19,14 +19,14 @@ import { fetchDocketByDocketNo } from "../../utils/docket";
 
 // ------------------- HEADER FIELDS -------------------
 const headerFields = [
-  { label: "Manifest No", name: "manifest_no" },
-  { label: "Manifest Date", name: "manifest_date", type: "date" },
-  { label: "Origin Branch", name: "origin_branch" },
-  { label: "Destination Branch", name: "dest_branch" },
-  { label: "Vehicle No", name: "vehicle_no" },
-  { label: "Vehicle Type", name: "vehicle_type" },
-  { label: "Driver Name", name: "driver_name" },
-  { label: "Driver Mobile", name: "driver_mobile" },
+  { label: "Manifest No", name: "manifest_no", disabled: true },
+  { label: "Manifest Date", name: "manifest_date", type: "date", disabled: true },
+  { label: "Origin Branch", name: "origin_branch", disabled: true },
+  { label: "Destination Branch", name: "dest_branch", disabled: true },
+  { label: "Vehicle No", name: "vehicle_no", disabled: true },
+  { label: "Vehicle Type", name: "vehicle_type", disabled: true },
+  { label: "Driver Name", name: "driver_name", disabled: true },
+  { label: "Driver Mobile", name: "driver_mobile", disabled: true },
   { label: "Arrival Date", name: "arrival_date", type: "date" },
   { label: "Arrival Time", name: "arrival_time", type: "time" },
   { label: "Seal No", name: "seal_no" },
@@ -34,7 +34,7 @@ const headerFields = [
   { label: "Total Dockets", name: "total_dockets", type: "number", disabled: true },
   { label: "Total Packages", name: "total_packages", type: "number", disabled: true },
   { label: "Total Weight", name: "total_weight", type: "number", disabled: true },
-  { label: "Manifest Status", name: "manifest_status" },
+  { label: "Manifest Status", name: "manifest_status", disabled: true },
   { label: "Arrival Remarks", name: "arrival_remarks", type: "textarea" },
 ];
 
@@ -60,9 +60,9 @@ const docketColumns = [
   { key: "booked_pkgs", label: "Booked Pkgs", minWidth: 90, align: "center" },
   { key: "received_pkgs", label: "Received Pkgs", minWidth: 100, type: "number", width: 70 },
   { key: "short_qty", label: "Short", minWidth: 70, type: "readonly_number", width: 60 },
-  { key: "excess_qty", label: "Excess", minWidth: 70, type: "readonly_number", width: 60 },
-  { key: "damage_qty", label: "Damage", minWidth: 70, type: "readonly_number", width: 60 },
-  { key: "leak_qty", label: "Leakage", minWidth: 70, type: "readonly_number", width: 60 },
+  { key: "excess_qty", label: "Excess", minWidth: 70, type: "number", width: 60 },
+  { key: "damage_qty", label: "Damage", minWidth: 70, type: "number", width: 60 },
+  { key: "leak_qty", label: "Leakage", minWidth: 70, type: "number", width: 60 },
   { key: "weight", label: "Weight", minWidth: 80, align: "right" },
   { key: "status", label: "Status", minWidth: 100, type: "select", options: statusOptions },
   { key: "remarks", label: "Remarks", minWidth: 140, type: "text", placeholder: "Remarks" },
@@ -205,6 +205,7 @@ export default function ManifestUnloading() {
       sr: index + 1,
       docket_no: docket.dwb_no || docket.docket_no || "",
       booking_date: docket.dwb_date || docket.booking_date || docket.date || "",
+      booking_date: new Date(docket.dwb_date || docket.booking_date || docket.date).toLocaleDateString(),
       consignor: docket.consignor || docket.from_party || docket.dwb_loc || "",
       consignee: docket.consignee || docket.to_party || "",
       destination: docket.docket_to_loc || "",
@@ -363,9 +364,10 @@ export default function ManifestUnloading() {
       setDockets((prev) =>
         prev.map((d) => {
           if (d.id !== rowId) return d;
-          const received = parseInt(newVal) || 0;
+          // Allow empty string so user can clear and type a new value
+          const received = newVal === "" ? "" : parseInt(newVal) || 0;
           const booked = d.booked_pkgs || 0;
-          const shortQty = Math.max(0, booked - received);
+          const shortQty = received === "" ? 0 : Math.max(0, booked - received);
           return {
             ...d,
             received_pkgs: received,
@@ -406,6 +408,16 @@ export default function ManifestUnloading() {
     if (key === "received_pkgs") handleReceivedChange(rowId, value);
     else if (key === "status") handleStatusChange(rowId, value);
     else if (key === "remarks") handleRemarksChange(rowId, value);
+    else if (key === "excess_qty" || key === "damage_qty" || key === "leak_qty") {
+      setDockets((prev) =>
+        prev.map((d) => {
+          if (d.id !== rowId) return d;
+          // Allow empty string so user can clear the field and type a new value
+          const newVal = value === "" ? "" : parseInt(value) || 0;
+          return { ...d, [key]: newVal };
+        })
+      );
+    }
   }, [handleReceivedChange, handleStatusChange, handleRemarksChange]);
 
   // ------------------- MANIFEST NO SEARCH HANDLERS -------------------
@@ -493,7 +505,7 @@ export default function ManifestUnloading() {
                   form={form}
                   setForm={setForm}
                   disabled={
-                    (field.name === "manifest_no" && !searchMode)
+                    field.disabled || (field.name === "manifest_no" && !searchMode)
                   }
                   onKeyDown={field.name === "manifest_no" ? handleManifestNoKeyDown : undefined}
                   onBlur={field.name === "manifest_no" ? handleManifestNoBlur : undefined}
