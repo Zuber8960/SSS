@@ -298,7 +298,8 @@ export default function EwayBillSection({
       if (onShowForm) onShowForm();
       return populated;
     } catch (err) {
-      showError(err.message || `Failed to fetch EWB ${ewbNo}`);
+      const apiMsg = err?.response?.data?.message;
+      showError(apiMsg || err.message || `Failed to fetch EWB ${ewbNo}`);
       return oldRow;
     }
   };

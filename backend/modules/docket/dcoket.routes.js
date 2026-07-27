@@ -54,7 +54,10 @@ router.get('/ewayfile/db/:ewbNumbers', async (req, res) => {
     const { results, apiCalls, docketData } = await DocketController.getEwayBillFromDB(ewbNumbers, tenant_id, divisionId);
     res.json({ success: true, data: results, apiCalls, docketData });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    const status = err.statusCode || 500;
+    const payload = { success: false, message: err.message };
+    if (err.docket_no) payload.docket_no = err.docket_no;
+    res.status(status).json(payload);
   }
 });
 
@@ -72,12 +75,12 @@ router.put('/ewayfile/db/:recId', async (req, res) => {
 
 router.post('/ewayfile/db', async (req, res) => {
   try {
-    const { tenant_id } = req;
+    const { tenant_id, divisionId } = req;
     const ewbData = req.body;
     if (!Array.isArray(ewbData) || !ewbData.length) {
       return res.status(400).json({ success: false, message: 'Ewaybill data array is required' });
     }
-    const data = await DocketController.saveEwayBillToDB(ewbData, tenant_id);
+    const data = await DocketController.saveEwayBillToDB(ewbData, tenant_id, divisionId);
     res.status(201).json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -85,6 +88,16 @@ router.post('/ewayfile/db', async (req, res) => {
 });
 
 /* ================= CHARGES ROUTES ================= */
+
+router.get('/charge-master', async (req, res) => {
+  try {
+    // const { tenant_id } = req;
+    const data = await DocketController.getChargeMaster();
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 router.get('/charges/:chargeId', async (req, res) => {
   try {

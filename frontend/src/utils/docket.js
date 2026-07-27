@@ -9,6 +9,7 @@ export const updateDocket = (docketNo, data) => Api.put(`/docket/${encodeURIComp
 export const updateDocketByRecId = (recId, data, docketNo) => Api.put(`/docket/rec/${encodeURIComponent(recId)}?docketNo=${encodeURIComponent(docketNo)}`, data).then(r => r.data.data || r.data);
 export const getDocketByRecId = (recId, docketNo) => Api.get(`/docket/rec/${encodeURIComponent(recId)}?docketNo=${encodeURIComponent(docketNo)}`).then(r => r.data.data || r.data);
 
+export const fetchChargeMaster = () => Api.get('/docket/charge-master').then(r => r.data.data || r.data || []);
 export const fetchCharges = (docketId) => Api.get(`/docket/${docketId}/charges`).then(r => r.data.data || r.data || []);
 export const createCharge = (docketId, data) => Api.post(`/docket/${docketId}/charges`, data).then(r => r.data.data || r.data);
 export const updateCharge = (chargeId, data) => Api.put(`/docket/charges/${chargeId}`, data).then(r => r.data.data || r.data);

@@ -26,8 +26,12 @@ module.exports = {
                 payload[field] = null;
             }
         }
+        for (const f of Object.keys(payload)) {
+            if (!payload[f]) payload[f] = null
+        }
         const record = { ...payload, record_created_by: userId, record_created_on: new Date() };
-        return db('sss.ssm_business_partner').insert(record).returning('*');
+        let query = db('sss.ssm_business_partner').insert(record).returning('*');
+        return query;
     },
 
     async updateBusinessPartnerData({ recId, tenant_id }, payload) {

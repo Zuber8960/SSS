@@ -73,18 +73,27 @@ import "../../styles/MasterPage.css";
 // Dropdown edit cell that commits immediately on selection (no blur required)
 function InstantSelectEditCell({ id, field, value, colDef }) {
   const apiRef = useGridApiContext();
+  const [open, setOpen] = useState(true);
+
   const handleChange = (e) => {
     apiRef.current.setEditCellValue({ id, field, value: e.target.value });
     apiRef.current.stopCellEditMode({ id, field });
   };
+
+  const handleClose = () => {
+    setOpen(false);
+    apiRef.current.stopCellEditMode({ id, field });
+  };
+
   return (
     <Select
       value={value ?? ""}
       onChange={handleChange}
+      onClose={handleClose}
       size="small"
       fullWidth
       autoFocus
-      open
+      open={open}
     >
       {colDef.valueOptions?.map((opt) => (
         <MenuItem key={opt} value={opt}>{opt}</MenuItem>

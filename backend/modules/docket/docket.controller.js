@@ -335,6 +335,14 @@ const deleteDocket = async (keys, trx = db) => {
 
 /* ================= CHARGES ================= */
 
+const getChargeMaster = async (tenant_id) => {
+  const query = db('sss.ssm_charge_master')
+    .where({status: '1'})
+    .select('charge_code', 'charge_desc', 'default_rate');
+  if (tenant_id) query.andWhere({ tenant_id });
+  return query.orderBy('charge_code');
+};
+
 const getChargesByDocketId = async (docketNo, tenant_id) => {
   const query = db('sss.sst_docket_charges').where({ docket_no: docketNo, record_status: 0 }).select('*');
   if (tenant_id) query.andWhere({ tenant_id });
@@ -377,19 +385,38 @@ const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
   const ewb_date = data.ewb_date ? moment(data.ewb_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : undefined;
   const ewb_valid_upto = data.ewb_valid ? moment(data.ewb_valid, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : undefined;
   const invoice_date = data.inv_date ? moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : undefined;
+  const { tenant_id, docket_no } = data;
+  const parseDate2 = (val) => {
+    if (!val) return undefined;
+    const m = moment(val, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true);
+    return m.isValid() ? m.format('YYYY-MM-DD') : undefined;
+  };
   const update = {
     ...(data.ewb_no !== undefined && { ewb_no: String(data.ewb_no) }),
     ...(ewb_date !== undefined && { ewb_date }),
     ...(ewb_valid_upto !== undefined && { ewb_valid_upto }),
     ...(invoice_date !== undefined && { invoice_date }),
     ...(data.inv_no !== undefined && { invoice_no: data.inv_no }),
+    ...(data.docket_date !== undefined && { docket_date: parseDate2(data.docket_date) }),
+    ...(data.docket_loc !== undefined && { docket_loc: data.docket_loc }),
+    ...(data.cnor_name !== undefined && { cnor_name: data.cnor_name }),
+    ...(data.cnor_address !== undefined && { cnor_address: data.cnor_address }),
+    ...(data.cnor_gstin !== undefined && { cnor_gstin: data.cnor_gstin }),
+    ...(data.cnor_pincode !== undefined && { cnor_pincode: data.cnor_pincode }),
+    ...(data.cnor_city !== undefined && { cnor_city: data.cnor_city }),
+    ...(data.cnee_name !== undefined && { cnee_name: data.cnee_name }),
+    ...(data.cnee_address !== undefined && { cnee_address: data.cnee_address }),
+    ...(data.cnee_gstin !== undefined && { cnee_gstin: data.cnee_gstin }),
+    ...(data.cnee_pincode !== undefined && { cnee_pincode: data.cnee_pincode }),
+    ...(data.cnee_city !== undefined && { cnee_city: data.cnee_city }),
     aud_date: new Date(),
+    docket_no
   };
-  const { tenant_id } = data;
   delete update.rec_id;
   const operation = await trx('sss.sst_docket_ewb').where({ ewb_no: update.ewb_no, tenant_id }).first() ? 'put' : 'post';
   if (operation === 'post') {
-    return trx('sss.sst_docket_ewb').where({ ewb_no: update.ewb_no, tenant_id }).insert(update);
+    update.tenant_id = tenant_id;
+    return trx('sss.sst_docket_ewb').insert(update);
   } else {
     return trx('sss.sst_docket_ewb').where({ ewb_no: update.ewb_no, tenant_id }).update(update);
   }
@@ -397,7 +424,19 @@ const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
 
 const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
   let xyz = await getListEwayDetails(ewbNumbers);
-  
+
+  // Check if any EWB is already linked to a docket
+  const existingEwb = await db('sss.sst_docket_ewb')
+    .whereIn('ewb_no', ewbNumbers.map(String))
+    .select('ewb_no', 'docket_no')
+    .first();
+  if (existingEwb) {
+    const err = new Error(`EWB No. ${existingEwb.ewb_no} is already associated with docket ${existingEwb.docket_no}`);
+    err.statusCode = 409;
+    err.docket_no = existingEwb.docket_no;
+    throw err;
+  }
+
   let apiCalls = false, docketData = null;
   const query = db('sss.sst_ewb_hdr as hdr')
     .whereIn('hdr.EWB_NO', ewbNumbers.map(String))
@@ -495,7 +534,8 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
 
       docketData = {
         ewb_no:        String(firstWithDocket.EWB_NO),
-        docket_no:     dk.docket_no                  || null,
+        // docket_no:     dk.docket_no                  || null,
+        docket_no:     null,
         docket_date:   dk.docket_date                || null,
         cnor_id:       dk.cnor_id                    ?? null,
         cnor_name:     dk.cnor_name                  || null,
@@ -603,7 +643,8 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
           cnee_gstin:   rawFirst.toGstin        || null,
           cnee_pincode: rawFirst.toPincode ? String(rawFirst.toPincode) : null,
           cnee_city:    rawFirst.toPlace        || null,
-          docket_no:     rawFirst.docNo          || null,
+          docket_no:     null,
+          // docket_no:     rawFirst.docNo          || null,
           docket_date:   rawFirst.docDate        || null,
           invoice_no:   rawFirst.docNo          || null,
           invoice_date: rawFirst.docDate        || null,
@@ -794,7 +835,7 @@ const saveDataEwb = async (apiResResult, tenant_id) => {
   return ewbResult;
 };
 
-const saveEwayBillToDB = async (ewbDataArray, tenant_id) => {
+const saveEwayBillToDB = async (ewbDataArray, tenant_id, division_code) => {
   const parseDate = (val) => {
     if (!val) return null;
     const m = moment(val, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true);
@@ -809,15 +850,19 @@ const saveEwayBillToDB = async (ewbDataArray, tenant_id) => {
       ewb_valid_upto: parseDate(data.ewb_valid || data.ewb_valid_upto || data.validUpto),
       invoice_no: data.inv_no || data.invoice_no || null,
       docket_no: data.docket_no || data.docNo || null,
+      docket_date: parseDate(data.docket_date) || null,
+      docket_loc: data.docket_loc || null,
       invoice_date: parseDate(data.inv_date || data.invoice_date),
       cnor_name: data.cnor_name || data.fromTrdName || '',
       cnor_address: data.cnor_address || ((data.fromAddr1 || '') + ' ' + (data.fromAddr2 || '')).trim() || '',
       cnor_gstin: data.cnor_gstin || data.fromGstin || '',
       cnor_pincode: data.cnor_pincode || data.fromPincode || null,
+      // cnor_city: data.cnor_city || data.fromPlace || null,
       cnee_name: data.cnee_name || data.toTrdName || '',
       cnee_address: data.cnee_address || ((data.toAddr1 || '') + ' ' + (data.toAddr2 || '')).trim() || '',
       cnee_gstin: data.cnee_gstin || data.toGstin || '',
       cnee_pincode: data.cnee_pincode || data.toPincode || null,
+      // cnee_city: data.cnee_city || data.toPlace || null,
       cgst: data.cgst || data.cgstValue || 0,
       sgst: data.sgst || data.sgstValue || 0,
       igst: data.igst || data.igstValue || 0,
@@ -843,6 +888,7 @@ const saveEwayBillToDB = async (ewbDataArray, tenant_id) => {
         .update(row);
       results.push({ ...existing, ...row });
     } else {
+      row.division_code=division_code;
       const [inserted] = await db('sss.sst_docket_ewb').insert(row).returning('*');
       results.push(inserted);
     }
@@ -885,6 +931,7 @@ module.exports = {
   deleteDocketDetails,
   getEwaybillDetails,
   getListEwayDetails,
+  getChargeMaster,
   getChargesByDocketId,
   createCharge,
   updateCharge,

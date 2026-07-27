@@ -589,6 +589,10 @@ export default function DocketPage() {
   // Save Form - POST for new, PUT for existing docket
   const handleFormSave = () => withLoading(async () => {
     try {
+      if (prePrinted && !form.docket_no) {
+        showError("Pre Printed Stationary is selected. Please enter a Docket Number before saving.");
+        return;
+      }
       if (!form.docket_date) { showError("Docket Date is required"); return; }
       if (!form.docket_loc)  { showError("From Location is required"); return; }
       if (!form.docket_to_loc) { showError("To Location is required"); return; }
@@ -689,11 +693,13 @@ export default function DocketPage() {
         });
         if (bpResult.cnor?.record_id) {
           resolvedCnorId = bpResult.cnor.record_id;
-          setForm((prev) => ({ ...prev, cnor_id: resolvedCnorId }));
+          form.cnor_id = +resolvedCnorId;
+          setForm((prev) => ({ ...prev, cnor_id: +resolvedCnorId }));
         }
         if (bpResult.cnee?.record_id) {
           resolvedCneeId = bpResult.cnee.record_id;
-          setForm((prev) => ({ ...prev, cnee_id: resolvedCneeId }));
+          form.cnee_id = +resolvedCneeId;
+          setForm((prev) => ({ ...prev, cnee_id: +resolvedCneeId }));
         }
       }
 
@@ -750,9 +756,21 @@ export default function DocketPage() {
           .map((row) => ({
             ...row,
             docket_no: savedDocketNo,
+            docket_date: toDbDate(form.docket_date) || null,
+            docket_loc: form.docket_loc || null,
             ewb_date: toDbDate(row.ewb_date),
             ewb_valid: toDbDate(row.ewb_valid),
             inv_date: toDbDate(row.inv_date),
+            cnor_name: row.cnor_name || form.cnor_name || null,
+            cnor_address: row.cnor_address || form.cnor_address || null,
+            cnor_gstin: row.cnor_gstin || form.cnor_gstin || null,
+            cnor_pincode: row.cnor_pincode || form.cnor_pincode || null,
+            cnor_city: row.cnor_city || form.cnor_city || null,
+            cnee_name: row.cnee_name || form.cnee_name || null,
+            cnee_address: row.cnee_address || form.cnee_address || null,
+            cnee_gstin: row.cnee_gstin || form.cnee_gstin || null,
+            cnee_pincode: row.cnee_pincode || form.cnee_pincode || null,
+            cnee_city: row.cnee_city || form.cnee_city || null,
           }));
         const existing = normalized.filter((r) => r.rec_id);
         const newRows  = normalized.filter((r) => !r.rec_id);
@@ -775,7 +793,7 @@ export default function DocketPage() {
         setEwbList([]);
         setEwbNoDisplay("");
         setIsFormEditMode(false);
-        showSuccess(`Docket ${savedDocketNo} created successfully`, "Success", 5000);
+        showSuccess(`Docket ${savedDocketNo} created successfully`, "Success", 8000);
       }
 
       console.log("Save result:", result);
