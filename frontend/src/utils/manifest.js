@@ -16,9 +16,9 @@ export const fetchManifestByKey = (mnfNo, mnfLoc, mnfDate) =>
 export const fetchManifestByNo = (mnfNo) =>
   Api.get(`/manifest/by-no/${encodeURIComponent(mnfNo)}`).then(r => r.data.data || r.data);
 
-// Fetch next manifest no
-export const fetchNextManifestNo = () =>
-  Api.get('/manifest/next-no').then(r => r.data.data || r.data);
+// Fetch manifests by location
+export const fetchManifestsByLocation = (locationId) =>
+  Api.get(`/manifest/by-location/${encodeURIComponent(locationId)}`).then(r => r.data.data || r.data || []);
 
 // Update manifest (header + details)
 export const updateManifest = (mnfNo, mnfLoc, mnfDate, header, details) =>

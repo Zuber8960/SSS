@@ -64,10 +64,11 @@ router.get('/by-docket/:docketNo', async (req, res) => {
 
 /* ================= GET NEXT MANIFEST NO ================= */
 
-router.get('/next-no', async (req, res) => {
+router.get('/by-location/:location', async (req, res) => {
   try {
-    const nextNo = await ManifestController.getNextManifestNo();
-    res.json({ success: true, data: { mnf_no: nextNo } });
+    const { location } = req.params;
+    const loc = await ManifestController.getManifestByLocation(location);
+    res.json({ success: true, data:  loc });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
