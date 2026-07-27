@@ -243,8 +243,8 @@ const emptyForm = {
   pay_loc: "",
   dly_type: "",
   cc: "",
-  act_wt: "",
-  chrg_wt: "",
+  act_wt: 30,
+  chrg_wt: 30,
   no_cb: 0,
   no_w_crate: 0,
   no_w_cbox: 0,
@@ -375,6 +375,25 @@ export default function DocketPage() {
       setDirtyFields((prev) => new Set(prev).add("pay_loc"));
     }
   }, [form.pay_type, form.docket_loc, form.docket_to_loc]);
+
+  const handleWeightBlur = (field, value) => {
+    let num = parseFloat(value);
+    if (!Number.isFinite(num) || num < 30) num = 30;
+
+    setForm((prev) => {
+      const updated = { ...prev, [field]: num };
+      // Ensure act_wt <= chrg_wt
+      if (field === "act_wt" && updated.act_wt > updated.chrg_wt) {
+        updated.chrg_wt = updated.act_wt;
+        setDirtyFields((d) => new Set(d).add("chrg_wt"));
+      }
+      if (field === "chrg_wt" && updated.chrg_wt < updated.act_wt) {
+        updated.chrg_wt = updated.act_wt;
+      }
+      return updated;
+    });
+    setDirtyFields((prev) => new Set(prev).add(field));
+  };
 
   const fetchBpSuggestions = async (searchTerm, prefix) => {
     if (!searchTerm || searchTerm.trim().length < 3) {
@@ -1101,6 +1120,9 @@ export default function DocketPage() {
               !isFormEditMode ||
               (["docket_no"].includes(field.name) && !isDocketNoEnabled)
             }
+            {...(["act_wt", "chrg_wt"].includes(field.name) ? {
+              onBlur: () => handleWeightBlur(field.name, form[field.name]),
+            } : {})}
           />
         </div>
       );
