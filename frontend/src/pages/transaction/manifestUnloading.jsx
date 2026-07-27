@@ -34,7 +34,7 @@ const headerFields = [
   { label: "Total Dockets", name: "total_dockets", type: "number", disabled: true },
   { label: "Total Packages", name: "total_packages", type: "number", disabled: true },
   { label: "Total Weight", name: "total_weight", type: "number", disabled: true },
-  { label: "Manifest Status", name: "manifest_status", disabled: true },
+  // { label: "Manifest Status", name: "manifest_status", disabled: true },
   { label: "Arrival Remarks", name: "arrival_remarks", type: "textarea" },
 ];
 
@@ -72,7 +72,7 @@ const docketColumns = [
 
 // ------------------- MANIFEST LIST (top grid) COLUMNS -------------------
 const manifestListColumns = [
-  { key: "sr", label: "Sr", minWidth: 40 },
+  // { key: "sr", label: "Sr", minWidth: 40 },
   { key: "manifest_no", label: "Manifest No", minWidth: 130, type: "link" },
   { key: "manifest_date", label: "Manifest Date", minWidth: 110 },
   { key: "origin_branch", label: "Origin Branch", minWidth: 120 },
@@ -81,8 +81,8 @@ const manifestListColumns = [
   { key: "driver_name", label: "Driver Name", minWidth: 130 },
   { key: "total_dockets", label: "Dockets", minWidth: 70, align: "center" },
   { key: "total_packages", label: "Packages", minWidth: 80, align: "center" },
-  { key: "manifest_status", label: "Status", minWidth: 100 },
-  { key: "arrival_date", label: "Arrival Date", minWidth: 110 },
+  // { key: "manifest_status", label: "Status", minWidth: 100 },
+  // { key: "arrival_date", label: "Arrival Date", minWidth: 110 },
 ];
 
 const emptyForm = {
@@ -194,7 +194,7 @@ export default function ManifestUnloading() {
     total_dockets: parseInt(hdr.mnf_no_of_dwb) || 0,
     total_packages: parseInt(hdr.mnf_no_of_pkgs) || parseInt(hdr.total_pkgs) || parseInt(hdr.no_of_packages) || 0,
     total_weight: parseFloat(hdr.mnf_charged_wt) || parseFloat(hdr.total_wt) || parseFloat(hdr.total_weight) || 0,
-    manifest_status: hdr.manifest_status || "Open",
+    // manifest_status: hdr.manifest_status || "Open",
     arrival_remarks: hdr.arrival_remarks || "",
   });
 
@@ -496,7 +496,7 @@ export default function ManifestUnloading() {
             const fieldStyle = {
               minWidth: 130,
               flex: "0 1 auto",
-              ...(isTextarea || field.fullWidth ? { flex: "1 1 100%" } : {}),
+              ...(isTextarea || field.fullWidth ? { flex: "1 1 50%" } : {}),
             };
             return (
               <div key={field.name} style={fieldStyle}>
@@ -675,9 +675,9 @@ export default function ManifestUnloading() {
             <div>
               <b style={styles.footerBold}>Updated By :</b> ADMIN
             </div>
-            <div>
+            {/* <div>
               <b style={styles.footerBold}>Status :</b> {form.manifest_status}
-            </div>
+            </div> */}
           </div>
         )}
 
