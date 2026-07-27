@@ -1,9 +1,12 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { logout as logoutUser } from "../utils/authService";
 import { getTenantConfig } from "../utils/tenantService";
 import { usePageTitle } from "../contexts/PageTitleContext";
 import { Tooltip } from "@mui/material";
 import { MenuIcon, CloseIcon, LogoutSvgIcon } from "../components/common/icons";
+import { fetchAllLocations } from "../utils/locationMaster";
+import { fetchAllDivisionsApi } from "../utils/divisionMaster";
 import "./Header.css";
 import logoImg from "../images/logo.png";
 
@@ -39,6 +42,32 @@ export default function Header({ onToggleSidebar, isMobileSidebarOpen }) {
     .join("")
     .toUpperCase() || "AD";
 
+  const branchCode = currentUser?.location_id || localStorage.getItem("loc_code") || "";
+  const [branchLabel, setBranchLabel] = useState(branchCode);
+
+  useEffect(() => {
+    if (!branchCode) return;
+    fetchAllLocations()
+      .then((locs) => {
+        const match = locs.find((l) => l.loc_code === branchCode);
+        if (match) setBranchLabel(`${match.loc_code} - ${match.loc_name}`);
+      })
+      .catch(() => {});
+  }, [branchCode]);
+
+  const divisionCode = currentUser?.division_code || localStorage.getItem("division_code") || "";
+  const [divisionLabel, setDivisionLabel] = useState(divisionCode);
+
+  useEffect(() => {
+    if (!divisionCode) return;
+    fetchAllDivisionsApi()
+      .then((divs) => {
+        const match = divs.find((d) => d.division_code === divisionCode);
+        if (match) setDivisionLabel(`${match.division_code} - ${match.division_name}`);
+      })
+      .catch(() => {});
+  }, [divisionCode]);
+
   return (
     <header className="appHeader">
       <div className="appHeaderBrand">
@@ -71,6 +100,19 @@ export default function Header({ onToggleSidebar, isMobileSidebarOpen }) {
       <h2 className="appHeaderPageTitle">{pageTitle}</h2>
 
       <div className="appHeaderActions">
+        {divisionCode && (
+          <div className="appHeaderBranch appHeaderDivision">
+            <span className="appHeaderBranchLabel">Division</span>
+            <span className="appHeaderBranchValue">{divisionLabel}</span>
+          </div>
+        )}
+        {branchCode && (
+          <div className="appHeaderBranch">
+            <span className="appHeaderBranchLabel">Branch</span>
+            <span className="appHeaderBranchValue appHeaderBranchFull">{branchLabel}</span>
+            <span className="appHeaderBranchValue appHeaderBranchShort">{branchCode}</span>
+          </div>
+        )}
         <div className="appHeaderUserInfo">
           <div className="appHeaderAvatar">{initials}</div>
           <span className="appHeaderUserName">{fullName}</span>
