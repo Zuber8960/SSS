@@ -60,12 +60,13 @@ const manifestFields = [
 ];
 
 // ✅ Detail Table Columns (Dockets inside Manifest)
+// Only docket_no is editable; all other columns are read-only (auto-filled from API)
 const detailColumns = [
-  { key: "docket_no", label: "Docket No" },
-  { key: "from_loc", label: "From" },
-  { key: "to_loc", label: "To" },
-  { key: "packages", label: "Packages" },
-  { key: "weight", label: "Weight" },
+  { key: "docket_no", label: "Docket No", editable: true },
+  { key: "from_loc", label: "From", editable: false },
+  { key: "to_loc", label: "To", editable: false },
+  { key: "packages", label: "Packages", editable: false },
+  { key: "weight", label: "Weight", editable: false },
 ];
 
 const emptyForm = {
@@ -302,6 +303,21 @@ export default function ManifestPage() {
         // ✅ Run CNS validation before filling the row
         const isValid = await validateDocketForManifest(docketNo, docketData);
         if (!isValid) {
+          // Clear the row's auto-filled fields since validation failed
+          setDetails((prev) => {
+            const upd = [...prev];
+            if (upd[index]) {
+              upd[index] = {
+                ...upd[index],
+                from_loc: "",
+                to_loc: "",
+                packages: "",
+                weight: "",
+                docket_date: "",
+              };
+            }
+            return upd;
+          });
           return;
         }
 
@@ -319,8 +335,40 @@ export default function ManifestPage() {
           }
           return upd;
         });
+      } else {
+        // Docket not found in API — clear the row's auto-filled fields
+        setDetails((prev) => {
+          const upd = [...prev];
+          if (upd[index]) {
+            upd[index] = {
+              ...upd[index],
+              from_loc: "",
+              to_loc: "",
+              packages: "",
+              weight: "",
+              docket_date: "",
+            };
+          }
+          return upd;
+        });
+        showError(`Docket No "${docketNo}" not found`);
       }
     } catch (err) {
+      // On error, clear the row's auto-filled fields
+      setDetails((prev) => {
+        const upd = [...prev];
+        if (upd[index]) {
+          upd[index] = {
+            ...upd[index],
+            from_loc: "",
+            to_loc: "",
+            packages: "",
+            weight: "",
+            docket_date: "",
+          };
+        }
+        return upd;
+      });
       showError(err.message || "Failed to fetch docket details");
       console.error("Fetch docket error:", err);
     } finally {
@@ -356,11 +404,24 @@ export default function ManifestPage() {
     }
   };
 
-  // ✅ Cell change handler
+  // ✅ Cell change handler (fires only when value actually changes)
   const handleCellChange = (rowIndex, key, value) => {
     updateRow(rowIndex, key, value);
     if (key === "docket_no") {
       fetchAndFillDocket(rowIndex, value);
+    }
+  };
+
+  // ✅ Cell edit stop handler (fires when user finishes editing, even if value didn't change)
+  // This allows re-entering the same docket number after a failed fetch/validation
+  const handleCellEditStop = (params, event) => {
+    const { id, field, reason } = params;
+    if (field === "docket_no" && (reason === "cellFocusOut" || reason === "escapeKeyDown")) {
+      const rowIndex = id;
+      const docketNo = details[rowIndex]?.docket_no?.trim();
+      if (docketNo) {
+        fetchAndFillDocket(rowIndex, docketNo);
+      }
     }
   };
 
@@ -748,6 +809,7 @@ export default function ManifestPage() {
           singleClick
           checkboxSelection
           onCellChange={handleCellChange}
+          onCellEditStop={handleCellEditStop}
           onRowSelectionModelChange={(model) => {
             // MUI v7: { type: 'include', ids: Set } or { type: 'exclude', ids: Set }
             // 'exclude' with empty ids means "all rows selected"

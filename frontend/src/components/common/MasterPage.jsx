@@ -241,6 +241,7 @@ export function DataTable({
   singleClick = false,
   onCellChange,
   onRowUpdate,
+  onCellEditStop,
   checkboxSelection = false,
   onRowSelectionModelChange,
   autoHeight = false,
@@ -442,6 +443,7 @@ export function DataTable({
         } : {})}
         {...(checkboxSelection ? { checkboxSelection: true } : {})}
         {...(onRowSelectionModelChange ? { onRowSelectionModelChange } : {})}
+        {...(onCellEditStop ? { onCellEditStop } : {})}
         processRowUpdate={async (newRow, oldRow) => {
           if (!editable) return newRow;
 

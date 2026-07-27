@@ -30,7 +30,7 @@ const headerFields = [
   { label: "Arrival Date", name: "arrival_date", type: "date" },
   { label: "Arrival Time", name: "arrival_time", type: "time" },
   { label: "Seal No", name: "seal_no" },
-  { label: "Dock No", name: "dock_no" },
+  { label: "Unloading Dock No", name: "dock_no" },
   { label: "Total Dockets", name: "total_dockets", type: "number", disabled: true },
   { label: "Total Packages", name: "total_packages", type: "number", disabled: true },
   { label: "Total Weight", name: "total_weight", type: "number", disabled: true },
@@ -199,13 +199,13 @@ export default function ManifestUnloading() {
   });
 
   const mapDocketToRow = (docket, index) => {
-    const booked = parseInt(docket.mnf_pkgs) || parseInt(docket.packages) || parseInt(docket.booked_pkgs) || parseInt(docket.dwb_pkgs) || 0;
+    const booked = parseInt(docket.docket_tot_pkgs)  || 0;
     return {
       id: docket.rec_id || docket.id || index + 1,
       sr: index + 1,
       docket_no: docket.dwb_no || docket.docket_no || "",
       booking_date: docket.dwb_date || docket.booking_date || docket.date || "",
-      booking_date: new Date(docket.dwb_date || docket.booking_date || docket.date).toLocaleDateString(),
+      booking_date: new Date(docket.dwb_date || docket.docket_date).toLocaleDateString(),
       consignor: docket.consignor || docket.from_party || docket.dwb_loc || "",
       consignee: docket.consignee || docket.to_party || "",
       destination: docket.docket_to_loc || "",
@@ -217,9 +217,9 @@ export default function ManifestUnloading() {
       leak_qty: docket.leak_qty || 0,
       weight: parseFloat(docket.dwb_actual_wt) || parseFloat(docket.weight) || 0,
       status: docket.unloading_status || docket.status || "OK",
-      remarks: docket.unloading_remarks || docket.remarks || "",
-      updated_by: docket.updated_by || "",
-      updated_time: docket.updated_time || docket.updated_on || "",
+      remarks: docket.docket_remark || "",
+      updated_by: docket.aud_user || "",
+      updated_time: new Date(docket.aud_date).toTimeString().substring(0, 8) || "",
       selected: false,
     };
   };
