@@ -102,7 +102,7 @@ const headerFields = [
       { label: "Per Trip", value: "Per Trip" },
       { label: "Per KG", value: "Per KG" },
       { label: "Per Unit", value: "Per Unit" },
-      { label: "Per Tone", value: "Per Tone" },
+      { label: "Per Tonne", value: "Per Tonne" },
     ],
   },
 
@@ -1456,6 +1456,10 @@ export default function DocketPage() {
               ref={chargesRef}
               docketId={form.docket_no}
               invoiceValue={form.invoice_value}
+              docketRate={form.rate}
+              rateUom={form.rate_uom}
+              chargeWeight={form.chrg_wt}
+              totalPkgs={form.tot_pkgs}
               buttonStyle={sectionButtonStyle}
               sectionHeaderStyle={sectionHeaderStyle}
               sectionActionsStyle={sectionActionsStyle}

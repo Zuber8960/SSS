@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
-import { Typography, Box, IconButton, Tooltip } from "@mui/material";
-import { AddIcon, DeleteIcon } from "../../../components/common/icons";
+import { Typography, Box, TextField } from "@mui/material";
+
 import { DataTable } from "../../../components/common/MasterPage";
 import {
   fetchChargeMaster,
   fetchCharges,
   createCharge,
   updateCharge,
-  deleteCharge as deleteChargeApi,
 } from "../../../utils/docket";
 import useAlert from "../../../components/common/UseAlert";
 import CommonAlertDialog from "../../../components/common/CommonAlertDialog";
@@ -22,59 +21,117 @@ const formatAmount = (value) => {
   return Number.isFinite(n) ? Number(n.toFixed(2)) : 0;
 };
 
-const getFreightAmount = (rows) => {
-  const row = rows.find((r) => r.charge_code === "DK01");
-  return row ? toNumber(row.user_code) : 0;
-};
-
-const calculateChargeRow = (row, rows, invValue, chargeMaster = []) => {
-  const userValue = toNumber(row.user_code);
+const calculateChargeRow = (row, rows, invValue, docketRate = 0, rateUom = "", chargeWeight = 0, totalPkgs = 0) => {
   const inv = toNumber(invValue);
   let chargeAmount;
+  let newUserCode = row.user_code;
 
   if (row.charge_code === "DK01") {
-    // FREIGHT — rate is the amount
-    chargeAmount = userValue;
+    // Rate auto-populated from docket rate field
+    const rate = toNumber(docketRate);
+    newUserCode = rate;
+    if (rateUom === "Per KG") {
+      chargeAmount = toNumber(chargeWeight) * rate;
+    } else if (rateUom === "Fixed" || rateUom === "Per Trip") {
+      chargeAmount = rate;
+    } else if (rateUom === "Per Unit") {
+      chargeAmount = toNumber(totalPkgs) * rate;
+    } else if (rateUom === "Per Tonne") {
+      chargeAmount = (toNumber(chargeWeight) / 1000) * rate;
+    } else {
+      chargeAmount = rate;
+    }
   } else if (row.charge_code === "DK02") {
-    // SURCHARGE — always DK01 amount * DK02 default_rate from master
-    const dk02Master = chargeMaster.find((m) => m.charge_code === "DK02");
-    const defaultRate = dk02Master ? toNumber(dk02Master.default_rate) : userValue;
-    chargeAmount = (getFreightAmount(rows) * defaultRate) / 100;
+    // Surcharge: user-entered rate % of DK01 charge amount
+    const userValue = toNumber(row.user_code);
+    const dk01Row = rows.find((r) => r.charge_code === "DK01");
+    const dk01ChargeAmt = dk01Row ? toNumber(dk01Row.charge_amt) : 0;
+    chargeAmount = (dk01ChargeAmt * userValue) / 100;
   } else if (row.charge_code === "DK03") {
-    // FREIGHT ON VALUE — % of invoice value
-    chargeAmount = (inv * userValue) / 100;
+    chargeAmount = (inv * toNumber(row.user_code)) / 100;
   } else if (row.charge_code === "DK04") {
-    // COVER OF CHARGE — rate * invoice value
-    chargeAmount = inv * userValue;
+    chargeAmount = inv * toNumber(row.user_code);
   } else {
-    // All other charges: user_code is the flat rate
-    chargeAmount = userValue;
+    chargeAmount = toNumber(row.user_code);
   }
 
-  return { ...row, charge_amt: formatAmount(chargeAmount) };
+  return { ...row, user_code: newUserCode, charge_amt: formatAmount(chargeAmount) };
 };
 
-const recalculateChargeList = (rows, invValue, chargeMaster = []) =>
-  rows.map((row) => calculateChargeRow(row, rows, invValue, chargeMaster));
+// Two-pass: DK01 first so its charge_amt is ready when DK02 is calculated
+const recalculateChargeList = (rows, invValue, docketRate = 0, rateUom = "", chargeWeight = 0, totalPkgs = 0) => {
+  const pass1 = rows.map((row) =>
+    row.charge_code === "DK01"
+      ? calculateChargeRow(row, rows, invValue, docketRate, rateUom, chargeWeight, totalPkgs)
+      : row
+  );
+  return pass1.map((row) =>
+    row.charge_code !== "DK01"
+      ? calculateChargeRow(row, pass1, invValue, docketRate, rateUom, chargeWeight, totalPkgs)
+      : row
+  );
+};
 
 const ChargesSection = forwardRef(function ChargesSection({
   docketId,
   invoiceValue,
+  docketRate = 0,
+  rateUom = "",
+  chargeWeight = 0,
+  totalPkgs = 0,
   sectionHeaderStyle,
   onChargesChange,
   singleClick = false,
 }, ref) {
-  const { dialog, closeAlert, showSuccess, showError, showWarning } = useAlert();
+  const { dialog, closeAlert, showSuccess, showError } = useAlert();
   const [chargeMaster, setChargeMaster] = useState([]);
   const [chargeList, setChargeList] = useState([]);
   const [dirtyRecIds, setDirtyRecIds] = useState(new Set());
   const tempIdCounter = useRef(-1);
   const chargesLoaded = useRef(false);
+  // Refs so effects always see the latest values without stale closures
+  const chargeMasterRef = useRef([]);
+  const docketIdRef = useRef(docketId);
+  const invoiceValueRef = useRef(invoiceValue);
+  const docketRateRef = useRef(docketRate);
+  const rateUomRef = useRef(rateUom);
+  const chargeWeightRef = useRef(chargeWeight);
+  const totalPkgsRef = useRef(totalPkgs);
+
+  // Keep refs in sync with props on every render
+  docketIdRef.current = docketId;
+  invoiceValueRef.current = invoiceValue;
+  docketRateRef.current = docketRate;
+  rateUomRef.current = rateUom;
+  chargeWeightRef.current = chargeWeight;
+  totalPkgsRef.current = totalPkgs;
+
+  const buildMasterRows = (master) =>
+    recalculateChargeList(
+      master.map((m) => ({
+        rec_id: tempIdCounter.current--,
+        charge_code: m.charge_code,
+        user_code: m.default_rate ?? "",
+      })),
+      invoiceValueRef.current,
+      docketRateRef.current,
+      rateUomRef.current,
+      chargeWeightRef.current,
+      totalPkgsRef.current,
+    );
 
   // Load charge master once on mount
   useEffect(() => {
     fetchChargeMaster()
-      .then(setChargeMaster)
+      .then((master) => {
+        chargeMasterRef.current = master;
+        setChargeMaster(master);
+        // Only auto-populate if no docket is loaded AND no charges exist yet
+        if (!docketIdRef.current && master.length > 0) {
+          setChargeList(buildMasterRows(master));
+          chargesLoaded.current = true;
+        }
+      })
       .catch(console.error);
   }, []);
 
@@ -120,30 +177,45 @@ const ChargesSection = forwardRef(function ChargesSection({
   useEffect(() => {
     if (!docketId) {
       chargesLoaded.current = false;
-      setChargeList([]);
       setDirtyRecIds(new Set());
       tempIdCounter.current = -1;
+      // No docket loaded — show all master rows for a new entry
+      const master = chargeMasterRef.current;
+      if (master.length > 0) {
+        setChargeList(buildMasterRows(master));
+      } else {
+        setChargeList([]);
+      }
+      chargesLoaded.current = true;
       return;
     }
     chargesLoaded.current = false;
     fetchCharges(docketId)
       .then((charges) => {
         chargesLoaded.current = true;
-        setChargeList(charges);
+        if (charges.length > 0) {
+          setChargeList(
+            recalculateChargeList(charges, invoiceValueRef.current, docketRateRef.current, rateUomRef.current, chargeWeightRef.current, totalPkgsRef.current)
+          );
+        } else {
+          // Docket has no saved charges — fall back to master rows
+          const master = chargeMasterRef.current;
+          setChargeList(master.length > 0 ? buildMasterRows(master) : []);
+        }
         setDirtyRecIds(new Set());
         tempIdCounter.current = -1;
       })
       .catch(console.error);
   }, [docketId]);
 
-  // When invoiceValue changes after charges are loaded, recalculate all rows
+  // Recalculate whenever any docket field that affects charge amounts changes
   useEffect(() => {
     if (!chargesLoaded.current) return;
     setChargeList((prev) => {
       if (prev.length === 0) return prev;
-      return recalculateChargeList(prev, invoiceValue, chargeMaster);
+      return recalculateChargeList(prev, invoiceValue, docketRate, rateUom, chargeWeight, totalPkgs);
     });
-  }, [invoiceValue, chargeMaster]);
+  }, [invoiceValue, docketRate, rateUom, chargeWeight, totalPkgs]);
 
   // Notify parent of chargeList changes
   useEffect(() => {
@@ -163,51 +235,6 @@ const ChargesSection = forwardRef(function ChargesSection({
 
   // --- Handlers ---
 
-  const addChargeRow = () => {
-    const existingCodes = new Set(chargeList.map((r) => r.charge_code));
-    const firstMaster = chargeMaster.find((m) => !existingCodes.has(m.charge_code));
-    if (!firstMaster) return;
-
-    const newRow = {
-      rec_id: tempIdCounter.current--,
-      charge_code: firstMaster.charge_code,
-      user_code: firstMaster.default_rate ?? "",
-    };
-    setChargeList((prev) =>
-      recalculateChargeList([...prev, newRow], invoiceValue, chargeMaster)
-    );
-  };
-
-  const deleteCharge = (row) => {
-    const chargeToDelete = chargeList.find((c) => c.rec_id === row.rec_id);
-    if (!chargeToDelete) return;
-
-    showWarning("Confirm Delete", "Are you sure you want to delete this Charge?", async () => {
-      if (chargeToDelete.rec_id < 0) {
-        setChargeList((prev) =>
-          recalculateChargeList(prev.filter((c) => c.rec_id !== row.rec_id), invoiceValue, chargeMaster)
-        );
-        showSuccess("Charge removed");
-        return;
-      }
-
-      try {
-        await deleteChargeApi(chargeToDelete.rec_id);
-        setChargeList((prev) =>
-          recalculateChargeList(prev.filter((c) => c.rec_id !== row.rec_id), invoiceValue, chargeMaster)
-        );
-        setDirtyRecIds((prev) => {
-          const next = new Set(prev);
-          next.delete(chargeToDelete.rec_id);
-          return next;
-        });
-        showSuccess("Charge deleted successfully");
-      } catch (err) {
-        console.error("Failed to delete charge:", err);
-        showError(err.message || "Failed to delete charge");
-      }
-    });
-  };
 
   const updateChargeRow = (recId, field, value) => {
     const idx = chargeList.findIndex((r) => r.rec_id === recId);
@@ -244,7 +271,7 @@ const ChargesSection = forwardRef(function ChargesSection({
       setDirtyRecIds((d) => new Set(d).add(existingRow.rec_id));
     }
 
-    const recalculated = recalculateChargeList(updated, invoiceValue, chargeMaster);
+    const recalculated = recalculateChargeList(updated, invoiceValue, docketRate, rateUom, chargeWeight, totalPkgs);
     setChargeList(recalculated);
 
     const displayRow = recalculated[idx];
@@ -262,26 +289,29 @@ const ChargesSection = forwardRef(function ChargesSection({
     return { ...row, charge_code: master ? chargeLabel(master) : row.charge_code };
   });
 
+  const totalChargeAmount = chargeList.reduce((sum, r) => sum + toNumber(r.charge_amt), 0);
+
   return (
     <div>
       <Box sx={{ ...sectionHeaderStyle, marginBottom: 1.5 }}>
         <Typography variant="h6" fontWeight={600}>Charges</Typography>
-        <Tooltip title="Add Charge">
-          <IconButton size="small" onClick={addChargeRow} sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
-            <AddIcon />
-          </IconButton>
-        </Tooltip>
+        <TextField
+          label="Total Charge Amount"
+          value={formatAmount(totalChargeAmount)}
+          size="small"
+          InputProps={{ readOnly: true }}
+          sx={{ width: 180 }}
+        />
       </Box>
 
       <DataTable
         columns={chargeColumns}
         rows={displayRows}
         getKey={(row) => row.rec_id}
-        actions={[
-          { label: "Delete", icon: <DeleteIcon />, onClick: (row) => deleteCharge(row) },
-        ]}
+
         editable
         singleClick={singleClick}
+        autoHeight
         onCellChange={(rowIndex, key, value) =>
           updateChargeRow(rowIndex, key, value)
         }

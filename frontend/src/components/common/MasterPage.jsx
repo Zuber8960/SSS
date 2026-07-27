@@ -243,6 +243,7 @@ export function DataTable({
   onRowUpdate,
   checkboxSelection = false,
   onRowSelectionModelChange,
+  autoHeight = false,
 }) {
   const apiRef = useGridApiRef();
   const [paginationModel, setPaginationModel] = useState({
@@ -356,7 +357,7 @@ export function DataTable({
     "& .MuiDataGrid-main": {
       background: "transparent",
     },
-    height: 320,
+    ...(autoHeight ? {} : { height: 320 }),
     "& .MuiDataGrid-columnHeaders": {
       background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
       borderBottom: "none",
@@ -427,14 +428,10 @@ export function DataTable({
         density="compact"
         rowHeight={55}
         headerHeight={42}
-        autoHeight={false}
+        autoHeight={autoHeight}
         hideFooter
         disableVirtualization={false}
         rowSelection={true}
-        sx={{
-          height: 320,
-          overflowY: "auto",
-        }}
         {...(singleClick ? {
           apiRef,
           onCellClick: (params) => {
