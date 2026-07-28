@@ -456,7 +456,7 @@ export default function ManifestPage() {
         dwb_pkgs: parseFloat(row.packages) || 0,
         dwb_actual_wt: parseFloat(row.weight) || 0,
         dwb_charged_wt: parseFloat(row.weight) || 0,
-        mnf_pkgs: parseFloat(computedTotals.total_pkgs) || 0,
+        mnf_pkgs: parseFloat(row.packages) || 0,
       }));
 
   // ✅ Map DB header to form fields

@@ -193,13 +193,13 @@ export default function ManifestUnloading() {
     dock_no: hdr.dock_no || "",
     total_dockets: parseInt(hdr.mnf_no_of_dwb) || 0,
     total_packages: parseInt(hdr.mnf_no_of_pkgs) || parseInt(hdr.total_pkgs) || parseInt(hdr.no_of_packages) || 0,
-    total_weight: parseFloat(hdr.mnf_charged_wt) || parseFloat(hdr.total_wt) || parseFloat(hdr.total_weight) || 0,
+    total_weight: parseFloat(hdr.mnf_actual_wt) || 0,
     // manifest_status: hdr.manifest_status || "Open",
     arrival_remarks: hdr.arrival_remarks || "",
   });
 
   const mapDocketToRow = (docket, index) => {
-    const booked = parseInt(docket.docket_tot_pkgs)  || 0;
+    const booked = parseInt(docket.docket_tot_pkgs) || 0;
     return {
       id: docket.rec_id || docket.id || index + 1,
       sr: index + 1,
@@ -215,7 +215,8 @@ export default function ManifestUnloading() {
       excess_qty: docket.excess_qty || 0,
       damage_qty: docket.damage_qty || 0,
       leak_qty: docket.leak_qty || 0,
-      weight: parseFloat(docket.dwb_actual_wt) || parseFloat(docket.weight) || 0,
+      docket_act_wt: parseFloat(docket.dwb_actual_wt) || 0,
+      docket_chrg_wt: parseFloat(docket.docket_chrg_wt) || 0,
       status: docket.unloading_status || docket.status || "OK",
       remarks: docket.docket_remark || "",
       updated_by: docket.aud_user || "",
@@ -324,6 +325,7 @@ export default function ManifestUnloading() {
         mnf_to_loc: form.dest_branch,
         dest_branch: form.dest_branch,
         arrival_date: form.arrival_date,
+        arrival_time: form.arrival_time,
         arrival_remarks: form.arrival_remarks,
         dock_no: form.dock_no,
         company_code: null,
@@ -341,6 +343,8 @@ export default function ManifestUnloading() {
           short_qty: d.short_qty,
           excess_qty: d.excess_qty,
           damage_qty: d.damage_qty,
+          docket_chrg_wt: d.docket_chrg_wt,
+          docket_act_wt: d.docket_act_wt,
           weight: d.weight,
           unloading_status: d.status,
           unloading_remarks: d.remarks,
