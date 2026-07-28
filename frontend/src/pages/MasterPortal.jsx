@@ -20,12 +20,14 @@ export default function MasterPortal() {
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const handleLogin = async () => {
-    if (!userId || !password) {
-      showError("User ID and Password are required");
-      return;
-    }
+    const e = {};
+    if (!userId) e.userId = true;
+    if (!password) e.password = true;
+    if (Object.keys(e).length) { setErrors(e); showError("User ID and Password are required"); return; }
+    setErrors({});
     setLoading(true);
     try {
       const result = await tenantLogin(userId, password);
@@ -82,8 +84,10 @@ export default function MasterPortal() {
               label="User ID"
               fullWidth
               size="small"
+              required
+              error={!!errors.userId}
               value={userId}
-              onChange={e => setUserId(e.target.value)}
+              onChange={e => { setUserId(e.target.value); setErrors(p => ({ ...p, userId: false })); }}
               autoFocus
             />
 
@@ -91,9 +95,11 @@ export default function MasterPortal() {
               label="Password"
               fullWidth
               size="small"
+              required
+              error={!!errors.password}
               type={showPwd ? "text" : "password"}
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={e => { setPassword(e.target.value); setErrors(p => ({ ...p, password: false })); }}
               slotProps={{
                 input: {
                   endAdornment: (
