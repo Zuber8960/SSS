@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { DataGrid, useGridApiContext, useGridApiRef } from "@mui/x-data-grid";
-import { Box, Button, Select, MenuItem, IconButton, Tooltip } from "@mui/material";
+import { Box, Button, FormControl, InputLabel, Select, MenuItem, IconButton, TextField, Tooltip } from "@mui/material";
 import { getDateFormat } from "../../utils/tenantService";
 
 function DateEditCell(props) {
@@ -229,6 +229,82 @@ export function FormField({
         />
       )}
     </div>
+  );
+}
+
+const muiFieldSx = {
+  "& .MuiInputBase-input": { fontSize: 13 },
+  "& .MuiInputLabel-root": { fontSize: 13 },
+};
+
+export function MuiField({
+  label,
+  name,
+  value,
+  onChange,
+  type = "text",
+  disabled = false,
+  required = false,
+  fullWidth = true,
+  size = "small",
+  sx = {},
+  onBlur,
+  onKeyDown,
+  slotProps,
+}) {
+  return (
+    <TextField
+      label={label}
+      size={size}
+      fullWidth={fullWidth}
+      disabled={disabled}
+      required={required}
+      type={type}
+      value={value ?? ""}
+      onChange={e => onChange(name, e.target.value)}
+      onBlur={onBlur}
+      onKeyDown={onKeyDown}
+      sx={{ ...muiFieldSx, ...sx }}
+      slotProps={{
+        inputLabel: type === "date" ? { shrink: true } : undefined,
+        ...slotProps,
+      }}
+    />
+  );
+}
+
+export function MuiSelectField({
+  label,
+  name,
+  value,
+  onChange,
+  options = [],
+  disabled = false,
+  required = false,
+  fullWidth = true,
+  size = "small",
+  sx = {},
+}) {
+  return (
+    <FormControl fullWidth={fullWidth} size={size} required={required} disabled={disabled} sx={{ ...muiFieldSx, ...sx }}>
+      <InputLabel sx={{ fontSize: 13 }}>{label}</InputLabel>
+      <Select
+        label={label}
+        value={value ?? ""}
+        onChange={e => onChange(name, e.target.value)}
+        sx={{ fontSize: 13 }}
+      >
+        {options.map(opt => (
+          <MenuItem
+            key={typeof opt === "object" ? opt.value : opt}
+            value={typeof opt === "object" ? opt.value : opt}
+            sx={{ fontSize: 13 }}
+          >
+            {typeof opt === "object" ? opt.label : opt}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
   );
 }
 

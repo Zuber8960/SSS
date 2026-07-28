@@ -403,12 +403,12 @@ const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
     ...(data.cnor_address !== undefined && { cnor_address: data.cnor_address }),
     ...(data.cnor_gstin !== undefined && { cnor_gstin: data.cnor_gstin }),
     ...(data.cnor_pincode !== undefined && { cnor_pincode: data.cnor_pincode }),
-    ...(data.cnor_city !== undefined && { cnor_city: data.cnor_city }),
+    // ...(data.cnor_city !== undefined && { cnor_city: data.cnor_city }),
     ...(data.cnee_name !== undefined && { cnee_name: data.cnee_name }),
     ...(data.cnee_address !== undefined && { cnee_address: data.cnee_address }),
     ...(data.cnee_gstin !== undefined && { cnee_gstin: data.cnee_gstin }),
     ...(data.cnee_pincode !== undefined && { cnee_pincode: data.cnee_pincode }),
-    ...(data.cnee_city !== undefined && { cnee_city: data.cnee_city }),
+    // ...(data.cnee_city !== undefined && { cnee_city: data.cnee_city }),
     aud_date: new Date(),
     docket_no
   };
@@ -447,113 +447,76 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
   if (tenant_id) query.andWhere({ 'hdr.tenant_id': tenant_id });
   let results = await query;
   if (results.length) {
-    const ewbNos = results.map(r => String(r.EWB_NO));
-    const docketRows = await db('sss.sst_docket_ewb as de')
-      .join('sss.sst_docket as dk', 'de.docket_no', 'dk.docket_no')
-      .leftJoin('sss.ssm_business_partner as cnor', 'dk.cnor_id', 'cnor.record_id')
-      .leftJoin('sss.ssm_business_partner as cnee', 'dk.cnee_id', 'cnee.record_id')
-      .whereIn('de.ewb_no', ewbNos)
-      .select(
-        'de.ewb_no',
-        'dk.*',
-        'cnor.record_id as cnor_id',
-        'cnor.bp_name as cnor_name',
-        'cnor.bp_addres as cnor_address',
-        'cnor.bp_city as cnor_city',
-        'cnor.bp_state as cnor_state',
-        'cnor.bp_pincode as cnor_pincode',
-        'cnor.bp_gstin as cnor_gstin',
-        'cnee.record_id as cnee_id',
-        'cnee.bp_name as cnee_name',
-        'cnee.bp_addres as cnee_address',
-        'cnee.bp_city as cnee_city',
-        'cnee.bp_state as cnee_state',
-        'cnee.bp_pincode as cnee_pincode',
-        'cnee.bp_gstin as cnee_gstin',
-        db.raw(`(SELECT JSON_AGG(dtl.*) FROM sss.sst_docket_dtl dtl WHERE dtl.docket_no = dk.docket_no) AS docket_data`)
-      );
-    const docketByEwb = {};
-    for (const row of docketRows) docketByEwb[String(row.ewb_no)] = row;
-    results = results.map(r => ({ ...r, docket: docketByEwb[String(r.EWB_NO)] || null }));
-
-    // Build docketData from the first EWB that has a linked docket
-    const firstWithDocket = results.find(r => r.docket);
-    if (firstWithDocket) {
-      const dk = firstWithDocket.docket;
-      const ewbDtl = Array.isArray(firstWithDocket.dtl_rows) ? firstWithDocket.dtl_rows[0] : null;
-
+    const firstWithDtl = results.find(r => Array.isArray(r.dtl_rows) && r.dtl_rows.length);
+    if (firstWithDtl) {
+      const ewbDtl = firstWithDtl.dtl_rows[0];
       const bpWarnings = [];
 
-      if (!dk.cnor_id) {
-        const cnorGstin = ewbDtl?.CNOR_GSTIN || null;
-        const cnorName  = ewbDtl?.FROM_CUST_NAME || null;
-        if (cnorGstin || cnorName) {
-          let cnorBp = null;
-          if (cnorGstin) {
-            cnorBp = await db('sss.ssm_business_partner')
-              .where({ bp_gstin: cnorGstin, tenant_id })
-              .select('record_id')
-              .first();
-          }
-          if (!cnorBp && cnorName) {
-            cnorBp = await db('sss.ssm_business_partner')
-              .whereRaw('LOWER(bp_name) = LOWER(?)', [cnorName])
-              .where({ tenant_id })
-              .select('record_id')
-              .first();
-          }
-          if (!cnorBp) {
-            bpWarnings.push(`Consignor with GSTIN/Name "${cnorGstin || cnorName}" is not present in BP master table.`);
-          }
+      const cnorGstin = ewbDtl?.CNOR_GSTIN || null;
+      const cnorName  = ewbDtl?.FROM_CUST_NAME || null;
+      let cnorBp = null;
+      if (cnorGstin || cnorName) {
+        if (cnorGstin) {
+          cnorBp = await db('sss.ssm_business_partner')
+            .where({ bp_gstin: cnorGstin, tenant_id })
+            .select('record_id')
+            .first();
+        }
+        if (!cnorBp && cnorName) {
+          cnorBp = await db('sss.ssm_business_partner')
+            .whereRaw('LOWER(bp_name) = LOWER(?)', [cnorName])
+            .where({ tenant_id })
+            .select('record_id')
+            .first();
+        }
+        if (!cnorBp) {
+          bpWarnings.push(`Consignor with GSTIN/Name "${cnorGstin || cnorName}" is not present in BP master table.`);
         }
       }
 
-      if (!dk.cnee_id) {
-        const cneeGstin = ewbDtl?.CNEE_GSTIN || null;
-        const cneeName  = ewbDtl?.TO_CUST_NAME || null;
-        if (cneeGstin || cneeName) {
-          let cneeBp = null;
-          if (cneeGstin) {
-            cneeBp = await db('sss.ssm_business_partner')
-              .where({ bp_gstin: cneeGstin, tenant_id })
-              .select('record_id')
-              .first();
-          }
-          if (!cneeBp && cneeName) {
-            cneeBp = await db('sss.ssm_business_partner')
-              .whereRaw('LOWER(bp_name) = LOWER(?)', [cneeName])
-              .where({ tenant_id })
-              .select('record_id')
-              .first();
-          }
-          if (!cneeBp) {
-            bpWarnings.push(`Consignee with GSTIN/Name "${cneeGstin || cneeName}" is not present in BP master table.`);
-          }
+      const cneeGstin = ewbDtl?.CNEE_GSTIN || null;
+      const cneeName  = ewbDtl?.TO_CUST_NAME || null;
+      let cneeBp = null;
+      if (cneeGstin || cneeName) {
+        if (cneeGstin) {
+          cneeBp = await db('sss.ssm_business_partner')
+            .where({ bp_gstin: cneeGstin, tenant_id })
+            .select('record_id')
+            .first();
+        }
+        if (!cneeBp && cneeName) {
+          cneeBp = await db('sss.ssm_business_partner')
+            .whereRaw('LOWER(bp_name) = LOWER(?)', [cneeName])
+            .where({ tenant_id })
+            .select('record_id')
+            .first();
+        }
+        if (!cneeBp) {
+          bpWarnings.push(`Consignee with GSTIN/Name "${cneeGstin || cneeName}" is not present in BP master table.`);
         }
       }
 
       docketData = {
-        ewb_no:        String(firstWithDocket.EWB_NO),
-        // docket_no:     dk.docket_no                  || null,
+        ewb_no:        String(firstWithDtl.EWB_NO),
         docket_no:     null,
-        docket_date:   dk.docket_date                || null,
-        cnor_id:       dk.cnor_id                    ?? null,
-        cnor_name:     dk.cnor_name                  || null,
-        cnor_address:  dk.cnor_address               || null,
-        cnor_city:     dk.cnor_city                  || null,
-        cnor_state:    dk.cnor_state                 || null,
-        cnor_pincode:  dk.cnor_pincode               || null,
-        cnor_gstin:    dk.cnor_gstin                 || null,
-        cnee_id:       dk.cnee_id                    ?? null,
-        cnee_name:     dk.cnee_name                  || null,
-        cnee_address:  dk.cnee_address               || null,
-        cnee_city:     dk.cnee_city                  || null,
-        cnee_state:    dk.cnee_state                 || null,
-        cnee_pincode:  dk.cnee_pincode               || null,
-        cnee_gstin:    dk.cnee_gstin                 || null,
-        invoice_no:    dk.docket_inv_no              || ewbDtl?.INV_NO || null,
-        invoice_date:  dk.docket_inv_date            || ewbDtl?.INV_DATE || null,
-        invoice_value: dk.docket_inv_value           ?? null,
+        docket_date:   null,
+        cnor_id:       cnorBp?.record_id             ?? null,
+        cnor_name:     ewbDtl?.FROM_CUST_NAME        || null,
+        cnor_address:  ewbDtl?.FROM_ADDRESS          || null,
+        cnor_city:     ewbDtl?.FROM_PLACE            || null,
+        cnor_state:    ewbDtl?.FROM_STATE            || null,
+        cnor_pincode:  ewbDtl?.FROM_PINCODE          || null,
+        cnor_gstin:    ewbDtl?.CNOR_GSTIN            || null,
+        cnee_id:       cneeBp?.record_id             ?? null,
+        cnee_name:     ewbDtl?.TO_CUST_NAME          || null,
+        cnee_address:  ewbDtl?.TO_ADDRESS            || null,
+        cnee_city:     ewbDtl?.TO_PLACE              || null,
+        cnee_state:    ewbDtl?.TO_STATE              || null,
+        cnee_pincode:  ewbDtl?.TO_PINCODE            || null,
+        cnee_gstin:    ewbDtl?.CNEE_GSTIN            || null,
+        invoice_no:    ewbDtl?.INV_NO                || null,
+        invoice_date:  ewbDtl?.INV_DATE              || null,
+        invoice_value: ewbDtl?.INV_VALUE             ?? null,
         bpWarnings:    bpWarnings.length ? bpWarnings : null,
       };
     }

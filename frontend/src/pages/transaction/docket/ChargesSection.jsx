@@ -142,9 +142,24 @@ const ChargesSection = forwardRef(function ChargesSection({
     getChargeList: () => chargeList,
     reset: () => {
       const master = chargeMasterRef.current;
-      setChargeList(master.length > 0 ? buildMasterRows(master) : []);
-      setDirtyRecIds(new Set());
       tempIdCounter.current = -1;
+      setChargeList(
+        master.length > 0
+          ? recalculateChargeList(
+              master.map((m) => ({
+                rec_id: tempIdCounter.current--,
+                charge_code: m.charge_code,
+                user_code: m.default_rate ?? "",
+              })),
+              invoiceValueRef.current,
+              docketRateRef.current,
+              rateUomRef.current,
+              chargeWeightRef.current,
+              totalPkgsRef.current,
+            )
+          : []
+      );
+      setDirtyRecIds(new Set());
     },
     saveCharges: async (docketIdOverride) => {
       const targetDocketId = docketIdOverride || docketId;

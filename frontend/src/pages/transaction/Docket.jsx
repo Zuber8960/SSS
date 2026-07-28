@@ -5,7 +5,8 @@ import { EditIcon, SaveIcon, ResetIcon, SECTION_ICONS } from "../../components/c
 import MainLayout from "../../layouts/MainLayout";
 import moment from "moment";
 import {
-  FormField,
+  MuiField,
+  MuiSelectField,
   PageBody,
 } from "../../components/common/MasterPage";
 import useAlert from "../../components/common/UseAlert";
@@ -679,10 +680,19 @@ export default function DocketPage() {
           return;
         }
         result = await updateDocketByRecId(docketRecId, payload);
-        setDirtyFields(new Set());
         savedDocketNo = payload.docket_no || docketNumberInput;
-        if (payload.docket_no) setDocketNumberInput(payload.docket_no);
-        showSuccess("Docket updated successfully");
+        prevLocRef.current = { docket_loc: "", docket_to_loc: "" };
+        ewbPopulatedRef.current = { cnor: false, cnee: false };
+        chargesRef.current?.reset();
+        setForm(emptyForm);
+        setDocketNumberInput("");
+        setDocketExists(false);
+        setDocketRecId(null);
+        setDirtyFields(new Set());
+        setEwbList([]);
+        setEwbNoDisplay("");
+        setIsFormEditMode(false);
+        showSuccess(`Docket ${savedDocketNo} updated successfully`, "Success", 8000);
       } else {
         // When EWB grid populated the form and auto-num stationary is selected,
         // omit docket_no so the backend generates it
@@ -971,6 +981,7 @@ export default function DocketPage() {
           : allSubGroups;
         fieldProps = { ...fieldProps, options: filtered.map(s => ({ label: s.subgroup_desc, value: s.sub_group_code })) };
       }
+      const subGroupLookup = allSubGroups;
       const isNameField = (isCnor || isCnee) && field.name === `${prefix}_name`;
 
       if (isNameField) {
@@ -981,18 +992,14 @@ export default function DocketPage() {
             key={field.name}
             style={{ position: "relative", ...(field.fullWidth ? sectionCardStyles.fullWidthField : {}) }}
           >
-            <div className="formFieldGroup">
-              <label>{field.label}</label>
-              <input
-                type="text"
-                value={form[`${prefix}_name`] || ""}
-                disabled={isDisabled}
-                onChange={(e) => handleBpNameChange(e.target.value, prefix)}
-                onBlur={() => handleBpNameBlur(prefix)}
-                placeholder={`Enter ${field.label}`}
-                style={{ width: "100%" }}
-              />
-            </div>
+            <MuiField
+              label={field.label}
+              name={`${prefix}_name`}
+              value={form[`${prefix}_name`] || ""}
+              onChange={(_, val) => handleBpNameChange(val, prefix)}
+              onBlur={() => handleBpNameBlur(prefix)}
+              disabled={isDisabled}
+            />
             {suggestions.length > 0 && (
               <ul
                 style={{
@@ -1040,70 +1047,97 @@ export default function DocketPage() {
         (isCnor || isCnee) &&
         [`${prefix}_address`, `${prefix}_city`, `${prefix}_state`, `${prefix}_pincode`, `${prefix}_gstin`].includes(field.name);
 
+      const isDisabled =
+        field.name === "tot_pkgs" ||
+        isCnorCneeDetail ||
+        !isFormEditMode ||
+        (field.name === "docket_no" && !(prePrinted && isFormEditMode));
+
+      const handleChange = (name, value) => {
+        let updated = { ...form, [name]: value };
+        setDirtyFields((prev) => new Set(prev).add(name));
+        // Auto-populate goods_desc when goods_subgrp is selected
+        if (name === "goods_subgrp") {
+          const match = subGroupLookup.find(s => s.sub_group_code === value);
+          if (match) {
+            updated = { ...updated, goods_desc: match.subgroup_desc };
+            setDirtyFields((prev) => new Set(prev).add("goods_desc"));
+          }
+        }
+        // Keep tot_pkgs in sync whenever a package count field changes
+        const pkgFields = ["no_cb", "no_w_crate", "no_w_cbox", "no_loose", "no_others"];
+        if (pkgFields.includes(name)) {
+          const newTotal =
+            (parseFloat(updated.no_cb) || 0) +
+            (parseFloat(updated.no_w_crate) || 0) +
+            (parseFloat(updated.no_w_cbox) || 0) +
+            (parseFloat(updated.no_loose) || 0) +
+            (parseFloat(updated.no_others) || 0);
+          updated = { ...updated, tot_pkgs: newTotal };
+        }
+        // Auto-set pay_loc when pay_type or locations change
+        if (["pay_type", "docket_loc", "docket_to_loc"].includes(name)) {
+          const payType = updated.pay_type;
+          const fromLoc = updated.docket_loc;
+          const toLoc = updated.docket_to_loc;
+          if (payType === "PAID" && fromLoc) {
+            updated = { ...updated, pay_loc: fromLoc };
+            setDirtyFields((prev) => new Set(prev).add("pay_loc"));
+          } else if (payType === "TO PAY" && toLoc) {
+            updated = { ...updated, pay_loc: toLoc };
+            setDirtyFields((prev) => new Set(prev).add("pay_loc"));
+          }
+        }
+        // Clear cnor when from-location changes (unless EWB-populated)
+        if (name === "docket_loc" && !ewbPopulatedRef.current.cnor) {
+          updated = { ...updated, cnor_id: null, cnor_name: "", cnor_address: "", cnor_city: "", cnor_state: "", cnor_pincode: "", cnor_gstin: "" };
+          setDirtyFields((prev) => {
+            const s = new Set(prev);
+            ["cnor_id","cnor_name","cnor_address","cnor_city","cnor_state","cnor_pincode","cnor_gstin"].forEach(k => s.add(k));
+            return s;
+          });
+        }
+        // Clear cnee when to-location changes (unless EWB-populated)
+        if (name === "docket_to_loc" && !ewbPopulatedRef.current.cnee) {
+          updated = { ...updated, cnee_id: null, cnee_name: "", cnee_address: "", cnee_city: "", cnee_state: "", cnee_pincode: "", cnee_gstin: "" };
+          setDirtyFields((prev) => {
+            const s = new Set(prev);
+            ["cnee_id","cnee_name","cnee_address","cnee_city","cnee_state","cnee_pincode","cnee_gstin"].forEach(k => s.add(k));
+            return s;
+          });
+        }
+        setForm(updated);
+      };
+
       return (
         <div
           key={field.name}
           style={isTextarea || field.fullWidth ? sectionCardStyles.fullWidthField : undefined}
         >
-          <FormField
-            {...fieldProps}
-            form={form}
-            setForm={(updated) => {
-              setDirtyFields((prev) => new Set(prev).add(field.name));
-              // Keep tot_pkgs in sync whenever a package count field changes
-              const pkgFields = ["no_cb", "no_w_crate", "no_w_cbox", "no_loose", "no_others"];
-              if (pkgFields.includes(field.name)) {
-                const newTotal =
-                  (parseFloat(updated.no_cb) || 0) +
-                  (parseFloat(updated.no_w_crate) || 0) +
-                  (parseFloat(updated.no_w_cbox) || 0) +
-                  (parseFloat(updated.no_loose) || 0) +
-                  (parseFloat(updated.no_others) || 0);
-                updated = { ...updated, tot_pkgs: newTotal };
-              }
-              // Auto-set pay_loc when pay_type or locations change
-              if (["pay_type", "docket_loc", "docket_to_loc"].includes(field.name)) {
-                const payType = updated.pay_type;
-                const fromLoc = updated.docket_loc;
-                const toLoc = updated.docket_to_loc;
-                if (payType === "PAID" && fromLoc) {
-                  updated = { ...updated, pay_loc: fromLoc };
-                  setDirtyFields((prev) => new Set(prev).add("pay_loc"));
-                } else if (payType === "TO PAY" && toLoc) {
-                  updated = { ...updated, pay_loc: toLoc };
-                  setDirtyFields((prev) => new Set(prev).add("pay_loc"));
-                }
-              }
-              // Clear cnor when from-location changes (unless EWB-populated)
-              if (field.name === "docket_loc" && !ewbPopulatedRef.current.cnor) {
-                updated = { ...updated, cnor_id: null, cnor_name: "", cnor_address: "", cnor_city: "", cnor_state: "", cnor_pincode: "", cnor_gstin: "" };
-                setDirtyFields((prev) => {
-                  const s = new Set(prev);
-                  ["cnor_id","cnor_name","cnor_address","cnor_city","cnor_state","cnor_pincode","cnor_gstin"].forEach(k => s.add(k));
-                  return s;
-                });
-              }
-              // Clear cnee when to-location changes (unless EWB-populated)
-              if (field.name === "docket_to_loc" && !ewbPopulatedRef.current.cnee) {
-                updated = { ...updated, cnee_id: null, cnee_name: "", cnee_address: "", cnee_city: "", cnee_state: "", cnee_pincode: "", cnee_gstin: "" };
-                setDirtyFields((prev) => {
-                  const s = new Set(prev);
-                  ["cnee_id","cnee_name","cnee_address","cnee_city","cnee_state","cnee_pincode","cnee_gstin"].forEach(k => s.add(k));
-                  return s;
-                });
-              }
-              setForm(updated);
-            }}
-            disabled={
-              field.name === "tot_pkgs" ||
-              isCnorCneeDetail ||
-              !isFormEditMode ||
-              (field.name === "docket_no" && !(prePrinted && isFormEditMode))
-            }
-            {...(["act_wt", "chrg_wt"].includes(field.name) ? {
-              onBlur: () => handleWeightBlur(field.name, form[field.name]),
-            } : {})}
-          />
+          {fieldProps.options ? (
+            <MuiSelectField
+              label={fieldProps.label}
+              name={fieldProps.name}
+              value={form[fieldProps.name]}
+              onChange={handleChange}
+              options={fieldProps.options}
+              disabled={isDisabled}
+              required={fieldProps.required}
+            />
+          ) : (
+            <MuiField
+              label={fieldProps.label}
+              name={fieldProps.name}
+              value={form[fieldProps.name]}
+              onChange={handleChange}
+              type={isTextarea ? "text" : (fieldProps.type || "text")}
+              disabled={isDisabled}
+              required={fieldProps.required}
+              {...(["act_wt", "chrg_wt"].includes(field.name) ? {
+                onBlur: () => handleWeightBlur(field.name, form[field.name]),
+              } : {})}
+            />
+          )}
         </div>
       );
     };
@@ -1342,15 +1376,14 @@ export default function DocketPage() {
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <h3 style={{ margin: 0 }}>FORM</h3>
-                <div className="formFieldGroup" style={{ width: 120 }}>
-                  <input
-                    type="text"
-                    value={ewbNoDisplay}
-                    placeholder="EWB No"
-                    disabled
-                    style={{ padding: "9px 14px", fontSize: 14 }}
-                  />
-                </div>
+                <MuiField
+                  label="EWB No"
+                  name="ewb_no"
+                  value={ewbNoDisplay}
+                  onChange={() => {}}
+                  disabled
+                  sx={{ width: 130 }}
+                />
                 <ToggleSwitch
                   checked={prePrinted}
                   onChange={() => setPrePrinted((prev) => !prev)}
@@ -1359,15 +1392,13 @@ export default function DocketPage() {
                 />
               </div>
               <div style={sectionActionsStyle}>
-                <div className="formFieldGroup" style={{ width: 150 }}>
-                  <input
-                    type="text"
-                    value={docketNumberInput}
-                    onChange={(e) => setDocketNumberInput(e.target.value)}
-                    placeholder="Enter Docket Num"
-                    style={{ padding: "9px 14px", fontSize: 14 }}
-                  />
-                </div>
+                <MuiField
+                  label="Docket No"
+                  name="docket_no"
+                  value={docketNumberInput}
+                  onChange={(_, val) => setDocketNumberInput(val)}
+                  sx={{ width: 160 }}
+                />
                 <Tooltip title="Edit / View">
                   <IconButton
                     onClick={handleEditView}
