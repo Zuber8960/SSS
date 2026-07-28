@@ -193,19 +193,20 @@
     align-items: stretch !important;
   }
 
-  .docketFormHeader>div {
+  .docketFormHeader>div:first-child {
     flex-direction: column !important;
     align-items: stretch !important;
   }
 
-  .docketFormHeader>div>div,
-  .docketFormHeader>div>button {
-    width: 100% !important;
-    min-width: unset !important;
+  .docketFormHeader>div:last-child {
+    flex-direction: row !important;
+    align-items: center !important;
+    flex-wrap: wrap;
   }
 
-  .docketFormHeader>div>button {
-    margin-top: 4px;
+  .docketFormHeader>div:first-child>div {
+    width: 100% !important;
+    min-width: unset !important;
   }
 
   .docketFormHeader h3 {
