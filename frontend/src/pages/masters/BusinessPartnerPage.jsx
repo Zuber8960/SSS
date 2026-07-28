@@ -5,10 +5,9 @@ import {
   PageBody,
   PageToolbar,
   FormPanel,
-  FormField,
   DataTable,
 } from "../../components/common/MasterPage";
-import { FormControl, MenuItem, Select } from "@mui/material";
+import { Box, FormControl, InputLabel, MenuItem, Select, TextField, Typography } from "@mui/material";
 import {
   fetchAllBusinessPartners,
   fetchBpTypes,
@@ -21,17 +20,7 @@ import { fetchAllLocations } from "../../utils/locationMaster";
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 
-const selectSx = (hasValue) => ({
-  fontSize: "14px",
-  fontFamily: "inherit",
-  color: hasValue ? "#1e293b" : "#cbd5e1",
-  background: "#ffffff",
-  borderRadius: "8px",
-  "& .MuiOutlinedInput-notchedOutline": { border: "1.5px solid #e2e8f0", borderRadius: "8px" },
-  "&:hover .MuiOutlinedInput-notchedOutline": { border: "1.5px solid #e2e8f0" },
-  "&.Mui-focused .MuiOutlinedInput-notchedOutline": { border: "1.5px solid #a855f7", boxShadow: "0 0 0 3px rgba(168,85,247,0.1)" },
-  "& .MuiSelect-select": { padding: "8px 5px" },
-});
+const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
 
 const ID_TYPES = ["PAN", "AADHAR", "PASSPORT", "DL"];
 const DOC_TYPES = ["Agreement", "NDA"];
@@ -56,7 +45,6 @@ const emptyForm = {
   bp_ind_id_type_2: "", bp_ind_id_no_2: "",
   bp_ind_id_type_3: "", bp_ind_id_no_3: "",
   bp_ind_id_type_4: "", bp_ind_id_no_4: "",
-  bp_ind_id_type_5: "", bp_ind_id_no_5: "",
   // Document Validity
   bp_ind_doc_type_1: "", bp_ind_doc_1_from: "", bp_ind_doc_1_to: "",
   bp_ind_doc_type_2: "", bp_ind_doc_2_from: "", bp_ind_doc_2_to: "",
@@ -95,21 +83,20 @@ function SectionHeader({ title }) {
   );
 }
 
-function SelectField({ label, name, value, onChange, options, placeholder }) {
+function MuiSelect({ label, name, value, onChange, options }) {
   return (
-    <div className="formFieldGroup">
-      <label>{label}</label>
-      <FormControl fullWidth>
-        <Select displayEmpty value={value ?? ""} onChange={(e) => onChange(name, e.target.value)} sx={selectSx(!!value)}>
-          <MenuItem value="" disabled sx={{ color: "#cbd5e1" }}>{placeholder || `Select ${label}`}</MenuItem>
-          {options.map((opt) => (
-            <MenuItem key={typeof opt === "object" ? opt.value : opt} value={typeof opt === "object" ? opt.value : opt}>
-              {typeof opt === "object" ? opt.label : opt}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-    </div>
+    <FormControl fullWidth size="small" sx={fieldSx}>
+      <InputLabel>{label}</InputLabel>
+      <Select label={label} value={value ?? ""} onChange={e => onChange(name, e.target.value)}
+        sx={{ fontSize: 13 }}>
+        {options.map((opt) => (
+          <MenuItem key={typeof opt === "object" ? opt.value : opt} value={typeof opt === "object" ? opt.value : opt}
+            sx={{ fontSize: 13 }}>
+            {typeof opt === "object" ? opt.label : opt}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
   );
 }
 
@@ -134,19 +121,6 @@ export default function BusinessPartnerPage() {
     setDirtyFields((prev) => new Set(prev).add(name));
   };
 
-  // Wrapper for FormField's setForm prop — detects which keys changed and marks them dirty
-  const setFormTracked = (updater) => {
-    const next = typeof updater === "function" ? updater(form) : updater;
-    const changed = Object.keys(next).filter((k) => next[k] !== form[k]);
-    if (changed.length) {
-      setDirtyFields((prev) => {
-        const s = new Set(prev);
-        changed.forEach((k) => s.add(k));
-        return s;
-      });
-    }
-    setForm(next);
-  };
 
   const clearForm = () => {
     setForm(emptyForm);
@@ -299,34 +273,49 @@ export default function BusinessPartnerPage() {
 
         {/* Basic Details */}
         <FormPanel>
-          <FormField label="Division Code" name="division_code" form={form} setForm={setFormTracked}
-            options={divisionOptions} />
-          <FormField label="PAN No" name="bp_pan_no" form={form} setForm={setFormTracked} />
-          <FormField label="PAN Name" name="bp_pan_name" form={form} setForm={setFormTracked} />
-          <FormField label="BP Name" name="bp_name" form={form} setForm={setFormTracked} />
-          <SelectField label="BP Type" name="bp_type" value={form.bp_type} onChange={setField}
-            options={bpTypeOptions} placeholder="Select BP Type" />
-          <SelectField label="Company Type" name="bp_company_type" value={form.bp_company_type} onChange={setField}
-            options={["Private Ltd", "Public Ltd", "Partnership", "Proprietorship", "LLP"]} />
-          <FormField label="Registration No" name="bp_registration_no" form={form} setForm={setFormTracked} />
-          <FormField label="TAN No" name="bp_tan_no" form={form} setForm={setFormTracked} />
-          <SelectField label="Deals With" name="bp_deals_with" value={form.bp_deals_with} onChange={setField}
-            options={["Service", "Item", "Both"]} />
-          <FormField label="Address" name="bp_addres" form={form} setForm={setFormTracked} />
-          <FormField label="Pincode" name="bp_pincode" form={form} setForm={setFormTracked} />
-          <FormField label="GSTIN" name="bp_gstin" form={form} setForm={setFormTracked} />
-          <FormField label="Location" name="loc_code" form={form} setForm={setFormTracked} options={locationOptions} />
+          <MuiSelect label="Division Code" name="division_code" value={form.division_code} onChange={setField} options={divisionOptions} />
+          <TextField size="small" label="PAN No" fullWidth sx={fieldSx} value={form.bp_pan_no} onChange={e => setField("bp_pan_no", e.target.value)} />
+          <TextField size="small" label="PAN Name" fullWidth sx={fieldSx} value={form.bp_pan_name} onChange={e => setField("bp_pan_name", e.target.value)} />
+          <TextField size="small" label="BP Name" fullWidth sx={fieldSx} value={form.bp_name} onChange={e => setField("bp_name", e.target.value)} />
+          <MuiSelect label="BP Type" name="bp_type" value={form.bp_type} onChange={setField} options={bpTypeOptions} />
+          <MuiSelect label="Company Type" name="bp_company_type" value={form.bp_company_type} onChange={setField} options={["Private Ltd", "Public Ltd", "Partnership", "Proprietorship", "LLP"]} />
+          <TextField size="small" label="Registration No" fullWidth sx={fieldSx} value={form.bp_registration_no} onChange={e => setField("bp_registration_no", e.target.value)} />
+          <TextField size="small" label="TAN No" fullWidth sx={fieldSx} value={form.bp_tan_no} onChange={e => setField("bp_tan_no", e.target.value)} />
+          <MuiSelect label="Deals With" name="bp_deals_with" value={form.bp_deals_with} onChange={setField} options={["Service", "Item", "Both"]} />
+          <TextField size="small" label="Address" fullWidth sx={fieldSx} value={form.bp_addres} onChange={e => setField("bp_addres", e.target.value)} />
+          <TextField size="small" label="Pincode" fullWidth sx={fieldSx} value={form.bp_pincode} onChange={e => setField("bp_pincode", e.target.value)} />
+          <TextField size="small" label="GSTIN" fullWidth sx={fieldSx} value={form.bp_gstin} onChange={e => setField("bp_gstin", e.target.value)} />
+          <MuiSelect label="Location" name="loc_code" value={form.loc_code} onChange={setField} options={locationOptions} />
         </FormPanel>
 
         {/* KYC */}
         <FormPanel>
           <SectionHeader title="Identification (KYC)" />
-          {[1, 2, 3, 4, 5].map((n) => (
-            <>
-              <SelectField key={`id_type_${n}`} label={`ID Type ${n}`} name={`bp_ind_id_type_${n}`}
-                value={form[`bp_ind_id_type_${n}`]} onChange={setField} options={ID_TYPES} />
-              <FormField key={`id_no_${n}`} label={`ID No ${n}`} name={`bp_ind_id_no_${n}`} form={form} setForm={setFormTracked} />
-            </>
+          {[1, 2, 3, 4].map((n) => (
+            <Box key={n} sx={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 500, color: "#475569" }}>ID {n}</Typography>
+              <Box sx={{ display: "flex", gap: "6px" }}>
+                <FormControl size="small" sx={{ minWidth: 110 }}>
+                  <InputLabel sx={{ fontSize: 13 }}>Type</InputLabel>
+                  <Select
+                    label="Type"
+                    value={form[`bp_ind_id_type_${n}`] ?? ""}
+                    onChange={e => setField(`bp_ind_id_type_${n}`, e.target.value)}
+                    sx={{ fontSize: 13 }}
+                  >
+                    {ID_TYPES.map(t => <MenuItem key={t} value={t} sx={{ fontSize: 13 }}>{t}</MenuItem>)}
+                  </Select>
+                </FormControl>
+                <TextField
+                  size="small"
+                  label="Number"
+                  fullWidth
+                  value={form[`bp_ind_id_no_${n}`] ?? ""}
+                  onChange={e => setField(`bp_ind_id_no_${n}`, e.target.value)}
+                  sx={{ flex: "1 1 0", minWidth: 0, ...fieldSx }}
+                />
+              </Box>
+            </Box>
           ))}
         </FormPanel>
 
@@ -334,31 +323,29 @@ export default function BusinessPartnerPage() {
         <FormPanel>
           <SectionHeader title="Document Validity" />
           {[1, 2].map((n) => (
-            <>
-              <SelectField key={`doc_type_${n}`} label={`Doc Type ${n}`} name={`bp_ind_doc_type_${n}`}
-                value={form[`bp_ind_doc_type_${n}`]} onChange={setField} options={DOC_TYPES} />
-              <FormField key={`doc_from_${n}`} label="Valid From" name={`bp_ind_doc_${n}_from`} type="date" form={form} setForm={setFormTracked} />
-              <FormField key={`doc_to_${n}`} label="Valid To" name={`bp_ind_doc_${n}_to`} type="date" form={form} setForm={setFormTracked} />
-            </>
+            <Box key={n} sx={{ display: "contents" }}>
+              <MuiSelect label={`Doc Type ${n}`} name={`bp_ind_doc_type_${n}`} value={form[`bp_ind_doc_type_${n}`]} onChange={setField} options={DOC_TYPES} />
+              <TextField size="small" label="Valid From" type="date" fullWidth sx={fieldSx} value={form[`bp_ind_doc_${n}_from`]} onChange={e => setField(`bp_ind_doc_${n}_from`, e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+              <TextField size="small" label="Valid To" type="date" fullWidth sx={fieldSx} value={form[`bp_ind_doc_${n}_to`]} onChange={e => setField(`bp_ind_doc_${n}_to`, e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+            </Box>
           ))}
         </FormPanel>
 
         {/* Bank Details */}
         <FormPanel>
           <SectionHeader title="Bank Details" />
-          <FormField label="Bank Name" name="bp_bank_name" form={form} setForm={setFormTracked} />
-          <FormField label="Account Name" name="bp_acount_name" form={form} setForm={setFormTracked} />
-          <FormField label="Account No" name="bp_account_no" form={form} setForm={setFormTracked} />
-          <FormField label="IFSC Code" name="bp_ifsc_code" form={form} setForm={setFormTracked} />
+          <TextField size="small" label="Bank Name" fullWidth sx={fieldSx} value={form.bp_bank_name} onChange={e => setField("bp_bank_name", e.target.value)} />
+          <TextField size="small" label="Account Name" fullWidth sx={fieldSx} value={form.bp_acount_name} onChange={e => setField("bp_acount_name", e.target.value)} />
+          <TextField size="small" label="Account No" fullWidth sx={fieldSx} value={form.bp_account_no} onChange={e => setField("bp_account_no", e.target.value)} />
+          <TextField size="small" label="IFSC Code" fullWidth sx={fieldSx} value={form.bp_ifsc_code} onChange={e => setField("bp_ifsc_code", e.target.value)} />
         </FormPanel>
 
         {/* Other Details */}
         <FormPanel>
           <SectionHeader title="Other Details" />
-          <FormField label="Credit Days" name="bp_credit_days" type="number" form={form} setForm={setFormTracked} />
-          <SelectField label="Status" name="bp_status" value={form.bp_status} onChange={setField}
-            options={[{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }]} />
-          <FormField label="Closed On" name="bp_closed_on" type="date" form={form} setForm={setFormTracked} />
+          <TextField size="small" label="Credit Days" type="number" fullWidth sx={fieldSx} value={form.bp_credit_days} onChange={e => setField("bp_credit_days", e.target.value)} />
+          <MuiSelect label="Status" name="bp_status" value={form.bp_status} onChange={setField} options={[{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }]} />
+          <TextField size="small" label="Closed On" type="date" fullWidth sx={fieldSx} value={form.bp_closed_on} onChange={e => setField("bp_closed_on", e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
         </FormPanel>
 
         <DataTable
