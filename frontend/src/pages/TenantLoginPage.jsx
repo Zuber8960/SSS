@@ -36,6 +36,7 @@ export default function TenantLoginPage() {
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const [divisions, setDivisions] = useState([]);
   const [selectedDivision, setSelectedDivision] = useState("");
   const [locations, setLocations] = useState([]);
@@ -104,7 +105,11 @@ export default function TenantLoginPage() {
   }, [tenantSlug]);
 
   const handleTenantLogin = async () => {
-    if (!tenantUserId || !tenantPassword) { showError("User ID and Password are required"); return; }
+    const e = {};
+    if (!tenantUserId) e.tenantUserId = true;
+    if (!tenantPassword) e.tenantPassword = true;
+    if (Object.keys(e).length) { setErrors(e); showError("User ID and Password are required"); return; }
+    setErrors({});
     setLoading(true);
     try {
       const result = await tenantLogin(tenantUserId, tenantPassword);
@@ -117,9 +122,19 @@ export default function TenantLoginPage() {
   };
 
   const handleAppLogin = async () => {
-    if (!userId || !password) { showError("Username and Password are required"); return; }
-    if (!selectedDivision) { showError("Please select a Division"); return; }
-    if (!selectedLocation) { showError("Please select a Location"); return; }
+    const e = {};
+    if (!userId) e.userId = true;
+    if (!password) e.password = true;
+    if (!selectedDivision) e.division = true;
+    if (!selectedLocation) e.location = true;
+    if (Object.keys(e).length) {
+      setErrors(e);
+      if (!userId || !password) { showError("Username and Password are required"); return; }
+      if (!selectedDivision) { showError("Please select a Division"); return; }
+      showError("Please select a Location");
+      return;
+    }
+    setErrors({});
     setLoading(true);
     try {
       const response = await loginUser(userId, password, selectedLocation, selectedDivision);
@@ -282,17 +297,21 @@ export default function TenantLoginPage() {
                     label="User ID"
                     fullWidth
                     size="small"
+                    required
+                    error={!!errors.tenantUserId}
                     value={tenantUserId}
-                    onChange={e => setTenantUserId(e.target.value)}
+                    onChange={e => { setTenantUserId(e.target.value); setErrors(p => ({ ...p, tenantUserId: false })); }}
                   />
 
                   <TextField
                     label="Password"
                     fullWidth
                     size="small"
+                    required
+                    error={!!errors.tenantPassword}
                     type={showTenantPwd ? "text" : "password"}
                     value={tenantPassword}
-                    onChange={e => setTenantPassword(e.target.value)}
+                    onChange={e => { setTenantPassword(e.target.value); setErrors(p => ({ ...p, tenantPassword: false })); }}
                     slotProps={{
                       input: {
                         endAdornment: (
@@ -339,17 +358,21 @@ export default function TenantLoginPage() {
                     label="Username"
                     fullWidth
                     size="small"
+                    required
+                    error={!!errors.userId}
                     value={userId}
-                    onChange={e => setUserId(e.target.value)}
+                    onChange={e => { setUserId(e.target.value); setErrors(p => ({ ...p, userId: false })); }}
                   />
 
                   <TextField
                     label="Password"
                     fullWidth
                     size="small"
+                    required
+                    error={!!errors.password}
                     type={showPwd ? "text" : "password"}
                     value={password}
-                    onChange={e => setPassword(e.target.value)}
+                    onChange={e => { setPassword(e.target.value); setErrors(p => ({ ...p, password: false })); }}
                     slotProps={{
                       input: {
                         endAdornment: (
@@ -363,12 +386,12 @@ export default function TenantLoginPage() {
                     }}
                   />
 
-                  <FormControl fullWidth size="small">
+                  <FormControl fullWidth size="small" required error={!!errors.division}>
                     <InputLabel sx={{ fontSize: 13 }}>Division</InputLabel>
                     <Select
                       label="Division"
                       value={selectedDivision}
-                      onChange={e => setSelectedDivision(e.target.value)}
+                      onChange={e => { setSelectedDivision(e.target.value); setErrors(p => ({ ...p, division: false })); }}
                       sx={{ fontSize: 13 }}
                       MenuProps={{
                         slotProps: {
@@ -388,12 +411,12 @@ export default function TenantLoginPage() {
                     </Select>
                   </FormControl>
 
-                  <FormControl fullWidth size="small">
+                  <FormControl fullWidth size="small" required error={!!errors.location}>
                     <InputLabel sx={{ fontSize: 13 }}>Location</InputLabel>
                     <Select
                       label="Location"
                       value={selectedLocation}
-                      onChange={e => setSelectedLocation(e.target.value)}
+                      onChange={e => { setSelectedLocation(e.target.value); setErrors(p => ({ ...p, location: false })); }}
                       sx={{ fontSize: 13 }}
                       MenuProps={{
                         slotProps: {
