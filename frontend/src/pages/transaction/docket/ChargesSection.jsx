@@ -50,7 +50,7 @@ const calculateChargeRow = (row, rows, invValue, docketRate = 0, rateUom = "", c
   } else if (row.charge_code === "DK03") {
     chargeAmount = (inv * toNumber(row.user_code)) / 100;
   } else if (row.charge_code === "DK04") {
-    chargeAmount = inv * toNumber(row.user_code);
+    chargeAmount = (inv * toNumber(row.user_code))/100;
   } else {
     chargeAmount = toNumber(row.user_code);
   }
