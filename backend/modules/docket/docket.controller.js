@@ -238,8 +238,8 @@ const sanitizeDocketData = (data) => {
       }
     }
   }
-  if ('docket_act_wt' in sanitized && sanitized.docket_act_wt === null) sanitized.docket_act_wt = 0;
-  if ('docket_chrg_wt' in sanitized && sanitized.docket_chrg_wt === null) sanitized.docket_chrg_wt = 0;
+  if ('docket_act_wt' in sanitized && sanitized.docket_act_wt === null) sanitized.docket_act_wt = 30;
+  if ('docket_chrg_wt' in sanitized && sanitized.docket_chrg_wt === null) sanitized.docket_chrg_wt = 30;
   // Coerce FK id fields to integer or null
   for (const field of ['cnor_id', 'cnee_id']) {
     if (field in sanitized) {
@@ -344,7 +344,7 @@ const getChargeMaster = async (tenant_id) => {
 };
 
 const getChargesByDocketId = async (docketNo, tenant_id) => {
-  const query = db('sss.sst_docket_charges').where({ docket_no: docketNo, record_status: 0 }).select('*');
+  const query = db('sss.sst_docket_charges').where({ docket_no: docketNo, record_status: 0 }).select('*').orderBy('charge_code');
   if (tenant_id) query.andWhere({ tenant_id });
   return query;
 };

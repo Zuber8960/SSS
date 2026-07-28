@@ -280,31 +280,7 @@ export default function DocketPage() {
   const [materialGroups, setMaterialGroups] = useState([]);
   const [allSubGroups, setAllSubGroups] = useState([]);
 
-  const tot_amt = useMemo(
-    () =>
-      (parseFloat(form.no_cb) || 0) +
-      (parseFloat(form.no_w_crate) || 0) +
-      (parseFloat(form.no_w_cbox) || 0) +
-      (parseFloat(form.no_loose) || 0) +
-      (parseFloat(form.no_others) || 0),
-    [form.no_cb, form.no_w_crate, form.no_w_cbox, form.no_loose, form.no_others]
-  );
 
-  const packageTotal = useMemo(
-    () =>
-      (parseFloat(form.no_cb) || 0) +
-      (parseFloat(form.no_w_crate) || 0) +
-      (parseFloat(form.no_w_cbox) || 0) +
-      (parseFloat(form.no_loose) || 0) +
-      (parseFloat(form.no_others) || 0),
-    [form.no_cb, form.no_w_crate, form.no_w_cbox, form.no_loose, form.no_others]
-  );
-
-  useEffect(() => {
-    setForm((prev) => (
-      prev.tot_pkgs === packageTotal ? prev : { ...prev, tot_pkgs: packageTotal }
-    ));
-  }, [packageTotal]);
 
   const [withEWB, setWithEWB] = useState(false);
   const [prePrinted, setPrePrinted] = useState(false);
@@ -326,55 +302,6 @@ export default function DocketPage() {
   const ewbPopulatedRef = useRef({ cnor: false, cnee: false });
   const chargesRef = useRef(null);
 
-  // Clear consignor/consignee data when location changes,
-  // but skip if that data was populated from EWB details
-  useEffect(() => {
-    const prev = prevLocRef.current;
-    const updates = {};
-    if (form.docket_loc !== prev.docket_loc) {
-      if (!ewbPopulatedRef.current.cnor) {
-        updates.cnor_id = null;
-        updates.cnor_name = "";
-        updates.cnor_address = "";
-        updates.cnor_city = "";
-        updates.cnor_state = "";
-        updates.cnor_pincode = "";
-        updates.cnor_gstin = "";
-      }
-    }
-    if (form.docket_to_loc !== prev.docket_to_loc) {
-      if (!ewbPopulatedRef.current.cnee) {
-        updates.cnee_id = null;
-        updates.cnee_name = "";
-        updates.cnee_address = "";
-        updates.cnee_city = "";
-        updates.cnee_state = "";
-        updates.cnee_pincode = "";
-        updates.cnee_gstin = "";
-      }
-    }
-    prevLocRef.current = { docket_loc: form.docket_loc, docket_to_loc: form.docket_to_loc };
-    const keys = Object.keys(updates);
-    if (keys.length > 0) {
-      setForm((prev) => ({ ...prev, ...updates }));
-      setDirtyFields((prev) => {
-        const s = new Set(prev);
-        keys.forEach((k) => s.add(k));
-        return s;
-      });
-    }
-  }, [form.docket_loc, form.docket_to_loc]);
-
-  // Auto-set Pay Location based on Pay Type
-  useEffect(() => {
-    if (form.pay_type === "PAID" && form.docket_loc) {
-      setForm((prev) => prev.pay_loc !== form.docket_loc ? { ...prev, pay_loc: form.docket_loc } : prev);
-      setDirtyFields((prev) => new Set(prev).add("pay_loc"));
-    } else if (form.pay_type === "TO PAY" && form.docket_to_loc) {
-      setForm((prev) => prev.pay_loc !== form.docket_to_loc ? { ...prev, pay_loc: form.docket_to_loc } : prev);
-      setDirtyFields((prev) => new Set(prev).add("pay_loc"));
-    }
-  }, [form.pay_type, form.docket_loc, form.docket_to_loc]);
 
   const handleWeightBlur = (field, value) => {
     let num = parseFloat(value);
@@ -685,6 +612,7 @@ export default function DocketPage() {
         remark:              "docket_remark",
         tot_pkgs:            "docket_tot_pkgs",
         docket_date:         "docket_date",
+        tot_amt:             "docket_tot_amt",
       };
 
       const currentUser = JSON.parse(localStorage.getItem("current_user") || "null");
@@ -729,9 +657,16 @@ export default function DocketPage() {
           payload[formToDb[formKey]] = form[formKey];
         }
       });
-      if (payload.docket_act_wt  === undefined || payload.docket_act_wt  === "" || payload.docket_act_wt  === null) payload.docket_act_wt  = 0;
-      if (payload.docket_chrg_wt === undefined || payload.docket_chrg_wt === "" || payload.docket_chrg_wt === null) payload.docket_chrg_wt = 0;
+      if (isNew) {
+        if (payload.docket_act_wt  === undefined || payload.docket_act_wt  === "" || payload.docket_act_wt  === null) payload.docket_act_wt  = Math.max(parseFloat(form.act_wt) || 30, 30);
+        if (payload.docket_chrg_wt === undefined || payload.docket_chrg_wt === "" || payload.docket_chrg_wt === null) payload.docket_chrg_wt = Math.max(parseFloat(form.chrg_wt) || 30, 30);
+      } else {
+        if (payload.docket_act_wt  === undefined || payload.docket_act_wt  === "" || payload.docket_act_wt  === null) delete payload.docket_act_wt;
+        if (payload.docket_chrg_wt === undefined || payload.docket_chrg_wt === "" || payload.docket_chrg_wt === null) delete payload.docket_chrg_wt;
+      }
       payload.docket_tot_pkgs = packageTotalValue;
+      // Always include total charge amount so it stays in sync with the charges grid
+      payload.docket_tot_amt = parseFloat(form.tot_amt) || 0;
 
       let result;
       let savedDocketNo;
@@ -804,6 +739,7 @@ export default function DocketPage() {
       if (isNewDocket) {
         prevLocRef.current = { docket_loc: "", docket_to_loc: "" };
         ewbPopulatedRef.current = { cnor: false, cnee: false };
+        chargesRef.current?.reset();
         setForm(emptyForm);
         setDocketNumberInput("");
         setDocketExists(false);
@@ -1112,13 +1048,55 @@ export default function DocketPage() {
             form={form}
             setForm={(updated) => {
               setDirtyFields((prev) => new Set(prev).add(field.name));
+              // Keep tot_pkgs in sync whenever a package count field changes
+              const pkgFields = ["no_cb", "no_w_crate", "no_w_cbox", "no_loose", "no_others"];
+              if (pkgFields.includes(field.name)) {
+                const newTotal =
+                  (parseFloat(updated.no_cb) || 0) +
+                  (parseFloat(updated.no_w_crate) || 0) +
+                  (parseFloat(updated.no_w_cbox) || 0) +
+                  (parseFloat(updated.no_loose) || 0) +
+                  (parseFloat(updated.no_others) || 0);
+                updated = { ...updated, tot_pkgs: newTotal };
+              }
+              // Auto-set pay_loc when pay_type or locations change
+              if (["pay_type", "docket_loc", "docket_to_loc"].includes(field.name)) {
+                const payType = updated.pay_type;
+                const fromLoc = updated.docket_loc;
+                const toLoc = updated.docket_to_loc;
+                if (payType === "PAID" && fromLoc) {
+                  updated = { ...updated, pay_loc: fromLoc };
+                  setDirtyFields((prev) => new Set(prev).add("pay_loc"));
+                } else if (payType === "TO PAY" && toLoc) {
+                  updated = { ...updated, pay_loc: toLoc };
+                  setDirtyFields((prev) => new Set(prev).add("pay_loc"));
+                }
+              }
+              // Clear cnor when from-location changes (unless EWB-populated)
+              if (field.name === "docket_loc" && !ewbPopulatedRef.current.cnor) {
+                updated = { ...updated, cnor_id: null, cnor_name: "", cnor_address: "", cnor_city: "", cnor_state: "", cnor_pincode: "", cnor_gstin: "" };
+                setDirtyFields((prev) => {
+                  const s = new Set(prev);
+                  ["cnor_id","cnor_name","cnor_address","cnor_city","cnor_state","cnor_pincode","cnor_gstin"].forEach(k => s.add(k));
+                  return s;
+                });
+              }
+              // Clear cnee when to-location changes (unless EWB-populated)
+              if (field.name === "docket_to_loc" && !ewbPopulatedRef.current.cnee) {
+                updated = { ...updated, cnee_id: null, cnee_name: "", cnee_address: "", cnee_city: "", cnee_state: "", cnee_pincode: "", cnee_gstin: "" };
+                setDirtyFields((prev) => {
+                  const s = new Set(prev);
+                  ["cnee_id","cnee_name","cnee_address","cnee_city","cnee_state","cnee_pincode","cnee_gstin"].forEach(k => s.add(k));
+                  return s;
+                });
+              }
               setForm(updated);
             }}
             disabled={
               field.name === "tot_pkgs" ||
               isCnorCneeDetail ||
               !isFormEditMode ||
-              (["docket_no"].includes(field.name) && !isDocketNoEnabled)
+              (field.name === "docket_no" && !(prePrinted && isFormEditMode))
             }
             {...(["act_wt", "chrg_wt"].includes(field.name) ? {
               onBlur: () => handleWeightBlur(field.name, form[field.name]),
@@ -1304,15 +1282,6 @@ export default function DocketPage() {
             labelOff="Show Form"
           />
 
-          <ToggleSwitch
-            checked={showCharges}
-            onChange={() => {
-              if (!showCharges) moveSectionToTop("charges");
-              setShowCharges((prev) => !prev);
-            }}
-            labelOn="Hide Charges"
-            labelOff="Show Charges"
-          />
         </div>
         {/* ✅ Detail Tables */}
         {withEWB && sectionOrder.map((section) => {
@@ -1388,16 +1357,6 @@ export default function DocketPage() {
                 />
               </div>
               <div style={sectionActionsStyle}>
-                <div className="formFieldGroup" style={{ width: 75 }}>
-                  <input
-                    type="number"
-                    value={tot_amt}
-                    placeholder="Total Amount"
-                    disabled={true}
-                    style={{ padding: "9px 14px", fontSize: 14 }}
-                  />
-                </div>
-
                 <div className="formFieldGroup" style={{ width: 150 }}>
                   <input
                     type="text"
@@ -1416,14 +1375,7 @@ export default function DocketPage() {
                     <EditIcon />
                   </IconButton>
                 </Tooltip>
-                {prePrinted && (
-                  <ToggleSwitch
-                    checked={isDocketNoEnabled}
-                    onChange={() => setIsDocketNoEnabled((prev) => !prev)}
-                    labelOn="Docket No On"
-                    labelOff="Docket No Off"
-                  />
-                )}
+                {/* Docket No On/Off toggle removed — docket_no is always enabled in edit mode when pre-printed */}
                 <Tooltip title="Reset Form">
                   <IconButton
                     onClick={() => {
@@ -1471,8 +1423,7 @@ export default function DocketPage() {
           </>
         )}
 
-        {showCharges && (
-          <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16 }}>
             <ChargesSection
               key="charges"
               ref={chargesRef}
@@ -1486,9 +1437,14 @@ export default function DocketPage() {
               sectionHeaderStyle={sectionHeaderStyle}
               sectionActionsStyle={sectionActionsStyle}
               singleClick
+              onChargesChange={(charges) => {
+                const total = charges.reduce((sum, c) => sum + (parseFloat(c.charge_amt) || 0), 0);
+                const rounded = Math.round(total * 100) / 100;
+                setForm((prev) => prev.tot_amt === rounded ? prev : { ...prev, tot_amt: rounded });
+                setDirtyFields((prev) => new Set(prev).add("tot_amt"));
+              }}
             />
           </div>
-        )}
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
         <LoadingOverlay isLoading={isLoading} message="Please wait..." />

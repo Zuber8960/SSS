@@ -89,6 +89,8 @@ const ChargesSection = forwardRef(function ChargesSection({
   const [dirtyRecIds, setDirtyRecIds] = useState(new Set());
   const tempIdCounter = useRef(-1);
   const chargesLoaded = useRef(false);
+  const onChargesChangeRef = useRef(onChargesChange);
+  onChargesChangeRef.current = onChargesChange;
   // Refs so effects always see the latest values without stale closures
   const chargeMasterRef = useRef([]);
   const docketIdRef = useRef(docketId);
@@ -135,9 +137,15 @@ const ChargesSection = forwardRef(function ChargesSection({
       .catch(console.error);
   }, []);
 
-  // Expose saveCharges and getChargeList to parent via ref
+  // Expose saveCharges, getChargeList, and reset to parent via ref
   useImperativeHandle(ref, () => ({
     getChargeList: () => chargeList,
+    reset: () => {
+      const master = chargeMasterRef.current;
+      setChargeList(master.length > 0 ? buildMasterRows(master) : []);
+      setDirtyRecIds(new Set());
+      tempIdCounter.current = -1;
+    },
     saveCharges: async (docketIdOverride) => {
       const targetDocketId = docketIdOverride || docketId;
       if (!targetDocketId) return;
@@ -154,6 +162,11 @@ const ChargesSection = forwardRef(function ChargesSection({
           });
           added++;
         } else if (dirtyRecIds.has(charge.rec_id)) {
+          //  console.log({
+          //   charge_code: charge.charge_code,
+          //   user_code: charge.user_code,
+          //   charge_amt: charge.charge_amt
+          // });
           await updateCharge(charge.rec_id, {
             charge_code: charge.charge_code,
             user_code: charge.user_code,
@@ -213,14 +226,26 @@ const ChargesSection = forwardRef(function ChargesSection({
     if (!chargesLoaded.current) return;
     setChargeList((prev) => {
       if (prev.length === 0) return prev;
-      return recalculateChargeList(prev, invoiceValue, docketRate, rateUom, chargeWeight, totalPkgs);
+      const recalculated = recalculateChargeList(prev, invoiceValue, docketRate, rateUom, chargeWeight, totalPkgs);
+      // Mark existing DB rows whose amount changed as dirty so saveCharges persists them
+      const changedIds = recalculated
+        .filter((r, i) => r.rec_id > 0 && r.charge_amt !== prev[i]?.charge_amt)
+        .map((r) => r.rec_id);
+      if (changedIds.length > 0) {
+        setDirtyRecIds((d) => {
+          const next = new Set(d);
+          changedIds.forEach((id) => next.add(id));
+          return next;
+        });
+      }
+      return recalculated;
     });
   }, [invoiceValue, docketRate, rateUom, chargeWeight, totalPkgs]);
 
-  // Notify parent of chargeList changes
+  // Notify parent of chargeList changes (ref avoids making the callback a dependency)
   useEffect(() => {
-    if (onChargesChange) onChargesChange(chargeList);
-  }, [chargeList, onChargesChange]);
+    if (onChargesChangeRef.current) onChargesChangeRef.current(chargeList);
+  }, [chargeList]);
 
   const chargeLabel = (m) => m.charge_desc;
 
@@ -299,7 +324,7 @@ const ChargesSection = forwardRef(function ChargesSection({
           label="Total Charge Amount"
           value={formatAmount(totalChargeAmount)}
           size="small"
-          InputProps={{ readOnly: true }}
+          slotProps={{ input: { readOnly: true } }}
           sx={{ width: 180 }}
         />
       </Box>
