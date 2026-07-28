@@ -600,6 +600,8 @@ export default function DocketPage() {
         rate_uom:            "docket_rate_uom",
         po_no:               "docket_po_no",
         po_date:             "docket_po_date",
+        invoice_no:          "docket_inv_no",
+        invoice_date:        "docket_inv_date",
         invoice_value:       "docket_inv_value",
         risk:                "docket_risk",
         insurance_company:   "docket_insurance_co",
