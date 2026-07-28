@@ -355,6 +355,9 @@ export default function ManifestUnloading() {
       await Api.post("/manifest/unloading", payload);
 
       showSuccess(`Manifest ${form.manifest_no} unloading saved successfully.`);
+      // Clear the form after successful save
+      setForm({ ...emptyForm });
+      setDockets([]);
     } catch (err) {
       showError(err.message || "Failed to save");
     } finally {
