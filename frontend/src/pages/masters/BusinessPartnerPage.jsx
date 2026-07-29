@@ -17,6 +17,7 @@ import {
 } from "../../utils/businessPartner";
 import { fetchAllDivisionsApi } from "../../utils/divisionMaster";
 import { fetchAllLocations } from "../../utils/locationMaster";
+import { fetchStatesAndCities } from "../../utils/stateCity";
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 
@@ -37,6 +38,8 @@ const emptyForm = {
   bp_tan_no: "",
   bp_deals_with: "",
   bp_addres: "",
+  bp_state: "",
+  bp_city: "",
   bp_pincode: "",
   bp_gstin: "",
   loc_code: "",
@@ -105,6 +108,8 @@ export default function BusinessPartnerPage() {
   const [bpTypes, setBpTypes] = useState([]);
   const [divisions, setDivisions] = useState([]);
   const [locations, setLocations] = useState([]);
+  const [states, setStates] = useState([]);
+  const [allCities, setAllCities] = useState([]);
   const { dialog, closeAlert, showSuccess, showError, showWarning } = useAlert();
   const [searchText, setSearchText] = useState("");
   const [form, setForm] = useState(emptyForm);
@@ -240,19 +245,29 @@ export default function BusinessPartnerPage() {
     label: `${loc.loc_code} - ${loc.loc_name}`,
   }));
 
+  const stateOptions = states.map((s) => ({ value: s.state_name, label: s.state_name }));
+
+  const selectedStateCode = states.find((s) => s.state_name === form.bp_state)?.state_code;
+  const cityOptions = allCities
+    .filter((c) => c.state_code === selectedStateCode)
+    .map((c) => ({ value: c.city_name, label: c.city_name }));
+
   useEffect(() => {
     (async () => {
       try {
-        const [partnerData, typeData, divisionData, locationData] = await Promise.all([
+        const [partnerData, typeData, divisionData, locationData, stateCityData] = await Promise.all([
           fetchAllBusinessPartners(),
           fetchBpTypes(),
           fetchAllDivisionsApi(),
           fetchAllLocations(),
+          fetchStatesAndCities(),
         ]);
         setPartners(partnerData);
         setBpTypes(typeData);
         setDivisions(divisionData);
         setLocations(locationData);
+        setStates(stateCityData.states || []);
+        setAllCities(stateCityData.cities || []);
       } catch (err) {
         showError(err.message || "Failed to load data");
         console.error("Load error:", err);
@@ -283,6 +298,8 @@ export default function BusinessPartnerPage() {
           <TextField size="small" label="TAN No" fullWidth sx={fieldSx} value={form.bp_tan_no} onChange={e => setField("bp_tan_no", e.target.value)} />
           <MuiSelect label="Deals With" name="bp_deals_with" value={form.bp_deals_with} onChange={setField} options={["Service", "Item", "Both"]} />
           <TextField size="small" label="Address" fullWidth sx={fieldSx} value={form.bp_addres} onChange={e => setField("bp_addres", e.target.value)} />
+          <MuiSelect label="State" name="bp_state" value={form.bp_state} onChange={(name, val) => { setField(name, val); setField("bp_city", ""); }} options={stateOptions} />
+          <MuiSelect label="City" name="bp_city" value={form.bp_city} onChange={setField} options={cityOptions} />
           <TextField size="small" label="Pincode" fullWidth sx={fieldSx} value={form.bp_pincode} onChange={e => setField("bp_pincode", e.target.value)} />
           <TextField size="small" label="GSTIN" fullWidth sx={fieldSx} value={form.bp_gstin} onChange={e => setField("bp_gstin", e.target.value)} />
           <MuiSelect label="Location" name="loc_code" value={form.loc_code} onChange={setField} options={locationOptions} />

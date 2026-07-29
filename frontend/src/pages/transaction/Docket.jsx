@@ -310,6 +310,7 @@ export default function DocketPage() {
   const handlePrint = () => {
     const charges = chargesRef.current?.getChargeList() ?? [];
     const ewb = ewbList[0] || {};
+    const printEwbNo = ewb.ewb_no || ewbNoDisplay || "";
 
     const fmt = (val) => val || "";
     const fmtDate = (val) => {
@@ -444,7 +445,7 @@ export default function DocketPage() {
                     <td>${fmt(form.invoice_no || ewb.inv_no)}</td>
                     <td>${fmtDate(form.invoice_date || ewb.inv_date)}</td>
                     <td>${fmt(form.invoice_value)}</td>
-                    <td colspan="2">${fmt(ewb.ewb_no)}</td>
+                    <td colspan="2">${fmt(printEwbNo)}</td>
                     <td colspan="4">${fmtDate(ewb.ewb_valid)}</td>
                   </tr>
                   <tr>
@@ -1065,7 +1066,9 @@ export default function DocketPage() {
             docket_no:           docketData.docket_no           || "",
             docket_date:         toDate(docketData.docket_date),
             docket_loc:          docketData.docket_loc          || "",
+            docket_from_town:    docketData.docket_pickup_town  || "",
             docket_to_loc:       docketData.docket_to_loc       || "",
+            docket_to_town:      docketData.docket_dly_town     || "",
             // cnor/cnee: IDs come from docket, display fields come from BP join
             cnor_id:             docketData.cnor_id             ?? null,
             cnor_name:           docketData.cnor_name           || "",

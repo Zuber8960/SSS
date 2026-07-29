@@ -20,6 +20,7 @@ const lorryMasterRoutes = require("../modules/lorryMaster/lorryMaster.routes");
 const hireVoucherRoutes = require("../modules/hireVoucher/hireVoucher.routes");
 const materialGroupRoutes = require("../modules/materialGroup/materialGroup.routes");
 const cnsRoutes = require("../modules/manifest/cns.routes");
+const { getStatesWithCities } = require("../common/commonCache");
 const axios = require('axios');
 const db = require('../config/db');
 
@@ -184,5 +185,15 @@ router.use('/lorryMaster', authMiddleware, lorryMasterRoutes);
 router.use('/hireVoucher', authMiddleware, hireVoucherRoutes);
 router.use('/materialGroup', authMiddleware, materialGroupRoutes);
 router.use('/cns', authMiddleware, cnsRoutes);
+
+router.get('/stateCity', authMiddleware, async (req, res) => {
+    try {
+        const data = await getStatesWithCities();
+        res.status(200).json({ success: true, data });
+    } catch (error) {
+        console.error('StateCityMaster error:', error);
+        res.status(500).json({ success: false, message: 'Error retrieving state/city data' });
+    }
+});
 
 module.exports = router;
