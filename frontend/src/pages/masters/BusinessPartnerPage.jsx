@@ -372,20 +372,20 @@ export default function BusinessPartnerPage() {
         </FormPanel>
 
         {/* Bank Details */}
-        <FormPanel>
+        {/* <FormPanel>
           <SectionHeader title="Bank Details" />
           <TextField size="small" label="Bank Name" fullWidth sx={fieldSx} value={form.bp_bank_name} onChange={e => setField("bp_bank_name", e.target.value)} />
           <TextField size="small" label="Account Name" fullWidth sx={fieldSx} value={form.bp_acount_name} onChange={e => setField("bp_acount_name", e.target.value)} />
           <TextField size="small" label="Account No" fullWidth sx={fieldSx} value={form.bp_account_no} onChange={e => setField("bp_account_no", e.target.value)} />
           <TextField size="small" label="IFSC Code" fullWidth sx={fieldSx} value={form.bp_ifsc_code} onChange={e => setField("bp_ifsc_code", e.target.value)} />
-        </FormPanel>
+        </FormPanel> */}
 
         {/* Other Details */}
         <FormPanel>
           <SectionHeader title="Other Details" />
           <TextField size="small" label="Credit Days" type="number" fullWidth sx={fieldSx} value={form.bp_credit_days} onChange={e => setField("bp_credit_days", e.target.value)} />
           <MuiSelect label="Status" name="bp_status" value={form.bp_status} onChange={setField} options={[{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }]} />
-          <TextField size="small" label="Closed On" type="date" fullWidth sx={fieldSx} value={form.bp_closed_on} onChange={e => setField("bp_closed_on", e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField size="small" label="Closed On" type="date" fullWidth sx={fieldSx} value={form.bp_closed_on} onChange={e => setField("bp_closed_on", e.target.value)} slotProps={{ inputLabel: { shrink: true } }} disabled={!isEditing} />
         </FormPanel>
 
         <DataTable
