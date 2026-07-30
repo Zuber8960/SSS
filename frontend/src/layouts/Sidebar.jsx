@@ -25,6 +25,7 @@ import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import DescriptionIcon from "@mui/icons-material/Description";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import FindInPageIcon from "@mui/icons-material/FindInPage";
+import BarChartIcon from "@mui/icons-material/BarChart";
 import AccountTreeSharp from "@mui/icons-material/TireRepair";
 import AccessTime from "@mui/icons-material/ManageHistory";
 import UnarchiveIcon from "@mui/icons-material/Unarchive";
@@ -47,6 +48,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
   const [openAdmin, setOpenAdmin] = useState(() => pathname.startsWith("/admin"));
   const [openMasters, setOpenMasters] = useState(() => pathname.startsWith("/masters"));
   const [openTransaction, setOpenTransaction] = useState(() => pathname.startsWith("/transaction"));
+  const [openReports, setOpenReports] = useState(() => pathname.startsWith("/reports"));
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem("sidebarCollapsed") === "true"
   );
@@ -107,6 +109,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         setOpenTransaction((p) => !p);
         setOpenAdmin(false);
         setOpenMasters(false);
+        setOpenReports(false);
       },
       children: [
         { path: "/transaction/docket",           label: "Docket",          icon: <DescriptionIcon /> },
@@ -116,6 +119,20 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/transaction/manifest-unloading", label: "Manifest Unloading", icon: <UnarchiveIcon /> },
         { path: "/transaction/docket-enquiry", label: "Docket Enquiry", icon: <FindInPageIcon /> },
       ],
+    },
+    {
+      key: "reports",
+      label: "Reports",
+      icon: <BarChartIcon />,
+      prefix: "/reports",
+      open: openReports,
+      onToggle: () => {
+        setOpenReports((p) => !p);
+        setOpenAdmin(false);
+        setOpenMasters(false);
+        setOpenTransaction(false);
+      },
+      children: [],
     },
   ];
   // ────────────────────────────────────────────────────────────────────────────
