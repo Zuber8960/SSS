@@ -6,13 +6,13 @@ let _stateCityCache = null;
 async function getStatesWithCities() {
     if (_stateCityCache) return _stateCityCache;
 
-    const rows = await db('sss.ssm_city as c')
-        .join('sss.ssm_state as s', 'c.state_code', 's.state_code')
+    const query = db('sss.ssm_state as s')
+        .leftJoin('sss.ssm_city as c', 'c.state_code', 's.state_code')
         .select('s.state_code', 's.state_name', 's.gst_state_code', 's.zone_name',
                 'c.city_code', 'c.city_name', 'c.district_name')
         .where('s.status', 'A')
-        .where('c.status', 'A')
         .orderBy(['s.state_name', 'c.city_name']);
+    const rows = await query;
 
     const stateMap = new Map();
     const cities = [];

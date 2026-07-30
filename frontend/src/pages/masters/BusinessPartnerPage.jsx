@@ -7,7 +7,7 @@ import {
   FormPanel,
   DataTable,
 } from "../../components/common/MasterPage";
-import { Box, FormControl, InputLabel, MenuItem, Select, TextField, Typography } from "@mui/material";
+import { Autocomplete, Box, FormControl, InputLabel, MenuItem, Select, TextField, Typography } from "@mui/material";
 import {
   fetchAllBusinessPartners,
   fetchBpTypes,
@@ -116,6 +116,8 @@ export default function BusinessPartnerPage() {
   const [dirtyFields, setDirtyFields] = useState(new Set());
   const [isEditing, setIsEditing] = useState(false);
   const [originalRecId, setOriginalRecId] = useState(null);
+  const [stateInput, setStateInput] = useState("");
+  const [cityInput, setCityInput] = useState("");
 
   const DATE_FIELDS = DATE_FORM_FIELDS;
 
@@ -132,6 +134,8 @@ export default function BusinessPartnerPage() {
     setDirtyFields(new Set());
     setIsEditing(false);
     setOriginalRecId(null);
+    setStateInput("");
+    setCityInput("");
   };
 
   const buildPayload = (onlyDirty) => {
@@ -188,10 +192,13 @@ export default function BusinessPartnerPage() {
   };
 
   const editPartner = (row) => {
-    setForm(mapRowToForm(row));
+    const mapped = mapRowToForm(row);
+    setForm(mapped);
     setDirtyFields(new Set());
     setOriginalRecId(row.record_id);
     setIsEditing(true);
+    setStateInput(mapped.bp_state || "");
+    setCityInput(mapped.bp_city || "");
   };
 
   const deletePartner = (recordId) => {
@@ -245,12 +252,6 @@ export default function BusinessPartnerPage() {
     label: `${loc.loc_code} - ${loc.loc_name}`,
   }));
 
-  const stateOptions = states.map((s) => ({ value: s.state_name, label: s.state_name }));
-
-  const selectedStateCode = states.find((s) => s.state_name === form.bp_state)?.state_code;
-  const cityOptions = allCities
-    .filter((c) => c.state_code === selectedStateCode)
-    .map((c) => ({ value: c.city_name, label: c.city_name }));
 
   useEffect(() => {
     (async () => {
@@ -298,8 +299,30 @@ export default function BusinessPartnerPage() {
           <TextField size="small" label="TAN No" fullWidth sx={fieldSx} value={form.bp_tan_no} onChange={e => setField("bp_tan_no", e.target.value)} />
           <MuiSelect label="Deals With" name="bp_deals_with" value={form.bp_deals_with} onChange={setField} options={["Service", "Item", "Both"]} />
           <TextField size="small" label="Address" fullWidth sx={fieldSx} value={form.bp_addres} onChange={e => setField("bp_addres", e.target.value)} />
-          <MuiSelect label="State" name="bp_state" value={form.bp_state} onChange={(name, val) => { setField(name, val); setField("bp_city", ""); }} options={stateOptions} />
-          <MuiSelect label="City" name="bp_city" value={form.bp_city} onChange={setField} options={cityOptions} />
+          <Autocomplete
+            size="small"
+            options={stateInput.length >= 3 ? states.filter(s => s.state_name.toLowerCase().includes(stateInput.toLowerCase())).map(s => s.state_name) : []}
+            value={form.bp_state || null}
+            inputValue={stateInput}
+            onInputChange={(_, val) => setStateInput(val)}
+            onChange={(_, val) => { setField("bp_state", val || ""); setField("bp_city", ""); setCityInput(""); }}
+            renderInput={(params) => <TextField {...params} label="State" size="small" sx={fieldSx} />}
+            noOptionsText={stateInput.length < 3 ? "Type 3 chars to search" : "No match"}
+          />
+          <Autocomplete
+            size="small"
+            freeSolo
+            options={cityInput.length >= 1 ? allCities.filter(c => c.state_code === states.find(s => s.state_name === form.bp_state)?.state_code && c.city_name?.toLowerCase().includes(cityInput?.toLowerCase())).map(c => c.city_name) : []}
+            value={form.bp_city || null}
+            inputValue={cityInput}
+            onInputChange={(_, val) => { 
+              setCityInput(val); 
+              setField("bp_city", val); 
+            }}
+            onChange={(_, val) => { const v = val || ""; setCityInput(v); setField("bp_city", v); }}
+            renderInput={(params) => <TextField {...params} label="City" size="small" sx={fieldSx} />}
+            noOptionsText="No match — typed city will be saved"
+          />
           <TextField size="small" label="Pincode" fullWidth sx={fieldSx} value={form.bp_pincode} onChange={e => setField("bp_pincode", e.target.value)} />
           <TextField size="small" label="GSTIN" fullWidth sx={fieldSx} value={form.bp_gstin} onChange={e => setField("bp_gstin", e.target.value)} />
           <MuiSelect label="Location" name="loc_code" value={form.loc_code} onChange={setField} options={locationOptions} />
