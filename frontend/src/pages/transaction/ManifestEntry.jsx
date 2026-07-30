@@ -14,8 +14,10 @@ import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
 import { fetchDocketByDocketNo } from "../../utils/docket";
 import { fetchAllLocations, fetchLocationTowns } from "../../utils/locationMaster";
-import { AddIcon, DeleteIcon, EditIcon, SaveIcon, NoteAddIcon, ResetIcon } from "../../components/common/icons";
+import { AddIcon, DeleteIcon, EditIcon, SaveIcon, NoteAddIcon, ResetIcon, PrintIcon } from "../../components/common/icons";
 import { IconButton, Tooltip } from "@mui/material";
+import { getTenantConfig } from "../../utils/tenantService";
+import logoImgFallback from "../../images/logo.png";
 import {
   createManifest,
   fetchManifestByNo,
@@ -566,6 +568,413 @@ export default function ManifestPage() {
     showInfo("Form cleared");
   };
 
+  // ✅ Print — open print window with professionally formatted manifest
+  const handlePrint = async () => {
+    if (!form.manifest_no) {
+      showError("Please load a manifest before printing");
+      return;
+    }
+
+    try {
+      showLoading();
+
+      const manifestTypeLabels = { lp: "Local Pickup", lh: "Long Haul", ld: "Local Delivery" };
+
+      // Format date helper
+      const formatDate = (dateStr) => {
+        if (!dateStr) return "";
+        const d = new Date(dateStr);
+        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        return `${String(d.getDate()).padStart(2,"0")}-${months[d.getMonth()]}-${d.getFullYear()}`;
+      };
+
+      const now = new Date();
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const printDate = `${String(now.getDate()).padStart(2,"0")}-${months[now.getMonth()]}-${now.getFullYear()}`;
+      const printTime = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+
+      const filteredDocketRows = details.filter((row) => row.docket_no && row.docket_no.trim() !== "");
+
+      // Get tenant config for logo and company name
+      const tenantConfig = getTenantConfig();
+      const tenantName = tenantConfig?.tenant_name || localStorage.getItem("company_name") || "ABC LOGISTICS PRIVATE LIMITED";
+      const tenantAddress = tenantConfig?.tenant_address || localStorage.getItem("company_address") || "Regd Office : Address | GSTIN | Phone | Email | Website";
+
+      // Convert logo to base64 for embedding
+      const logoUrl = tenantConfig?.logo_url || logoImgFallback;
+      let logoBase64 = "";
+      try {
+        const response = await fetch(logoUrl);
+        const blob = await response.blob();
+        logoBase64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        // If logo fetch fails, use fallback
+        try {
+          const response = await fetch(logoImgFallback);
+          const blob = await response.blob();
+          logoBase64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch {
+          logoBase64 = "";
+        }
+      }
+
+      const qrCodeSvg = `<span style="font-size:10px;font-family:monospace;">${form.manifest_no.replace(/./g, "|")}</span>`;
+
+      const currentUser = localStorage.getItem("user_name") || "ADMIN";
+
+      const printContent = `
+      <html>
+      <head>
+        <title>Manifest #${form.manifest_no}</title>
+        <style>
+          @page { margin: 8mm; }
+          * { box-sizing: border-box; }
+          body {
+            font-family: "Courier New", Courier, monospace;
+            margin: 0;
+            padding: 0;
+            color: #000;
+            font-size: 10px;
+            line-height: 1.3;
+          }
+          .print-container { padding: 5px 8px; }
+
+          /* Box-drawing style using borders */
+          .main-border { border: 2px solid #000; }
+          .top-border { border-top: 2px solid #000; }
+          .bottom-border { border-bottom: 2px solid #000; }
+          .left-border { border-left: 2px solid #000; }
+          .right-border { border-right: 2px solid #000; }
+
+          /* Company Header */
+          .company-header {
+            text-align: center;
+            border: 2px solid #000;
+            padding: 6px 10px;
+            margin-bottom: 0;
+          }
+          .company-header .logo-img {
+            max-height: 60px;
+            max-width: 200px;
+            margin-bottom: 4px;
+          }
+          .company-header .company-name {
+            font-size: 13px;
+            font-weight: bold;
+            margin-top: 2px;
+          }
+          .company-header .company-address {
+            font-size: 9px;
+            color: #333;
+            margin-top: 2px;
+          }
+
+          /* Info Row - two column label-value */
+          .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #000;
+            border-top: none;
+          }
+          .info-table td {
+            border: 1px solid #000;
+            padding: 3px 5px;
+            font-size: 10px;
+            vertical-align: top;
+          }
+          .info-table td.label {
+            font-weight: bold;
+            width: 140px;
+            white-space: nowrap;
+            background: #f0f0f0;
+          }
+
+          /* Docket Table */
+          .docket-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #000;
+            border-top: none;
+          }
+          .docket-table th, .docket-table td {
+            border: 1px solid #000;
+            padding: 3px 4px;
+            font-size: 9px;
+          }
+          .docket-table th {
+            background: #e0e0e0;
+            font-weight: bold;
+            text-align: center;
+            font-size: 9px;
+          }
+          .docket-table td.num { text-align: right; }
+          .docket-table td.center { text-align: center; }
+
+          /* Section border */
+          .section-border {
+            border: 2px solid #000;
+            border-top: none;
+            padding: 5px 8px;
+          }
+
+          .signature-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #000;
+            border-top: none;
+          }
+          .signature-table td {
+            border: 1px solid #000;
+            padding: 5px 8px;
+            font-size: 10px;
+            vertical-align: top;
+            height: 50px;
+          }
+          .signature-table td.label {
+            font-weight: bold;
+            background: #f0f0f0;
+          }
+
+          /* Footer */
+          .print-footer-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #000;
+            border-top: none;
+          }
+          .print-footer-table td {
+            border: 1px solid #000;
+            padding: 3px 5px;
+            font-size: 9px;
+          }
+
+          .checklist-item {
+            display: inline-block;
+            margin-right: 12px;
+            font-size: 10px;
+          }
+
+          @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none; }
+            .info-table td.label { background: #f0f0f0 !important; }
+            .docket-table th { background: #e0e0e0 !important; }
+            .signature-table td.label { background: #f0f0f0 !important; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="print-container">
+
+          <!-- COMPANY HEADER -->
+          <div class="company-header">
+            ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" class="logo-img" />` : '<div class="logo-img" style="font-size:14px;font-weight:bold;letter-spacing:2px;">[ COMPANY LOGO ]</div>'}
+            <div class="company-name">${tenantName}</div>
+            <div class="company-address">${tenantAddress}</div>
+          </div>
+
+          <!-- MANIFEST INFO ROW -->
+          <table class="info-table">
+            <tr>
+              <td class="label">MANIFEST NO</td>
+              <td>${form.manifest_no}</td>
+              <td class="label">DATE</td>
+              <td>${formatDate(form.manifest_date)}</td>
+              <td class="label">TIME</td>
+              <td>${printTime}</td>
+              <td class="label">PAGE</td>
+              <td>1 OF 1</td>
+            </tr>
+          </table>
+
+          <!-- ROUTE INFO -->
+          <table class="info-table">
+            <tr>
+              <td class="label">FROM</td>
+              <td>${form.from_loc}${form.from_town ? "(" + form.from_town + ")" : ""}</td>
+              <td class="label">TO</td>
+              <td>${form.to_loc}${form.to_town ? "(" + form.to_town + ")" : ""}</td>
+              <td class="label">TYPE</td>
+              <td>${manifestTypeLabels[form.manifest_type] || form.manifest_type}</td>
+            </tr>
+          </table>
+
+          <!-- VEHICLE INFO -->
+          <table class="info-table">
+            <tr>
+              <td class="label">VEHICLE NO</td>
+              <td>${form.vehicle_no}</td>
+              <td class="label">DRIVER</td>
+              <td>${form.driver_name}</td>
+              <td class="label">MOBILE</td>
+              <td>${form.driver_mobile}</td>
+            </tr>
+          </table>
+
+          <!-- EXTRA INFO ROW (optional fields with fallback) -->
+          <table class="info-table">
+            <tr>
+              <td class="label">VEHICLE TYPE</td>
+              <td>${form.vehicle_type || "OWN VEHICLE"}</td>
+              <td class="label">SEAL NO</td>
+              <td colspan="3">${form.seal_no || ""}</td>
+            </tr>
+          </table>
+
+          <!-- DOCKET TABLE HEADER -->
+          <table class="docket-table" style="margin-top:2px;">
+            <thead>
+              <tr>
+                <th style="width:25px;">SR</th>
+                <th>DOCKET NO</th>
+                <th style="width:60px;">DOCKET DATE</th>
+                <th style="width:45px;">FROM</th>
+                <th style="width:45px;">TO</th>
+                <th style="width:35px;">PKGS</th>
+                <th style="width:45px;">ACT WT</th>
+                <th style="width:80px;">EWB NO</th>
+                <th style="width:70px;">EWB EXPIRY</th>
+                <th>REMARKS</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(() => {
+                if (filteredDocketRows.length === 0) {
+                  return '<tr><td colspan="10" style="text-align:center;padding:20px;font-style:italic;font-size:10px;">No dockets added</td></tr>';
+                }
+                return filteredDocketRows.map(
+                  (row, idx) => {
+                    const docketDate = row.docket_date ? formatDate(row.docket_date) : "";
+                    const ewbNo = row.ewb_no || "";
+                    const ewbExpiry = row.ewb_expiry ? formatDate(row.ewb_expiry) : "";
+                    const remarks = row.remarks || "";
+                    return `
+                      <tr>
+                        <td class="center">${idx + 1}</td>
+                        <td class="center">${row.docket_no}</td>
+                        <td class="center">${docketDate}</td>
+                        <td class="center">${row.from_loc}</td>
+                        <td class="center">${row.to_loc}</td>
+                        <td class="num">${row.packages}</td>
+                        <td class="num">${row.weight}</td>
+                        <td class="center">${ewbNo}</td>
+                        <td class="center">${ewbExpiry}</td>
+                        <td>${remarks}</td>
+                      </tr>
+                    `;
+                  }
+                ).join("");
+              })()}
+              ${(() => {
+                // Add empty rows to fill space
+                const emptyRows = Math.max(0, 6 - filteredDocketRows.length);
+                let html = "";
+                for (let i = 0; i < emptyRows; i++) {
+                  html += '<tr><td colspan="10" style="border:none;height:18px;">&nbsp;</td></tr>';
+                }
+                return html;
+              })()}
+            </tbody>
+          </table>
+
+          <!-- TOTALS ROW -->
+          <table class="info-table">
+            <tr style="font-weight:bold;">
+              <td class="label">TOTAL DOCKETS</td>
+              <td>${computedTotals.total_dockets}</td>
+              <td class="label">TOTAL PKGS</td>
+              <td>${computedTotals.total_pkgs}</td>
+              <td class="label">ACT WT</td>
+              <td>${computedTotals.total_wt} KG</td>
+            </tr>
+          </table>
+
+          <!-- SPECIAL INSTRUCTIONS -->
+          <table class="info-table">
+            <tr>
+              <td class="label">SPECIAL INSTRUCTIONS</td>
+              <td colspan="5">${form.remarks || ""}</td>
+            </tr>
+          </table>
+
+          <!-- CHECKLIST -->
+          <table class="info-table">
+            <tr>
+              <td colspan="6" style="padding:5px 8px;">
+                <span class="checklist-item">☐ Vehicle Checked</span>
+                <span class="checklist-item">☐ Documents Verified</span>
+                <span class="checklist-item">☐ Seal Applied</span>
+                <span class="checklist-item">☐ GPS Active</span>
+              </td>
+            </tr>
+          </table>
+
+          <!-- SIGNATURES -->
+          <table class="signature-table">
+            <tr>
+              <td class="label" style="width:33%;">Prepared By</td>
+              <td class="label" style="width:34%;">Checked By</td>
+              <td class="label" style="width:33%;">Driver Signature</td>
+            </tr>
+            <tr>
+              <td style="height:40px;vertical-align:bottom;">
+                <div style="margin-top:15px;">Name: ${localStorage.getItem("user_name") || ""}</div>
+                <div>Sign: __________________</div>
+              </td>
+              <td style="height:40px;vertical-align:bottom;">
+                <div style="margin-top:25px;">__________________</div>
+              </td>
+              <td style="height:40px;vertical-align:bottom;">
+                <div style="margin-top:25px;">__________________</div>
+              </td>
+            </tr>
+          </table>
+
+          <!-- FOOTER -->
+          <table class="print-footer-table">
+            <tr>
+              <td style="width:35%;">Printed On : ${printDate} ${printTime}</td>
+              <td style="width:30%;">Printed By : ${currentUser}</td>
+              <td style="width:35%;text-align:right;">
+                ${qrCodeSvg ? qrCodeSvg : '<span style="font-size:10px;">' + form.manifest_no.replace(/./g, "|") + '</span>'}
+              </td>
+            </tr>
+          </table>
+
+        </div>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    } else {
+      showError("Popup blocked. Please allow popups for this site.");
+    }
+    } catch (err) {
+      showError("Print failed: " + (err.message || "Unknown error"));
+      console.error("Print error:", err);
+    } finally {
+      hideLoading();
+    }
+  };
+
   // ✅ Save — create or update based on mode
   const handleSave = async () => {
     if (!form.from_loc) {
@@ -675,6 +1084,11 @@ export default function ManifestPage() {
           <Tooltip title="Save">
             <IconButton onClick={handleSave} size="small" sx={{ color: "#16a34a", "&:hover": { background: "#dcfce7" } }}>
               <SaveIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Print">
+            <IconButton onClick={handlePrint} size="small" sx={{ color: "#2563eb", "&:hover": { background: "#dbeafe" } }}>
+              <PrintIcon />
             </IconButton>
           </Tooltip>
           <span
