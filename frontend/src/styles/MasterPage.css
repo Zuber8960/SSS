@@ -3,9 +3,23 @@
   grid-template-columns: 1fr 1fr;
 }
 
+/* Dashboard Stat Cards */
+.dashboardCards {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 1024px) {
+  .dashboardCards {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
 @media (max-width: 768px) {
   .dashboardCharts {
     grid-template-columns: 1fr !important;
+  }
+  .dashboardCards {
+    grid-template-columns: 1fr 1fr !important;
   }
 }
 

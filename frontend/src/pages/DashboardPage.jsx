@@ -33,23 +33,20 @@ function StatCard({ label, value, subtext, color, icon }) {
 
 function BarChart({ data }) {
   if (!data || data.length === 0) {
-    return <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>No data</div>;
+    return <div style={{ height: 240, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>No data</div>;
   }
 
   const max = Math.max(...data.map(d => d.count), 1);
-  const W = 560, H = 200, padL = 40, padB = 40, padT = 10, padR = 10;
+  const W = 580, H = 240, padL = 40, padB = 60, padT = 10, padR = 10;
   const chartW = W - padL - padR;
   const chartH = H - padT - padB;
-  const barW = Math.max(4, Math.floor(chartW / data.length) - 2);
-
-  // Show only every Nth label to avoid crowding
-  const labelEvery = Math.ceil(data.length / 7);
+  const slotW = chartW / data.length;
+  const barW = Math.max(6, Math.floor(slotW * 0.6));
 
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(f * max));
 
   return (
     <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible" }}>
-      {/* grid + y-axis labels */}
       {yTicks.map(v => {
         const y = padT + chartH - (v / max) * chartH;
         return (
@@ -59,23 +56,26 @@ function BarChart({ data }) {
           </g>
         );
       })}
-      {/* axes */}
       <line x1={padL} y1={padT} x2={padL} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1" />
       <line x1={padL} y1={padT + chartH} x2={W - padR} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1" />
 
-      {/* bars */}
       {data.map((d, i) => {
-        const x = padL + i * (chartW / data.length) + (chartW / data.length - barW) / 2;
-        const barH = (d.count / max) * chartH;
+        const cx = padL + i * slotW + slotW / 2;
+        const x = cx - barW / 2;
+        const barH = Math.max(2, (d.count / max) * chartH);
         const y = padT + chartH - barH;
-        const label = String(d.day).slice(5); // MM-DD
+        const label = String(d.day).slice(0, 10).slice(5); // MM-DD, safe for Date objects or ISO strings
         return (
           <g key={i}>
-            <rect x={x} y={y} width={barW} height={barH} rx="2"
-              fill="#2563eb" opacity="0.75" />
-            {i % labelEvery === 0 && (
-              <text x={x + barW / 2} y={padT + chartH + 14} fontSize="9" fill="#9ca3af" textAnchor="middle">{label}</text>
+            <rect x={x} y={y} width={barW} height={barH} rx="2" fill="#2563eb" opacity="0.8" />
+            {d.count > 0 && (
+              <text x={cx} y={y - 4} fontSize="9" fill="#6b7280" textAnchor="middle">{d.count}</text>
             )}
+            <text
+              x={cx} y={padT + chartH + 10}
+              fontSize="9" fill="#9ca3af" textAnchor="end"
+              transform={`rotate(-45, ${cx}, ${padT + chartH + 10})`}
+            >{label}</text>
           </g>
         );
       })}
@@ -83,51 +83,71 @@ function BarChart({ data }) {
   );
 }
 
-function DonutChart({ statusCounts, total }) {
-  if (!statusCounts || statusCounts.length === 0 || total === 0) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <svg width="160" height="160" viewBox="0 0 160 160">
-          <circle cx="80" cy="80" r="50" fill="none" stroke="#f3f4f6" strokeWidth="18" />
-          <text x="80" y="86" fontSize="22" fontWeight="700" textAnchor="middle" fill="#d1d5db">0</text>
-        </svg>
-        <p style={{ color: "#9ca3af", fontSize: 13 }}>No dockets yet</p>
-      </div>
-    );
-  }
+function ManifestStatusChart({ completed, inTransit }) {
+  const [hovered, setHovered] = useState(null);
+  const total = completed + inTransit;
+  const circumference = 2 * Math.PI * 54;
 
-  const palette = ["#ea580c", "#2563eb", "#059669", "#7c3aed", "#dc2626"];
-  const circumference = 2 * Math.PI * 50;
+  const segmentDefs = [
+    { label: "Completed", count: completed, color: "#059669" },
+    { label: "On The Way", count: inTransit, color: "#ea580c" },
+  ];
 
-  const segments = statusCounts.reduce((acc, s, i) => {
+  const segments = total === 0 ? [] : segmentDefs.reduce((acc, s) => {
     const arc = (s.count / total) * circumference;
-    const runningOffset = acc.length > 0 ? acc[acc.length - 1].nextOffset : 0;
-    acc.push({ ...s, arc, offset: runningOffset, nextOffset: runningOffset + arc, color: palette[i % palette.length] });
+    const offset = acc.length > 0 ? acc[acc.length - 1]._next : 0;
+    acc.push({ ...s, arc, offset, _next: offset + arc });
     return acc;
   }, []);
 
+  const hoveredSeg = hovered ? segments.find(s => s.label === hovered) : null;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <svg width="160" height="160" viewBox="0 0 160 160">
-        {segments.map(s => (
-          <circle key={s.status} cx="80" cy="80" r="50"
-            fill="none"
-            stroke={s.color}
-            strokeWidth="18"
-            strokeDasharray={`${s.arc} ${circumference - s.arc}`}
-            strokeDashoffset={-s.offset}
-            transform="rotate(-90 80 80)"
-          />
-        ))}
-        <text x="80" y="86" fontSize="22" fontWeight="700" textAnchor="middle" fill="#111">{total}</text>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+      <svg width="180" height="180" viewBox="0 0 180 180">
+        {total === 0 ? (
+          <circle cx="90" cy="90" r="54" fill="none" stroke="#f3f4f6" strokeWidth="20" />
+        ) : segments.map(s => {
+          const isHovered = hovered === s.label;
+          return (
+            <circle key={s.label} cx="90" cy="90" r="54"
+              fill="none"
+              stroke={s.color}
+              strokeWidth={isHovered ? 28 : 20}
+              strokeDasharray={`${s.arc} ${circumference - s.arc}`}
+              strokeDashoffset={-s.offset}
+              transform="rotate(-90 90 90)"
+              style={{ cursor: "pointer", transition: "stroke-width 0.15s ease" }}
+              onMouseEnter={() => setHovered(s.label)}
+              onMouseLeave={() => setHovered(null)}
+            />
+          );
+        })}
+        {hoveredSeg ? (
+          <>
+            <text x="90" y="84" fontSize="20" fontWeight="700" textAnchor="middle" fill={hoveredSeg.color}>{hoveredSeg.count}</text>
+            <text x="90" y="102" fontSize="10" textAnchor="middle" fill="#6b7280">{hoveredSeg.label}</text>
+          </>
+        ) : (
+          <>
+            <text x="90" y="84" fontSize="20" fontWeight="700" textAnchor="middle" fill="#111">{total}</text>
+            <text x="90" y="102" fontSize="10" textAnchor="middle" fill="#9ca3af">Total</text>
+          </>
+        )}
       </svg>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", justifyContent: "center", marginTop: 12 }}>
-        {segments.map(s => (
-          <div key={s.status} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <span style={{ width: 10, height: 10, borderRadius: "50%", background: s.color, display: "inline-block" }} />
-            <span style={{ color: "#6b7280" }}>{s.status}</span>
-            <span style={{ fontWeight: 700, color: "#111" }}>{s.count}</span>
+      <div style={{ display: "flex", gap: 24 }}>
+        {segmentDefs.map(s => (
+          <div key={s.label}
+            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer", opacity: hovered && hovered !== s.label ? 0.4 : 1, transition: "opacity 0.15s" }}
+            onMouseEnter={() => setHovered(s.label)}
+            onMouseLeave={() => setHovered(null)}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: s.color, display: "inline-block" }} />
+              <span style={{ fontSize: 12, color: "#6b7280" }}>{s.label}</span>
+            </div>
+            <span style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.count}</span>
           </div>
         ))}
       </div>
@@ -146,37 +166,21 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const last30Total = stats?.dailyCounts?.reduce((a, b) => a + b.count, 0) ?? 0;
+  const v = (key) => loading ? "…" : (stats?.[key] ?? 0);
 
   const cards = [
-    {
-      label: "Total Dockets",
-      value: loading ? "…" : stats?.totalDockets ?? 0,
-      subtext: "All time",
-      color: "blue",
-      icon: "📋",
-    },
-    {
-      label: "Last 30 Days",
-      value: loading ? "…" : last30Total,
-      subtext: "Dockets this month",
-      color: "green",
-      icon: "📅",
-    },
-    {
-      label: "Total Lorries",
-      value: loading ? "…" : stats?.totalLorries ?? 0,
-      subtext: "Registered vehicles",
-      color: "orange",
-      icon: "🚚",
-    },
-    {
-      label: "Business Partners",
-      value: loading ? "…" : stats?.totalBusinessPartners ?? 0,
-      subtext: "Active partners",
-      color: "purple",
-      icon: "🤝",
-    },
+    [
+      { label: "Total DOCKET Booked",   value: v("totalDockets"),       color: "blue",   icon: "📋" },
+      { label: "In Transit DOCKET",     value: v("inTransitDockets"),   color: "orange", icon: "🚛" },
+      { label: "Undelivered Dockets",   value: v("undeliveredDockets"), color: "red",    icon: "📦" },
+      { label: "Delivered Dockets",     value: v("deliveredDockets"),   color: "green",  icon: "✅" },
+    ],
+    [
+      { label: "Delivered But Not Billed", value: v("deliveredNotBilled"),  color: "purple", icon: "💰" },
+      { label: "In Transit Vehicles",      value: v("inTransitVehicles"),   color: "orange", icon: "🚚" },
+      { label: "Waiting For Dispatch",     value: v("waitingForDispatch"),  color: "blue",   icon: "⏳" },
+      { label: "EWB Expiring Today",       value: v("ewbExpiringToday"),    color: "red",    icon: "⚠️" },
+    ],
   ];
 
   return (
@@ -188,17 +192,19 @@ export default function DashboardPage() {
       }}>
         <PageBody title="Dashboard">
 
-          {/* Stat Cards */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: 20,
-            marginBottom: 30,
-          }}>
-            {cards.map(c => (
-              <StatCard key={c.label} {...c} />
-            ))}
-          </div>
+          {/* Stat Cards — 2 rows × 4 columns */}
+          {cards.map((row, ri) => (
+            <div key={ri} style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: 20,
+              marginBottom: 20,
+            }} className="dashboardCards">
+              {row.map(c => (
+                <StatCard key={c.label} {...c} />
+              ))}
+            </div>
+          ))}
 
           {/* Charts */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 20 }}
@@ -217,19 +223,22 @@ export default function DashboardPage() {
               <BarChart data={stats?.dailyCounts} />
             </div>
 
-            {/* Donut chart — docket status */}
+            {/* Manifest status chart */}
             <div style={{
               background: "#fff", borderRadius: 12, padding: 24,
               boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
               display: "flex", flexDirection: "column",
             }}>
               <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#111" }}>
-                📋 Dockets by Pay Type
+                🚛 Manifest Status
               </h3>
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {loading
                   ? <span style={{ color: "#9ca3af", fontSize: 13 }}>Loading…</span>
-                  : <DonutChart statusCounts={stats?.statusCounts} total={stats?.totalDockets ?? 0} />
+                  : <ManifestStatusChart
+                      completed={stats?.manifestCompleted ?? 0}
+                      inTransit={stats?.manifestInTransit ?? 0}
+                    />
                 }
               </div>
             </div>
