@@ -20,6 +20,7 @@ const lorryMasterRoutes = require("../modules/lorryMaster/lorryMaster.routes");
 const hireVoucherRoutes = require("../modules/hireVoucher/hireVoucher.routes");
 const materialGroupRoutes = require("../modules/materialGroup/materialGroup.routes");
 const cnsRoutes = require("../modules/manifest/cns.routes");
+const dashboardRoutes = require("../modules/dashboard/dashboard.routes");
 const { getStatesWithCities } = require("../common/commonCache");
 const axios = require('axios');
 const db = require('../config/db');
@@ -185,6 +186,7 @@ router.use('/lorryMaster', authMiddleware, lorryMasterRoutes);
 router.use('/hireVoucher', authMiddleware, hireVoucherRoutes);
 router.use('/materialGroup', authMiddleware, materialGroupRoutes);
 router.use('/cns', authMiddleware, cnsRoutes);
+router.use('/dashboard', authMiddleware, dashboardRoutes);
 
 router.get('/stateCity', authMiddleware, async (req, res) => {
     try {

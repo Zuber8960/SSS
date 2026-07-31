@@ -1,256 +1,240 @@
+import { useEffect, useState } from "react";
 import MainLayout from "../layouts/MainLayout";
 import { PageBody } from "../components/common/MasterPage";
+import { fetchDashboardStats } from "../utils/dashboard";
 import "../styles/MasterPage.css";
 
-// StatCard Component
-function StatCard({ label, value, subtext, colorClass, icon }) {
-  const borderColors = {
-    red: "#dc2626",
-    blue: "#2563eb",
-    green: "#059669",
-    orange: "#ea580c"
-  };
+const COLORS = {
+  red: "#dc2626",
+  blue: "#2563eb",
+  green: "#059669",
+  orange: "#ea580c",
+  purple: "#7c3aed",
+};
 
+function StatCard({ label, value, subtext, color, icon }) {
+  const c = COLORS[color] || COLORS.blue;
   return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: 12,
-        padding: 20,
-        borderTop: `4px solid ${borderColors[colorClass]}`,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-        transition: "all 0.3s ease"
-      }}
-    >
+    <div style={{
+      background: "#fff", borderRadius: 12, padding: 20,
+      borderTop: `4px solid ${c}`, boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+    }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 12 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>
-          {label}
-        </span>
-        <div style={{
-          background: `${borderColors[colorClass]}15`,
-          padding: 8,
-          borderRadius: 8,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 16
-        }}>
-          {icon}
-        </div>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>{label}</span>
+        <div style={{ background: `${c}18`, padding: 8, borderRadius: 8, fontSize: 16 }}>{icon}</div>
       </div>
-      <h2 style={{ margin: "0 0 6px", fontSize: 32, fontWeight: 700, color: borderColors[colorClass] }}>
-        {value}
+      <h2 style={{ margin: "0 0 6px", fontSize: 32, fontWeight: 700, color: c }}>
+        {value ?? <span style={{ fontSize: 20, color: "#d1d5db" }}>—</span>}
       </h2>
       <p style={{ margin: 0, fontSize: 13, color: "#9ca3af" }}>{subtext}</p>
     </div>
   );
 }
 
-// Simple Line Chart Component
-function LineChart() {
+function BarChart({ data }) {
+  if (!data || data.length === 0) {
+    return <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>No data</div>;
+  }
+
+  const max = Math.max(...data.map(d => d.count), 1);
+  const W = 560, H = 200, padL = 40, padB = 40, padT = 10, padR = 10;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+  const barW = Math.max(4, Math.floor(chartW / data.length) - 2);
+
+  // Show only every Nth label to avoid crowding
+  const labelEvery = Math.ceil(data.length / 7);
+
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(f * max));
+
   return (
-    <div style={{ position: "relative", width: "100%", height: 300 }}>
-      <svg width="100%" height="100%" viewBox="0 0 600 300" style={{ overflow: "visible" }}>
-        {/* Grid */}
-        <line x1="50" y1="270" x2="580" y2="270" stroke="#e5e7eb" strokeWidth="1" />
-        <line x1="50" y1="210" x2="580" y2="210" stroke="#f3f4f6" strokeWidth="1" />
-        <line x1="50" y1="150" x2="580" y2="150" stroke="#f3f4f6" strokeWidth="1" />
-        <line x1="50" y1="90" x2="580" y2="90" stroke="#f3f4f6" strokeWidth="1" />
-        <line x1="50" y1="30" x2="580" y2="30" stroke="#f3f4f6" strokeWidth="1" />
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible" }}>
+      {/* grid + y-axis labels */}
+      {yTicks.map(v => {
+        const y = padT + chartH - (v / max) * chartH;
+        return (
+          <g key={v}>
+            <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="#f3f4f6" strokeWidth="1" />
+            <text x={padL - 6} y={y + 4} fontSize="10" fill="#9ca3af" textAnchor="end">{v}</text>
+          </g>
+        );
+      })}
+      {/* axes */}
+      <line x1={padL} y1={padT} x2={padL} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1" />
+      <line x1={padL} y1={padT + chartH} x2={W - padR} y2={padT + chartH} stroke="#e5e7eb" strokeWidth="1" />
 
-        {/* Y axis */}
-        <line x1="50" y1="20" x2="50" y2="280" stroke="#d1d5db" strokeWidth="2" />
-        {/* X axis */}
-        <line x1="50" y1="270" x2="580" y2="270" stroke="#d1d5db" strokeWidth="2" />
-
-        {/* Y labels */}
-        <text x="35" y="275" fontSize="12" fill="#6b7280" textAnchor="end">0</text>
-        <text x="35" y="215" fontSize="12" fill="#6b7280" textAnchor="end">250</text>
-        <text x="35" y="155" fontSize="12" fill="#6b7280" textAnchor="end">500</text>
-        <text x="35" y="95" fontSize="12" fill="#6b7280" textAnchor="end">750</text>
-        <text x="35" y="35" fontSize="12" fill="#6b7280" textAnchor="end">1000</text>
-
-        {/* Data lines - Blue line */}
-        <polyline
-          points="80,220 150,200 220,140 290,80 360,50 430,40 500,35"
-          fill="none"
-          stroke="#2563eb"
-          strokeWidth="3"
-          opacity="0.7"
-        />
-        {/* Data lines - Red line */}
-        <polyline
-          points="80,240 150,210 220,160 290,100 360,60 430,45 500,40"
-          fill="none"
-          stroke="#dc2626"
-          strokeWidth="3"
-          opacity="0.6"
-        />
-
-        {/* Gradient fill */}
-        <defs>
-          <linearGradient id="grad1" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#2563eb" stopOpacity="0.1" />
-            <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <polygon
-          points="80,220 150,200 220,140 290,80 360,50 430,40 500,35 500,270 430,270 360,270 290,270 220,270 150,270 80,270"
-          fill="url(#grad1)"
-        />
-
-        {/* X labels */}
-        <text x="80" y="290" fontSize="12" fill="#6b7280" textAnchor="middle">Last 7 Days</text>
-        <text x="220" y="290" fontSize="12" fill="#6b7280" textAnchor="middle">Last 15 Days</text>
-        <text x="360" y="290" fontSize="12" fill="#6b7280" textAnchor="middle">Last 30 Days</text>
-        <text x="500" y="290" fontSize="12" fill="#6b7280" textAnchor="middle">For The Year</text>
-      </svg>
-    </div>
+      {/* bars */}
+      {data.map((d, i) => {
+        const x = padL + i * (chartW / data.length) + (chartW / data.length - barW) / 2;
+        const barH = (d.count / max) * chartH;
+        const y = padT + chartH - barH;
+        const label = String(d.day).slice(5); // MM-DD
+        return (
+          <g key={i}>
+            <rect x={x} y={y} width={barW} height={barH} rx="2"
+              fill="#2563eb" opacity="0.75" />
+            {i % labelEvery === 0 && (
+              <text x={x + barW / 2} y={padT + chartH + 14} fontSize="9" fill="#9ca3af" textAnchor="middle">{label}</text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
-// Donut Chart Component
-function DonutChart() {
-  const total = 15;
-  const pending = 15;
-  const inProgress = 0;
-  const closed = 0;
+function DonutChart({ statusCounts, total }) {
+  if (!statusCounts || statusCounts.length === 0 || total === 0) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <svg width="160" height="160" viewBox="0 0 160 160">
+          <circle cx="80" cy="80" r="50" fill="none" stroke="#f3f4f6" strokeWidth="18" />
+          <text x="80" y="86" fontSize="22" fontWeight="700" textAnchor="middle" fill="#d1d5db">0</text>
+        </svg>
+        <p style={{ color: "#9ca3af", fontSize: 13 }}>No dockets yet</p>
+      </div>
+    );
+  }
+
+  const palette = ["#ea580c", "#2563eb", "#059669", "#7c3aed", "#dc2626"];
+  const circumference = 2 * Math.PI * 50;
+
+  const segments = statusCounts.reduce((acc, s, i) => {
+    const arc = (s.count / total) * circumference;
+    const runningOffset = acc.length > 0 ? acc[acc.length - 1].nextOffset : 0;
+    acc.push({ ...s, arc, offset: runningOffset, nextOffset: runningOffset + arc, color: palette[i % palette.length] });
+    return acc;
+  }, []);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-      <svg width="200" height="200" viewBox="0 0 200 200" style={{ marginBottom: 20 }}>
-        {/* Orange segment (Pending) */}
-        <circle cx="100" cy="100" r="60" fill="none" stroke="#ea580c" strokeWidth="20"
-          strokeDasharray={`${(pending / total) * 376.99} 376.99`}
-          strokeDashoffset="0"
-          transform="rotate(-90 100 100)" />
-        
-        {/* Blue segment (In Progress) */}
-        <circle cx="100" cy="100" r="60" fill="none" stroke="#2563eb" strokeWidth="20"
-          strokeDasharray={`${(inProgress / total) * 376.99} 376.99`}
-          strokeDashoffset={`-${(pending / total) * 376.99}`}
-          transform="rotate(-90 100 100)" />
-        
-        {/* Green segment (Closed) */}
-        <circle cx="100" cy="100" r="60" fill="none" stroke="#059669" strokeWidth="20"
-          strokeDasharray={`${(closed / total) * 376.99} 376.99`}
-          strokeDashoffset={`-${((pending + inProgress) / total) * 376.99}`}
-          transform="rotate(-90 100 100)" />
-
-        {/* Center text */}
-        <text x="100" y="110" fontSize="28" fontWeight="700" textAnchor="middle" fill="#000">
-          {total}
-        </text>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <svg width="160" height="160" viewBox="0 0 160 160">
+        {segments.map(s => (
+          <circle key={s.status} cx="80" cy="80" r="50"
+            fill="none"
+            stroke={s.color}
+            strokeWidth="18"
+            strokeDasharray={`${s.arc} ${circumference - s.arc}`}
+            strokeDashoffset={-s.offset}
+            transform="rotate(-90 80 80)"
+          />
+        ))}
+        <text x="80" y="86" fontSize="22" fontWeight="700" textAnchor="middle" fill="#111">{total}</text>
       </svg>
 
-      {/* Legend */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20, width: "100%", textAlign: "center" }}>
-        <div>
-          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Pending</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "#ea580c" }}>{pending}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>In Progress</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "#2563eb" }}>{inProgress}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Closed</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "#059669" }}>{closed}</div>
-        </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", justifyContent: "center", marginTop: 12 }}>
+        {segments.map(s => (
+          <div key={s.status} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: s.color, display: "inline-block" }} />
+            <span style={{ color: "#6b7280" }}>{s.status}</span>
+            <span style={{ fontWeight: 700, color: "#111" }}>{s.count}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
 export default function DashboardPage() {
-  const dashboardCards = [
-    { label: "Total Enquiries", value: "1122", subtext: "Across all periods", color: "red", icon: "📋" },
-    { label: "Resolved Enquiries", value: "912", subtext: "Across all periods", color: "blue", icon: "✓" },
-    { label: "Team Attendance", value: "0%", subtext: "0 / 0 Present Today", color: "green", icon: "👥" },
-    { label: "Delayed Vehicles", value: "0", subtext: "0 Today, 0 This Week", color: "orange", icon: "🚚" },
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardStats()
+      .then(setStats)
+      .catch(err => console.error("Dashboard stats error:", err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const last30Total = stats?.dailyCounts?.reduce((a, b) => a + b.count, 0) ?? 0;
+
+  const cards = [
+    {
+      label: "Total Dockets",
+      value: loading ? "…" : stats?.totalDockets ?? 0,
+      subtext: "All time",
+      color: "blue",
+      icon: "📋",
+    },
+    {
+      label: "Last 30 Days",
+      value: loading ? "…" : last30Total,
+      subtext: "Dockets this month",
+      color: "green",
+      icon: "📅",
+    },
+    {
+      label: "Total Lorries",
+      value: loading ? "…" : stats?.totalLorries ?? 0,
+      subtext: "Registered vehicles",
+      color: "orange",
+      icon: "🚚",
+    },
+    {
+      label: "Business Partners",
+      value: loading ? "…" : stats?.totalBusinessPartners ?? 0,
+      subtext: "Active partners",
+      color: "purple",
+      icon: "🤝",
+    },
   ];
 
   return (
     <MainLayout>
-      <div
-        style={{
-          minHeight: "100%",
-          background: "linear-gradient(135deg, #f3e8ff 0%, #f0f9ff 50%, #ecfdf5 100%)",
-          padding: 24
-        }}
-      >
+      <div style={{
+        minHeight: "100%",
+        background: "linear-gradient(135deg, #f3e8ff 0%, #f0f9ff 50%, #ecfdf5 100%)",
+        padding: 24,
+      }}>
         <PageBody title="Dashboard">
+
           {/* Stat Cards */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: 20,
-              marginBottom: 30
-            }}
-          >
-            {dashboardCards.map((card) => (
-              <StatCard
-                key={card.label}
-                label={card.label}
-                value={card.value}
-                subtext={card.subtext}
-                colorClass={card.color}
-                icon={card.icon}
-              />
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: 20,
+            marginBottom: 30,
+          }}>
+            {cards.map(c => (
+              <StatCard key={c.label} {...c} />
             ))}
           </div>
 
-          {/* Charts Section */}
-          <div
-            style={{
-              display: "grid",
-              gap: 24,
-              marginBottom: 20
-            }}
-            className="dashboardCharts"
-          >
-            {/* Left: Line Chart */}
-            <div
-              style={{
-                background: "#fff",
-                borderRadius: 12,
-                padding: 24,
-                boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#111" }}>
-                  📊 Enquiry Summary Overview
+          {/* Charts */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 20 }}
+            className="dashboardCharts">
+
+            {/* Bar chart — dockets per day */}
+            <div style={{ background: "#fff", borderRadius: 12, padding: 24, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#111" }}>
+                  📊 Dockets — Last 30 Days
                 </h3>
-                <span style={{ fontSize: 12, color: "#6b7280", cursor: "pointer" }}>Data visualization</span>
+                <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                  {loading ? "Loading…" : `${stats?.dailyCounts?.reduce((a, b) => a + b.count, 0) ?? 0} total`}
+                </span>
               </div>
-              <LineChart />
+              <BarChart data={stats?.dailyCounts} />
             </div>
 
-            {/* Right: Donut Chart */}
-            <div
-              style={{
-                background: "#fff",
-                borderRadius: 12,
-                padding: 24,
-                boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "center"
-              }}
-            >
-              <h3 style={{ margin: "0 0 24px", fontSize: 18, fontWeight: 700, color: "#111" }}>
-                📋 Task Status
+            {/* Donut chart — docket status */}
+            <div style={{
+              background: "#fff", borderRadius: 12, padding: 24,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+              display: "flex", flexDirection: "column",
+            }}>
+              <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#111" }}>
+                📋 Dockets by Pay Type
               </h3>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <div style={{ marginBottom: 20, fontSize: 12, color: "#9ca3af" }}>
-                  <strong style={{ color: "#111" }}>My Tasks</strong> — 15 Total
-                </div>
-                <DonutChart />
+              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {loading
+                  ? <span style={{ color: "#9ca3af", fontSize: 13 }}>Loading…</span>
+                  : <DonutChart statusCounts={stats?.statusCounts} total={stats?.totalDockets ?? 0} />
+                }
               </div>
             </div>
           </div>
+
         </PageBody>
       </div>
     </MainLayout>
