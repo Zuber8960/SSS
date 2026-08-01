@@ -5,7 +5,7 @@ module.exports = {
     async getAllCompanyData(recId, tenant_id) {
         const query = db('sss.ssm_company').select('*');
         if (tenant_id) query.where({ tenant_id, record_status: 0 });
-        return query;
+        return query.orderBy('company_code' , 'asc');
     },
 
     async getCompanyDataByRecId(recId, tenant_id) {

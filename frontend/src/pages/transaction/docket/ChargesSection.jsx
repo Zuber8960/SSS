@@ -139,7 +139,10 @@ const ChargesSection = forwardRef(function ChargesSection({
 
   // Expose saveCharges, getChargeList, and reset to parent via ref
   useImperativeHandle(ref, () => ({
-    getChargeList: () => chargeList,
+    getChargeList: () => chargeList.map((row) => {
+      const master = chargeMasterRef.current.find((m) => m.charge_code === row.charge_code);
+      return { ...row, charge_name: master ? master.charge_desc : row.charge_code };
+    }),
     reset: () => {
       const master = chargeMasterRef.current;
       tempIdCounter.current = -1;

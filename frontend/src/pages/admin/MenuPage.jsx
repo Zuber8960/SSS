@@ -172,7 +172,7 @@ export default function MenuPage() {
           search={{ placeholder: "Search Menu...", value: searchText, onChange: setSearchText }}
         />
         {loading && <div className="alertBox info">Loading...</div>}
-        <FormPanel flex>
+        <FormPanel columns={4}>
           {menuFields.map((field) => (
             <FormField
               key={field.name}

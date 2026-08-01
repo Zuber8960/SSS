@@ -3,10 +3,27 @@ import MainLayout from "../../layouts/MainLayout";
 
 import {
   DataTable,
-  FormField,
   FormPanel,
   PageBody,
 } from "../../components/common/MasterPage";
+import { TextField, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
+
+const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiSelect-select": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
+
+function MuiSelect({ label, name, value, onChange, options, disabled }) {
+  return (
+    <FormControl fullWidth size="small" sx={fieldSx} disabled={disabled}>
+      <InputLabel>{label}</InputLabel>
+      <Select label={label} size="small" value={value ?? ""} onChange={(e) => onChange(name, e.target.value)} sx={{ fontSize: 13 }}>
+        {options.map((opt) => (
+          <MenuItem key={typeof opt === "object" ? opt.value : opt} value={typeof opt === "object" ? opt.value : opt} sx={{ fontSize: 13 }}>
+            {typeof opt === "object" ? opt.label : opt}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  );
+}
 
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
@@ -29,37 +46,6 @@ import {
   validateLongHaul,
   validateLocalDelivery,
 } from "../../utils/cnsValidation";
-
-// ✅ Header Fields
-const manifestFields = [
-  { label: "Manifest No", name: "manifest_no" },
-  {
-    label: "Manifest Type",
-    name: "manifest_type",
-    options: [
-      { label: "local pickup", value: "lp" },
-      { label: "long haul", value: "lh" },
-      { label: "local delivery", value: "ld" }
-    ],
-  },
-
-  { label: "Manifest Date", name: "manifest_date", type: "date" },
-  { label: "From Location", name: "from_loc", isLocation: true },
-  { label: "From Town", name: "from_town" },
-  { label: "To Location", name: "to_loc", isLocation: true },
-  { label: "To Town", name: "to_town" },
-
-  { label: "Vehicle No", name: "vehicle_no" },
-  { label: "Driver Name", name: "driver_name" },
-  { label: "Driver Mobile", name: "driver_mobile" },
-
-
-  { label: "No of Dockets", name: "no_of_docket", type: "number" ,disabled: true},
-  { label: "Total Weight", name: "total_wt", type: "number", disabled: true },
-  { label: "Total Packages", name: "total_pkgs", type: "number", disabled: true },
-
-  { label: "Remarks", name: "remarks", type: "textarea" },
-];
 
 // ✅ Detail Table Columns (Dockets inside Manifest)
 // Only docket_no is editable; all other columns are read-only (auto-filled from API)
@@ -1047,20 +1033,6 @@ export default function ManifestPage() {
     flexWrap: "wrap",
   };
 
-  // Inject location/town options for fields in FormPanel
-  const getFieldWithOptions = (field) => {
-    if (field.isLocation) {
-      return { ...field, options: locationOptions };
-    }
-    if (field.name === "from_town") {
-      return { ...field, options: townFieldOptions.from };
-    }
-    if (field.name === "to_town") {
-      return { ...field, options: townFieldOptions.to };
-    }
-    return field;
-  };
-
   return (
     <MainLayout>
       <PageBody title="Manifest Entry">
@@ -1112,83 +1084,82 @@ export default function ManifestPage() {
 
         {/* ✅ Header Form */}
         <FormPanel>
-          {manifestFields.map((field) => {
-            // Special: when search is active, render manifest_no as plain input with Enter/Blur handlers
-            // Vehicle No: auto-uppercase + validate against Lorry Master
-            if (field.name === "vehicle_no") {
-              return (
-                <div key={field.name} className="formFieldGroup">
-                  <label>Vehicle No</label>
-                  <input
-                    type="text"
-                    value={form.vehicle_no}
-                    onChange={(e) => handleVehicleNoChange(e.target.value)}
-                    onBlur={handleVehicleNoValidate}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        handleVehicleNoValidate();
-                      }
-                    }}
-                    placeholder="Enter Vehicle No"
-                  />
-                </div>
-              );
-            }
-            if (field.name === "manifest_no" && isSearchActive) {
-              return (
-                <div key={field.name} className="formFieldGroup">
-                  <label>Manifest No</label>
-                  <input
-                    type="text"
-                    value={form.manifest_no}
-                    onChange={(e) => setForm({ ...form, manifest_no: e.target.value })}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        const mnfNo = form.manifest_no.trim();
-                        if (mnfNo) fetchAndLoadManifest(mnfNo);
-                      }
-                    }}
-                    onBlur={() => {
-                      const mnfNo = form.manifest_no.trim();
-                      if (mnfNo && isSearchActive) fetchAndLoadManifest(mnfNo);
-                    }}
-                    placeholder="Enter Manifest No"
-                    autoFocus
-                  />
-                </div>
-              );
-            }
-            const displayForm = {
-              ...form,
-              no_of_docket: computedTotals.total_dockets,
-              total_wt: computedTotals.total_wt,
-              total_pkgs: computedTotals.total_pkgs,
-            };
-            const enhancedField = getFieldWithOptions(field);
-            if (field.name === "remarks") {
-              return (
-                <div key={field.name} style={{ gridColumn: "1 / -1" }}>
-                  <FormField
-                    {...enhancedField}
-                    form={displayForm}
-                    setForm={setForm}
-                  />
-                </div>
-              );
-            }
-            return (
-              <FormField
-                key={field.name}
-                {...enhancedField}
-                form={displayForm}
-                setForm={setForm}
-                disabled={
-                  field.disabled ||
-                  (field.name === "manifest_no" && mode === "create" && !isSearchActive)
-                }
+          {isSearchActive ? (
+            <div className="formFieldGroup">
+              <label>Manifest No</label>
+              <input
+                type="text"
+                value={form.manifest_no}
+                onChange={(e) => setForm({ ...form, manifest_no: e.target.value })}
+                onKeyDown={(e) => { if (e.key === "Enter") { const mnfNo = form.manifest_no.trim(); if (mnfNo) fetchAndLoadManifest(mnfNo); } }}
+                onBlur={() => { const mnfNo = form.manifest_no.trim(); if (mnfNo && isSearchActive) fetchAndLoadManifest(mnfNo); }}
+                placeholder="Enter Manifest No"
+                autoFocus
               />
-            );
-          })}
+            </div>
+          ) : (
+            <TextField size="small" label="Manifest No" fullWidth sx={fieldSx}
+              value={form.manifest_no}
+              onChange={(e) => setForm((prev) => ({ ...prev, manifest_no: e.target.value }))}
+              disabled={mode === "create" && !isSearchActive} />
+          )}
+
+          <MuiSelect label="Manifest Type" name="manifest_type" value={form.manifest_type}
+            onChange={(name, val) => setForm((prev) => ({ ...prev, [name]: val }))}
+            options={[{ label: "Local Pickup", value: "lp" }, { label: "Long Haul", value: "lh" }, { label: "Local Delivery", value: "ld" }]} />
+
+          <TextField size="small" label="Manifest Date" type="date" fullWidth sx={fieldSx}
+            value={form.manifest_date}
+            onChange={(e) => setForm((prev) => ({ ...prev, manifest_date: e.target.value }))}
+            slotProps={{ inputLabel: { shrink: true } }} />
+
+          <MuiSelect label="From Location" name="from_loc" value={form.from_loc}
+            onChange={(name, val) => setForm((prev) => ({ ...prev, [name]: val }))}
+            options={locationOptions} />
+
+          <MuiSelect label="From Town" name="from_town" value={form.from_town}
+            onChange={(name, val) => setForm((prev) => ({ ...prev, [name]: val }))}
+            options={townFieldOptions.from} />
+
+          <MuiSelect label="To Location" name="to_loc" value={form.to_loc}
+            onChange={(name, val) => setForm((prev) => ({ ...prev, [name]: val }))}
+            options={locationOptions} />
+
+          <MuiSelect label="To Town" name="to_town" value={form.to_town}
+            onChange={(name, val) => setForm((prev) => ({ ...prev, [name]: val }))}
+            options={townFieldOptions.to} />
+
+          <TextField size="small" label="Vehicle No" fullWidth sx={fieldSx}
+            value={form.vehicle_no}
+            onChange={(e) => handleVehicleNoChange(e.target.value)}
+            onBlur={handleVehicleNoValidate}
+            onKeyDown={(e) => { if (e.key === "Enter") handleVehicleNoValidate(); }} />
+
+          <TextField size="small" label="Driver Name" fullWidth sx={fieldSx}
+            value={form.driver_name}
+            onChange={(e) => setForm((prev) => ({ ...prev, driver_name: e.target.value }))} />
+
+          <TextField size="small" label="Driver Mobile" fullWidth sx={fieldSx}
+            value={form.driver_mobile}
+            onChange={(e) => setForm((prev) => ({ ...prev, driver_mobile: e.target.value }))} />
+
+          <TextField size="small" label="No of Dockets" fullWidth sx={fieldSx} type="number"
+            value={computedTotals.total_dockets} disabled
+            slotProps={{ input: { readOnly: true } }} />
+
+          <TextField size="small" label="Total Weight" fullWidth sx={fieldSx} type="number"
+            value={computedTotals.total_wt} disabled
+            slotProps={{ input: { readOnly: true } }} />
+
+          <TextField size="small" label="Total Packages" fullWidth sx={fieldSx} type="number"
+            value={computedTotals.total_pkgs} disabled
+            slotProps={{ input: { readOnly: true } }} />
+
+          <div style={{ gridColumn: "1 / -1" }}>
+            <TextField size="small" label="Remarks" fullWidth sx={fieldSx} multiline rows={2}
+              value={form.remarks}
+              onChange={(e) => setForm((prev) => ({ ...prev, remarks: e.target.value }))} />
+          </div>
         </FormPanel>
 
         <div style={sectionHeaderStyle}>

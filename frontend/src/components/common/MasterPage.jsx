@@ -186,49 +186,34 @@ export function FormField({
   onBlur,
   required = false,
 }) {
-  const updateField = (value) => setForm({ ...form, [name]: value });
+  const handleChange = (fieldName, value) => setForm({ ...form, [fieldName]: value });
+
+  if (options) {
+    return (
+      <MuiSelectField
+        label={label}
+        name={name}
+        value={form[name]}
+        onChange={handleChange}
+        options={options}
+        disabled={disabled}
+        required={required}
+      />
+    );
+  }
 
   return (
-    <div className="formFieldGroup">
-      <label>
-        {label}
-        {required && <span style={{ color: "#e53935", marginLeft: 2 }}>*</span>}
-      </label>
-      {options ? (
-        <select
-          value={form[name]}
-          disabled={disabled}
-          onChange={(e) => updateField(e.target.value)}
-          onKeyDown={onKeyDown}
-          onBlur={onBlur}
-        >
-          <option value="">Select {label}</option>
-          {options.map((option) => (
-            <option key={option.value ?? option} value={option.value ?? option}>
-              {option.label ?? option}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <input
-          type={type === "number" ? "text" : type}
-          inputMode={type === "number" ? "numeric" : undefined}
-          value={form[name]}
-          disabled={disabled}
-          onChange={(e) => {
-            if (type === "number") {
-              const cleaned = e.target.value.replace(/[^0-9]/g, "");
-              updateField(cleaned);
-            } else {
-              updateField(e.target.value);
-            }
-          }}
-          onKeyDown={onKeyDown}
-          onBlur={onBlur}
-          placeholder={`Enter ${label}`}
-        />
-      )}
-    </div>
+    <MuiField
+      label={label}
+      name={name}
+      value={form[name]}
+      onChange={handleChange}
+      type={type}
+      disabled={disabled}
+      required={required}
+      onKeyDown={onKeyDown}
+      onBlur={onBlur}
+    />
   );
 }
 

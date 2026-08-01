@@ -1,12 +1,13 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import MainLayout from "../../layouts/MainLayout";
-import { IconButton, Tooltip } from "@mui/material";
+import { IconButton, Tooltip, TextField } from "@mui/material";
 import { SaveIcon, ResetIcon } from "../../components/common/icons";
 
 import {
-  FormField,
   PageBody,
 } from "../../components/common/MasterPage";
+
+const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiSelect-select": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
 
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
@@ -16,27 +17,6 @@ import StatusGrid from "../../components/common/StatusGrid";
 
 import { fetchManifestByNo, fetchManifestsByLocation } from "../../utils/manifest";
 import { fetchDocketByDocketNo } from "../../utils/docket";
-
-// ------------------- HEADER FIELDS -------------------
-const headerFields = [
-  { label: "Manifest No", name: "manifest_no", disabled: true },
-  { label: "Manifest Date", name: "manifest_date", type: "date", disabled: true },
-  { label: "Origin Branch", name: "origin_branch", disabled: true },
-  { label: "Destination Branch", name: "dest_branch", disabled: true },
-  { label: "Vehicle No", name: "vehicle_no", disabled: true },
-  { label: "Vehicle Type", name: "vehicle_type", disabled: true },
-  { label: "Driver Name", name: "driver_name", disabled: true },
-  { label: "Driver Mobile", name: "driver_mobile", disabled: true },
-  { label: "Arrival Date", name: "arrival_date", type: "date" },
-  { label: "Arrival Time", name: "arrival_time", type: "time" },
-  { label: "Seal No", name: "seal_no" },
-  { label: "Unloading Dock No", name: "dock_no" },
-  { label: "Total Dockets", name: "total_dockets", type: "number", disabled: true },
-  { label: "Total Packages", name: "total_packages", type: "number", disabled: true },
-  { label: "Total Weight", name: "total_weight", type: "number", disabled: true },
-  // { label: "Manifest Status", name: "manifest_status", disabled: true },
-  { label: "Arrival Remarks", name: "arrival_remarks", type: "textarea" },
-];
 
 // ------------------- DOCKET COLUMNS (original) -------------------
 const statusOptions = ["OK", "Short", "Excess", "Damage", "Leakage", "Missing", "Returned", "Hold"];
@@ -112,7 +92,7 @@ export default function ManifestUnloading() {
 
   const [form, setForm] = useState({ ...emptyForm });
   const [dockets, setDockets] = useState([]);
-  const [searchMode, setSearchMode] = useState(true);
+  const [searchMode] = useState(true);
 
   // State for the location-based manifest list grid on top
   const [locationManifests, setLocationManifests] = useState([]);
@@ -204,7 +184,6 @@ export default function ManifestUnloading() {
       id: docket.rec_id || docket.id || index + 1,
       sr: index + 1,
       docket_no: docket.dwb_no || docket.docket_no || "",
-      booking_date: docket.dwb_date || docket.booking_date || docket.date || "",
       booking_date: new Date(docket.dwb_date || docket.docket_date).toLocaleDateString(),
       consignor: docket.consignor || docket.from_party || docket.dwb_loc || "",
       consignee: docket.consignee || docket.to_party || "",
@@ -260,7 +239,7 @@ export default function ManifestUnloading() {
             } else {
               fetchedDockets.push(mapDocketToRow(detail, fetchedDockets.length));
             }
-          } catch (err) {
+          } catch {
             fetchedDockets.push(mapDocketToRow(detail, fetchedDockets.length));
           }
         }
@@ -446,11 +425,6 @@ export default function ManifestUnloading() {
   };
 
   // ------------------- RENDER SECTION CARD -------------------
-  const fieldMap = {};
-  headerFields.forEach((f) => {
-    fieldMap[f.name] = f;
-  });
-
   const sectionCardStyles = {
     sectionCard: {
       background: "#fffefe",
@@ -480,9 +454,6 @@ export default function ManifestUnloading() {
   };
 
   const renderFormSection = () => {
-    const sectionFieldConfigs = headerFields.filter(Boolean);
-    if (sectionFieldConfigs.length === 0) return null;
-
     const horizontalStyle = {
       padding: "14px 16px",
       display: "flex",
@@ -498,28 +469,58 @@ export default function ManifestUnloading() {
           <h4 style={sectionCardStyles.sectionTitle}>Manifest Information</h4>
         </div>
         <div style={horizontalStyle}>
-          {sectionFieldConfigs.map((field) => {
-            const isTextarea = field.type === "textarea";
-            const fieldStyle = {
-              minWidth: 130,
-              flex: "0 1 auto",
-              ...(isTextarea || field.fullWidth ? { flex: "1 1 50%" } : {}),
-            };
-            return (
-              <div key={field.name} style={fieldStyle}>
-                <FormField
-                  {...field}
-                  form={form}
-                  setForm={setForm}
-                  disabled={
-                    field.disabled || (field.name === "manifest_no" && !searchMode)
-                  }
-                  onKeyDown={field.name === "manifest_no" ? handleManifestNoKeyDown : undefined}
-                  onBlur={field.name === "manifest_no" ? handleManifestNoBlur : undefined}
-                />
-              </div>
-            );
-          })}
+          {/* Manifest No — searchable */}
+          <TextField size="small" label="Manifest No" sx={{ ...fieldSx, minWidth: 150 }}
+            value={form.manifest_no}
+            onChange={(e) => setForm((p) => ({ ...p, manifest_no: e.target.value }))}
+            onKeyDown={handleManifestNoKeyDown}
+            onBlur={handleManifestNoBlur}
+            disabled={!searchMode} />
+          <TextField size="small" label="Manifest Date" type="date" sx={{ ...fieldSx, minWidth: 150 }}
+            value={form.manifest_date}
+            onChange={(e) => setForm((p) => ({ ...p, manifest_date: e.target.value }))}
+            slotProps={{ inputLabel: { shrink: true } }} disabled />
+          <TextField size="small" label="Origin Branch" sx={{ ...fieldSx, minWidth: 130 }}
+            value={form.origin_branch} disabled
+            onChange={(e) => setForm((p) => ({ ...p, origin_branch: e.target.value }))} />
+          <TextField size="small" label="Destination Branch" sx={{ ...fieldSx, minWidth: 130 }}
+            value={form.dest_branch} disabled
+            onChange={(e) => setForm((p) => ({ ...p, dest_branch: e.target.value }))} />
+          <TextField size="small" label="Vehicle No" sx={{ ...fieldSx, minWidth: 130 }}
+            value={form.vehicle_no} disabled
+            onChange={(e) => setForm((p) => ({ ...p, vehicle_no: e.target.value }))} />
+          <TextField size="small" label="Vehicle Type" sx={{ ...fieldSx, minWidth: 110 }}
+            value={form.vehicle_type} disabled
+            onChange={(e) => setForm((p) => ({ ...p, vehicle_type: e.target.value }))} />
+          <TextField size="small" label="Driver Name" sx={{ ...fieldSx, minWidth: 130 }}
+            value={form.driver_name} disabled
+            onChange={(e) => setForm((p) => ({ ...p, driver_name: e.target.value }))} />
+          <TextField size="small" label="Driver Mobile" sx={{ ...fieldSx, minWidth: 120 }}
+            value={form.driver_mobile} disabled
+            onChange={(e) => setForm((p) => ({ ...p, driver_mobile: e.target.value }))} />
+          <TextField size="small" label="Arrival Date" type="date" sx={{ ...fieldSx, minWidth: 150 }}
+            value={form.arrival_date}
+            onChange={(e) => setForm((p) => ({ ...p, arrival_date: e.target.value }))}
+            slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField size="small" label="Arrival Time" type="time" sx={{ ...fieldSx, minWidth: 130 }}
+            value={form.arrival_time}
+            onChange={(e) => setForm((p) => ({ ...p, arrival_time: e.target.value }))}
+            slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField size="small" label="Seal No" sx={{ ...fieldSx, minWidth: 120 }}
+            value={form.seal_no}
+            onChange={(e) => setForm((p) => ({ ...p, seal_no: e.target.value }))} />
+          <TextField size="small" label="Unloading Dock No" sx={{ ...fieldSx, minWidth: 130 }}
+            value={form.dock_no}
+            onChange={(e) => setForm((p) => ({ ...p, dock_no: e.target.value }))} />
+          <TextField size="small" label="Total Dockets" type="number" sx={{ ...fieldSx, minWidth: 110 }}
+            value={form.total_dockets} disabled />
+          <TextField size="small" label="Total Packages" type="number" sx={{ ...fieldSx, minWidth: 110 }}
+            value={form.total_packages} disabled />
+          <TextField size="small" label="Total Weight" type="number" sx={{ ...fieldSx, minWidth: 110 }}
+            value={form.total_weight} disabled />
+          <TextField size="small" label="Arrival Remarks" sx={{ ...fieldSx, flex: "1 1 50%", minWidth: 200 }}
+            value={form.arrival_remarks} multiline rows={2}
+            onChange={(e) => setForm((p) => ({ ...p, arrival_remarks: e.target.value }))} />
         </div>
       </div>
     );
