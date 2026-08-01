@@ -12,7 +12,7 @@ import { fetchAllDockets, fetchCharges } from "../../utils/docket";
 import { fetchAllLocations } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { RefreshIcon, PrintIcon } from "../../components/common/icons";
-import { IconButton, Tooltip, Chip, Button, TextField, Menu, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
+import { IconButton, Tooltip, Button, TextField, Menu, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import { printDocket } from "../../components/common/DocketPrint";
 import moment from "moment";
@@ -230,10 +230,17 @@ export default function DocketReport() {
               }}
             />
 
-            <Chip label={`${gridRows.length} docket(s)`} size="small" color="primary" variant="outlined" sx={{ fontWeight: 600 }} />
-            {selectedRow && (
-              <Chip label={`Selected: ${selectedRow.docket_no}`} size="small" color="success" variant="outlined" sx={{ fontWeight: 600 }} />
-            )}
+            <div style={{
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              minWidth: 52, padding: "4px 12px",
+              background: "#f3e8ff", borderRadius: 8, border: "1.5px solid #d8b4fe",
+              lineHeight: 1.2,
+            }}>
+              <span style={{ fontSize: 18, fontWeight: 700, color: "#7e22ce" }}>{gridRows.length}</span>
+              <span style={{ fontSize: 10, fontWeight: 500, color: "#9333ea", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                {searchText.trim() ? "filtered" : "dockets"}
+              </span>
+            </div>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -271,8 +278,55 @@ export default function DocketReport() {
           </div>
         </div>
 
+        {/* ── Selected docket info strip ── */}
+        {selectedRow ? (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+            marginTop: 10, padding: "8px 14px",
+            background: "#f3e8ff", borderRadius: 8,
+            border: "1.5px solid #d8b4fe",
+            fontSize: 13,
+          }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 5, fontWeight: 700, color: "#7e22ce" }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#7e22ce", display: "inline-block" }} />
+              {selectedRow.docket_no}
+            </span>
+            <span style={{ color: "#6b7280" }}>|</span>
+            <span style={{ color: "#374151" }}>{selectedRow.cnor_name || "—"}</span>
+            <span style={{ color: "#7e22ce", fontWeight: 600 }}>→</span>
+            <span style={{ color: "#374151" }}>{selectedRow.cnee_name || "—"}</span>
+            <span style={{ color: "#6b7280" }}>|</span>
+            <span style={{ color: "#374151" }}>
+              {selectedRow.docket_pickup_town || selectedRow.docket_loc || "—"}
+              <span style={{ color: "#7e22ce", fontWeight: 600, margin: "0 4px" }}>→</span>
+              {selectedRow.docket_dly_town || selectedRow.docket_to_loc || "—"}
+            </span>
+            {selectedRow.delivery_status && (
+              <>
+                <span style={{ color: "#6b7280" }}>|</span>
+                <span style={{
+                  padding: "2px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600,
+                  background: selectedRow.delivery_status === "Delivered" ? "#dcfce7" : "#fff7ed",
+                  color: selectedRow.delivery_status === "Delivered" ? "#15803d" : "#ea580c",
+                }}>
+                  {selectedRow.delivery_status}
+                </span>
+              </>
+            )}
+          </div>
+        ) : (
+          <div style={{
+            marginTop: 10, padding: "7px 14px",
+            background: "#f9fafb", borderRadius: 8,
+            border: "1.5px dashed #d1d5db",
+            fontSize: 13, color: "#9ca3af", fontStyle: "italic",
+          }}>
+            No docket selected — click a row to select
+          </div>
+        )}
+
         {/* ── Docket Grid ── */}
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 10 }}>
           <DataTable
             columns={docketColumns}
             rows={gridRows}
