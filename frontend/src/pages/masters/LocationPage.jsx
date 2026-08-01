@@ -183,7 +183,8 @@ export default function LocationPage() {
             slotProps={{ inputLabel: { shrink: true } }} />
           <TextField size="small" label="Closed On" type="date" fullWidth sx={fieldSx}
             value={form.loc_closed_on} onChange={(e) => setField("loc_closed_on", e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }} />
+            slotProps={{ inputLabel: { shrink: true } }}
+            disabled={!isEditing} />
           <MuiSelect label="Status" name="loc_status" value={form.loc_status} onChange={setField}
             options={[{ label: "Active", value: "A" }, { label: "Inactive", value: "I" }]} />
           <MuiSelect label="Division Code" name="division_code" value={form.division_code} onChange={setField}

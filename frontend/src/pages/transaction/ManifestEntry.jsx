@@ -975,6 +975,10 @@ export default function ManifestPage() {
       showError("Please add docket to save the manifest");
       return;
     }
+    if (form.driver_mobile && form.driver_mobile.length !== 10) {
+      showError("Driver Mobile number must be exactly 10 digits");
+      return;
+    }
 
     try {
       showLoading();
@@ -1024,6 +1028,25 @@ export default function ManifestPage() {
       hideLoading();
     }
   };
+
+  const mobileError = !!form.driver_mobile && form.driver_mobile.length !== 10;
+
+  const headerFields = [
+    { name: "manifest_no",    label: "Manifest No",    inputProps: { inputMode: "numeric" } },
+    { name: "manifest_type",  label: "Manifest Type",  type: "select", options: [{ label: "Local Pickup", value: "lp" }, { label: "Long Haul", value: "lh" }, { label: "Local Delivery", value: "ld" }] },
+    { name: "manifest_date",  label: "Manifest Date",  type: "date",   slotProps: { inputLabel: { shrink: true } } },
+    { name: "from_loc",       label: "From Location",  type: "select", options: locationOptions },
+    { name: "from_town",      label: "From Town",      type: "select", options: townFieldOptions.from },
+    { name: "to_loc",         label: "To Location",    type: "select", options: locationOptions },
+    { name: "to_town",        label: "To Town",        type: "select", options: townFieldOptions.to },
+    { name: "vehicle_no",     label: "Vehicle No" },
+    { name: "driver_name",    label: "Driver Name" },
+    { name: "driver_mobile",  label: "Driver Mobile",  inputProps: { inputMode: "numeric", maxLength: 10 }, error: mobileError, helperText: mobileError ? "Mobile number must be 10 digits" : "" },
+    { name: "total_dockets",  label: "No of Dockets",  type: "number", disabled: true, value: computedTotals.total_dockets, slotProps: { input: { readOnly: true } } },
+    { name: "total_wt",       label: "Total Weight",   type: "number", disabled: true, value: computedTotals.total_wt,      slotProps: { input: { readOnly: true } } },
+    { name: "total_pkgs",     label: "Total Packages", type: "number", disabled: true, value: computedTotals.total_pkgs,    slotProps: { input: { readOnly: true } } },
+    { name: "remarks",        label: "Remarks",        multiline: true, rows: 2, fullSpan: true },
+  ];
 
   const sectionHeaderStyle = {
     display: "flex",
@@ -1084,82 +1107,50 @@ export default function ManifestPage() {
 
         {/* ✅ Header Form */}
         <FormPanel>
-          {isSearchActive ? (
-            <div className="formFieldGroup">
-              <label>Manifest No</label>
-              <input
-                type="text"
-                value={form.manifest_no}
-                onChange={(e) => setForm({ ...form, manifest_no: e.target.value })}
-                onKeyDown={(e) => { if (e.key === "Enter") { const mnfNo = form.manifest_no.trim(); if (mnfNo) fetchAndLoadManifest(mnfNo); } }}
-                onBlur={() => { const mnfNo = form.manifest_no.trim(); if (mnfNo && isSearchActive) fetchAndLoadManifest(mnfNo); }}
-                placeholder="Enter Manifest No"
-                autoFocus
+          {headerFields.map((f) => {
+            const value = f.value !== undefined ? f.value : (form[f.name] ?? "");
+
+            if (f.type === "select") {
+              return (
+                <MuiSelect key={f.name} label={f.label} name={f.name} value={value}
+                  onChange={(name, val) => setForm((prev) => ({ ...prev, [name]: val }))}
+                  options={f.options} disabled={f.disabled} />
+              );
+            }
+
+            let onChange, onKeyDown, onBlur, disabled, autoFocus;
+
+            if (f.name === "manifest_no") {
+              disabled   = mode === "create" && !isSearchActive;
+              autoFocus  = isSearchActive;
+              onChange   = (e) => setForm((prev) => ({ ...prev, manifest_no: e.target.value.replace(/\D/g, "") }));
+              onKeyDown  = (e) => { if (e.key === "Enter" && isSearchActive) { const v = form.manifest_no.trim(); if (v) fetchAndLoadManifest(v); } };
+              onBlur     = () => { const v = form.manifest_no.trim(); if (v && isSearchActive) fetchAndLoadManifest(v); };
+            } else if (f.name === "vehicle_no") {
+              onChange   = (e) => handleVehicleNoChange(e.target.value);
+              onKeyDown  = (e) => { if (e.key === "Enter") handleVehicleNoValidate(); };
+              onBlur     = handleVehicleNoValidate;
+            } else if (f.name === "driver_mobile") {
+              onChange   = (e) => setForm((prev) => ({ ...prev, driver_mobile: e.target.value.replace(/\D/g, "").slice(0, 10) }));
+            } else {
+              onChange   = (e) => setForm((prev) => ({ ...prev, [f.name]: e.target.value }));
+              disabled   = f.disabled;
+            }
+
+            const field = (
+              <TextField key={f.name} size="small" label={f.label} fullWidth sx={fieldSx}
+                type={f.type || "text"} value={value}
+                onChange={onChange} disabled={disabled} autoFocus={autoFocus}
+                multiline={f.multiline} rows={f.rows}
+                inputProps={f.inputProps} error={f.error} helperText={f.helperText}
+                slotProps={f.slotProps} onKeyDown={onKeyDown} onBlur={onBlur}
               />
-            </div>
-          ) : (
-            <TextField size="small" label="Manifest No" fullWidth sx={fieldSx}
-              value={form.manifest_no}
-              onChange={(e) => setForm((prev) => ({ ...prev, manifest_no: e.target.value }))}
-              disabled={mode === "create" && !isSearchActive} />
-          )}
+            );
 
-          <MuiSelect label="Manifest Type" name="manifest_type" value={form.manifest_type}
-            onChange={(name, val) => setForm((prev) => ({ ...prev, [name]: val }))}
-            options={[{ label: "Local Pickup", value: "lp" }, { label: "Long Haul", value: "lh" }, { label: "Local Delivery", value: "ld" }]} />
-
-          <TextField size="small" label="Manifest Date" type="date" fullWidth sx={fieldSx}
-            value={form.manifest_date}
-            onChange={(e) => setForm((prev) => ({ ...prev, manifest_date: e.target.value }))}
-            slotProps={{ inputLabel: { shrink: true } }} />
-
-          <MuiSelect label="From Location" name="from_loc" value={form.from_loc}
-            onChange={(name, val) => setForm((prev) => ({ ...prev, [name]: val }))}
-            options={locationOptions} />
-
-          <MuiSelect label="From Town" name="from_town" value={form.from_town}
-            onChange={(name, val) => setForm((prev) => ({ ...prev, [name]: val }))}
-            options={townFieldOptions.from} />
-
-          <MuiSelect label="To Location" name="to_loc" value={form.to_loc}
-            onChange={(name, val) => setForm((prev) => ({ ...prev, [name]: val }))}
-            options={locationOptions} />
-
-          <MuiSelect label="To Town" name="to_town" value={form.to_town}
-            onChange={(name, val) => setForm((prev) => ({ ...prev, [name]: val }))}
-            options={townFieldOptions.to} />
-
-          <TextField size="small" label="Vehicle No" fullWidth sx={fieldSx}
-            value={form.vehicle_no}
-            onChange={(e) => handleVehicleNoChange(e.target.value)}
-            onBlur={handleVehicleNoValidate}
-            onKeyDown={(e) => { if (e.key === "Enter") handleVehicleNoValidate(); }} />
-
-          <TextField size="small" label="Driver Name" fullWidth sx={fieldSx}
-            value={form.driver_name}
-            onChange={(e) => setForm((prev) => ({ ...prev, driver_name: e.target.value }))} />
-
-          <TextField size="small" label="Driver Mobile" fullWidth sx={fieldSx}
-            value={form.driver_mobile}
-            onChange={(e) => setForm((prev) => ({ ...prev, driver_mobile: e.target.value }))} />
-
-          <TextField size="small" label="No of Dockets" fullWidth sx={fieldSx} type="number"
-            value={computedTotals.total_dockets} disabled
-            slotProps={{ input: { readOnly: true } }} />
-
-          <TextField size="small" label="Total Weight" fullWidth sx={fieldSx} type="number"
-            value={computedTotals.total_wt} disabled
-            slotProps={{ input: { readOnly: true } }} />
-
-          <TextField size="small" label="Total Packages" fullWidth sx={fieldSx} type="number"
-            value={computedTotals.total_pkgs} disabled
-            slotProps={{ input: { readOnly: true } }} />
-
-          <div style={{ gridColumn: "1 / -1" }}>
-            <TextField size="small" label="Remarks" fullWidth sx={fieldSx} multiline rows={2}
-              value={form.remarks}
-              onChange={(e) => setForm((prev) => ({ ...prev, remarks: e.target.value }))} />
-          </div>
+            return f.fullSpan
+              ? <div key={f.name} style={{ gridColumn: "1 / -1" }}>{field}</div>
+              : field;
+          })}
         </FormPanel>
 
         <div style={sectionHeaderStyle}>
