@@ -142,9 +142,19 @@ const getListEwayDetails = async (ewbLists) => {
   }
 };
 
-const getAllDockets = async (tenant_id) => {
-  const query = db('sss.sst_docket').select('*').where({ record_status: 0 });
-  if (tenant_id) query.andWhere({ tenant_id });
+const getAllDockets = async (tenant_id, cnor_cnee) => {
+  const query = db('sss.sst_docket as d').select('*').where({ record_status: 0 });
+  if (tenant_id) {
+    query.andWhere('d.tenant_id', tenant_id);
+  }
+  if (cnor_cnee) {
+    query.leftJoin('sss.ssm_business_partner as cnor', 'd.cnor_id', 'cnor.record_id')
+      .leftJoin('sss.ssm_business_partner as cnee', 'd.cnee_id', 'cnee.record_id')
+      .select(
+        'cnor.bp_name as cnor_name',
+        'cnee.bp_name as cnee_name',
+      )
+  }
   return query;
 };
 
@@ -337,7 +347,7 @@ const deleteDocket = async (keys, trx = db) => {
 
 const getChargeMaster = async (tenant_id) => {
   const query = db('sss.ssm_charge_master')
-    .where({status: '1'})
+    .where({ status: '1' })
     .select('charge_code', 'charge_desc', 'default_rate');
   if (tenant_id) query.andWhere({ tenant_id });
   return query.orderBy('charge_code');
@@ -453,7 +463,7 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
       const bpWarnings = [];
 
       const cnorGstin = ewbDtl?.CNOR_GSTIN || null;
-      const cnorName  = ewbDtl?.FROM_CUST_NAME || null;
+      const cnorName = ewbDtl?.FROM_CUST_NAME || null;
       let cnorBp = null;
       if (cnorGstin || cnorName) {
         if (cnorGstin) {
@@ -475,7 +485,7 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
       }
 
       const cneeGstin = ewbDtl?.CNEE_GSTIN || null;
-      const cneeName  = ewbDtl?.TO_CUST_NAME || null;
+      const cneeName = ewbDtl?.TO_CUST_NAME || null;
       let cneeBp = null;
       if (cneeGstin || cneeName) {
         if (cneeGstin) {
@@ -497,27 +507,27 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
       }
 
       docketData = {
-        ewb_no:        String(firstWithDtl.EWB_NO),
-        docket_no:     null,
-        docket_date:   null,
-        cnor_id:       cnorBp?.record_id             ?? null,
-        cnor_name:     ewbDtl?.FROM_CUST_NAME        || null,
-        cnor_address:  ewbDtl?.FROM_ADDRESS          || null,
-        cnor_city:     ewbDtl?.FROM_PLACE            || null,
-        cnor_state:    ewbDtl?.FROM_STATE            || null,
-        cnor_pincode:  ewbDtl?.FROM_PINCODE          || null,
-        cnor_gstin:    ewbDtl?.CNOR_GSTIN            || null,
-        cnee_id:       cneeBp?.record_id             ?? null,
-        cnee_name:     ewbDtl?.TO_CUST_NAME          || null,
-        cnee_address:  ewbDtl?.TO_ADDRESS            || null,
-        cnee_city:     ewbDtl?.TO_PLACE              || null,
-        cnee_state:    ewbDtl?.TO_STATE              || null,
-        cnee_pincode:  ewbDtl?.TO_PINCODE            || null,
-        cnee_gstin:    ewbDtl?.CNEE_GSTIN            || null,
-        invoice_no:    ewbDtl?.INV_NO                || null,
-        invoice_date:  ewbDtl?.INV_DATE              || null,
-        invoice_value: ewbDtl?.INV_VALUE             ?? null,
-        bpWarnings:    bpWarnings.length ? bpWarnings : null,
+        ewb_no: String(firstWithDtl.EWB_NO),
+        docket_no: null,
+        docket_date: null,
+        cnor_id: cnorBp?.record_id ?? null,
+        cnor_name: ewbDtl?.FROM_CUST_NAME || null,
+        cnor_address: ewbDtl?.FROM_ADDRESS || null,
+        cnor_city: ewbDtl?.FROM_PLACE || null,
+        cnor_state: ewbDtl?.FROM_STATE || null,
+        cnor_pincode: ewbDtl?.FROM_PINCODE || null,
+        cnor_gstin: ewbDtl?.CNOR_GSTIN || null,
+        cnee_id: cneeBp?.record_id ?? null,
+        cnee_name: ewbDtl?.TO_CUST_NAME || null,
+        cnee_address: ewbDtl?.TO_ADDRESS || null,
+        cnee_city: ewbDtl?.TO_PLACE || null,
+        cnee_state: ewbDtl?.TO_STATE || null,
+        cnee_pincode: ewbDtl?.TO_PINCODE || null,
+        cnee_gstin: ewbDtl?.CNEE_GSTIN || null,
+        invoice_no: ewbDtl?.INV_NO || null,
+        invoice_date: ewbDtl?.INV_DATE || null,
+        invoice_value: ewbDtl?.INV_VALUE ?? null,
+        bpWarnings: bpWarnings.length ? bpWarnings : null,
       };
     }
   }
@@ -593,26 +603,26 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
         }
 
         docketData = {
-          ewb_no:       rawFirst.ewbNo ? String(rawFirst.ewbNo) : null,
-          cnor_id:      cnorBp?.record_id || null,
-          cnor_name:    rawFirst.fromTrdName    || null,
+          ewb_no: rawFirst.ewbNo ? String(rawFirst.ewbNo) : null,
+          cnor_id: cnorBp?.record_id || null,
+          cnor_name: rawFirst.fromTrdName || null,
           cnor_address: ((rawFirst.fromAddr1 || '') + ' ' + (rawFirst.fromAddr2 || '')).trim() || null,
-          cnor_gstin:   rawFirst.fromGstin      || null,
+          cnor_gstin: rawFirst.fromGstin || null,
           cnor_pincode: rawFirst.fromPincode ? String(rawFirst.fromPincode) : null,
-          cnor_city:    rawFirst.fromPlace      || null,
-          cnee_id:      cneeBp?.record_id || null,
-          cnee_name:    rawFirst.toTrdName      || null,
+          cnor_city: rawFirst.fromPlace || null,
+          cnee_id: cneeBp?.record_id || null,
+          cnee_name: rawFirst.toTrdName || null,
           cnee_address: ((rawFirst.toAddr1 || '') + ' ' + (rawFirst.toAddr2 || '')).trim() || null,
-          cnee_gstin:   rawFirst.toGstin        || null,
+          cnee_gstin: rawFirst.toGstin || null,
           cnee_pincode: rawFirst.toPincode ? String(rawFirst.toPincode) : null,
-          cnee_city:    rawFirst.toPlace        || null,
-          docket_no:     null,
+          cnee_city: rawFirst.toPlace || null,
+          docket_no: null,
           // docket_no:     rawFirst.docNo          || null,
-          docket_date:   rawFirst.docDate        || null,
-          invoice_no:   rawFirst.docNo          || null,
-          invoice_date: rawFirst.docDate        || null,
-          invoice_value: rawFirst.totInvValue   || null,
-          bpWarnings:   bpWarnings.length ? bpWarnings : null,
+          docket_date: rawFirst.docDate || null,
+          invoice_no: rawFirst.docNo || null,
+          invoice_date: rawFirst.docDate || null,
+          invoice_value: rawFirst.totInvValue || null,
+          bpWarnings: bpWarnings.length ? bpWarnings : null,
         };
         const ewbResult = await saveDataEwb(results, tenant_id);
         results = ewbResult.map(obj => {
@@ -629,7 +639,7 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
     }
   };
   const returnObj = { results, apiCalls, docketData };
-  
+
   return returnObj;
 }
 
@@ -851,7 +861,7 @@ const saveEwayBillToDB = async (ewbDataArray, tenant_id, division_code) => {
         .update(row);
       results.push({ ...existing, ...row });
     } else {
-      row.division_code=division_code;
+      row.division_code = division_code;
       const [inserted] = await db('sss.sst_docket_ewb').insert(row).returning('*');
       results.push(inserted);
     }

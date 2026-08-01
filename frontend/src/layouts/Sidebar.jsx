@@ -28,7 +28,9 @@ import FindInPageIcon from "@mui/icons-material/FindInPage";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import AccountTreeSharp from "@mui/icons-material/TireRepair";
 import AccessTime from "@mui/icons-material/ManageHistory";
+import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
 import UnarchiveIcon from "@mui/icons-material/Unarchive";
+import ListAltIcon from "@mui/icons-material/ListAlt";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import Tooltip from "@mui/material/Tooltip";
@@ -132,7 +134,10 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         setOpenMasters(false);
         setOpenTransaction(false);
       },
-      children: [],
+      children: [
+        { path: "/reports/delivery-update", label: "Delivery Update", icon: <SystemUpdateAltIcon /> },
+        { path: "/reports/docket-report", label: " All Docket Report", icon: <ListAltIcon /> },
+      ],
     },
   ];
   // ────────────────────────────────────────────────────────────────────────────

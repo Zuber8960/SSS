@@ -177,7 +177,8 @@ router.post('/bp/find-or-create', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { tenant_id } = req;
-    const data = await DocketController.getAllDockets(tenant_id);
+    const cnor_cnee = req.query.cnor_cnee === 'true' ? true : false; // Optional query parameter for docket number
+    const data = await DocketController.getAllDockets(tenant_id, cnor_cnee);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -247,12 +248,12 @@ router.post('/', async (req, res) => {
   try {
     const { tenant_id, divisionId, locId, loc_code } = req;
     const firstDigit = String(Math.floor(Math.random() * 10));
-    let docket_no = req.body.docket_no?.length>0 ? req.body.docket_no : null;
-    if (!docket_no) {        
-      const [updatedRow] = await  trx('sss.ssm_doc_control').where({ doc_type: 'DKT', loc_code })
-      .update({ last_upd_no: trx.raw('last_upd_no + 1') }).returning('last_upd_no');
-  
-      const nextId = updatedRow.last_upd_no ;
+    let docket_no = req.body.docket_no?.length > 0 ? req.body.docket_no : null;
+    if (!docket_no) {
+      const [updatedRow] = await trx('sss.ssm_doc_control').where({ doc_type: 'DKT', loc_code })
+        .update({ last_upd_no: trx.raw('last_upd_no + 1') }).returning('last_upd_no');
+
+      const nextId = updatedRow.last_upd_no;
       docket_no = String(moment().format('YY')) + firstDigit + locId + divisionId + nextId
     }
     // const rest = require('crypto').randomBytes(7).toString('hex').toUpperCase().slice(0, 13);
