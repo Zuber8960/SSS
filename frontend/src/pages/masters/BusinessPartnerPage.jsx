@@ -21,7 +21,7 @@ import { fetchStatesAndCities } from "../../utils/stateCity";
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 
-const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
+const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiSelect-select": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
 
 const ID_TYPES = ["PAN", "AADHAR", "PASSPORT", "DL"];
 const DOC_TYPES = ["Agreement", "NDA"];

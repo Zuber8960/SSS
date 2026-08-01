@@ -25,7 +25,7 @@ import {
 import { fetchStatesAndCities } from "../../utils/stateCity";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 
-const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
+const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiSelect-select": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
 
 function MuiSelect({ label, name, value, onChange, options }) {
   return (

@@ -3,7 +3,6 @@ import { SaveIcon, RefreshIcon, ClearIcon, NoteAddIcon, EditIcon } from "../../c
 import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
-  PageToolbar,
   FormPanel,
   FormField,
 } from "../../components/common/MasterPage";
@@ -18,7 +17,6 @@ import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import {
   Box,
-  Button,
   Checkbox,
   FormControl,
   FormControlLabel,
@@ -31,19 +29,36 @@ import {
   Tooltip,
   Typography,
   Chip,
+  TextField,
+  InputLabel,
 } from "@mui/material";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import SearchIcon from "@mui/icons-material/Search";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import BuildIcon from "@mui/icons-material/Build";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import SpeedIcon from "@mui/icons-material/Speed";
 import CarRepairIcon from "@mui/icons-material/CarRepair";
 import AirlineSeatFlatIcon from "@mui/icons-material/AirlineSeatFlat";
-import BedIcon from "@mui/icons-material/Bed";
 import LuggageIcon from "@mui/icons-material/Luggage";
 import EmergencyIcon from "@mui/icons-material/Emergency";
+
+const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiSelect-select": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
+
+function MuiSelect({ label, name, value, onChange, options }) { 
+  return (
+    <FormControl fullWidth size="small" sx={fieldSx}>
+      <InputLabel>{label}</InputLabel>
+      <Select label={label} size="small" value={value ?? ""} onChange={(e) => onChange(name, e.target.value)} sx={{ fontSize: 13 }}>
+        {options.map((opt) => (
+          <MenuItem key={typeof opt === "object" ? opt.value : opt} value={typeof opt === "object" ? opt.value : opt} sx={{ fontSize: 13 }}>
+            {typeof opt === "object" ? opt.label : opt}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  );
+}
 
 const emptyLorryForm = {
   // ── Top Section ──
@@ -237,9 +252,8 @@ const mapLorryToForm = (row) => ({
 
 export default function LorryPage() {
 
-  const [lorries, setLorries] = useState([]);
+  const [, setLorries] = useState([]);
   const { dialog, closeAlert, showSuccess, showError, showWarning } = useAlert();
-  const [searchText, setSearchText] = useState("");
 
   const [form, setForm] = useState(emptyLorryForm);
 
@@ -310,12 +324,14 @@ export default function LorryPage() {
     }
   };
 
+  // eslint-disable-next-line no-unused-vars
   const editLorry = (row) => {
     setForm(mapLorryToForm(row));
     setOriginalLorry(row);
     setIsEditing(true);
   };
 
+  // eslint-disable-next-line no-unused-vars
   const handleDeleteLorry = (rec_id) => {
     showWarning("Confirm Delete", "Delete Lorry ?",
       async () => {
@@ -420,7 +436,6 @@ export default function LorryPage() {
 
   // Refs for hidden file inputs
   const fileInputRefs = useRef({});
-  const docInputRef = useRef(null);
 
   const handleFileSelect = (docKey) => (event) => {
     const file = event.target.files?.[0];
@@ -513,44 +528,80 @@ export default function LorryPage() {
         {/* ═══════════════════ VEHICLE DETAILS ═══════════════════ */}
         <h3 style={sectionStyle}>🔹 Vehicle Details</h3>
         <FormPanel>
-          <FormField label="Vehicle Number" name="vehicle_no" form={form} setForm={setForm}
-            inputProps={{
-              onKeyDown: handleVehicleNoKeyDown,
-            }}
-          />
-          <FormField label="Branch Code" name="branch_code" form={form} setForm={setForm} />
-          <FormField label="Chassis Number" name="chassis_no" form={form} setForm={setForm} />
-          <FormField label="Fleet Number" name="fleet_no" form={form} setForm={setForm} />
-          <FormField label="Owner Name" name="owner_name" form={form} setForm={setForm} />
-          <FormField label="Make" name="make" form={form} setForm={setForm} />
-          <FormField label="Model" name="model" form={form} setForm={setForm} />
-          <FormField label="Engine Number" name="engine_no" form={form} setForm={setForm} />
-          <FormField label="Engine Power HP" name="engine_power_hp" form={form} setForm={setForm} type="number" />
-          <FormField label="Tax Token" name="tax_token" form={form} setForm={setForm} />
-          <FormField label="Tax From Date" name="tax_from_date" form={form} setForm={setForm} type="date" />
-          <FormField label="Tax Exp. Date" name="tax_exp_date" form={form} setForm={setForm} type="date" />
-          <FormField label="Body Type" name="body_type" form={form} setForm={setForm} options={["Open Body", "Closed Body", "Container", "Tanker", "Flat Bed", "Refrigerated", "Hydraulic"]} />
-          <FormField label="Floor Type" name="floor_type" form={form} setForm={setForm} options={["Wooden", "Aluminum", "Steel", "PVC", "Rubber Mat"]} />
-          <FormField label="Fitness From Date" name="fitness_from_date" form={form} setForm={setForm} type="date" />
-          <FormField label="Fitness Exp. Date" name="fitness_exp_date" form={form} setForm={setForm} type="date" />
-          <FormField label="Vehicle Registered Year" name="regis_year" form={form} setForm={setForm} />
-          <FormField label="Registration RTO" name="regis_rto" form={form} setForm={setForm} />
-          <FormField label="Lorry Condition" name="lorry_condition" form={form} setForm={setForm} options={["Excellent", "Good", "Average", "Poor"]} />
-          <FormField label="Emission Stage" name="emission_stage" form={form} setForm={setForm} options={["BS3", "BS4", "BS6", "Euro 3", "Euro 4", "Euro 5", "Euro 6"]} />
-          <FormField label="Tax Issue Place" name="tax_issue_place" form={form} setForm={setForm} />
-          <FormField label="PUC No" name="puc_no" form={form} setForm={setForm} />
-          <FormField label="PUC Exp. Date" name="puc_exp_date" form={form} setForm={setForm} type="date" />
-          <FormField label="Fastag Provider" name="fastag_provider" form={form} setForm={setForm} options={["ICICI", "HDFC", "SBI", "Axis", "Paytm", "Airtel", "Other"]} />
-          <FormField label="Fastag ID" name="fastag_id" form={form} setForm={setForm} />
-          <FormField label="Vehicle Assigned To" name="vehicle_assigned_to" form={form} setForm={setForm} />
-          <FormField label="Vehicle Category" name="vehicle_category" form={form} setForm={setForm} options={["LCV", "MCV", "HCV", "Trailer", "Tractor"]} />
-          <FormField label="Driver Pay Type" name="driver_pay_type" form={form} setForm={setForm} options={["Fixed", "Per Trip", "Per Km", "Percentage"]} />
-          <FormField label="GPS Service Provider" name="gps_service_provider" form={form} setForm={setForm} />
-          <FormField label="GPS Device ID" name="gps_device_id" form={form} setForm={setForm} />
-          <FormField label="Financer" name="financer" form={form} setForm={setForm} />
-          <FormField label="Max No of Tyres" name="max_no_tyres" form={form} setForm={setForm} type="number" />
-          <FormField label="Black Listed" name="black_listed" form={form} setForm={setForm} options={["No", "Yes"]} />
-          <FormField label="Is Active" name="is_active" form={form} setForm={setForm} options={["Active", "Inactive"]} />
+          <TextField size="small" label="Vehicle Number" fullWidth sx={fieldSx}
+            value={form.vehicle_no} onChange={(e) => updateField("vehicle_no", e.target.value)}
+            onKeyDown={handleVehicleNoKeyDown} />
+          <TextField size="small" label="Branch Code" fullWidth sx={fieldSx}
+            value={form.branch_code} onChange={(e) => updateField("branch_code", e.target.value)} />
+          <TextField size="small" label="Chassis Number" fullWidth sx={fieldSx}
+            value={form.chassis_no} onChange={(e) => updateField("chassis_no", e.target.value)} />
+          <TextField size="small" label="Fleet Number" fullWidth sx={fieldSx}
+            value={form.fleet_no} onChange={(e) => updateField("fleet_no", e.target.value)} />
+          <TextField size="small" label="Owner Name" fullWidth sx={fieldSx}
+            value={form.owner_name} onChange={(e) => updateField("owner_name", e.target.value)} />
+          <TextField size="small" label="Make" fullWidth sx={fieldSx}
+            value={form.make} onChange={(e) => updateField("make", e.target.value)} />
+          <TextField size="small" label="Model" fullWidth sx={fieldSx}
+            value={form.model} onChange={(e) => updateField("model", e.target.value)} />
+          <TextField size="small" label="Engine Number" fullWidth sx={fieldSx}
+            value={form.engine_no} onChange={(e) => updateField("engine_no", e.target.value)} />
+          <TextField size="small" label="Engine Power HP" fullWidth sx={fieldSx} type="number"
+            value={form.engine_power_hp} onChange={(e) => updateField("engine_power_hp", e.target.value)} />
+          <TextField size="small" label="Tax Token" fullWidth sx={fieldSx}
+            value={form.tax_token} onChange={(e) => updateField("tax_token", e.target.value)} />
+          <TextField size="small" label="Tax From Date" type="date" fullWidth sx={fieldSx}
+            value={form.tax_from_date} onChange={(e) => updateField("tax_from_date", e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField size="small" label="Tax Exp. Date" type="date" fullWidth sx={fieldSx}
+            value={form.tax_exp_date} onChange={(e) => updateField("tax_exp_date", e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }} />
+          <MuiSelect label="Body Type" name="body_type" value={form.body_type} onChange={updateField}
+            options={["Open Body", "Closed Body", "Container", "Tanker", "Flat Bed", "Refrigerated", "Hydraulic"]} />
+          <MuiSelect label="Floor Type" name="floor_type" value={form.floor_type} onChange={updateField}
+            options={["Wooden", "Aluminum", "Steel", "PVC", "Rubber Mat"]} />
+          <TextField size="small" label="Fitness From Date" type="date" fullWidth sx={fieldSx}
+            value={form.fitness_from_date} onChange={(e) => updateField("fitness_from_date", e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField size="small" label="Fitness Exp. Date" type="date" fullWidth sx={fieldSx}
+            value={form.fitness_exp_date} onChange={(e) => updateField("fitness_exp_date", e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField size="small" label="Vehicle Registered Year" fullWidth sx={fieldSx}
+            value={form.regis_year} onChange={(e) => updateField("regis_year", e.target.value)} />
+          <TextField size="small" label="Registration RTO" fullWidth sx={fieldSx}
+            value={form.regis_rto} onChange={(e) => updateField("regis_rto", e.target.value)} />
+          <MuiSelect label="Lorry Condition" name="lorry_condition" value={form.lorry_condition} onChange={updateField}
+            options={["Excellent", "Good", "Average", "Poor"]} />
+          <MuiSelect label="Emission Stage" name="emission_stage" value={form.emission_stage} onChange={updateField}
+            options={["BS3", "BS4", "BS6", "Euro 3", "Euro 4", "Euro 5", "Euro 6"]} />
+          <TextField size="small" label="Tax Issue Place" fullWidth sx={fieldSx}
+            value={form.tax_issue_place} onChange={(e) => updateField("tax_issue_place", e.target.value)} />
+          <TextField size="small" label="PUC No" fullWidth sx={fieldSx}
+            value={form.puc_no} onChange={(e) => updateField("puc_no", e.target.value)} />
+          <TextField size="small" label="PUC Exp. Date" type="date" fullWidth sx={fieldSx}
+            value={form.puc_exp_date} onChange={(e) => updateField("puc_exp_date", e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }} />
+          <MuiSelect label="Fastag Provider" name="fastag_provider" value={form.fastag_provider} onChange={updateField}
+            options={["ICICI", "HDFC", "SBI", "Axis", "Paytm", "Airtel", "Other"]} />
+          <TextField size="small" label="Fastag ID" fullWidth sx={fieldSx}
+            value={form.fastag_id} onChange={(e) => updateField("fastag_id", e.target.value)} />
+          <TextField size="small" label="Vehicle Assigned To" fullWidth sx={fieldSx}
+            value={form.vehicle_assigned_to} onChange={(e) => updateField("vehicle_assigned_to", e.target.value)} />
+          <MuiSelect label="Vehicle Category" name="vehicle_category" value={form.vehicle_category} onChange={updateField}
+            options={["LCV", "MCV", "HCV", "Trailer", "Tractor"]} />
+          <MuiSelect label="Driver Pay Type" name="driver_pay_type" value={form.driver_pay_type} onChange={updateField}
+            options={["Fixed", "Per Trip", "Per Km", "Percentage"]} />
+          <TextField size="small" label="GPS Service Provider" fullWidth sx={fieldSx}
+            value={form.gps_service_provider} onChange={(e) => updateField("gps_service_provider", e.target.value)} />
+          <TextField size="small" label="GPS Device ID" fullWidth sx={fieldSx}
+            value={form.gps_device_id} onChange={(e) => updateField("gps_device_id", e.target.value)} />
+          <TextField size="small" label="Financer" fullWidth sx={fieldSx}
+            value={form.financer} onChange={(e) => updateField("financer", e.target.value)} />
+          <TextField size="small" label="Max No of Tyres" fullWidth sx={fieldSx} type="number"
+            value={form.max_no_tyres} onChange={(e) => updateField("max_no_tyres", e.target.value)} />
+          <MuiSelect label="Black Listed" name="black_listed" value={form.black_listed} onChange={updateField}
+            options={["No", "Yes"]} />
+          <MuiSelect label="Is Active" name="is_active" value={form.is_active} onChange={updateField}
+            options={["Active", "Inactive"]} />
         </FormPanel>
 
         {/* ═══════════════════ OWN VEHICLE EXTRA DETAILS ═══════════════════ */}
