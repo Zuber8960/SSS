@@ -304,6 +304,7 @@ export function DataTable({
   onRowUpdate,
   onCellEditStop,
   checkboxSelection = false,
+  disableMultipleRowSelection = false,
   onRowSelectionModelChange,
   autoHeight = false,
 }) {
@@ -503,6 +504,7 @@ export function DataTable({
           }
         } : {})}
         {...(checkboxSelection ? { checkboxSelection: true } : {})}
+        {...(disableMultipleRowSelection ? { disableMultipleRowSelection: true } : {})}
         {...(onRowSelectionModelChange ? { onRowSelectionModelChange } : {})}
         {...(onCellEditStop ? { onCellEditStop } : {})}
         processRowUpdate={async (newRow, oldRow) => {
