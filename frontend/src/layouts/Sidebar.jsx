@@ -99,6 +99,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/masters/location",         label: "Location Master",   icon: <LocationOnIcon /> },
         { path: "/masters/business-partner", label: "Business Partner",  icon: <HandshakeIcon /> },
         { path: "/masters/lorry",            label: "Lorry Master",      icon: <DirectionsCarIcon /> },
+        { path: "/transaction/add-town",     label: "Add Town",          icon: <LocationOnIcon /> },
       ],
     },
     {
@@ -114,7 +115,6 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         setOpenReports(false);
       },
       children: [
-        { path: "/transaction/add-town",          label: "Add Town",        icon: <LocationOnIcon /> },
         { path: "/transaction/docket",           label: "Docket",          icon: <DescriptionIcon /> },
         { path: "/transaction/trip-sheet",       label: "Trip Sheet",      icon: <AccountTreeSharp /> },
         { path: "/transaction/manifest-entry",   label: "Manifest Entry",  icon: <AccessTime /> },
