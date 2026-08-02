@@ -191,6 +191,7 @@ export default function MenuPage() {
             { label: "Edit", icon: <EditIcon />, onClick: editMenu },
             { label: "Delete", icon: <DeleteIcon />, onClick: handleDelete },
           ]}
+          isHeight={420}
         />
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
       </PageBody>
