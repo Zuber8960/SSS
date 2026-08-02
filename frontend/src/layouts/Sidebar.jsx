@@ -120,7 +120,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/transaction/manifest-entry",   label: "Manifest Entry",  icon: <AccessTime /> },
         { path: "/transaction/hire-voucher",     label: "Hire Voucher",    icon: <ReceiptLongIcon /> },
         { path: "/transaction/manifest-unloading", label: "Manifest Unloading", icon: <UnarchiveIcon /> },
-        { path: "/transaction/docket-enquiry", label: "Docket Enquiry", icon: <FindInPageIcon /> },
+        { path: "/reports/delivery-update", label: "Delivery Update", icon: <SystemUpdateAltIcon /> },
       ],
     },
     {
@@ -136,7 +136,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         setOpenTransaction(false);
       },
       children: [
-        { path: "/reports/delivery-update", label: "Delivery Update", icon: <SystemUpdateAltIcon /> },
+        { path: "/transaction/docket-enquiry", label: "Docket Enquiry", icon: <FindInPageIcon /> },
         { path: "/reports/docket-report", label: " All Docket Report", icon: <ListAltIcon /> },
       ],
     },

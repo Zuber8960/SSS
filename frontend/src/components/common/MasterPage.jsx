@@ -307,13 +307,23 @@ export function DataTable({
   disableMultipleRowSelection = false,
   onRowSelectionModelChange,
   autoHeight = false,
-  isHeight
+  isHeight,
+  scroll,
 }) {
   const apiRef = useGridApiRef();
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
     pageSize: 5,
   });
+
+  const ROW_HEIGHT = 55;
+  const HEADER_HEIGHT = 42;
+  const maxRows = scroll?.afterRows ?? null;
+  const useScrollHeight = maxRows != null && rows.length > maxRows;
+  const resolvedAutoHeight = autoHeight && !useScrollHeight;
+  const resolvedHeight = useScrollHeight
+    ? maxRows * ROW_HEIGHT + HEADER_HEIGHT + 2
+    : isHeight;
 
   const lastPage = Math.max(Math.ceil(rows.length / paginationModel.pageSize) - 1, 0);
   const effectivePaginationModel = {
@@ -325,8 +335,7 @@ export function DataTable({
     ...columns.map((col) => ({
       field: col.key,
       headerName: col.label,
-      flex: 1,
-      minWidth: col.minWidth ?? 100,
+      ...(scroll?.horizontal ? { width: col.minWidth ?? 120 } : { flex: 1, minWidth: col.minWidth ?? 100 }),
       sortable: true,
       editable: col.editable ?? editable,
       type: col.options ? "singleSelect" : col.type,
@@ -415,13 +424,13 @@ export function DataTable({
   const tableSx = {
     border: "none",
     borderRadius: "16px",
-    overflow: "hidden",
     background: "linear-gradient(180deg, #ffffff 0%, #fcfbff 100%)",
     boxShadow: "none",
     "& .MuiDataGrid-main": {
       background: "transparent",
     },
-    ...(autoHeight ? {} : { height: isHeight ? isHeight : 320 }),
+    ...(resolvedAutoHeight ? {} : { height: resolvedHeight ?? 320 }),
+    width: "100%",
     "& .MuiDataGrid-columnHeaders": {
       background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
       borderBottom: "none",
@@ -482,8 +491,20 @@ export function DataTable({
     },
   };
 
+  const totalMinWidth = columns.reduce((sum, col) => sum + (col.minWidth ?? 120), 0)
+    + (actions?.length ? 170 : 0)
+    + (checkboxSelection ? 50 : 0);
+
   return (
-    <div className="dataTableWrapper" style={{ width: "100%", marginBottom: 24, overflowX: "auto" }}>
+    <div
+      className="dataTableWrapper"
+      style={{
+        width: "100%",
+        marginBottom: 24,
+        overflowX: scroll?.horizontal ? "auto" : "visible",
+      }}
+    >
+      <div style={scroll?.horizontal ? { width: totalMinWidth } : { width: "100%" }}>
       <DataGrid
         rows={muiRows}
         columns={muiColumns}
@@ -492,7 +513,7 @@ export function DataTable({
         density="compact"
         rowHeight={55}
         headerHeight={42}
-        autoHeight={autoHeight}
+        autoHeight={resolvedAutoHeight}
         hideFooter
         disableVirtualization={false}
         rowSelection={true}
@@ -530,6 +551,7 @@ export function DataTable({
 
         sx={tableSx}
       />
+      </div>
     </div>
   );
 }

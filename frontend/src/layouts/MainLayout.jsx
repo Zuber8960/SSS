@@ -37,7 +37,7 @@ export default function MainLayout({ children }) {
             isMobileSidebarOpen={mobileSidebarOpen}
           />
 
-          <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+          <div style={{ flex: 1, overflow: "auto" }}>
             <div style={{ padding: "0px" }}>
               {children}
             </div>

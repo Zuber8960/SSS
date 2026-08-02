@@ -31,7 +31,6 @@
   background: linear-gradient(135deg, #eef2ff 0%, #f3f0ff 30%, #ffffff 100%);
   box-shadow: inset 0 0 80px rgba(168, 85, 247, 0.06);
   position: relative;
-  overflow: hidden;
 }
 
 .pageBody::before {
@@ -402,14 +401,29 @@
   overflow-x: auto;
   overflow-y: hidden;
   box-shadow: 0 16px 40px rgba(109, 40, 217, 0.08);
-  transition: all 0.2s ease;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  /* padding: 6px; */
+  transition: box-shadow 0.2s ease;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(168, 85, 247, 0.9) #f3e8ff;
 }
 
 .dataTableWrapper::-webkit-scrollbar {
-  display: none;
+  height: 1px;
+  width: 1px;
+}
+
+.dataTableWrapper::-webkit-scrollbar-track {
+  background: #f3e8ff;
+  border-radius: 999px;
+}
+
+.dataTableWrapper::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.9);
+  border-radius: 999px;
+  border: 2px solid #f3e8ff;
+}
+
+.dataTableWrapper::-webkit-scrollbar-thumb:hover {
+  background: #7c3aed;
 }
 
 .dataTableWrapper .MuiDataGrid-root {
@@ -438,7 +452,7 @@
   text-align: left !important;
 }
 
-/* Show a themed vertical scrollbar inside the DataGrid scroller */
+/* Outer wrapper handles horizontal scroll — hide MUI's internal one */
 .dataTableWrapper .MuiDataGrid-scrollbar--horizontal {
   display: none;
 }
@@ -449,7 +463,7 @@
 } */
 
 .dataTableWrapper .MuiDataGrid-virtualScroller::-webkit-scrollbar {
-  width: 10px;
+  width: 5px;
 }
 
 .dataTableWrapper .MuiDataGrid-virtualScroller::-webkit-scrollbar-track {

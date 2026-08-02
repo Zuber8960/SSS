@@ -12,9 +12,10 @@ import { fetchAllDockets, fetchCharges } from "../../utils/docket";
 import { fetchAllLocations } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { RefreshIcon, PrintIcon } from "../../components/common/icons";
-import { IconButton, Tooltip, Button, TextField, Menu, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
+import { IconButton, Tooltip, Button, TextField, Menu, MenuItem, ListItemIcon, ListItemText, Autocomplete } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import { printDocket } from "../../components/common/DocketPrint";
+import SelectedRowInfo from "../../components/common/SelectedRowInfo";
 import moment from "moment";
 
 const docketColumns = [
@@ -60,6 +61,8 @@ export default function DocketReport() {
   const [company, setCompany]           = useState(null);
   const [locations, setLocations]     = useState([]);
   const [searchText, setSearchText]   = useState("");
+  const [fromTown, setFromTown]       = useState("");
+  const [toTown, setToTown]           = useState("");
 
   // Used only by the Refresh button — shows loading indicator
   const loadDockets = async () => {
@@ -96,29 +99,44 @@ export default function DocketReport() {
     );
   }, [allDockets, branchCode]);
 
+  const mappedDockets = useMemo(() => branchDockets.map((d, index) => {
+    const row = {
+      ...d,
+      docket_date:        toDate(d.docket_date),
+      docket_tot_pkgs:    d.docket_tot_pkgs ?? d.total_pkgs ?? "",
+      docket_act_wt:      d.docket_act_wt ?? d.actual_wt ?? "",
+      docket_chrg_wt:     d.docket_chrg_wt ?? "",
+      docket_pickup_town: d.docket_pickup_town || d.docket_from_town || "",
+      docket_dly_town:    d.docket_dly_town || d.docket_to_town || "",
+      delivery_status:    d.delivery_status || "Pending",
+    };
+    row.id = row.docket_no + (row.docket_date || "") + index;
+    return row;
+  }), [branchDockets]);
+
+  const fromTownOptions = useMemo(() =>
+    [...new Set(mappedDockets.map((r) => r.docket_pickup_town).filter(Boolean))].sort()
+  , [mappedDockets]);
+
+  const toTownOptions = useMemo(() =>
+    [...new Set(mappedDockets.map((r) => r.docket_dly_town).filter(Boolean))].sort()
+  , [mappedDockets]);
+
   const gridRows = useMemo(() => {
     const q = searchText.toLowerCase().trim();
-    return branchDockets
-      .map((d, index) => {
-        const row = {
-          ...d,
-          docket_date:        toDate(d.docket_date),
-          docket_tot_pkgs:    d.docket_tot_pkgs ?? d.total_pkgs ?? "",
-          docket_act_wt:      d.docket_act_wt ?? d.actual_wt ?? "",
-          docket_chrg_wt:     d.docket_chrg_wt ?? "",
-          docket_pickup_town: d.docket_pickup_town || d.docket_from_town || "",
-          docket_dly_town:    d.docket_dly_town || d.docket_to_town || "",
-          delivery_status:    d.delivery_status || "Pending",
-        };
-        row.id = row.docket_no + (row.docket_date || "") + index;
-        return row;
-      })
-      .filter((row) => !q || [
+    const ft = fromTown.toLowerCase();
+    const tt = toTown.toLowerCase();
+    return mappedDockets.filter((row) => {
+      if (ft && !String(row.docket_pickup_town ?? "").toLowerCase().includes(ft)) return false;
+      if (tt && !String(row.docket_dly_town ?? "").toLowerCase().includes(tt)) return false;
+      if (q && ![
         row.docket_no, row.cnor_name, row.cnee_name,
         row.docket_pickup_town, row.docket_dly_town,
         row.docket_loc, row.docket_to_loc, row.delivery_status,
-      ].some((v) => String(v ?? "").toLowerCase().includes(q)));
-  }, [branchDockets, searchText]);
+      ].some((v) => String(v ?? "").toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }, [mappedDockets, searchText, fromTown, toTown]);
 
   const handleRefresh = () => {
     setSelectedRow(null);
@@ -210,7 +228,7 @@ export default function DocketReport() {
       <PageBody title="Docket Report">
         {/* ── Toolbar ── */}
         <div className="pageToolbar" style={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", width: "100%" }}>
             <Tooltip title="Refresh">
               <IconButton onClick={handleRefresh} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
                 <RefreshIcon />
@@ -223,11 +241,60 @@ export default function DocketReport() {
               value={searchText}
               onChange={(e) => { setSearchText(e.target.value); setSelectedRow(null); }}
               sx={{
-                minWidth: 260,
+                flex: "1 1 180px",
+                minWidth: 160,
                 "& .MuiInputBase-input": { fontSize: 13 },
                 "& .MuiOutlinedInput-notchedOutline": { borderColor: "#7e22ce" },
                 "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#7e22ce" },
               }}
+            />
+
+            <Autocomplete
+              size="small"
+              options={fromTownOptions}
+              value={fromTown || null}
+              onChange={(_, val) => { setFromTown(val || ""); setSelectedRow(null); }}
+              slotProps={{
+                popupIndicator: { sx: { padding: "1px", minWidth: 16, width: 16, "& .MuiSvgIcon-root": { fontSize: 11 } } },
+                clearIndicator: { sx: { display: "none" } },
+                paper: { sx: {
+                  "& .MuiAutocomplete-option": { fontSize: 13, minHeight: "32px !important", padding: "4px 10px" },
+                  "& .MuiAutocomplete-listbox": {
+                    scrollbarWidth: "thin",
+                    "&::-webkit-scrollbar": { width: "1px" },
+                    "&::-webkit-scrollbar-thumb": { background: "rgba(168,85,247,0.9)", borderRadius: "999px" },
+                    "&::-webkit-scrollbar-track": { background: "#f3e8ff" },
+                  },
+                } },
+              }}
+              sx={{ flex: "1 1 140px", minWidth: 130 }}
+              renderInput={(params) => (
+                <TextField {...params} placeholder="From Town" sx={{ "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiOutlinedInput-notchedOutline": { borderColor: "#7e22ce" } }} />
+              )}
+            />
+
+            <Autocomplete
+              size="small"
+              options={toTownOptions}
+              value={toTown || null}
+              onChange={(_, val) => { setToTown(val || ""); setSelectedRow(null); }}
+              slotProps={{
+                popupIndicator: { sx: { padding: "1px", minWidth: 16, width: 16, "& .MuiSvgIcon-root": { fontSize: 11 } } },
+                clearIndicator: { sx: { display: "none" } },
+                paper: { sx: {
+                  "& .MuiAutocomplete-option": { fontSize: 13, minHeight: "32px !important", padding: "4px 10px" },
+                  "& .MuiAutocomplete-listbox": {
+                    scrollbarWidth: "thin",
+                    "&::-webkit-scrollbar": { width: "1px" },
+                    "&::-webkit-scrollbar-thumb": { background: "rgba(168,85,247,0.9)", borderRadius: "999px" },
+                    "&::-webkit-scrollbar-track": { background: "#f3e8ff" },
+                  },
+                } },
+              }}
+              sx={{ flex: "1 1 140px", minWidth: 130 }}
+              renderInput={(params) => (
+                <TextField {...params} placeholder="To Town" sx={{ "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiOutlinedInput-notchedOutline": { borderColor: "#7e22ce" } }} />
+              )}
             />
 
             <div style={{
@@ -238,7 +305,7 @@ export default function DocketReport() {
             }}>
               <span style={{ fontSize: 18, fontWeight: 700, color: "#7e22ce" }}>{gridRows.length}</span>
               <span style={{ fontSize: 10, fontWeight: 500, color: "#9333ea", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                {searchText.trim() ? "filtered" : "dockets"}
+                {(searchText.trim() || fromTown || toTown) ? "filtered" : "dockets"}
               </span>
             </div>
           </div>
@@ -279,51 +346,7 @@ export default function DocketReport() {
         </div>
 
         {/* ── Selected docket info strip ── */}
-        {selectedRow ? (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
-            marginTop: 10, padding: "8px 14px",
-            background: "#f3e8ff", borderRadius: 8,
-            border: "1.5px solid #d8b4fe",
-            fontSize: 13,
-          }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 5, fontWeight: 700, color: "#7e22ce" }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#7e22ce", display: "inline-block" }} />
-              {selectedRow.docket_no}
-            </span>
-            <span style={{ color: "#6b7280" }}>|</span>
-            <span style={{ color: "#374151" }}>{selectedRow.cnor_name || "—"}</span>
-            <span style={{ color: "#7e22ce", fontWeight: 600 }}>→</span>
-            <span style={{ color: "#374151" }}>{selectedRow.cnee_name || "—"}</span>
-            <span style={{ color: "#6b7280" }}>|</span>
-            <span style={{ color: "#374151" }}>
-              {selectedRow.docket_pickup_town || selectedRow.docket_loc || "—"}
-              <span style={{ color: "#7e22ce", fontWeight: 600, margin: "0 4px" }}>→</span>
-              {selectedRow.docket_dly_town || selectedRow.docket_to_loc || "—"}
-            </span>
-            {selectedRow.delivery_status && (
-              <>
-                <span style={{ color: "#6b7280" }}>|</span>
-                <span style={{
-                  padding: "2px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600,
-                  background: selectedRow.delivery_status === "Delivered" ? "#dcfce7" : "#fff7ed",
-                  color: selectedRow.delivery_status === "Delivered" ? "#15803d" : "#ea580c",
-                }}>
-                  {selectedRow.delivery_status}
-                </span>
-              </>
-            )}
-          </div>
-        ) : (
-          <div style={{
-            marginTop: 10, padding: "7px 14px",
-            background: "#f9fafb", borderRadius: 8,
-            border: "1.5px dashed #d1d5db",
-            fontSize: 13, color: "#9ca3af", fontStyle: "italic",
-          }}>
-            No docket selected — click a row to select
-          </div>
-        )}
+        <SelectedRowInfo row={selectedRow} emptyText="No docket selected — click a row to select" />
 
         {/* ── Docket Grid ── */}
         <div style={{ marginTop: 10 }}>
@@ -333,6 +356,7 @@ export default function DocketReport() {
             getKey={(row, index) => row.docket_no + (row.docket_date || "") + index}
             actions={[]}
             autoHeight
+            scroll={{ afterRows: 10, horizontal: true }}
             checkboxSelection
             disableMultipleRowSelection
             onRowSelectionModelChange={handleRowSelection}
