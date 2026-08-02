@@ -18,7 +18,8 @@ import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import ImageIcon from "@mui/icons-material/Image";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import CloseIcon from "@mui/icons-material/Close";
-import { fetchDocketByDocketNo, updateDocket } from "../../utils/docket";
+import { fetchDocketByDocketNo } from "../../utils/docket";
+import { saveDeliveryNote, updateDeliveryNote, fetchDeliveryNoteByDocketNo } from "../../utils/deliveryNote";
 
 const emptyForm = {
   docket_no: "",
@@ -61,6 +62,7 @@ export default function DeliveryUpdate() {
 
   const [docketNumberInput, setDocketNumberInput] = useState("");
   const [form, setForm] = useState({ ...emptyForm });
+  const [dlyNoteNo, setDlyNoteNo] = useState("");
   const [isDirty, setIsDirty] = useState(false);
 
   // ── POD Upload State ──
@@ -100,6 +102,9 @@ export default function DeliveryUpdate() {
       const docketData = await fetchDocketByDocketNo(docketNo);
 
       if (docketData && docketData.docket_no) {
+        const savedNote = await fetchDeliveryNoteByDocketNo(docketNo).catch(() => null);
+        setDlyNoteNo(savedNote?.dly_note_no || "");
+
         setForm({
           docket_no:           docketData.docket_no               || "",
           docket_date:         toDate(docketData.docket_date),
@@ -112,10 +117,10 @@ export default function DeliveryUpdate() {
           total_pkgs:          docketData.docket_tot_pkgs         ?? docketData.total_pkgs ?? "",
           actual_wt:           docketData.docket_act_wt           ?? docketData.actual_wt ?? "",
           charged_wt:          docketData.docket_chrg_wt          ?? "",
-          delivery_status:     docketData.delivery_status         || "",
-          delivery_date:       toDate(docketData.delivery_date),
-          delivery_remarks:    docketData.docket_remark           || docketData.delivery_remarks || "",
-          received_by:         docketData.received_by             || "",
+          delivery_status:     savedNote?.delivery_status || docketData.delivery_status || "",
+          delivery_date:       toDate(savedNote?.dly_date || docketData.delivery_date),
+          delivery_remarks:    savedNote?.delivery_remarks || docketData.docket_remark || docketData.delivery_remarks || "",
+          received_by:         savedNote?.received_by || docketData.received_by || "",
         });
         setIsDirty(false);
         showSuccess(`Docket #${docketNo} loaded successfully`);
@@ -136,6 +141,11 @@ export default function DeliveryUpdate() {
       return;
     }
 
+    if (selectedFiles.length === 0 && uploadedPods.length === 0) {
+      showError("Please upload one POD file before saving the delivery update");
+      return;
+    }
+
     const requiredFields = ["delivery_status", "delivery_date"];
     const missing = requiredFields.filter((f) => !form[f]);
     if (missing.length > 0) {
@@ -146,15 +156,32 @@ export default function DeliveryUpdate() {
     try {
       showLoading();
       const payload = {
+        company_code: localStorage.getItem("current_user") ? JSON.parse(localStorage.getItem("current_user")).company_code : null,
+        division_code: localStorage.getItem("current_user") ? JSON.parse(localStorage.getItem("current_user")).division_code : null,
+        dly_note_no: dlyNoteNo || `${docketNumberInput}`,
+        dly_date: form.delivery_date,
+        docket_no: docketNumberInput.trim(),
+        docket_date: form.docket_date || null,
+        docket_from_loc: form.from_loc || null,
+        docket_from_town: form.from_town || null,
+        docket_to_loc: form.to_loc || null,
+        docket_to_town: form.to_town || null,
         delivery_status: form.delivery_status,
-        delivery_date: form.delivery_date,
-        received_by: form.received_by,
-        docket_remark: form.delivery_remarks,
+        delivery_remarks: form.delivery_remarks || "",
+        received_by: form.received_by || "",
+        pod_url: uploadedPods[0]?.url || selectedFiles[0]?.name || null,
+        record_updated_by: localStorage.getItem("current_user") ? JSON.parse(localStorage.getItem("current_user")).user_id : null,
       };
 
-      await updateDocket(docketNumberInput.trim(), payload);
+      if (dlyNoteNo) {
+        await updateDeliveryNote(dlyNoteNo, payload);
+      } else {
+        const saved = await saveDeliveryNote(payload);
+        setDlyNoteNo(saved?.dly_note_no || payload.dly_note_no);
+      }
+
       setIsDirty(false);
-      showSuccess("Delivery update saved successfully");
+      showSuccess("Delivery note saved successfully");
     } catch (err) {
       showError(err.message || "Failed to save delivery update");
       console.error("Save delivery error:", err);
@@ -165,6 +192,7 @@ export default function DeliveryUpdate() {
 
   const handleClear = () => {
     setDocketNumberInput("");
+    setDlyNoteNo("");
     setForm({ ...emptyForm });
     setIsDirty(false);
     showInfo("Form cleared");
