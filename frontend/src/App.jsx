@@ -12,6 +12,7 @@ import DivisionPage from "./pages/masters/DivisionPage";
 import LocationPage from "./pages/masters/LocationPage";
 import BusinessPartnerPage from "./pages/masters/BusinessPartnerPage";
 import LorryPage from "./pages/masters/LorryPage";
+import AddTown from "./pages/transaction/AddTown";
 import Docket from "./pages/transaction/Docket";
 import TripSheet from "./pages/transaction/TripSheet";
 import ManifestEntry from "./pages/transaction/ManifestEntry";
@@ -37,6 +38,7 @@ const appRoutes = [
   { path: "/masters/location", element: <LocationPage />, protected: true },
   { path: "/masters/business-partner", element: <BusinessPartnerPage />, protected: true },
   { path: "/masters/lorry", element: <LorryPage />, protected: true },
+  { path: "/transaction/add-town", element: <AddTown />, protected: true },
   { path: "/transaction/docket", element: <Docket />, protected: true },
   { path: "/transaction/trip-sheet", element: <TripSheet />, protected: true },
   { path: "/transaction/manifest-entry", element: <ManifestEntry />, protected: true },

@@ -114,6 +114,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         setOpenReports(false);
       },
       children: [
+        { path: "/transaction/add-town",          label: "Add Town",        icon: <LocationOnIcon /> },
         { path: "/transaction/docket",           label: "Docket",          icon: <DescriptionIcon /> },
         { path: "/transaction/trip-sheet",       label: "Trip Sheet",      icon: <AccountTreeSharp /> },
         { path: "/transaction/manifest-entry",   label: "Manifest Entry",  icon: <AccessTime /> },

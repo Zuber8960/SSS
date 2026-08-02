@@ -307,6 +307,7 @@ export function DataTable({
   disableMultipleRowSelection = false,
   onRowSelectionModelChange,
   autoHeight = false,
+  isHeight
 }) {
   const apiRef = useGridApiRef();
   const [paginationModel, setPaginationModel] = useState({
@@ -420,7 +421,7 @@ export function DataTable({
     "& .MuiDataGrid-main": {
       background: "transparent",
     },
-    ...(autoHeight ? {} : { height: 320 }),
+    ...(autoHeight ? {} : { height: isHeight ? isHeight : 320 }),
     "& .MuiDataGrid-columnHeaders": {
       background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
       borderBottom: "none",
