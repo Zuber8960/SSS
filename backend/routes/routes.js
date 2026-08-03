@@ -39,17 +39,12 @@ router.post('/login', async (req, res) => {
     }
 
     // Resolve tenant_id from tenant JWT
-    let tenant_id = null;
+    let tenant_id = null,locId,divisionId;
     if (tenantToken) {
       const secret = process.env.JWT_SECRET || 'your_jwt_secret_key';
       const decoded = jwt.verify(tenantToken, secret);
       tenant_id = decoded.tenant_id ?? null;
-    }
-    let locId,divisionId;
-    if (loc_id > 0) locId = loc_id;
-    else locId = '000';
-    if (division_code > 0)  divisionId = division_code;
-    else  divisionId = '0';
+    };
 
 
     // Authenticate user from database
@@ -60,11 +55,12 @@ router.post('/login', async (req, res) => {
       let query = db('sss.ssm_location')
         .where({ tenant_id: user.tenant_id })
         .orderBy('record_id', 'asc')
-        .select('loc_code')
+        .select('loc_id')
         .first();
-      if (locId>0) query.where({loc_id: locId})
+      query.where({loc_code: loc_id});
       const locRow = await query;
-      const loc_code = locRow?.loc_code || null;
+      locId = locRow?.loc_id || '000';
+      divisionId = division_code > 0 ? division_code : '0';
 
       // Generate JWT token
       const secret = process.env.JWT_SECRET || 'your_jwt_secret_key';
@@ -77,7 +73,7 @@ router.post('/login', async (req, res) => {
           tenant_id: user.tenant_id,
           locId,
           divisionId,
-          loc_code,
+          loc_code: loc_id,
         },
         secret,
         { expiresIn: '24h' }
@@ -116,7 +112,7 @@ router.post('/login', async (req, res) => {
           mobile_no: user.mobile_no,
           is_admin: user.is_admin,
           tenant_id: user.tenant_id,
-          loc_code,
+          loc_code: loc_id,
         }
       });
     } else {

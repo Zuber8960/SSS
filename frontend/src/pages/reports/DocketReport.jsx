@@ -63,6 +63,8 @@ export default function DocketReport() {
   const [searchText, setSearchText]   = useState("");
   const [fromTown, setFromTown]       = useState("");
   const [toTown, setToTown]           = useState("");
+  const [dateFrom, setDateFrom]       = useState("");
+  const [dateTo, setDateTo]           = useState("");
 
   // Used only by the Refresh button — shows loading indicator
   const loadDockets = async () => {
@@ -126,9 +128,18 @@ export default function DocketReport() {
     const q = searchText.toLowerCase().trim();
     const ft = fromTown.toLowerCase();
     const tt = toTown.toLowerCase();
+    const df = dateFrom ? moment(dateFrom, "YYYY-MM-DD") : null;
+    const dt = dateTo   ? moment(dateTo,   "YYYY-MM-DD") : null;
     return mappedDockets.filter((row) => {
       if (ft && !String(row.docket_pickup_town ?? "").toLowerCase().includes(ft)) return false;
       if (tt && !String(row.docket_dly_town ?? "").toLowerCase().includes(tt)) return false;
+      if (df || dt) {
+        const rd = moment(row.docket_date, "DD-MM-YYYY");
+        if (rd.isValid()) {
+          if (df && rd.isBefore(df, "day")) return false;
+          if (dt && rd.isAfter(dt, "day"))  return false;
+        }
+      }
       if (q && ![
         row.docket_no, row.cnor_name, row.cnee_name,
         row.docket_pickup_town, row.docket_dly_town,
@@ -136,7 +147,7 @@ export default function DocketReport() {
       ].some((v) => String(v ?? "").toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [mappedDockets, searchText, fromTown, toTown]);
+  }, [mappedDockets, searchText, fromTown, toTown, dateFrom, dateTo]);
 
   const handleRefresh = () => {
     setSelectedRow(null);
@@ -298,6 +309,41 @@ export default function DocketReport() {
             />
 
             <div style={{
+              position: "relative",
+              display: "flex", alignItems: "center",
+              border: "1.5px solid #c4b5fd", borderRadius: 6,
+              padding: "4px 8px", background: "#fff", flex: "1 1 260px", minWidth: 240,
+            }}>
+              <span style={{
+                position: "absolute", top: -9, left: 8,
+                background: "#fff", padding: "0 4px",
+                fontSize: 11, fontWeight: 600, color: "#7e22ce",
+                letterSpacing: "0.3px", lineHeight: 1, whiteSpace: "nowrap",
+              }}>Docket Date Range</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, width: "100%" }}>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => { setDateFrom(e.target.value); setSelectedRow(null); }}
+                  style={{ border: "none", outline: "none", fontSize: 13, color: "#374151", background: "transparent", width: "100%", colorScheme: "light" }}
+                />
+                <span style={{ fontSize: 12, color: "#7e22ce", fontWeight: 700, padding: "0 2px" }}>→</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => { setDateTo(e.target.value); setSelectedRow(null); }}
+                  style={{ border: "none", outline: "none", fontSize: 13, color: "#374151", background: "transparent", width: "100%", colorScheme: "light" }}
+                />
+                {(dateFrom || dateTo) && (
+                  <span
+                    onClick={() => { setDateFrom(""); setDateTo(""); setSelectedRow(null); }}
+                    style={{ cursor: "pointer", fontSize: 14, color: "#9ca3af", lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
+                  >×</span>
+                )}
+              </div>
+            </div>
+
+            <div style={{
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               minWidth: 52, padding: "4px 12px",
               background: "#f3e8ff", borderRadius: 8, border: "1.5px solid #d8b4fe",
@@ -305,7 +351,7 @@ export default function DocketReport() {
             }}>
               <span style={{ fontSize: 18, fontWeight: 700, color: "#7e22ce" }}>{gridRows.length}</span>
               <span style={{ fontSize: 10, fontWeight: 500, color: "#9333ea", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                {(searchText.trim() || fromTown || toTown) ? "filtered" : "dockets"}
+                {(searchText.trim() || fromTown || toTown || dateFrom || dateTo) ? "filtered" : "dockets"}
               </span>
             </div>
           </div>
