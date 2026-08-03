@@ -31,6 +31,9 @@ app.use(cors({
 // Initialize DB connection
 require('./config/db');
 
+// Start Wheelseye location cron job (every 15 minutes)
+require('./common/wheelseyeCron');
+
 
 // ✅ ROOT using process.cwd()
 const ROOT_DIR = process.cwd();
