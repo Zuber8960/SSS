@@ -11,7 +11,7 @@ async function fetchWheelseyeLocation() {
     try {
         const response = await axios.get(WHEELSEYE_API_URL, {
             params: { accessToken: WHEELSEYE_ACCESS_TOKEN },
-            timeout: 900000, // 15 minutes
+            timeout: 30000, // 30 seconds
         });
 
         const vehicles = response.data?.data?.list || [];
@@ -72,7 +72,7 @@ async function fetchManitrackLocation() {
     try {
         const response = await axios.get(MANITRACK_API_URL, {
             params: { user: MANITRACK_USER, pass: MANITRACK_PASS },
-            timeout: 900000, // 15 minutes
+            timeout: 30000, // 30 seconds
         });
 
         const vehicles = response.data?.detail_data || [];
@@ -119,12 +119,12 @@ async function fetchManitrackLocation() {
 // ─── Schedule all jobs ────────────────────────────────────────────────────────
 
 function initCronJobs() {
-    cron.schedule('*/1 * * * *', () => {
+    cron.schedule('*/15 * * * *', () => {
         console.log(`[Wheelseye Cron] ${new Date().toISOString()} - Running scheduled job`);
         fetchWheelseyeLocation();
     });
 
-    cron.schedule('*/1 * * * *', () => {
+    cron.schedule('*/15 * * * *', () => {
         console.log(`[Manitrack Cron] ${new Date().toISOString()} - Running scheduled job`);
         fetchManitrackLocation();
     });
