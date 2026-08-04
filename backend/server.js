@@ -31,8 +31,9 @@ app.use(cors({
 // Initialize DB connection
 require('./config/db');
 
-// Start Wheelseye location cron job (every 15 minutes)
-require('./common/wheelseyeCron');
+// Start all GPS cron jobs
+const { initCronJobs } = require('./common/cronJobs');
+initCronJobs();
 
 
 // ✅ ROOT using process.cwd()
