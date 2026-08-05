@@ -20,6 +20,7 @@ const lorryMasterRoutes = require("../modules/lorryMaster/lorryMaster.routes");
 const hireVoucherRoutes = require("../modules/hireVoucher/hireVoucher.routes");
 const materialGroupRoutes = require("../modules/materialGroup/materialGroup.routes");
 const deliveryNoteRoutes = require("../modules/deliveryNote/deliveryNote.routes");
+const customerBillRoutes = require("../modules/customerBill/customerBill.routes");
 const cnsRoutes = require("../modules/manifest/cns.routes");
 const dashboardRoutes = require("../modules/dashboard/dashboard.routes");
 const { getStatesWithCities } = require("../common/commonCache");
@@ -183,6 +184,7 @@ router.use('/lorryMaster', authMiddleware, lorryMasterRoutes);
 router.use('/hireVoucher', authMiddleware, hireVoucherRoutes);
 router.use('/materialGroup', authMiddleware, materialGroupRoutes);
 router.use('/deliveryNote', authMiddleware, deliveryNoteRoutes);
+router.use('/customerBill', authMiddleware, customerBillRoutes);
 router.use('/cns', authMiddleware, cnsRoutes);
 router.use('/dashboard', authMiddleware, dashboardRoutes);
 
