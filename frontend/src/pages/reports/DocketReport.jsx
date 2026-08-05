@@ -224,7 +224,7 @@ export default function DocketReport() {
         ewbNoDisplay: d.ewb_no || d.eway_bill_no || "",
         company,
         locations,
-        copies: ["Consignor Copy", "Consignee Copy", "Driver Copy"],
+        copies: ["Consignor Copy", "Consignee Copy", "Lorry Copy", "File Copy"],
       });
     } catch (err) {
       showError(err.message || "Failed to print docket");

@@ -168,55 +168,59 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
 
 const PRINT_CSS = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, sans-serif; font-size: 8px; background: #fff; }
+  body { font-family: Arial, sans-serif; font-size: 9px; background: #fff; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
   @page { size: A4 portrait; margin: 6mm; }
   @media print {
     body { margin: 0; }
     .no-print { display: none; }
+    .page-break { page-break-before: always; }
   }
   .page { width: 210mm; padding: 4mm; }
-  .slip { border: 1px solid #333; margin-bottom: 4px; page-break-inside: avoid; }
-  .slip-inner { padding: 4px 6px; }
+  .page-break { page-break-before: always; padding-top: 4mm; }
+  .slip { border: 1.5px solid #222; margin-bottom: 5px; page-break-inside: avoid; }
+  .slip-inner { padding: 5px 7px; }
 
-  .header-row { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #333; padding-bottom: 3px; margin-bottom: 3px; gap: 6px; }
+  .header-row { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1.5px solid #222; padding-bottom: 4px; margin-bottom: 4px; gap: 6px; }
   .logo-col { display: flex; align-items: center; justify-content: center; min-width: 48px; }
   .co-logo { max-height: 48px; max-width: 80px; object-fit: contain; }
   .company-block { flex: 1; }
-  .company-name { font-size: 11px; font-weight: bold; }
-  .company-addr, .company-contact { font-size: 7px; }
-  .cn-block { text-align: right; min-width: 100px; }
-  .cn-title { font-size: 9px; font-weight: bold; border: 1px solid #333; padding: 1px 4px; background: #eee; }
+  .company-name { font-size: 14px; font-weight: 900; letter-spacing: 0.3px; }
+  .company-addr, .company-contact { font-size: 8px; font-weight: 600; }
+  .cn-block { text-align: right; min-width: 110px; }
+  .cn-title { font-size: 10px; font-weight: 900; border: 1.5px solid #222; padding: 2px 5px; background: #eee; letter-spacing: 0.5px; }
   .cn-barcode { font-size: 14px; letter-spacing: -2px; color: #222; }
-  .cn-no { font-size: 10px; font-weight: bold; }
-  .cn-billed { font-size: 7px; }
+  .cn-no { font-size: 12px; font-weight: 900; letter-spacing: 0.5px; }
+  .cn-billed { font-size: 8px; font-weight: 700; }
 
-  .route-table { width: 100%; border-collapse: collapse; margin-bottom: 3px; font-size: 7px; }
-  .route-table th, .route-table td { border: 1px solid #999; padding: 1px 3px; text-align: left; }
-  .route-table th { background: #f0f0f0; font-weight: bold; }
+  .route-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; font-size: 8px; }
+  .route-table th, .route-table td { border: 1px solid #666; padding: 2px 4px; text-align: left; }
+  .route-table th { background: #e8e8e8; font-weight: 900; font-size: 8px; letter-spacing: 0.3px; }
+  .route-table td { font-weight: 700; }
 
-  .party-row { display: flex; gap: 4px; margin-bottom: 3px; }
-  .party-box { flex: 1; border: 1px solid #999; padding: 3px 4px; }
-  .party-title { font-size: 7px; font-weight: bold; background: #f0f0f0; margin: -3px -4px 2px -4px; padding: 1px 4px; }
-  .party-name { font-size: 8px; font-weight: bold; }
-  .party-addr, .party-gstin, .party-state { font-size: 7px; }
+  .party-row { display: flex; gap: 5px; margin-bottom: 4px; }
+  .party-box { flex: 1; border: 1px solid #666; padding: 3px 5px; }
+  .party-title { font-size: 8px; font-weight: 900; background: #e8e8e8; margin: -3px -5px 3px -5px; padding: 2px 5px; letter-spacing: 0.5px; }
+  .party-name { font-size: 10px; font-weight: 900; }
+  .party-addr { font-size: 8px; font-weight: 600; }
+  .party-gstin, .party-state { font-size: 7.5px; font-weight: 700; }
 
-  .pkg-charges-row { display: flex; gap: 4px; margin-bottom: 3px; }
+  .pkg-charges-row { display: flex; gap: 5px; margin-bottom: 4px; }
   .pkg-section { flex: 1; }
-  .pkg-table { width: 100%; border-collapse: collapse; font-size: 7px; margin-bottom: 3px; }
-  .pkg-table td { border: 1px solid #999; padding: 1px 3px; }
-  .pkg-label { background: #f0f0f0; font-weight: bold; white-space: nowrap; }
-  .note-block { font-size: 6.5px; border: 1px solid #999; padding: 2px 4px; }
-  .charges-section { min-width: 110px; }
-  .charges-table { width: 100%; border-collapse: collapse; font-size: 7px; }
-  .charges-table th, .charges-table td { border: 1px solid #999; padding: 1px 3px; }
-  .charges-table th { background: #f0f0f0; }
-  .amt-cell { text-align: right; }
-  .total-row td { font-weight: bold; background: #f9f9f9; }
-  .company-footer { font-size: 6.5px; text-align: center; font-weight: bold; }
+  .pkg-table { width: 100%; border-collapse: collapse; font-size: 8px; margin-bottom: 3px; }
+  .pkg-table td { border: 1px solid #666; padding: 2px 4px; font-weight: 600; }
+  .pkg-label { background: #e8e8e8; font-weight: 900; white-space: nowrap; }
+  .note-block { font-size: 7.5px; font-weight: 600; border: 1px solid #666; padding: 2px 4px; }
+  .charges-section { min-width: 120px; }
+  .charges-table { width: 100%; border-collapse: collapse; font-size: 8px; }
+  .charges-table th, .charges-table td { border: 1px solid #666; padding: 2px 4px; font-weight: 600; }
+  .charges-table th { background: #e8e8e8; font-weight: 900; }
+  .amt-cell { text-align: right; font-weight: 700; }
+  .total-row td { font-weight: 900; background: #f0f0f0; font-size: 9px; }
+  .company-footer { font-size: 7.5px; text-align: center; font-weight: 900; }
 
-  .copy-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #999; padding-top: 2px; margin-top: 2px; }
-  .copy-label { font-size: 9px; font-weight: bold; color: #c00; }
-  .auth-sign { font-size: 7px; }
+  .copy-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1.5px solid #444; padding-top: 3px; margin-top: 3px; }
+  .copy-label { font-size: 11px; font-weight: 900; color: #c00; letter-spacing: 0.5px; }
+  .auth-sign { font-size: 8px; font-weight: 700; }
 
   .print-btn { display: block; margin: 10px auto; padding: 8px 24px; font-size: 14px; background: #7e22ce; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
 `;
@@ -224,7 +228,8 @@ const PRINT_CSS = `
 const DEFAULT_COPIES = [
   "Consignor Copy",
   "Consignee Copy",
-  "Driver Copy",
+  "Lorry Copy",
+  "File Copy",
 ];
 
 /**
@@ -264,6 +269,10 @@ export function printDocket({ form, charges, ewbList, ewbNoDisplay, company, loc
     }
   }
 
+  // Always use 4 fixed copies split across 2 pages
+  const page1Labels = [copyLabels[0] || "Consignor Copy", copyLabels[1] || "Consignee Copy"];
+  const page2Labels = [copyLabels[2] || "Lorry Copy",     copyLabels[3] || "File Copy"];
+
   const printWindow = window.open("", "_blank", "width=900,height=1200");
   printWindow.document.write(`<!DOCTYPE html>
 <html>
@@ -275,7 +284,10 @@ export function printDocket({ form, charges, ewbList, ewbNoDisplay, company, loc
 <body>
   <button class="print-btn no-print" onclick="window.print(); window.close();">Print</button>
   <div class="page">
-    ${copyLabels.map((label) => buildSlipHtml({ ...slipData, copyLabel: label })).join("")}
+    ${page1Labels.map((label) => buildSlipHtml({ ...slipData, copyLabel: label })).join("")}
+  </div>
+  <div class="page page-break">
+    ${page2Labels.map((label) => buildSlipHtml({ ...slipData, copyLabel: label })).join("")}
   </div>
 </body>
 </html>`);

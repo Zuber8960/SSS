@@ -315,7 +315,7 @@ export default function DocketPage() {
       ewbNoDisplay,
       company,
       locations,
-      copies: ["Consignor Copy", "Consignee Copy", "Driver Copy"],
+      copies: ["Consignor Copy", "Consignee Copy", "Lorry Copy", "File Copy"],
     });
   };
 
