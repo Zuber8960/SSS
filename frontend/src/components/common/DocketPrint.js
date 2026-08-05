@@ -168,59 +168,61 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
 
 const PRINT_CSS = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, sans-serif; font-size: 9px; background: #fff; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  html, body { width: 100%; overflow-x: hidden; }
+  body { font-family: Arial, sans-serif; font-size: 8px; font-weight: 800; background: #fff; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
   @page { size: A4 portrait; margin: 6mm; }
   @media print {
     body { margin: 0; }
     .no-print { display: none; }
     .page-break { page-break-before: always; }
   }
-  .page { width: 210mm; padding: 4mm; }
-  .page-break { page-break-before: always; padding-top: 4mm; }
-  .slip { border: 1.5px solid #222; margin-bottom: 5px; page-break-inside: avoid; }
-  .slip-inner { padding: 5px 7px; }
+  .page { width: 100%; max-width: 210mm; padding: 2mm; }
+  .page-break { page-break-before: always; padding-top: 2mm; }
+  .slip { border: 1.5px solid #222; margin-bottom: 4px; page-break-inside: avoid; }
+  .slip-inner { padding: 3px 6px; }
 
-  .header-row { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1.5px solid #222; padding-bottom: 4px; margin-bottom: 4px; gap: 6px; }
-  .logo-col { display: flex; align-items: center; justify-content: center; min-width: 48px; }
-  .co-logo { max-height: 48px; max-width: 80px; object-fit: contain; }
+  .header-row { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1.5px solid #222; padding-bottom: 2px; margin-bottom: 2px; gap: 4px; }
+  .logo-col { display: flex; align-items: center; justify-content: center; min-width: 40px; }
+  .co-logo { max-height: 38px; max-width: 70px; object-fit: contain; }
   .company-block { flex: 1; }
-  .company-name { font-size: 14px; font-weight: 900; letter-spacing: 0.3px; }
-  .company-addr, .company-contact { font-size: 8px; font-weight: 600; }
-  .cn-block { text-align: right; min-width: 110px; }
-  .cn-title { font-size: 10px; font-weight: 900; border: 1.5px solid #222; padding: 2px 5px; background: #eee; letter-spacing: 0.5px; }
-  .cn-barcode { font-size: 14px; letter-spacing: -2px; color: #222; }
-  .cn-no { font-size: 12px; font-weight: 900; letter-spacing: 0.5px; }
-  .cn-billed { font-size: 8px; font-weight: 700; }
+  .company-name { font-size: 12px; font-weight: 900; letter-spacing: 0.3px; }
+  .company-addr { font-size: 8px; font-weight: 800; }
+  .company-contact { font-size: 8px; font-weight: 800; }
+  .cn-block { text-align: right; min-width: 100px; }
+  .cn-title { font-size: 9px; font-weight: 900; border: 1.5px solid #222; padding: 1px 4px; background: #eee; letter-spacing: 0.5px; }
+  .cn-barcode { font-size: 12px; letter-spacing: -2px; color: #222; }
+  .cn-no { font-size: 11px; font-weight: 900; letter-spacing: 0.5px; }
+  .cn-billed { font-size: 8px; font-weight: 800; }
 
-  .route-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; font-size: 8px; }
-  .route-table th, .route-table td { border: 1px solid #666; padding: 2px 4px; text-align: left; }
-  .route-table th { background: #e8e8e8; font-weight: 900; font-size: 8px; letter-spacing: 0.3px; }
-  .route-table td { font-weight: 700; }
+  .route-table { width: 100%; border-collapse: collapse; margin-bottom: 2px; font-size: 8px; }
+  .route-table th { border: 1px solid #555; padding: 1px 3px; text-align: left; background: #e8e8e8; font-weight: 900; }
+  .route-table td { border: 1px solid #555; padding: 1px 3px; text-align: left; font-weight: 800; }
 
-  .party-row { display: flex; gap: 5px; margin-bottom: 4px; }
-  .party-box { flex: 1; border: 1px solid #666; padding: 3px 5px; }
-  .party-title { font-size: 8px; font-weight: 900; background: #e8e8e8; margin: -3px -5px 3px -5px; padding: 2px 5px; letter-spacing: 0.5px; }
-  .party-name { font-size: 10px; font-weight: 900; }
-  .party-addr { font-size: 8px; font-weight: 600; }
-  .party-gstin, .party-state { font-size: 7.5px; font-weight: 700; }
+  .party-row { display: flex; gap: 3px; margin-bottom: 2px; }
+  .party-box { flex: 1; border: 1px solid #555; padding: 2px 4px; }
+  .party-title { font-size: 8px; font-weight: 900; background: #e8e8e8; margin: -2px -4px 2px -4px; padding: 1px 4px; letter-spacing: 0.5px; }
+  .party-name { font-size: 9px; font-weight: 900; }
+  .party-addr { font-size: 8px; font-weight: 800; }
+  .party-gstin { font-size: 8px; font-weight: 800; }
+  .party-state { font-size: 8px; font-weight: 800; }
 
-  .pkg-charges-row { display: flex; gap: 5px; margin-bottom: 4px; }
+  .pkg-charges-row { display: flex; gap: 3px; margin-bottom: 2px; }
   .pkg-section { flex: 1; }
-  .pkg-table { width: 100%; border-collapse: collapse; font-size: 8px; margin-bottom: 3px; }
-  .pkg-table td { border: 1px solid #666; padding: 2px 4px; font-weight: 600; }
+  .pkg-table { width: 100%; border-collapse: collapse; font-size: 8px; margin-bottom: 2px; }
+  .pkg-table td { border: 1px solid #555; padding: 1px 3px; font-weight: 800; }
   .pkg-label { background: #e8e8e8; font-weight: 900; white-space: nowrap; }
-  .note-block { font-size: 7.5px; font-weight: 600; border: 1px solid #666; padding: 2px 4px; }
-  .charges-section { min-width: 120px; }
+  .note-block { font-size: 7.5px; font-weight: 800; border: 1px solid #555; padding: 2px 4px; }
+  .charges-section { min-width: 115px; }
   .charges-table { width: 100%; border-collapse: collapse; font-size: 8px; }
-  .charges-table th, .charges-table td { border: 1px solid #666; padding: 2px 4px; font-weight: 600; }
-  .charges-table th { background: #e8e8e8; font-weight: 900; }
-  .amt-cell { text-align: right; font-weight: 700; }
-  .total-row td { font-weight: 900; background: #f0f0f0; font-size: 9px; }
+  .charges-table th { border: 1px solid #555; padding: 1px 3px; background: #e8e8e8; font-weight: 900; }
+  .charges-table td { border: 1px solid #555; padding: 1px 3px; font-weight: 800; }
+  .amt-cell { text-align: right; font-weight: 900; }
+  .total-row td { font-weight: 900; background: #f0f0f0; font-size: 8.5px; }
   .company-footer { font-size: 7.5px; text-align: center; font-weight: 900; }
 
-  .copy-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1.5px solid #444; padding-top: 3px; margin-top: 3px; }
-  .copy-label { font-size: 11px; font-weight: 900; color: #c00; letter-spacing: 0.5px; }
-  .auth-sign { font-size: 8px; font-weight: 700; }
+  .copy-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1.5px solid #444; padding-top: 2px; margin-top: 2px; }
+  .copy-label { font-size: 10px; font-weight: 900; color: #c00; letter-spacing: 0.5px; }
+  .auth-sign { font-size: 8px; font-weight: 800; }
 
   .print-btn { display: block; margin: 10px auto; padding: 8px 24px; font-size: 14px; background: #7e22ce; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
 `;
