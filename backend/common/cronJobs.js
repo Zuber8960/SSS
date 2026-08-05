@@ -44,7 +44,7 @@ async function fetchWheelseyeLocation() {
             created_on: new Date(),
         }));
 
-        await db('sss.sst_cargo_yarn_gps_data').insert(rows);
+        await db('sss.sst_cargo_yaan_gps_data').insert(rows);
         console.log(`[Wheelseye Cron] ${new Date().toISOString()} - Inserted ${rows.length} records`);
     } catch (error) {
         console.error(`[Wheelseye Cron] ${new Date().toISOString()} - Error:`, error.message);
@@ -105,7 +105,7 @@ async function fetchManitrackLocation() {
             created_on: new Date(),
         }));
 
-        await db('sss.sst_cargo_yarn_gps_data').insert(rows);
+        await db('sss.sst_cargo_yaan_gps_data').insert(rows);
         console.log(`[Manitrack Cron] ${new Date().toISOString()} - Inserted ${rows.length} records`);
     } catch (error) {
         console.error(`[Manitrack Cron] ${new Date().toISOString()} - Error:`, error.message);
