@@ -695,7 +695,7 @@ const saveDataEwb = async (apiResResult, tenant_id) => {
       EWB_NO: ewbNoStr,
       EWB_DATE: ewbDateStr,
       EWB_VALID_UPTO: validUpto.isValid() ? validUpto.format('YYYY-MM-DD') : null,
-      EWB_GENERATED_BY: data.userGstin || null,
+      EWB_GENERATED_BY: data.fromGstin || null,
       INV_NO: docketNo,
       INV_DATE: invDateStr,
       REJ_STATUS: data.rejectStatus || null,
