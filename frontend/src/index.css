@@ -59,6 +59,12 @@ body {
   margin: 0;
   overflow-x: hidden;
   zoom: var(--zoom);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+body::-webkit-scrollbar {
+  display: none;
 }
 
 #root {
