@@ -528,7 +528,25 @@ export function DataTable({
         {...(checkboxSelection ? { checkboxSelection: true } : {})}
         {...(disableMultipleRowSelection ? { disableMultipleRowSelection: true } : {})}
         {...(onRowSelectionModelChange ? { onRowSelectionModelChange } : {})}
-        {...(onCellEditStop ? { onCellEditStop } : {})}
+        {...(onCellEditStop || (editable && onCellChange) ? {
+          onCellEditStop: (params, event) => {
+            const { id, field, value } = params;
+            // onCellEditStop fires BEFORE processRowUpdate, so the row in the
+            // grid still holds the pre-edit value. If the value didn't change
+            // (e.g. user pressed Enter/Tab without editing), processRowUpdate
+            // won't fire onCellChange. Fire it here so the API fetch still
+            // happens (e.g. re-fetching docket data). When the value DID
+            // change, row?.[field] !== value, so we skip and let
+            // processRowUpdate handle it — avoiding a double API call.
+            if (editable && onCellChange) {
+              const row = apiRef.current.getRow(id);
+              if (row?.[field] === value) {
+                onCellChange(id, field, value);
+              }
+            }
+            if (onCellEditStop) onCellEditStop(params, event);
+          }
+        } : {})}
         processRowUpdate={async (newRow, oldRow) => {
           if (!editable) return newRow;
 
@@ -537,12 +555,16 @@ export function DataTable({
           if (!onCellChange) return newRow;
 
           let updatedRow = newRow;
-          columns.forEach((col) => {
+          for (const col of columns) {
             if (newRow[col.key] !== oldRow[col.key]) {
-              const changedRow = onCellChange(newRow.id, col.key, newRow[col.key]);
+              // onCellChange may be async (e.g. fetching remote data to auto-fill
+              // other cells in the row). Await it so the returned row contains the
+              // fully-updated values, keeping the grid's internal row state in
+              // sync and allowing the same cell to be re-edited again.
+              const changedRow = await onCellChange(newRow.id, col.key, newRow[col.key]);
               if (changedRow) updatedRow = { ...updatedRow, ...changedRow };
             }
-          });
+          }
           return updatedRow;
         }}
         onProcessRowUpdateError={(error) => {

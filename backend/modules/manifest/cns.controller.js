@@ -68,27 +68,27 @@ const validateLongHaul = async ({ docketNo, fromLoc, fromTown }) => {
   }
 
   // Check sst_unloading_dtl for available packages at the unloading location
-  const unloading = await db('sss.sst_unloading_dtl')
-    .where({
-      docket_no: docketNo,
-      unld_loc_code: fromLoc,
-    })
-    .whereRaw('(pkgs_received - desp_pkgs) > 0')
-    .first();
+  // const unloading = await db('sss.sst_unloading_dtl')
+  //   .where({
+  //     docket_no: docketNo,
+  //     unld_loc_code: fromLoc,
+  //   })
+  //   .whereRaw('(pkgs_received - desp_pkgs) > 0')
+  //   .first();
 
-  if (!unloading) {
-    return {
-      valid: false,
-      message: 'No unloaded packages available for long haul at this location',
-    };
-  }
+  // if (!unloading) {
+  //   return {
+  //     valid: false,
+  //     message: 'No unloaded packages available for long haul at this location',
+  //   };
+  // }
 
   return {
     valid: true,
     message: 'Docket is valid for long haul',
     data: {
       docket,
-      unloading,
+      // unloading,
     },
   };
 };
