@@ -537,12 +537,16 @@ export function DataTable({
           if (!onCellChange) return newRow;
 
           let updatedRow = newRow;
-          columns.forEach((col) => {
+          for (const col of columns) {
             if (newRow[col.key] !== oldRow[col.key]) {
-              const changedRow = onCellChange(newRow.id, col.key, newRow[col.key]);
+              // onCellChange may be async (e.g. fetching remote data to auto-fill
+              // other cells in the row). Await it so the returned row contains the
+              // fully-updated values, keeping the grid's internal row state in
+              // sync and allowing the same cell to be re-edited again.
+              const changedRow = await onCellChange(newRow.id, col.key, newRow[col.key]);
               if (changedRow) updatedRow = { ...updatedRow, ...changedRow };
             }
-          });
+          }
           return updatedRow;
         }}
         onProcessRowUpdateError={(error) => {

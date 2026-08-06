@@ -77,6 +77,15 @@ const sanitizeDetail = (payload = {}) => ({
   modified_on: payload.modified_on ?? null,
 });
 
+/* ================= GENERATE NEXT INVOICE NO ================= */
+
+async function getNextInvoiceNo() {
+  const result = await db.raw(
+    "SELECT COALESCE(MAX(CAST(invoice_no AS INTEGER)), 0) + 1 AS next_no FROM sss.sst_invoice_hdr"
+  );
+  return result.rows?.[0]?.next_no || 1;
+}
+
 /* ================= GET ================= */
 
 async function getAllInvoices(filters = {}) {
@@ -117,11 +126,18 @@ async function getFullInvoice(invoiceNo, invoiceDate, invoiceLoc, company_code) 
 async function saveInvoice(payload = {}) {
   const { header = {}, details = [] } = payload;
 
+  let headerWithNo = { ...header };
+
+  // Auto-generate invoice_no when not provided
+  if (!header.invoice_no) {
+    headerWithNo.invoice_no = await getNextInvoiceNo();
+  }
+
   const keys = {
-    division_code: header.division_code,
-    invoice_no: header.invoice_no,
-    loc_code: header.loc_code,
-    invoice_date: header.invoice_date,
+    division_code: headerWithNo.division_code,
+    invoice_no: headerWithNo.invoice_no,
+    loc_code: headerWithNo.loc_code,
+    invoice_date: headerWithNo.invoice_date,
   };
 
   const trx = await db.transaction();
@@ -134,7 +150,7 @@ async function saveInvoice(payload = {}) {
     let savedHeader;
     if (existing) {
       // Update existing header
-      const updates = sanitizeHeader({ ...header, modified_on: new Date() });
+      const updates = sanitizeHeader({ ...headerWithNo, modified_on: new Date() });
       delete updates.record_id;
       delete updates.created_on;
       delete updates.created_by;
@@ -144,17 +160,17 @@ async function saveInvoice(payload = {}) {
         .update(updates)
         .returning('*');
     } else {
-      // Insert new header
+      // Insert new header with auto-generated invoice_no
       [savedHeader] = await trx('sss.sst_invoice_hdr')
-        .insert(sanitizeHeader(header))
+        .insert(sanitizeHeader(headerWithNo))
         .returning('*');
     }
 
     // Delete old details and re-insert
     const detailKeys = {
-      invoice_no: header.invoice_no,
-      invoice_date: header.invoice_date,
-      invoice_loc: header.loc_code,
+      invoice_no: savedHeader.invoice_no,
+      invoice_date: savedHeader.invoice_date,
+      invoice_loc: savedHeader.loc_code,
     };
     await trx('sss.sst_invoice_dtl').where(detailKeys).del();
 

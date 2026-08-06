@@ -276,8 +276,11 @@ export default function ManifestPage() {
   };
 
   // ✅ When docket_no changes, fetch details from API, validate CNS, and auto-fill the row
+  // Returns the row updates (filled or cleared fields) so the DataGrid stays in sync
+  // with the async fetch. This prevents the grid's internal row state from going stale,
+  // which previously caused re-editing the same cell a second time to fail.
   const fetchAndFillDocket = async (index, docketNo) => {
-    if (!docketNo) return;
+    if (!docketNo) return null;
     try {
       showLoading();
       let docketData = docketCache[docketNo];
@@ -287,78 +290,57 @@ export default function ManifestPage() {
           setDocketCache((prev) => ({ ...prev, [docketNo]: docketData }));
         }
       }
+
+      let rowUpdate;
       if (docketData) {
         // ✅ Run CNS validation before filling the row
         const isValid = await validateDocketForManifest(docketNo, docketData);
         if (!isValid) {
           // Clear the row's auto-filled fields since validation failed
+          rowUpdate = { from_loc: "", to_loc: "", packages: "", weight: "", docket_date: "" };
           setDetails((prev) => {
             const upd = [...prev];
-            if (upd[index]) {
-              upd[index] = {
-                ...upd[index],
-                from_loc: "",
-                to_loc: "",
-                packages: "",
-                weight: "",
-                docket_date: "",
-              };
-            }
+            if (upd[index]) upd[index] = { ...upd[index], ...rowUpdate };
             return upd;
           });
-          return;
+          return rowUpdate;
         }
 
+        rowUpdate = {
+          from_loc: docketData.docket_loc || "",
+          to_loc: docketData.docket_to_loc || "",
+          packages: docketData.docket_tot_pkgs ?? "",
+          weight: docketData.docket_act_wt ?? "",
+          docket_date: docketData.docket_date ? docketData.docket_date.substring(0, 10) : "",
+        };
         setDetails((prev) => {
           const upd = [...prev];
-          if (upd[index]) {
-            upd[index] = {
-              ...upd[index],
-              from_loc: docketData.docket_loc || "",
-              to_loc: docketData.docket_to_loc || "",
-              packages: docketData.docket_tot_pkgs ?? "",
-              weight: docketData.docket_act_wt ?? "",
-              docket_date: docketData.docket_date ? docketData.docket_date.substring(0, 10) : "",
-            };
-          }
+          if (upd[index]) upd[index] = { ...upd[index], ...rowUpdate };
           return upd;
         });
+        return rowUpdate;
       } else {
         // Docket not found in API — clear the row's auto-filled fields
+        rowUpdate = { from_loc: "", to_loc: "", packages: "", weight: "", docket_date: "" };
         setDetails((prev) => {
           const upd = [...prev];
-          if (upd[index]) {
-            upd[index] = {
-              ...upd[index],
-              from_loc: "",
-              to_loc: "",
-              packages: "",
-              weight: "",
-              docket_date: "",
-            };
-          }
+          if (upd[index]) upd[index] = { ...upd[index], ...rowUpdate };
           return upd;
         });
         showError(`Docket No "${docketNo}" not found`);
+        return rowUpdate;
       }
     } catch (err) {
       // On error, clear the row's auto-filled fields
+      const rowUpdate = { from_loc: "", to_loc: "", packages: "", weight: "", docket_date: "" };
       setDetails((prev) => {
         const upd = [...prev];
-        if (upd[index]) {
-          upd[index] = {
-            ...upd[index],
-            from_loc: "",
-            to_loc: "",
-            packages: "",
-            weight: "",
-            docket_date: "",
-          };
-        }
+        if (upd[index]) upd[index] = { ...upd[index], ...rowUpdate };
         return upd;
       });
       showError(err.message || "Failed to fetch docket details");
       console.error("Fetch docket error:", err);
+      return rowUpdate;
     } finally {
       hideLoading();
     }
@@ -393,11 +375,13 @@ export default function ManifestPage() {
   };
 
   // ✅ Cell change handler (fires only when value actually changes)
-  const handleCellChange = (rowIndex, key, value) => {
+  // Returns the async row updates so the DataGrid can commit the fully-updated row.
+  const handleCellChange = async (rowIndex, key, value) => {
     updateRow(rowIndex, key, value);
     if (key === "docket_no") {
-      fetchAndFillDocket(rowIndex, value);
+      return await fetchAndFillDocket(rowIndex, value);
     }
+    return null;
   };
 
   // ✅ Cell edit stop handler (fires when user finishes editing, even if value didn't change)
