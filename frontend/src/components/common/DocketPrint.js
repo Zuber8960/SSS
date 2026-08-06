@@ -176,9 +176,9 @@ const PRINT_CSS = `
     .no-print { display: none; }
     .page-break { page-break-before: always; }
   }
-  .page { width: 100%; max-width: 210mm; padding: 2mm; }
-  .page-break { page-break-before: always; padding-top: 2mm; }
-  .slip { border: 1.5px solid #222; margin-bottom: 4px; page-break-inside: avoid; }
+  .page { width: 100%; max-width: 210mm; padding: 8mm 2mm 2mm 2mm; }
+  .page-break { page-break-before: always; padding: 8mm 2mm 2mm 2mm; }
+  .slip { border: 1.5px solid #222; margin-bottom: 30mm; page-break-inside: avoid; }
   .slip-inner { padding: 3px 6px; }
 
   .header-row { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1.5px solid #222; padding-bottom: 2px; margin-bottom: 2px; gap: 4px; }
