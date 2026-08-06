@@ -385,17 +385,11 @@ export default function ManifestPage() {
   };
 
   // ✅ Cell edit stop handler (fires when user finishes editing, even if value didn't change)
-  // This allows re-entering the same docket number after a failed fetch/validation
-  const handleCellEditStop = (params, event) => {
-    const { id, field, reason } = params;
-    if (field === "docket_no" && (reason === "cellFocusOut" || reason === "escapeKeyDown")) {
-      const rowIndex = id;
-      const docketNo = details[rowIndex]?.docket_no?.trim();
-      if (docketNo) {
-        fetchAndFillDocket(rowIndex, docketNo);
-      }
-    }
-  };
+  // The DataTable's internal onCellEditStop now handles firing onCellChange when
+  // the value is unchanged (e.g. pressing Enter/Tab without editing), so we no
+  // longer need to call fetchAndFillDocket here — doing so would cause a double
+  // API call when the value did change (processRowUpdate already fired it).
+  const handleCellEditStop = () => {};
 
   // ✅ Map form fields to DB header columns
   const mapFormToHeader = () => ({

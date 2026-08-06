@@ -528,7 +528,25 @@ export function DataTable({
         {...(checkboxSelection ? { checkboxSelection: true } : {})}
         {...(disableMultipleRowSelection ? { disableMultipleRowSelection: true } : {})}
         {...(onRowSelectionModelChange ? { onRowSelectionModelChange } : {})}
-        {...(onCellEditStop ? { onCellEditStop } : {})}
+        {...(onCellEditStop || (editable && onCellChange) ? {
+          onCellEditStop: (params, event) => {
+            const { id, field, value } = params;
+            // onCellEditStop fires BEFORE processRowUpdate, so the row in the
+            // grid still holds the pre-edit value. If the value didn't change
+            // (e.g. user pressed Enter/Tab without editing), processRowUpdate
+            // won't fire onCellChange. Fire it here so the API fetch still
+            // happens (e.g. re-fetching docket data). When the value DID
+            // change, row?.[field] !== value, so we skip and let
+            // processRowUpdate handle it — avoiding a double API call.
+            if (editable && onCellChange) {
+              const row = apiRef.current.getRow(id);
+              if (row?.[field] === value) {
+                onCellChange(id, field, value);
+              }
+            }
+            if (onCellEditStop) onCellEditStop(params, event);
+          }
+        } : {})}
         processRowUpdate={async (newRow, oldRow) => {
           if (!editable) return newRow;
 
