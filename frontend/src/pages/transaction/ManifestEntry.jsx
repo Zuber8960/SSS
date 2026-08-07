@@ -1311,6 +1311,7 @@ export default function ManifestPage() {
               }
             }}
             isHeight={520}
+            scroll={{ afterRows: 10, horizontal: true }}
 
           />
         </>
