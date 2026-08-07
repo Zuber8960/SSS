@@ -29,10 +29,10 @@ import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
-import { fetchDocketByDocketNo } from "../../utils/docket";
+import { fetchDocketByDocketNo, fetchAllDockets } from "../../utils/docket";
 import { fetchAllLocations, fetchLocationTowns } from "../../utils/locationMaster";
-import { AddIcon, DeleteIcon, EditIcon, SaveIcon, NoteAddIcon, ResetIcon, PrintIcon } from "../../components/common/icons";
-import { IconButton, Tooltip } from "@mui/material";
+import { EditIcon, SaveIcon, NoteAddIcon, ResetIcon, PrintIcon } from "../../components/common/icons";
+import { IconButton, Tooltip, Button } from "@mui/material";
 import { getTenantConfig } from "../../utils/tenantService";
 import logoImgFallback from "../../images/logo.png";
 import {
@@ -50,7 +50,7 @@ import {
 // ✅ Detail Table Columns (Dockets inside Manifest)
 // Only docket_no is editable; all other columns are read-only (auto-filled from API)
 const detailColumns = [
-  { key: "docket_no", label: "Docket No", editable: true },
+  { key: "docket_no", label: "Docket No", editable: false },
   { key: "from_loc", label: "From", editable: false },
   { key: "to_loc", label: "To", editable: false },
   { key: "packages", label: "Packages", editable: false },
@@ -77,15 +77,17 @@ const emptyForm = {
 };
 
 export default function ManifestPage() {
-  const { dialog, closeAlert, showSuccess, showError, showInfo, showWarning } = useAlert();
+  const { dialog, closeAlert, showSuccess, showError, showInfo } = useAlert();
   const { isLoading, showLoading, hideLoading } = useLoading();
 
   const [form, setForm] = useState({ ...emptyForm });
   const [details, setDetails] = useState([]);
   const [docketCache, setDocketCache] = useState({});
-  const [selectedRows, setSelectedRows] = useState([]);
   const [locations, setLocations] = useState([]);
   const [townOptions, setTownOptions] = useState({ from: [], to: [] });
+  const [availableDockets, setAvailableDockets] = useState([]);
+  const [showDocketMode, setShowDocketMode] = useState(false);
+  const [availableSelectedIds, setAvailableSelectedIds] = useState(new Set());
 
   // Build location dropdown options
   const locationOptions = locations.map((loc) => ({
@@ -156,12 +158,18 @@ export default function ManifestPage() {
   // Store original composite key for updates
   const originalKey = useRef(null);
 
-  // ✅ Compute totals from detail rows
+  // ✅ Compute totals from detail rows (edit mode) or selected available dockets (create mode)
   const computedTotals = useMemo(() => {
     let totalWt = 0;
     let totalPkgs = 0;
     let totalDockets = 0;
-    details.forEach((row) => {
+
+    const sourceRows =
+      mode === "create"
+        ? availableDockets.filter((_, idx) => availableSelectedIds.has(idx))
+        : details;
+
+    sourceRows.forEach((row) => {
       totalWt += parseFloat(row.weight) || 0;
       totalPkgs += parseFloat(row.packages) || 0;
       if (row.docket_no && row.docket_no.trim() !== "") {
@@ -169,39 +177,8 @@ export default function ManifestPage() {
       }
     });
     return { total_wt: totalWt, total_pkgs: totalPkgs, total_dockets: totalDockets };
-  }, [details]);
+  }, [details, availableDockets, availableSelectedIds, mode]);
 
-
-  // ✅ Add Row
-  const addRow = () => {
-    setDetails([
-      ...details,
-      {
-        docket_no: "",
-        from_loc: "",
-        to_loc: "",
-        packages: "",
-        weight: "",
-      },
-    ]);
-  };
-
-  // ✅ Delete selected rows
-  const deleteSelectedRows = () => {
-    const ids = Array.from(selectedRows);
-    if (!ids.length) {
-      showError("Please select at least one row to delete");
-      return;
-    }
-    showWarning(
-      "Delete Rows",
-      `Are you sure you want to delete ${ids.length} selected row(s)?`,
-      () => {
-        setDetails((prev) => prev.filter((_, idx) => !ids.includes(idx)));
-        setSelectedRows([]);
-      }
-    );
-  };
 
   // ✅ Update Row
   const updateRow = (index, field, value) => {
@@ -391,6 +368,109 @@ export default function ManifestPage() {
   // API call when the value did change (processRowUpdate already fired it).
   const handleCellEditStop = () => {};
 
+  // ✅ Show Docket — fetch all dockets up to manifest date and display in a selectable table
+  const handleShowDocket = async () => {
+    if (!form.manifest_date) {
+      showError("Please select Manifest Date first");
+      return;
+    }
+    if (!form.from_loc) {
+      showError("Please select From Location first");
+      return;
+    }
+    if (!form.manifest_type) {
+      showError("Please select Manifest Type first");
+      return;
+    }
+
+    try {
+      showLoading();
+      const allDockets = await fetchAllDockets(true);
+      const docketList = Array.isArray(allDockets) ? allDockets : [];
+
+      // Filter dockets: from location matches, date <= manifest date, and not already in details
+      const manifestDate = new Date(form.manifest_date);
+      const existingNos = new Set(details.map((d) => d.docket_no).filter(Boolean));
+
+      const filtered = docketList.filter((d) => {
+        // Match from location
+        if ((d.docket_loc || "").toLowerCase() !== form.from_loc.toLowerCase()) return false;
+
+        // Match date <= manifest date
+        if (d.docket_date) {
+          const docketDate = new Date(d.docket_date.substring(0, 10));
+          if (docketDate > manifestDate) return false;
+        }
+
+        // Skip already added dockets
+        if (existingNos.has(d.docket_no)) return false;
+
+        return true;
+      });
+
+      // Map to display format
+      const mapped = filtered.map((d) => ({
+        docket_no: d.docket_no || "",
+        docket_date: d.docket_date ? d.docket_date.substring(0, 10) : "",
+        from_loc: d.docket_loc || "",
+        to_loc: d.docket_to_loc || "",
+        packages: d.docket_tot_pkgs ?? d.total_pkgs ?? "",
+        weight: d.docket_act_wt ?? d.actual_wt ?? "",
+        docket_data: d,
+      }));
+
+      setAvailableDockets(mapped);
+      setShowDocketMode(true);
+      showInfo(`Found ${mapped.length} docket(s) up to ${form.manifest_date}`);
+    } catch (err) {
+      showError(err.message || "Failed to fetch dockets");
+      console.error("Fetch dockets error:", err);
+    } finally {
+      hideLoading();
+    }
+  };
+
+  // ✅ Add selected dockets from the available dockets table to the manifest details
+  const handleAddSelectedDockets = async (selectedIds) => {
+    if (!selectedIds || selectedIds.size === 0) {
+      showError("Please select at least one docket to add");
+      return;
+    }
+
+    const selectedDockets = availableDockets.filter((d, idx) => selectedIds.has(idx));
+    if (!selectedDockets.length) {
+      showError("No valid dockets selected");
+      return;
+    }
+
+    // Validate each selected docket against CNS rules
+    const validDockets = [];
+    for (const d of selectedDockets) {
+      const isValid = await validateDocketForManifest(d.docket_no, d.docket_data);
+      if (isValid) {
+        validDockets.push({
+          docket_no: d.docket_no,
+          docket_date: d.docket_date,
+          from_loc: d.from_loc,
+          to_loc: d.to_loc,
+          packages: d.packages,
+          weight: d.weight,
+        });
+      }
+    }
+
+    if (!validDockets.length) {
+      showError("None of the selected dockets passed validation");
+      return;
+    }
+
+    setDetails((prev) => [...prev, ...validDockets]);
+    setAvailableDockets((prev) => prev.filter((d, idx) => !selectedIds.has(idx)));
+    setAvailableSelectedIds(new Set());
+    setShowDocketMode(false);
+    showSuccess(`${validDockets.length} docket(s) added to manifest`);
+  };
+
   // ✅ Map form fields to DB header columns
   const mapFormToHeader = () => ({
     division_code: localStorage.getItem("division_code") || "",
@@ -505,6 +585,7 @@ export default function ManifestPage() {
   // ✅ Edit/View — first click enables the field, second click (after typing) fetches data
   const handleEditView = async () => {
     const mnfNo = form.manifest_no.trim();
+    handleClear()
 
     if (!mnfNo && !isSearchActive) {
       // First click: enable the manifest_no field so user can type
@@ -949,8 +1030,8 @@ export default function ManifestPage() {
       showError("Manifest Date is required");
       return;
     }
-    if (!details.length) {
-      showError("Please add docket to save the manifest");
+    if (availableSelectedIds.size === 0) {
+      showError("Please select at least one docket to save the manifest");
       return;
     }
     if (form.driver_mobile && form.driver_mobile.length !== 10) {
@@ -962,7 +1043,18 @@ export default function ManifestPage() {
       showLoading();
 
       const header = mapFormToHeader();
-      const detailRows = mapDetailsToDb();
+      const detailRows = availableDockets
+        .filter((d, idx) => availableSelectedIds.has(idx))
+        .map((row) => ({
+          dwb_no: row.docket_no,
+          dwb_date: row.docket_date || null,
+          dwb_loc: row.from_loc,
+          dwb_to_loc: row.to_loc,
+          dwb_pkgs: parseFloat(row.packages) || 0,
+          dwb_actual_wt: parseFloat(row.weight) || 0,
+          dwb_charged_wt: parseFloat(row.weight) || 0,
+          mnf_pkgs: parseFloat(row.packages) || 0,
+        }));
 
       if (mode === "create") {
         const response = await createManifest(header, detailRows);
@@ -1023,7 +1115,8 @@ export default function ManifestPage() {
     { name: "total_dockets",  label: "No of Dockets",  type: "number", disabled: true, value: computedTotals.total_dockets, slotProps: { input: { readOnly: true } } },
     { name: "total_wt",       label: "Total Weight",   type: "number", disabled: true, value: computedTotals.total_wt,      slotProps: { input: { readOnly: true } } },
     { name: "total_pkgs",     label: "Total Packages", type: "number", disabled: true, value: computedTotals.total_pkgs,    slotProps: { input: { readOnly: true } } },
-    { name: "remarks",        label: "Remarks",        multiline: true, rows: 2, fullSpan: true },
+    { name: "docket_btn",},
+    { name: "remarks",        label: "Remarks",        multiline: true, rows: 1, fullSpan: true },
   ];
 
   const sectionHeaderStyle = {
@@ -1125,34 +1218,40 @@ export default function ManifestPage() {
               />
             );
 
+            if (f.name === "docket_btn") {
+              return (
+                <div key={f.name} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  {/* <div style={{ flex: 1 }}>{field}</div> */}
+                  <Button
+                    variant="contained"
+                    onClick={handleShowDocket}
+                    sx={{
+                      background: "linear-gradient(135deg, #7e22ce, #a855f7)",
+                      "&:hover": { background: "linear-gradient(135deg, #6b21a8, #9333ea)" },
+                      textTransform: "none",
+                      fontWeight: 600,
+                      fontSize: 13,
+                      borderRadius: 2,
+                      whiteSpace: "nowrap",
+                      minWidth: 120,
+                      height: 35,
+                      marginTop: 0,
+                    }}
+                  >
+                    Show Docket
+                  </Button>
+                </div>
+              );
+            }
+
             return f.fullSpan
               ? <div key={f.name} style={{ gridColumn: "1 / -1" }}>{field}</div>
               : field;
           })}
         </FormPanel>
 
-        <div style={sectionHeaderStyle}>
+        {/* <div style={sectionHeaderStyle}>
           <h3>Docket Details</h3>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <Tooltip title="Add Row">
-              <IconButton
-                onClick={addRow}
-                size="small"
-                sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}
-              >
-                <AddIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Delete selected">
-              <IconButton
-                onClick={deleteSelectedRows}
-                size="small"
-                sx={{ color: "#dc2626", "&:hover": { background: "#fee2e2" } }}
-              >
-                <DeleteIcon />
-              </IconButton>
-            </Tooltip>
-          </div>
         </div>
         <DataTable
           columns={detailColumns}
@@ -1164,18 +1263,33 @@ export default function ManifestPage() {
           checkboxSelection
           onCellChange={handleCellChange}
           onCellEditStop={handleCellEditStop}
-          onRowSelectionModelChange={(model) => {
-            // MUI v7: { type: 'include', ids: Set } or { type: 'exclude', ids: Set }
-            // 'exclude' with empty ids means "all rows selected"
-            if (model?.type === 'exclude') {
-              const allIds = new Set(details.map((_, idx) => idx).filter(idx => !model.ids.has(idx)));
-              setSelectedRows(allIds);
-            } else {
-              const ids = model?.ids instanceof Set ? model.ids : new Set(Array.isArray(model) ? model : []);
-              setSelectedRows(ids);
-            }
-          }}
-        />
+        /> */}
+
+       
+          <>
+            <div style={sectionHeaderStyle}>
+              <h3> Docket Details(up to {form.manifest_date})</h3>
+            </div>
+            <DataTable
+              columns={detailColumns}
+              rows={availableDockets}
+              getKey={(row, index) => index}
+              actions={[]}
+              checkboxSelection
+              onRowSelectionModelChange={(model) => {
+                if (model?.type === 'exclude') {
+                  const allIds = new Set(availableDockets.map((_, idx) => idx).filter(idx => !model.ids.has(idx)));
+                  setAvailableSelectedIds(allIds);
+                } else {
+                  const ids = model?.ids instanceof Set ? model.ids : new Set(Array.isArray(model) ? model : []);
+                  setAvailableSelectedIds(ids);
+                }
+              }}
+              isHeight={520}
+
+            />
+          </>
+        
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
         <LoadingOverlay isLoading={isLoading} message="Please wait..." />

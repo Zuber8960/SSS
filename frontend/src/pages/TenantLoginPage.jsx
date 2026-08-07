@@ -392,12 +392,12 @@ export default function TenantLoginPage() {
                       label="Division"
                       value={selectedDivision}
                       onChange={e => { setSelectedDivision(e.target.value); setErrors(p => ({ ...p, division: false })); }}
-                      sx={{ fontSize: 13 }}
+                      sx={{ fontSize: 13, textAlign: "left" }}
                       MenuProps={{
                         slotProps: {
                           paper: {
                             sx: {
-                              '& .MuiMenuItem-root': { fontSize: 13 },
+                              '& .MuiMenuItem-root': { fontSize: 13, textAlign: "left" },
                             },
                           },
                         },
@@ -417,12 +417,12 @@ export default function TenantLoginPage() {
                       label="Location"
                       value={selectedLocation}
                       onChange={e => { setSelectedLocation(e.target.value); setErrors(p => ({ ...p, location: false })); }}
-                      sx={{ fontSize: 13 }}
+                      sx={{ fontSize: 13, textAlign: "left" }}
                       MenuProps={{
                         slotProps: {
                           paper: {
                             sx: {
-                              '& .MuiMenuItem-root': { fontSize: 13 },
+                              '& .MuiMenuItem-root': { fontSize: 13, textAlign: "left" },
                             },
                           },
                         },
@@ -455,12 +455,12 @@ export default function TenantLoginPage() {
                   </Button>
                 </Stack>
               )}
-            </Paper>
-          </Box>
+          </Paper>
         </Box>
-
-        <Footer />
       </Box>
+
+      <Footer />
+    </Box >
       <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
     </>
   );

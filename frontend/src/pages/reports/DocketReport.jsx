@@ -31,13 +31,14 @@ const docketColumns = [
   { key: "docket_act_wt", label: "Actual Wt", minWidth: 90 },
   { key: "docket_chrg_wt", label: "Charged Wt", minWidth: 100 },
   { key: "docket_pay_type", label: "Pay Type", minWidth: 100 },
-  { key: "docket_load_type", label: "Load Type", minWidth: 100 },
-  { key: "docket_transit_type", label: "Transit Type", minWidth: 110 },
-  { key: "docket_rate", label: "Rate", minWidth: 80 },
-  { key: "docket_rate_uom", label: "Rate UOM", minWidth: 90 },
-  { key: "docket_tot_amt", label: "Total Amount", minWidth: 110 },
-  { key: "delivery_status", label: "Delivery Status", minWidth: 130 },
-  { key: "docket_remark", label: "Remarks", minWidth: 150 },
+  { key: "docket_dispatch_pkgs", label: "Dispatch Pkgs", minWidth: 100 },
+  // { key: "docket_load_type", label: "Load Type", minWidth: 100 },
+  // { key: "docket_transit_type", label: "Transit Type", minWidth: 110 },
+  // { key: "docket_rate", label: "Rate", minWidth: 80 },
+  // { key: "docket_rate_uom", label: "Rate UOM", minWidth: 90 },
+  // { key: "docket_tot_amt", label: "Total Amount", minWidth: 110 },
+  // { key: "delivery_status", label: "Delivery Status", minWidth: 130 },
+  // { key: "docket_remark", label: "Remarks", minWidth: 150 },
 ];
 
 const toDate = (val) => {

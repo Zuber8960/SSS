@@ -143,7 +143,7 @@ const getListEwayDetails = async (ewbLists) => {
 };
 
 const getAllDockets = async (tenant_id, cnor_cnee) => {
-  const query = db('sss.sst_docket as d').select('*').where({ record_status: 0 });
+  const query = db('sss.sst_docket as d').select('*').where({ record_status: 0 }).orderBy('d.aud_date', 'desc');
   if (tenant_id) {
     query.andWhere('d.tenant_id', tenant_id);
   }
