@@ -586,6 +586,7 @@ export default function ManifestPage() {
   const handleEditView = async () => {
     const mnfNo = form.manifest_no.trim();
     handleClear()
+    setAvailableDockets([]);
 
     if (!mnfNo && !isSearchActive) {
       // First click: enable the manifest_no field so user can type
