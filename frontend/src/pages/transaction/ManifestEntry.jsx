@@ -50,11 +50,24 @@ import {
 // ✅ Detail Table Columns (Dockets inside Manifest)
 // Only docket_no is editable; all other columns are read-only (auto-filled from API)
 const detailColumns = [
-  { key: "docket_no", label: "Docket No", editable: false },
-  { key: "from_loc", label: "From", editable: false },
-  { key: "to_loc", label: "To", editable: false },
-  { key: "packages", label: "Packages", editable: false },
-  { key: "weight", label: "Weight", editable: false },
+  // { key: "docket_no", label: "Docket No", editable: false },
+  // { key: "from_loc", label: "From", editable: false },
+  // { key: "to_loc", label: "To", editable: false },
+  // { key: "packages", label: "Packages", editable: false },
+  // { key: "weight", label: "Weight", editable: false },
+  { key: "docket_no", label: "Docket No", minWidth: 120 },
+  { key: "docket_date", label: "Docket Date", minWidth: 110 },
+  { key: "docket_loc", label: "From Location", minWidth: 120 },
+  { key: "docket_pickup_town", label: "From Town", minWidth: 120 },
+  { key: "docket_to_loc", label: "To Location", minWidth: 120 },
+  { key: "docket_dly_town", label: "To Town", minWidth: 120 },
+  { key: "cnor_name", label: "Consignor", minWidth: 150 },
+  { key: "cnee_name", label: "Consignee", minWidth: 150 },
+  { key: "docket_tot_pkgs", label: "Packages", minWidth: 90 },
+  { key: "docket_act_wt", label: "Actual Wt", minWidth: 90 },
+  { key: "docket_chrg_wt", label: "Charged Wt", minWidth: 100 },
+  { key: "docket_pay_type", label: "Pay Type", minWidth: 100 },
+  { key: "docket_dispatch_pkgs", label: "Dispatch Pkgs", minWidth: 100 },
 ];
 
 const emptyForm = {
@@ -366,7 +379,7 @@ export default function ManifestPage() {
   // the value is unchanged (e.g. pressing Enter/Tab without editing), so we no
   // longer need to call fetchAndFillDocket here — doing so would cause a double
   // API call when the value did change (processRowUpdate already fired it).
-  const handleCellEditStop = () => {};
+  const handleCellEditStop = () => { };
 
   // ✅ Show Docket — fetch all dockets up to manifest date and display in a selectable table
   const handleShowDocket = async () => {
@@ -412,6 +425,17 @@ export default function ManifestPage() {
       const mapped = filtered.map((d) => ({
         docket_no: d.docket_no || "",
         docket_date: d.docket_date ? d.docket_date.substring(0, 10) : "",
+        docket_loc: d.docket_loc || "",
+        docket_pickup_town: d.docket_pickup_town || d.docket_from_town || "",
+        docket_to_loc: d.docket_to_loc || "",
+        docket_dly_town: d.docket_dly_town || d.docket_to_town || "",
+        cnor_name: d.cnor_name || "",
+        cnee_name: d.cnee_name || "",
+        docket_tot_pkgs: d.docket_tot_pkgs ?? "",
+        docket_act_wt: d.docket_act_wt ?? "",
+        docket_chrg_wt: d.docket_chrg_wt ?? "",
+        docket_pay_type: d.docket_pay_type || "",
+        docket_dispatch_pkgs: d.docket_tot_pkgs ?? "",
         from_loc: d.docket_loc || "",
         to_loc: d.docket_to_loc || "",
         packages: d.docket_tot_pkgs ?? d.total_pkgs ?? "",
@@ -630,14 +654,14 @@ export default function ManifestPage() {
       const formatDate = (dateStr) => {
         if (!dateStr) return "";
         const d = new Date(dateStr);
-        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-        return `${String(d.getDate()).padStart(2,"0")}-${months[d.getMonth()]}-${d.getFullYear()}`;
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        return `${String(d.getDate()).padStart(2, "0")}-${months[d.getMonth()]}-${d.getFullYear()}`;
       };
 
       const now = new Date();
-      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-      const printDate = `${String(now.getDate()).padStart(2,"0")}-${months[now.getMonth()]}-${now.getFullYear()}`;
-      const printTime = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const printDate = `${String(now.getDate()).padStart(2, "0")}-${months[now.getMonth()]}-${now.getFullYear()}`;
+      const printTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
       const filteredDocketRows = details.filter((row) => row.docket_no && row.docket_no.trim() !== "");
 
@@ -895,16 +919,16 @@ export default function ManifestPage() {
             </thead>
             <tbody>
               ${(() => {
-                if (filteredDocketRows.length === 0) {
-                  return '<tr><td colspan="10" style="text-align:center;padding:20px;font-style:italic;font-size:10px;">No dockets added</td></tr>';
-                }
-                return filteredDocketRows.map(
-                  (row, idx) => {
-                    const docketDate = row.docket_date ? formatDate(row.docket_date) : "";
-                    const ewbNo = row.ewb_no || "";
-                    const ewbExpiry = row.ewb_expiry ? formatDate(row.ewb_expiry) : "";
-                    const remarks = row.remarks || "";
-                    return `
+          if (filteredDocketRows.length === 0) {
+            return '<tr><td colspan="10" style="text-align:center;padding:20px;font-style:italic;font-size:10px;">No dockets added</td></tr>';
+          }
+          return filteredDocketRows.map(
+            (row, idx) => {
+              const docketDate = row.docket_date ? formatDate(row.docket_date) : "";
+              const ewbNo = row.ewb_no || "";
+              const ewbExpiry = row.ewb_expiry ? formatDate(row.ewb_expiry) : "";
+              const remarks = row.remarks || "";
+              return `
                       <tr>
                         <td class="center">${idx + 1}</td>
                         <td class="center">${row.docket_no}</td>
@@ -918,18 +942,18 @@ export default function ManifestPage() {
                         <td>${remarks}</td>
                       </tr>
                     `;
-                  }
-                ).join("");
-              })()}
+            }
+          ).join("");
+        })()}
               ${(() => {
-                // Add empty rows to fill space
-                const emptyRows = Math.max(0, 6 - filteredDocketRows.length);
-                let html = "";
-                for (let i = 0; i < emptyRows; i++) {
-                  html += '<tr><td colspan="10" style="border:none;height:18px;">&nbsp;</td></tr>';
-                }
-                return html;
-              })()}
+          // Add empty rows to fill space
+          const emptyRows = Math.max(0, 6 - filteredDocketRows.length);
+          let html = "";
+          for (let i = 0; i < emptyRows; i++) {
+            html += '<tr><td colspan="10" style="border:none;height:18px;">&nbsp;</td></tr>';
+          }
+          return html;
+        })()}
             </tbody>
           </table>
 
@@ -1002,17 +1026,17 @@ export default function ManifestPage() {
       </html>
     `;
 
-    const printWindow = window.open("", "_blank", "width=900,height=700");
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-      }, 500);
-    } else {
-      showError("Popup blocked. Please allow popups for this site.");
-    }
+      const printWindow = window.open("", "_blank", "width=900,height=700");
+      if (printWindow) {
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      } else {
+        showError("Popup blocked. Please allow popups for this site.");
+      }
     } catch (err) {
       showError("Print failed: " + (err.message || "Unknown error"));
       console.error("Print error:", err);
@@ -1103,21 +1127,21 @@ export default function ManifestPage() {
   const mobileError = !!form.driver_mobile && form.driver_mobile.length !== 10;
 
   const headerFields = [
-    { name: "manifest_no",    label: "Manifest No",    inputProps: { inputMode: "numeric" } },
-    { name: "manifest_type",  label: "Manifest Type",  type: "select", options: [{ label: "Local Pickup", value: "lp" }, { label: "Long Haul", value: "lh" }, { label: "Local Delivery", value: "ld" }] },
-    { name: "manifest_date",  label: "Manifest Date",  type: "date",   slotProps: { inputLabel: { shrink: true } } },
-    { name: "from_loc",       label: "From Location",  type: "select", options: locationOptions },
-    { name: "from_town",      label: "From Town",      type: "select", options: townFieldOptions.from },
-    { name: "to_loc",         label: "To Location",    type: "select", options: locationOptions },
-    { name: "to_town",        label: "To Town",        type: "select", options: townFieldOptions.to },
-    { name: "vehicle_no",     label: "Vehicle No" },
-    { name: "driver_name",    label: "Driver Name" },
-    { name: "driver_mobile",  label: "Driver Mobile",  inputProps: { inputMode: "numeric", maxLength: 10 }, error: mobileError, helperText: mobileError ? "Mobile number must be 10 digits" : "" },
-    { name: "total_dockets",  label: "No of Dockets",  type: "number", disabled: true, value: computedTotals.total_dockets, slotProps: { input: { readOnly: true } } },
-    { name: "total_wt",       label: "Total Weight",   type: "number", disabled: true, value: computedTotals.total_wt,      slotProps: { input: { readOnly: true } } },
-    { name: "total_pkgs",     label: "Total Packages", type: "number", disabled: true, value: computedTotals.total_pkgs,    slotProps: { input: { readOnly: true } } },
-    { name: "docket_btn",},
-    { name: "remarks",        label: "Remarks",        multiline: true, rows: 1, fullSpan: true },
+    { name: "manifest_no", label: "Manifest No", inputProps: { inputMode: "numeric" } },
+    { name: "manifest_type", label: "Manifest Type", type: "select", options: [{ label: "Local Pickup", value: "lp" }, { label: "Long Haul", value: "lh" }, { label: "Local Delivery", value: "ld" }] },
+    { name: "manifest_date", label: "Manifest Date", type: "date", slotProps: { inputLabel: { shrink: true } } },
+    { name: "from_loc", label: "From Location", type: "select", options: locationOptions },
+    { name: "from_town", label: "From Town", type: "select", options: townFieldOptions.from },
+    { name: "to_loc", label: "To Location", type: "select", options: locationOptions },
+    { name: "to_town", label: "To Town", type: "select", options: townFieldOptions.to },
+    { name: "vehicle_no", label: "Vehicle No" },
+    { name: "driver_name", label: "Driver Name" },
+    { name: "driver_mobile", label: "Driver Mobile", inputProps: { inputMode: "numeric", maxLength: 10 }, error: mobileError, helperText: mobileError ? "Mobile number must be 10 digits" : "" },
+    { name: "total_dockets", label: "No of Dockets", type: "number", disabled: true, value: computedTotals.total_dockets, slotProps: { input: { readOnly: true } } },
+    { name: "total_wt", label: "Total Weight", type: "number", disabled: true, value: computedTotals.total_wt, slotProps: { input: { readOnly: true } } },
+    { name: "total_pkgs", label: "Total Packages", type: "number", disabled: true, value: computedTotals.total_pkgs, slotProps: { input: { readOnly: true } } },
+    { name: "docket_btn", },
+    { name: "remarks", label: "Remarks", multiline: true, rows: 1, fullSpan: true },
   ];
 
   const sectionHeaderStyle = {
@@ -1193,20 +1217,20 @@ export default function ManifestPage() {
             let onChange, onKeyDown, onBlur, disabled, autoFocus;
 
             if (f.name === "manifest_no") {
-              disabled   = mode === "create" && !isSearchActive;
-              autoFocus  = isSearchActive;
-              onChange   = (e) => setForm((prev) => ({ ...prev, manifest_no: e.target.value.replace(/\D/g, "") }));
-              onKeyDown  = (e) => { if (e.key === "Enter" && isSearchActive) { const v = form.manifest_no.trim(); if (v) fetchAndLoadManifest(v); } };
-              onBlur     = () => { const v = form.manifest_no.trim(); if (v && isSearchActive) fetchAndLoadManifest(v); };
+              disabled = mode === "create" && !isSearchActive;
+              autoFocus = isSearchActive;
+              onChange = (e) => setForm((prev) => ({ ...prev, manifest_no: e.target.value.replace(/\D/g, "") }));
+              onKeyDown = (e) => { if (e.key === "Enter" && isSearchActive) { const v = form.manifest_no.trim(); if (v) fetchAndLoadManifest(v); } };
+              onBlur = () => { const v = form.manifest_no.trim(); if (v && isSearchActive) fetchAndLoadManifest(v); };
             } else if (f.name === "vehicle_no") {
-              onChange   = (e) => handleVehicleNoChange(e.target.value);
-              onKeyDown  = (e) => { if (e.key === "Enter") handleVehicleNoValidate(); };
-              onBlur     = handleVehicleNoValidate;
+              onChange = (e) => handleVehicleNoChange(e.target.value);
+              onKeyDown = (e) => { if (e.key === "Enter") handleVehicleNoValidate(); };
+              onBlur = handleVehicleNoValidate;
             } else if (f.name === "driver_mobile") {
-              onChange   = (e) => setForm((prev) => ({ ...prev, driver_mobile: e.target.value.replace(/\D/g, "").slice(0, 10) }));
+              onChange = (e) => setForm((prev) => ({ ...prev, driver_mobile: e.target.value.replace(/\D/g, "").slice(0, 10) }));
             } else {
-              onChange   = (e) => setForm((prev) => ({ ...prev, [f.name]: e.target.value }));
-              disabled   = f.disabled;
+              onChange = (e) => setForm((prev) => ({ ...prev, [f.name]: e.target.value }));
+              disabled = f.disabled;
             }
 
             const field = (
@@ -1266,31 +1290,31 @@ export default function ManifestPage() {
           onCellEditStop={handleCellEditStop}
         /> */}
 
-       
-          <>
-            <div style={sectionHeaderStyle}>
-              <h3> Docket Details(up to {form.manifest_date})</h3>
-            </div>
-            <DataTable
-              columns={detailColumns}
-              rows={availableDockets}
-              getKey={(row, index) => index}
-              actions={[]}
-              checkboxSelection
-              onRowSelectionModelChange={(model) => {
-                if (model?.type === 'exclude') {
-                  const allIds = new Set(availableDockets.map((_, idx) => idx).filter(idx => !model.ids.has(idx)));
-                  setAvailableSelectedIds(allIds);
-                } else {
-                  const ids = model?.ids instanceof Set ? model.ids : new Set(Array.isArray(model) ? model : []);
-                  setAvailableSelectedIds(ids);
-                }
-              }}
-              isHeight={520}
 
-            />
-          </>
-        
+        <>
+          <div style={sectionHeaderStyle}>
+            <h3> Docket Details(up to {form.manifest_date})</h3>
+          </div>
+          <DataTable
+            columns={detailColumns}
+            rows={availableDockets}
+            getKey={(row, index) => index}
+            actions={[]}
+            checkboxSelection
+            onRowSelectionModelChange={(model) => {
+              if (model?.type === 'exclude') {
+                const allIds = new Set(availableDockets.map((_, idx) => idx).filter(idx => !model.ids.has(idx)));
+                setAvailableSelectedIds(allIds);
+              } else {
+                const ids = model?.ids instanceof Set ? model.ids : new Set(Array.isArray(model) ? model : []);
+                setAvailableSelectedIds(ids);
+              }
+            }}
+            isHeight={520}
+
+          />
+        </>
+
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
         <LoadingOverlay isLoading={isLoading} message="Please wait..." />
