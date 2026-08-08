@@ -43,27 +43,41 @@ export default function Header({ onToggleSidebar, isMobileSidebarOpen }) {
     .toUpperCase() || "AD";
 
   const branchCode = currentUser?.location_id || localStorage.getItem("loc_code") || "";
-  const [branchLabel, setBranchLabel] = useState(branchCode);
+  const [branchLabel, setBranchLabel] = useState(
+    () => localStorage.getItem("header_branch_label") || branchCode
+  );
 
   useEffect(() => {
     if (!branchCode) return;
+    if (localStorage.getItem("header_branch_label")) return;
     fetchAllLocations()
       .then((locs) => {
         const match = locs.find((l) => l.loc_code === branchCode);
-        if (match) setBranchLabel(`${match.loc_code} - ${match.loc_name}`);
+        if (match) {
+          const label = `${match.loc_code} - ${match.loc_name}`;
+          localStorage.setItem("header_branch_label", label);
+          setBranchLabel(label);
+        }
       })
       .catch(() => {});
   }, [branchCode]);
 
   const divisionCode = currentUser?.division_code || localStorage.getItem("division_code") || "";
-  const [divisionLabel, setDivisionLabel] = useState(divisionCode);
+  const [divisionLabel, setDivisionLabel] = useState(
+    () => localStorage.getItem("header_division_label") || divisionCode
+  );
 
   useEffect(() => {
     if (!divisionCode) return;
+    if (localStorage.getItem("header_division_label")) return;
     fetchAllDivisionsApi()
       .then((divs) => {
         const match = divs.find((d) => d.division_code === divisionCode);
-        if (match) setDivisionLabel(`${match.division_code} - ${match.division_name}`);
+        if (match) {
+          const label = `${match.division_code} - ${match.division_name}`;
+          localStorage.setItem("header_division_label", label);
+          setDivisionLabel(label);
+        }
       })
       .catch(() => {});
   }, [divisionCode]);
@@ -91,7 +105,7 @@ export default function Header({ onToggleSidebar, isMobileSidebarOpen }) {
           {isMobileSidebarOpen ? <CloseIcon /> : <MenuIcon />}
         </button>
 
-        <img src={logoSrc} alt="Logo" className="appHeaderLogo" />
+        {/* <img src={logoSrc} alt="Logo" className="appHeaderLogo" /> */}
         {/* <h2 className="appHeaderTitle">
           {appTitle} ERP
         </h2> */}

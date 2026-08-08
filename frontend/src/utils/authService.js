@@ -26,7 +26,11 @@ export const resetPassword = (userId, email, mobileNo, newPassword) =>
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 
-export const logout = () => localStorage.removeItem(TOKEN_KEY);
+export const logout = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem("header_branch_label");
+  localStorage.removeItem("header_division_label");
+};
 
 export const isAuthenticated = () => !!localStorage.getItem(TOKEN_KEY);
 
