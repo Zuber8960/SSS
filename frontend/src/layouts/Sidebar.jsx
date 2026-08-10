@@ -31,6 +31,7 @@ import AccessTime from "@mui/icons-material/ManageHistory";
 import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
 import UnarchiveIcon from "@mui/icons-material/Unarchive";
 import ListAltIcon from "@mui/icons-material/ListAlt";
+import RequestQuoteIcon from "@mui/icons-material/RequestQuote";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import Tooltip from "@mui/material/Tooltip";
@@ -139,6 +140,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
       children: [
         { path: "/transaction/docket-enquiry", label: "Docket Enquiry", icon: <FindInPageIcon /> },
         { path: "/reports/docket-report", label: "All Docket Report", icon: <ListAltIcon /> },
+        { path: "/reports/invoice-report", label: "Invoice Report", icon: <RequestQuoteIcon /> },
       ],
     },
   ];
