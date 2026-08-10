@@ -19,6 +19,7 @@ app.use(cors({
     'http://localhost:4000',
     'http://198.38.86.85:4000',
     "http://saralsamadhan.in",
+    "https://saralsamadhan.in",
     process.env.FRONTEND_URL
   ],
   credentials: true
