@@ -21,6 +21,7 @@ import ManifestUnloading from "./pages/transaction/manifestUnloading";
 import DocketEnquiry from "./pages/transaction/DocketEnquiry";
 import DeliveryUpdate from "./pages/reports/DeliveryUpdate";
 import DocketReport from "./pages/reports/DocketReport";
+import InvoiceReport from "./pages/reports/InvoiceReport";
 import CustomerBill from "./pages/transaction/CustomerBill";
 import { isAuthenticated } from "./utils/authService";
 
@@ -49,6 +50,7 @@ const appRoutes = [
   { path: "/transaction/customer-bill", element: <CustomerBill />, protected: true },
   { path: "/reports/delivery-update", element: <DeliveryUpdate />, protected: true },
   { path: "/reports/docket-report", element: <DocketReport />, protected: true },
+  { path: "/reports/invoice-report", element: <InvoiceReport />, protected: true },
 ];
 
 function ProtectedRoute({ children }) {

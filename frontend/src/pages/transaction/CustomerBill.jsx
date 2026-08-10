@@ -11,6 +11,8 @@ import { fetchCharges, fetchChargeMaster, fetchDocketByDocketNo } from "../../ut
 import { fetchDeliveryNotes } from "../../utils/deliveryNote";
 import { fetchAllLocations } from "../../utils/locationMaster";
 import { saveInvoice, updateInvoice, deleteInvoice } from "../../utils/customerBill";
+import { fetchAllCompanies } from "../../utils/companyMaster";
+import { printInvoice } from "../../components/common/InvoicePrint";
 import { Button, Chip, IconButton, Tooltip } from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
 import moment from "moment";
@@ -32,6 +34,7 @@ const billingColumns = [
   { key: "unloading", label: "Unloading", minWidth: 100 },
   { key: "detention", label: "Detention", minWidth: 95 },
   { key: "add_toll", label: "Add Toll", minWidth: 95 },
+  { key: "green_tax", label: "Green Tax", minWidth: 95 },
   { key: "other_charges", label: "Other Charges", minWidth: 120 },
   { key: "discount", label: "Discount", minWidth: 90 },
   { key: "taxable", label: "Taxable", minWidth: 100 },
@@ -89,6 +92,7 @@ const CHARGE_MAP = [
   { key: "unloading", keywords: ["UNLOAD", "UNLOADING", "ULD"] },
   { key: "detention", keywords: ["DET", "DETENTION"] },
   { key: "add_toll", keywords: ["TOLL"] },
+  { key: "green_tax", keywords: ["GREEN", "GRN", "ENV"] },
   { key: "other_charges", keywords: ["OTH", "OTHER"] },
   { key: "discount", keywords: ["DISC", "DISCOUNT"] },
 ];
@@ -108,6 +112,7 @@ export default function CustomerBill() {
   const [chargeMaster, setChargeMaster] = useState([]);
   const [deliveryNotesMap, setDeliveryNotesMap] = useState({});
   const [locations, setLocations] = useState([]);
+  const [company, setCompany] = useState(null);
   const [selectedRowId, setSelectedRowId] = useState(null);
   const [editingInvoice, setEditingInvoice] = useState(null); // { invoice_no, invoice_date, loc_code }
 
@@ -128,6 +133,9 @@ export default function CustomerBill() {
     fetchAllLocations()
       .then((data) => setLocations(Array.isArray(data) ? data : []))
       .catch((err) => console.error("Failed to load locations:", err));
+    fetchAllCompanies()
+      .then((data) => { if (Array.isArray(data) && data.length) setCompany(data[0]); })
+      .catch((err) => console.error("Failed to load company:", err));
   }, []);
 
   useEffect(() => {
@@ -190,6 +198,7 @@ export default function CustomerBill() {
       unloading: 0,
       detention: 0,
       add_toll: 0,
+      green_tax: 0,
       other_charges: 0,
       discount: 0,
     };
@@ -220,6 +229,7 @@ export default function CustomerBill() {
       chargeAmounts.unloading +
       chargeAmounts.detention +
       chargeAmounts.add_toll +
+      chargeAmounts.green_tax +
       chargeAmounts.other_charges -
       chargeAmounts.discount;
     const taxableRounded = Math.round(taxable * 100) / 100;
@@ -256,6 +266,7 @@ export default function CustomerBill() {
       unloading: chargeAmounts.unloading.toFixed(2),
       detention: chargeAmounts.detention.toFixed(2),
       add_toll: chargeAmounts.add_toll.toFixed(2),
+      green_tax: chargeAmounts.green_tax.toFixed(2),
       other_charges: chargeAmounts.other_charges.toFixed(2),
       discount: chargeAmounts.discount.toFixed(2),
       taxable: taxableRounded.toFixed(2),
@@ -265,6 +276,45 @@ export default function CustomerBill() {
       amount: totalAmount.toFixed(2),
       pod: pod === "Received" ? "YES" : "NO",
       delivery_status: deliveryStatus,
+    };
+  };
+
+  // Editable charge columns - user can modify these values in the grid
+  const editableChargeKeys = ["loading", "unloading", "detention", "add_toll", "green_tax", "other_charges"];
+
+  // Recalculate derived fields (taxable, GST, amount) when charge values change
+  const recalculateRow = (row) => {
+    const freight = parseFloat(row.freight) || 0;
+    const loading = parseFloat(row.loading) || 0;
+    const unloading = parseFloat(row.unloading) || 0;
+    const detention = parseFloat(row.detention) || 0;
+    const add_toll = parseFloat(row.add_toll) || 0;
+    const green_tax = parseFloat(row.green_tax) || 0;
+    const other_charges = parseFloat(row.other_charges) || 0;
+    const discount = parseFloat(row.discount) || 0;
+
+    const taxable = Math.round(
+      (freight + loading + unloading + detention + add_toll + green_tax + other_charges - discount) * 100
+    ) / 100;
+
+    const fromLoc = (row.origin || "").toLowerCase();
+    const toLoc = (row.destination || "").toLowerCase();
+    const interState = fromLoc !== toLoc;
+
+    const gstRate = 0.18;
+    const gstAmount = Math.round(taxable * gstRate * 100) / 100;
+    const cgst = interState ? 0 : Math.round((gstAmount / 2) * 100) / 100;
+    const sgst = interState ? 0 : Math.round((gstAmount / 2) * 100) / 100;
+    const igst = interState ? gstAmount : 0;
+    const totalAmount = Math.round((taxable + gstAmount) * 100) / 100;
+
+    return {
+      ...row,
+      taxable: taxable.toFixed(2),
+      cgst: cgst.toFixed(2),
+      sgst: sgst.toFixed(2),
+      igst: igst.toFixed(2),
+      amount: totalAmount.toFixed(2),
     };
   };
 
@@ -289,6 +339,7 @@ export default function CustomerBill() {
       unloading: "",
       detention: "",
       add_toll: "",
+      green_tax: "",
       other_charges: "",
       discount: "",
       taxable: "",
@@ -304,6 +355,17 @@ export default function CustomerBill() {
 
   // When a docket number is entered in a row, fetch all docket data and populate the row
   const handleRowUpdate = async (newRow, oldRow) => {
+    // Check if a charge field was edited - recalculate derived fields
+    const chargeFieldChanged = editableChargeKeys.some((key) => newRow[key] !== oldRow[key]);
+    if (chargeFieldChanged) {
+      const recalculated = recalculateRow(newRow);
+      // Update the billingRows state so the recalculated row persists in the grid
+      setBillingRows((prev) =>
+        prev.map((row) => (row.id === newRow.id ? { ...recalculated, id: newRow.id } : row))
+      );
+      return recalculated;
+    }
+
     if (newRow.docket_no && newRow.docket_no !== oldRow.docket_no) {
       // Billing branch is mandatory - must be selected before entering a docket number
       const selectedBranch = form.billing_branch || "";
@@ -350,10 +412,10 @@ export default function CustomerBill() {
     return newRow;
   };
 
-  // Only the Docket column should be editable
+  // Only Docket and charge columns should be editable
   const tableColumns = billingColumns.map((col) => ({
     ...col,
-    editable: col.key === "docket_no",
+    editable: col.key === "docket_no" || editableChargeKeys.includes(col.key),
   }));
 
   const totals = billingRows.reduce(
@@ -363,6 +425,7 @@ export default function CustomerBill() {
       unloading: acc.unloading + (parseFloat(row.unloading) || 0),
       detention: acc.detention + (parseFloat(row.detention) || 0),
       add_toll: acc.add_toll + (parseFloat(row.add_toll) || 0),
+      green_tax: acc.green_tax + (parseFloat(row.green_tax) || 0),
       other_charges: acc.other_charges + (parseFloat(row.other_charges) || 0),
       discount: acc.discount + (parseFloat(row.discount) || 0),
       taxable: acc.taxable + (parseFloat(row.taxable) || 0),
@@ -371,7 +434,7 @@ export default function CustomerBill() {
       igst: acc.igst + (parseFloat(row.igst) || 0),
       amount: acc.amount + (parseFloat(row.amount) || 0),
     }),
-    { freight: 0, loading: 0, unloading: 0, detention: 0, add_toll: 0, other_charges: 0, discount: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, amount: 0 }
+    { freight: 0, loading: 0, unloading: 0, detention: 0, add_toll: 0, green_tax: 0, other_charges: 0, discount: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, amount: 0 }
   );
 
   const handleDeleteRow = () => {
@@ -448,6 +511,7 @@ export default function CustomerBill() {
         loading: parseFloat(row.loading) || 0,
         unloading: parseFloat(row.unloading) || 0,
         detention: parseFloat(row.detention) || 0,
+        green_tax: parseFloat(row.green_tax) || 0,
         additional_toll: parseFloat(row.add_toll) || 0,
         other_charges: parseFloat(row.other_charges) || 0,
         taxable_amt: parseFloat(row.taxable) || 0,
@@ -462,6 +526,39 @@ export default function CustomerBill() {
       }));
 
     return { header, details };
+  };
+
+  const handlePrint = () => {
+    if (billingRows.length === 0) {
+      showError("Please add at least one docket before printing");
+      return;
+    }
+    if (!form.customer || form.customer === "Select Customer") {
+      showError("Please select a customer before printing");
+      return;
+    }
+    const selectedBranch = form.billing_branch || "";
+    const selectedLocCode = selectedBranch.split(" - ")[0].trim();
+    const customer = partners.find((p) => p.bp_name === form.customer);
+    const totalAmt = billingRows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+
+    const invoice = {
+      invoice_no: form.invoice_no || "AUTO",
+      invoice_date: form.invoice_date || "",
+      bp_name: form.customer === "Select Customer" ? "" : form.customer || "",
+      bp_code: customer?.bp_code || "",
+      loc_code: selectedLocCode || "",
+      loc_label: selectedBranch || "",
+      invoice_type: form.billing_type === "Complimentory" ? "CM" : "C",
+      total_inv_amt: totalAmt.toFixed(2),
+    };
+
+    printInvoice({
+      invoice,
+      details: billingRows.filter((r) => r.docket_no),
+      company,
+      locationsMap: Object.fromEntries(locations.map((l) => [l.loc_code, l])),
+    });
   };
 
   const handleSave = async () => {
@@ -573,7 +670,7 @@ export default function CustomerBill() {
           <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} sx={saveHeaderButtonStyle}>
             Save
           </Button>
-          <Button variant="contained" startIcon={<PrintIcon />} onClick={handleSave} sx={printHeaderButtonStyle}>
+          <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint} sx={printHeaderButtonStyle}>
             Print
           </Button>
           <Button variant="contained" startIcon={<DeleteIcon />} onClick={handleDeleteInvoice} sx={deleteHeaderButtonStyle}>
@@ -665,6 +762,7 @@ export default function CustomerBill() {
               <div style={totalCellStyle}>{totals.unloading.toFixed(2)}</div>
               <div style={totalCellStyle}>{totals.detention.toFixed(2)}</div>
               <div style={totalCellStyle}>{totals.add_toll.toFixed(2)}</div>
+              <div style={totalCellStyle}>{totals.green_tax.toFixed(2)}</div>
               <div style={totalCellStyle}>{totals.other_charges.toFixed(2)}</div>
               <div style={totalCellStyle}>{totals.discount.toFixed(2)}</div>
               <div style={totalCellStyle}>{totals.taxable.toFixed(2)}</div>
@@ -747,7 +845,7 @@ const tableTitleStyle = {
 
 const totalRowStyle = {
   display: "grid",
-  gridTemplateColumns: "repeat(14, minmax(80px, 1fr))",
+  gridTemplateColumns: "repeat(15, minmax(80px, 1fr))",
   background: "#f5f0d6",
   border: "1px solid #dfeaf8",
   borderTop: "none",
