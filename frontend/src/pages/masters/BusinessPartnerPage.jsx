@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import moment from "moment";
 import { NoteAddIcon, SaveIcon, EditIcon, DeleteIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import {
@@ -26,6 +27,39 @@ const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiSelect-selec
 const ID_TYPES = ["PAN", "AADHAR", "PASSPORT", "DL"];
 const DOC_TYPES = ["Agreement", "NDA"];
 
+// ── Field config arrays ──────────────────────────────────────────────────────
+const BASIC_FIELDS = [
+  { name: "division_code",      label: "Division Code",   type: "select",  options: "divisionOptions" },
+  { name: "bp_pan_no",          label: "PAN No",          type: "text" },
+  { name: "bp_pan_name",        label: "PAN Name",        type: "text" },
+  { name: "bp_name",            label: "BP Name",         type: "text" },
+  { name: "bp_type",            label: "BP Type",         type: "select",  options: "bpTypeOptions" },
+  { name: "bp_company_type",    label: "Company Type",    type: "select",  options: ["Private Ltd", "Public Ltd", "Partnership", "Proprietorship", "LLP"] },
+  { name: "bp_registration_no", label: "Registration No", type: "text" },
+  { name: "bp_tan_no",          label: "TAN No",          type: "text" },
+  { name: "bp_deals_with",      label: "Deals With",      type: "select",  options: ["Service", "Item", "Both"] },
+  { name: "bp_addres",          label: "Address",         type: "text" },
+  { name: "bp_state",           label: "State",           type: "state-auto" },
+  { name: "bp_city",            label: "City",            type: "city-auto" },
+  { name: "bp_pincode",         label: "Pincode",         type: "text" },
+  { name: "bp_gstin",           label: "GSTIN",           type: "text" },
+  { name: "loc_code",           label: "Location",        type: "select",  options: "locationOptions" },
+];
+
+const BANK_FIELDS = [
+  { name: "bp_bank_name",   label: "Bank Name",    type: "text" },
+  { name: "bp_acount_name", label: "Account Name", type: "text" },
+  { name: "bp_account_no",  label: "Account No",   type: "text" },
+  { name: "bp_ifsc_code",   label: "IFSC Code",    type: "text" },
+];
+
+const OTHER_FIELDS = [
+  { name: "bp_credit_days", label: "Credit Days", type: "number" },
+  { name: "bp_status",      label: "Status",      type: "select", options: [{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }] },
+  { name: "bp_closed_on",   label: "Closed On",   type: "date",   disabledWhenNew: true },
+];
+// ────────────────────────────────────────────────────────────────────────────
+
 const emptyForm = {
   record_id: "",
   division_code: "",
@@ -43,20 +77,16 @@ const emptyForm = {
   bp_pincode: "",
   bp_gstin: "",
   loc_code: "",
-  // KYC
   bp_ind_id_type_1: "", bp_ind_id_no_1: "",
   bp_ind_id_type_2: "", bp_ind_id_no_2: "",
   bp_ind_id_type_3: "", bp_ind_id_no_3: "",
   bp_ind_id_type_4: "", bp_ind_id_no_4: "",
-  // Document Validity
   bp_ind_doc_type_1: "", bp_ind_doc_1_from: "", bp_ind_doc_1_to: "",
   bp_ind_doc_type_2: "", bp_ind_doc_2_from: "", bp_ind_doc_2_to: "",
-  // Bank
   bp_bank_name: "",
   bp_acount_name: "",
   bp_account_no: "",
   bp_ifsc_code: "",
-  // Other
   bp_credit_days: "",
   bp_status: "",
   bp_closed_on: "",
@@ -118,6 +148,7 @@ export default function BusinessPartnerPage() {
   const [originalRecId, setOriginalRecId] = useState(null);
   const [stateInput, setStateInput] = useState("");
   const [cityInput, setCityInput] = useState("");
+  const [showBankDetails, setShowBankDetails] = useState(false);
 
   const DATE_FIELDS = DATE_FORM_FIELDS;
 
@@ -126,8 +157,12 @@ export default function BusinessPartnerPage() {
   const setField = (name, value) => {
     setForm((prev) => ({ ...prev, [name]: value }));
     setDirtyFields((prev) => new Set(prev).add(name));
+    if (name === "bp_type") {
+      const selectedType = bpTypes.find((t) => String(t.rec_id) === String(value));
+      const isCustomer = selectedType?.rec_name?.toLowerCase().includes("customer");
+      setShowBankDetails(!isCustomer);
+    }
   };
-
 
   const clearForm = () => {
     setForm(emptyForm);
@@ -136,6 +171,7 @@ export default function BusinessPartnerPage() {
     setOriginalRecId(null);
     setStateInput("");
     setCityInput("");
+    setShowBankDetails(false);
   };
 
   const buildPayload = (onlyDirty) => {
@@ -157,7 +193,6 @@ export default function BusinessPartnerPage() {
     if (!form.bp_name) { showError("BP Name is required"); return; }
     if (!form.bp_type) { showError("BP Type is required"); return; }
 
-    // Validate all date fields
     let dirtyDates = DATE_FIELDS.filter((f) => dirtyFields.has(f));
     for (const f of dirtyDates) {
       if (form[f] && !isValidDate(form[f])) {
@@ -199,6 +234,9 @@ export default function BusinessPartnerPage() {
     setIsEditing(true);
     setStateInput(mapped.bp_state || "");
     setCityInput(mapped.bp_city || "");
+    const selectedType = bpTypes.find((t) => String(t.rec_id) === String(mapped.bp_type));
+    const isCustomer = selectedType?.rec_name?.toLowerCase().includes("customer");
+    setShowBankDetails(!isCustomer);
   };
 
   const deletePartner = (recordId) => {
@@ -238,20 +276,9 @@ export default function BusinessPartnerPage() {
     { label: "Delete", icon: <DeleteIcon />, onClick: (row) => deletePartner(row.record_id) },
   ];
 
-  // BP Type options for dropdown: { value: rec_id, label: rec_name }
-  const bpTypeOptions = bpTypes.map((t) => ({ value: String(t.rec_id), label: t.rec_name }));
-
-  // Division options for dropdown: { value: division_code, label: "code - name" }
-  const divisionOptions = divisions.map((div) => ({
-    value: div.division_code,
-    label: `${div.division_code} - ${div.division_name}`,
-  }));
-
-  const locationOptions = locations.map((loc) => ({
-    value: loc.loc_code,
-    label: `${loc.loc_code} - ${loc.loc_name}`,
-  }));
-
+  const bpTypeOptions   = bpTypes.map((t) => ({ value: String(t.rec_id), label: t.rec_name }));
+  const divisionOptions = divisions.map((div) => ({ value: div.division_code, label: `${div.division_code} - ${div.division_name}` }));
+  const locationOptions = locations.map((loc) => ({ value: loc.loc_code, label: `${loc.loc_code} - ${loc.loc_name}` }));
 
   useEffect(() => {
     (async () => {
@@ -276,6 +303,102 @@ export default function BusinessPartnerPage() {
     })();
   }, []);
 
+  // Resolves string option keys to their dynamic arrays
+  const resolveOptions = (options) => {
+    if (options === "divisionOptions") return divisionOptions;
+    if (options === "bpTypeOptions")   return bpTypeOptions;
+    if (options === "locationOptions") return locationOptions;
+    return options || [];
+  };
+
+  // Generic field renderer — driven by field config objects
+  const renderField = (f) => {
+    const disabled = f.disabledWhenNew ? !isEditing : false;
+
+    switch (f.type) {
+      case "select":
+        return (
+          <MuiSelect
+            key={f.name}
+            label={f.label}
+            name={f.name}
+            value={form[f.name]}
+            onChange={setField}
+            options={resolveOptions(f.options)}
+          />
+        );
+      case "date":
+        return (
+          <TextField
+            key={f.name}
+            size="small"
+            label={f.label}
+            type="date"
+            fullWidth
+            sx={fieldSx}
+            value={form[f.name]}
+            onChange={e => setField(f.name, e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+            disabled={disabled}
+          />
+        );
+      case "number":
+        return (
+          <TextField
+            key={f.name}
+            size="small"
+            label={f.label}
+            type="number"
+            fullWidth
+            sx={fieldSx}
+            value={form[f.name]}
+            onChange={e => setField(f.name, e.target.value)}
+          />
+        );
+      case "state-auto":
+        return (
+          <Autocomplete
+            key={f.name}
+            size="small"
+            options={stateInput.length >= 3 ? states.filter(s => s.state_name.toLowerCase().includes(stateInput.toLowerCase())).map(s => s.state_name) : []}
+            value={form.bp_state || null}
+            inputValue={stateInput}
+            onInputChange={(_, val) => setStateInput(val)}
+            onChange={(_, val) => { setField("bp_state", val || ""); setField("bp_city", ""); setCityInput(""); }}
+            renderInput={(params) => <TextField {...params} label="State" size="small" sx={fieldSx} />}
+            noOptionsText={stateInput.length < 3 ? "Type 3 chars to search" : "No match"}
+          />
+        );
+      case "city-auto":
+        return (
+          <Autocomplete
+            key={f.name}
+            size="small"
+            freeSolo
+            options={cityInput.length >= 1 ? allCities.filter(c => c.state_code === states.find(s => s.state_name === form.bp_state)?.state_code && c.city_name?.toLowerCase().includes(cityInput?.toLowerCase())).map(c => c.city_name) : []}
+            value={form.bp_city || null}
+            inputValue={cityInput}
+            onInputChange={(_, val) => { setCityInput(val); setField("bp_city", val); }}
+            onChange={(_, val) => { const v = val || ""; setCityInput(v); setField("bp_city", v); }}
+            renderInput={(params) => <TextField {...params} label="City" size="small" sx={fieldSx} />}
+            noOptionsText="No match — typed city will be saved"
+          />
+        );
+      default:
+        return (
+          <TextField
+            key={f.name}
+            size="small"
+            label={f.label}
+            fullWidth
+            sx={fieldSx}
+            value={form[f.name]}
+            onChange={e => setField(f.name, e.target.value)}
+          />
+        );
+    }
+  };
+
   return (
     <MainLayout>
       <PageBody title="Business Partner Master">
@@ -289,43 +412,7 @@ export default function BusinessPartnerPage() {
 
         {/* Basic Details */}
         <FormPanel>
-          <MuiSelect label="Division Code" name="division_code" value={form.division_code} onChange={setField} options={divisionOptions} />
-          <TextField size="small" label="PAN No" fullWidth sx={fieldSx} value={form.bp_pan_no} onChange={e => setField("bp_pan_no", e.target.value)} />
-          <TextField size="small" label="PAN Name" fullWidth sx={fieldSx} value={form.bp_pan_name} onChange={e => setField("bp_pan_name", e.target.value)} />
-          <TextField size="small" label="BP Name" fullWidth sx={fieldSx} value={form.bp_name} onChange={e => setField("bp_name", e.target.value)} />
-          <MuiSelect label="BP Type" name="bp_type" value={form.bp_type} onChange={setField} options={bpTypeOptions} />
-          <MuiSelect label="Company Type" name="bp_company_type" value={form.bp_company_type} onChange={setField} options={["Private Ltd", "Public Ltd", "Partnership", "Proprietorship", "LLP"]} />
-          <TextField size="small" label="Registration No" fullWidth sx={fieldSx} value={form.bp_registration_no} onChange={e => setField("bp_registration_no", e.target.value)} />
-          <TextField size="small" label="TAN No" fullWidth sx={fieldSx} value={form.bp_tan_no} onChange={e => setField("bp_tan_no", e.target.value)} />
-          <MuiSelect label="Deals With" name="bp_deals_with" value={form.bp_deals_with} onChange={setField} options={["Service", "Item", "Both"]} />
-          <TextField size="small" label="Address" fullWidth sx={fieldSx} value={form.bp_addres} onChange={e => setField("bp_addres", e.target.value)} />
-          <Autocomplete
-            size="small"
-            options={stateInput.length >= 3 ? states.filter(s => s.state_name.toLowerCase().includes(stateInput.toLowerCase())).map(s => s.state_name) : []}
-            value={form.bp_state || null}
-            inputValue={stateInput}
-            onInputChange={(_, val) => setStateInput(val)}
-            onChange={(_, val) => { setField("bp_state", val || ""); setField("bp_city", ""); setCityInput(""); }}
-            renderInput={(params) => <TextField {...params} label="State" size="small" sx={fieldSx} />}
-            noOptionsText={stateInput.length < 3 ? "Type 3 chars to search" : "No match"}
-          />
-          <Autocomplete
-            size="small"
-            freeSolo
-            options={cityInput.length >= 1 ? allCities.filter(c => c.state_code === states.find(s => s.state_name === form.bp_state)?.state_code && c.city_name?.toLowerCase().includes(cityInput?.toLowerCase())).map(c => c.city_name) : []}
-            value={form.bp_city || null}
-            inputValue={cityInput}
-            onInputChange={(_, val) => { 
-              setCityInput(val); 
-              setField("bp_city", val); 
-            }}
-            onChange={(_, val) => { const v = val || ""; setCityInput(v); setField("bp_city", v); }}
-            renderInput={(params) => <TextField {...params} label="City" size="small" sx={fieldSx} />}
-            noOptionsText="No match — typed city will be saved"
-          />
-          <TextField size="small" label="Pincode" fullWidth sx={fieldSx} value={form.bp_pincode} onChange={e => setField("bp_pincode", e.target.value)} />
-          <TextField size="small" label="GSTIN" fullWidth sx={fieldSx} value={form.bp_gstin} onChange={e => setField("bp_gstin", e.target.value)} />
-          <MuiSelect label="Location" name="loc_code" value={form.loc_code} onChange={setField} options={locationOptions} />
+          {BASIC_FIELDS.map(renderField)}
         </FormPanel>
 
         {/* KYC */}
@@ -371,21 +458,18 @@ export default function BusinessPartnerPage() {
           ))}
         </FormPanel>
 
-        {/* Bank Details */}
-        {/* <FormPanel>
-          <SectionHeader title="Bank Details" />
-          <TextField size="small" label="Bank Name" fullWidth sx={fieldSx} value={form.bp_bank_name} onChange={e => setField("bp_bank_name", e.target.value)} />
-          <TextField size="small" label="Account Name" fullWidth sx={fieldSx} value={form.bp_acount_name} onChange={e => setField("bp_acount_name", e.target.value)} />
-          <TextField size="small" label="Account No" fullWidth sx={fieldSx} value={form.bp_account_no} onChange={e => setField("bp_account_no", e.target.value)} />
-          <TextField size="small" label="IFSC Code" fullWidth sx={fieldSx} value={form.bp_ifsc_code} onChange={e => setField("bp_ifsc_code", e.target.value)} />
-        </FormPanel> */}
+        {/* Bank Details — hidden for Customer type */}
+        {showBankDetails && (
+          <FormPanel>
+            <SectionHeader title="Bank Details" />
+            {BANK_FIELDS.map(renderField)}
+          </FormPanel>
+        )}
 
         {/* Other Details */}
         <FormPanel>
           <SectionHeader title="Other Details" />
-          <TextField size="small" label="Credit Days" type="number" fullWidth sx={fieldSx} value={form.bp_credit_days} onChange={e => setField("bp_credit_days", e.target.value)} />
-          <MuiSelect label="Status" name="bp_status" value={form.bp_status} onChange={setField} options={[{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }]} />
-          <TextField size="small" label="Closed On" type="date" fullWidth sx={fieldSx} value={form.bp_closed_on} onChange={e => setField("bp_closed_on", e.target.value)} slotProps={{ inputLabel: { shrink: true } }} disabled={!isEditing} />
+          {OTHER_FIELDS.map(renderField)}
         </FormPanel>
 
         <DataTable
