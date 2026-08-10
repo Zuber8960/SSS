@@ -1,0 +1,11 @@
+-- Rename table
+ALTER TABLE sss.sst_cargo_yarn_gps_data RENAME TO sst_cargo_yaan_gps_data;
+
+-- Rename primary key constraint
+ALTER TABLE sss.sst_cargo_yaan_gps_data RENAME CONSTRAINT pk_sst_cargo_yarn_gps_data TO pk_sst_cargo_yaan_gps_data;
+
+-- Rename indexes
+ALTER INDEX sss.idx_sst_cargo_yarn_gps_data_gps_datetime RENAME TO idx_sst_cargo_yaan_gps_data_gps_datetime;
+ALTER INDEX sss.idx_sst_cargo_yarn_gps_data_provider RENAME TO idx_sst_cargo_yaan_gps_data_provider;
+ALTER INDEX sss.idx_sst_cargo_yarn_gps_data_vehicle_datetime RENAME TO idx_sst_cargo_yaan_gps_data_vehicle_datetime;
+ALTER INDEX sss.idx_sst_cargo_yarn_gps_data_vehicle_no RENAME TO idx_sst_cargo_yaan_gps_data_vehicle_no;
