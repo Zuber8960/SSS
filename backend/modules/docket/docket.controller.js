@@ -232,7 +232,8 @@ const NUMERIC_DOCKET_FIELDS = [
   'docket_rate', 'docket_tot_amt', 'docket_inv_value',
   'docket_insurance_amt', 'docket_po_amt', 'docket_transit_days',
   'docket_crtns', 'docket_bndls', 'docket_bags',
-  'docket_loose', 'docket_other', 'docket_tot_pkgs'
+  'docket_loose', 'docket_other', 'docket_tot_pkgs',
+  'dim_length', 'dim_breadth', 'dim_height',
 ];
 
 const sanitizeDocketData = (data) => {

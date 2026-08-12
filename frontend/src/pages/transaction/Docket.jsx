@@ -98,6 +98,17 @@ const headerFields = [
   { label: "No of Others", name: "no_others", type: "number" },
   { label: "Total Pkgs", name: "tot_pkgs", type: "number", required: true },
 
+  {
+    label: "Dimension Unit", name: "dim_unit", options: [
+      { label: "Inches", value: "inches" },
+      { label: "MM", value: "mm" },
+      { label: "CM", value: "cm" },
+    ]
+  },
+  { label: "Length",  name: "dim_length",  type: "number" },
+  { label: "Breadth", name: "dim_breadth", type: "number" },
+  { label: "Height",  name: "dim_height",  type: "number" },
+
   { label: "Rate", name: "rate", type: "number", required: true },
   {
     label: "Rate UOM",
@@ -176,6 +187,10 @@ const formSections = [
       "no_loose",
       "no_others",
       "tot_pkgs",
+      "dim_unit",
+      "dim_length",
+      "dim_breadth",
+      "dim_height",
     ],
     half: true,
     columns: 4,
@@ -257,6 +272,10 @@ const emptyForm = {
   no_loose: 0,
   no_others: 0,
   tot_pkgs: 0,
+  dim_unit: "",
+  dim_length: "",
+  dim_breadth: "",
+  dim_height: "",
   rate: "",
   rate_uom: "",
   tot_amt: "",
@@ -648,6 +667,10 @@ export default function DocketPage() {
         tot_pkgs:            "docket_tot_pkgs",
         docket_date:         "docket_date",
         tot_amt:             "docket_tot_amt",
+        dim_unit:            "dim_unit",
+        dim_length:          "dim_length",
+        dim_breadth:         "dim_breadth",
+        dim_height:          "dim_height",
       };
 
       const currentUser = JSON.parse(localStorage.getItem("current_user") || "null");
@@ -845,6 +868,10 @@ export default function DocketPage() {
             no_loose:            docketData.docket_loose        ?? 0,
             no_others:           docketData.docket_other        ?? 0,
             tot_pkgs:            docketData.docket_tot_pkgs     ?? 0,
+            dim_unit:            docketData.dim_unit            || "",
+            dim_length:          docketData.dim_length          ?? "",
+            dim_breadth:         docketData.dim_breadth         ?? "",
+            dim_height:          docketData.dim_height          ?? "",
             rate:                docketData.docket_rate         ?? "",
             rate_uom:            docketData.docket_rate_uom     || "",
             tot_amt:             docketData.docket_tot_amt      ?? "",
@@ -1165,8 +1192,11 @@ export default function DocketPage() {
     const packageTopFields = isPackageDetails
       ? filteredFields.filter((field) => ["act_wt", "chrg_wt"].includes(field.name))
       : [];
+    const packageCompactFields = isPackageDetails
+      ? filteredFields.filter((field) => field.compact)
+      : [];
     const packageBottomFields = isPackageDetails
-      ? filteredFields.filter((field) => !["act_wt", "chrg_wt"].includes(field.name))
+      ? filteredFields.filter((field) => !["act_wt", "chrg_wt"].includes(field.name) && !field.compact)
       : filteredFields;
 
     return (
@@ -1189,6 +1219,11 @@ export default function DocketPage() {
               </div>
               <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #ece7f4", margin: "4px 0 2px" }} />
               {packageBottomFields.map((field) => renderFieldInput(field))}
+              {packageCompactFields.length > 0 && (
+                <div style={{ gridColumn: "1 / -1", display: "grid", gap: 8, gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+                  {packageCompactFields.map((field) => renderFieldInput(field))}
+                </div>
+              )}
             </>
           ) : (
             filteredFields.map((field) => renderFieldInput(field))
