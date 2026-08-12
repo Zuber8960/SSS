@@ -25,6 +25,8 @@ import {
 import { fetchAllLocations, fetchLocationTowns } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { printDocket } from "../../components/common/DocketPrint";
+import { printSticker } from "./docket/StickerPrint";
+import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import { fetchBpByBpName } from "../../utils/businessPartner";
 import { fetchAllMaterialGroups, fetchAllMaterialSubGroups } from "../../utils/materialGroup";
 import ChargesSection from "./docket/ChargesSection";
@@ -308,6 +310,10 @@ export default function DocketPage() {
   const chargesRef = useRef(null);
 
   const handlePrint = () => {
+    if (!form.docket_no) {
+      showError("Please load docket details before printing.");
+      return;
+    }
     printDocket({
       form,
       charges: chargesRef.current?.getChargeList() ?? [],
@@ -317,6 +323,14 @@ export default function DocketPage() {
       locations,
       copies: ["Consignor Copy", "Consignee Copy", "Lorry Copy", "File Copy"],
     });
+  };
+
+  const handleStickerPrint = () => {
+    if (!form.docket_no) {
+      showError("Please load docket details before printing.");
+      return;
+    }
+    printSticker({ form, company });
   };
 
   const handleWeightBlur = (field, value) => {
@@ -699,16 +713,7 @@ export default function DocketPage() {
         }
         result = await updateDocketByRecId(docketRecId, payload);
         savedDocketNo = payload.docket_no || docketNumberInput;
-        prevLocRef.current = { docket_loc: "", docket_to_loc: "" };
-        ewbPopulatedRef.current = { cnor: false, cnee: false };
-        chargesRef.current?.reset();
-        setForm(emptyForm);
-        setDocketNumberInput("");
-        setDocketExists(false);
-        setDocketRecId(null);
         setDirtyFields(new Set());
-        setEwbList([]);
-        setEwbNoDisplay("");
         setIsFormEditMode(false);
         showSuccess(`Docket ${savedDocketNo} updated successfully`, "Success", 8000);
       } else {
@@ -767,16 +772,11 @@ export default function DocketPage() {
       }
 
       if (isNewDocket) {
-        prevLocRef.current = { docket_loc: "", docket_to_loc: "" };
-        ewbPopulatedRef.current = { cnor: false, cnee: false };
-        chargesRef.current?.reset();
-        setForm(emptyForm);
-        setDocketNumberInput("");
-        setDocketExists(false);
-        setDocketRecId(null);
+        setForm((prev) => ({ ...prev, docket_no: savedDocketNo }));
+        setDocketNumberInput(savedDocketNo || "");
+        setDocketExists(true);
+        setDocketRecId(result?.rec_id ?? result?.record_id ?? null);
         setDirtyFields(new Set());
-        setEwbList([]);
-        setEwbNoDisplay("");
         setIsFormEditMode(false);
         showSuccess(`Docket ${savedDocketNo} created successfully`, "Success", 8000);
       }
@@ -1338,15 +1338,26 @@ export default function DocketPage() {
               labelOff="Show Form"
             />
           </div>
-          <Tooltip title="Print Consignment">
-            <IconButton
-              onClick={handlePrint}
-              size="small"
-              sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}
-            >
-              <PrintIcon />
-            </IconButton>
-          </Tooltip>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <Tooltip title="Print Consignment">
+              <IconButton
+                onClick={handlePrint}
+                size="small"
+                sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}
+              >
+                <PrintIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Print Sticker">
+              <IconButton
+                onClick={handleStickerPrint}
+                size="small"
+                sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}
+              >
+                <LocalOfferIcon />  
+              </IconButton>
+            </Tooltip>
+          </div>
         </div>
         {/* ✅ Detail Tables */}
         {withEWB && sectionOrder.map((section) => {
