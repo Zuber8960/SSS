@@ -74,6 +74,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         setOpenAdmin((p) => !p);
         setOpenMasters(false);
         setOpenTransaction(false);
+        setOpenReports(false);
       },
       children: [
         { path: "/admin/users",     label: "User Master",        icon: <GroupIcon /> },
@@ -93,6 +94,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         setOpenMasters((p) => !p);
         setOpenAdmin(false);
         setOpenTransaction(false);
+        setOpenReports(false);
       },
       children: [
         { path: "/masters/company",          label: "Company Master",    icon: <ApartmentIcon /> },
@@ -138,7 +140,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         setOpenTransaction(false);
       },
       children: [
-        { path: "/transaction/docket-enquiry", label: "Docket Enquiry", icon: <FindInPageIcon /> },
+        { path: "/reports/docket-enquiry", label: "Docket Enquiry", icon: <FindInPageIcon /> },
         { path: "/reports/docket-report", label: "All Docket Report", icon: <ListAltIcon /> },
         { path: "/reports/invoice-report", label: "Invoice Report", icon: <RequestQuoteIcon /> },
       ],

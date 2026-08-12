@@ -46,7 +46,7 @@ const appRoutes = [
   { path: "/transaction/manifest-entry", element: <ManifestEntry />, protected: true },
   { path: "/transaction/hire-voucher", element: <HireVoucherPage />, protected: true },
   { path: "/transaction/manifest-unloading", element: <ManifestUnloading />, protected: true },
-  { path: "/transaction/docket-enquiry", element: <DocketEnquiry />, protected: true },
+  { path: "/reports/docket-enquiry", element: <DocketEnquiry />, protected: true },
   { path: "/transaction/customer-bill", element: <CustomerBill />, protected: true },
   { path: "/reports/delivery-update", element: <DeliveryUpdate />, protected: true },
   { path: "/reports/docket-report", element: <DocketReport />, protected: true },
