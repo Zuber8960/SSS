@@ -354,8 +354,12 @@ const getChargeMaster = async (tenant_id) => {
 };
 
 const getChargesByDocketId = async (docketNo, tenant_id) => {
-  const query = db('sss.sst_docket_charges').where({ docket_no: docketNo, record_status: 0 }).select('*').orderBy('charge_code');
-  if (tenant_id) query.andWhere({ tenant_id });
+  const query = db('sss.sst_docket_charges as dc')
+    .leftJoin('sss.ssm_charge_master as cm', 'dc.charge_code', 'cm.charge_code')
+    .where({ 'dc.docket_no': docketNo, 'dc.record_status': 0 })
+    .select('dc.*', 'cm.charge_desc as charge_name')
+    .orderBy('dc.charge_code');
+  if (tenant_id) query.andWhere({ 'dc.tenant_id': tenant_id });
   return query;
 };
 

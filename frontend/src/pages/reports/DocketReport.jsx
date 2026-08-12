@@ -8,7 +8,7 @@ import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
-import { fetchAllDockets, fetchCharges } from "../../utils/docket";
+import { fetchAllDockets, fetchCharges, fetchDocketByDocketNo } from "../../utils/docket";
 import { fetchAllLocations } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { RefreshIcon, PrintIcon } from "../../components/common/icons";
@@ -174,38 +174,41 @@ export default function DocketReport() {
       showLoading();
       const d = selectedRow;
 
+      // Fetch full docket to get GSTIN/addresses from the BP join (list API doesn't return them)
+      const full = await fetchDocketByDocketNo(d.docket_no);
+
       const form = {
-        docket_no:        d.docket_no,
-        docket_date:      d.docket_date,
-        docket_loc:       d.docket_loc,
-        docket_from_town: d.docket_pickup_town || d.docket_from_town,
-        docket_to_loc:    d.docket_to_loc,
-        docket_to_town:   d.docket_dly_town || d.docket_to_town,
-        pay_type:         d.docket_pay_type,
-        pay_loc:          d.docket_pay_loc,
-        transit_type:     d.docket_transit_type,
-        load_type:        d.docket_load_type,
-        cnor_name:        d.cnor_name,
-        cnor_address:     d.cnor_address,
-        cnor_city:        d.cnor_city,
-        cnor_state:       d.cnor_state,
-        cnor_pincode:     d.cnor_pincode,
-        cnor_gstin:       d.cnor_gstin,
-        cnee_name:        d.cnee_name,
-        cnee_address:     d.cnee_address,
-        cnee_city:        d.cnee_city,
-        cnee_state:       d.cnee_state,
-        cnee_pincode:     d.cnee_pincode,
-        cnee_gstin:       d.cnee_gstin,
-        dly_type:         d.docket_dly_type,
-        act_wt:           d.docket_act_wt,
-        chrg_wt:          d.docket_chrg_wt,
-        tot_pkgs:         d.docket_tot_pkgs,
-        goods_desc:       d.docket_goods_desc,
-        invoice_no:       d.docket_inv_no,
-        invoice_date:     d.docket_inv_date,
-        invoice_value:    d.docket_inv_value,
-        remark:           d.docket_remark,
+        docket_no:        full.docket_no        || d.docket_no,
+        docket_date:      full.docket_date      || d.docket_date,
+        docket_loc:       full.docket_loc       || d.docket_loc,
+        docket_from_town: full.docket_from_town || d.docket_pickup_town || d.docket_from_town,
+        docket_to_loc:    full.docket_to_loc    || d.docket_to_loc,
+        docket_to_town:   full.docket_to_town   || d.docket_dly_town   || d.docket_to_town,
+        pay_type:         full.docket_pay_type  || d.docket_pay_type,
+        pay_loc:          full.docket_pay_loc   || d.docket_pay_loc,
+        transit_type:     full.docket_transit_type || d.docket_transit_type,
+        load_type:        full.docket_load_type    || d.docket_load_type,
+        cnor_name:        full.cnor_name    || d.cnor_name,
+        cnor_address:     full.cnor_address || d.cnor_address,
+        cnor_city:        full.cnor_city    || d.cnor_city,
+        cnor_state:       full.cnor_state   || d.cnor_state,
+        cnor_pincode:     full.cnor_pincode || d.cnor_pincode,
+        cnor_gstin:       full.cnor_gstin   || d.cnor_gstin,
+        cnee_name:        full.cnee_name    || d.cnee_name,
+        cnee_address:     full.cnee_address || d.cnee_address,
+        cnee_city:        full.cnee_city    || d.cnee_city,
+        cnee_state:       full.cnee_state   || d.cnee_state,
+        cnee_pincode:     full.cnee_pincode || d.cnee_pincode,
+        cnee_gstin:       full.cnee_gstin   || d.cnee_gstin,
+        dly_type:         full.docket_dly_type  || d.docket_dly_type,
+        act_wt:           full.docket_act_wt    || d.docket_act_wt,
+        chrg_wt:          full.docket_chrg_wt   || d.docket_chrg_wt,
+        tot_pkgs:         full.docket_tot_pkgs  || d.docket_tot_pkgs,
+        goods_desc:       full.docket_goods_desc || d.docket_goods_desc,
+        invoice_no:       full.docket_inv_no    || d.docket_inv_no,
+        invoice_date:     full.docket_inv_date  || d.docket_inv_date,
+        invoice_value:    full.docket_inv_value || d.docket_inv_value,
+        remark:           full.docket_remark    || d.docket_remark,
       };
 
       let charges = [];
