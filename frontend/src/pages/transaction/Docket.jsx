@@ -99,15 +99,23 @@ const headerFields = [
   { label: "Total Pkgs", name: "tot_pkgs", type: "number", required: true },
 
   {
-    label: "Dimension Unit", name: "dim_unit", options: [
+    label: "Dimension Unit", name: "dim_unit"
+    // , compact: true
+    , options: [
       { label: "Inches", value: "inches" },
       { label: "MM", value: "mm" },
       { label: "CM", value: "cm" },
     ]
   },
-  { label: "Length",  name: "dim_length",  type: "number" },
-  { label: "Breadth", name: "dim_breadth", type: "number" },
-  { label: "Height",  name: "dim_height",  type: "number" },
+  { label: "Length",  name: "dim_length",  type: "number"
+    // , compact: true
+   },
+  { label: "Breadth", name: "dim_breadth", type: "number"
+    // , compact: true
+   },
+  { label: "Height",  name: "dim_height",  type: "number"
+    // , compact: true
+   },
 
   { label: "Rate", name: "rate", type: "number", required: true },
   {

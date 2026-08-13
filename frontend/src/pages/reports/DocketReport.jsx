@@ -14,7 +14,9 @@ import { fetchAllCompanies } from "../../utils/companyMaster";
 import { RefreshIcon, PrintIcon } from "../../components/common/icons";
 import { IconButton, Tooltip, Button, TextField, Menu, MenuItem, ListItemIcon, ListItemText, Autocomplete } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import { printDocket } from "../../components/common/DocketPrint";
+import { printStickerFromRow } from "./docketReport/StickerPrint";
 import SelectedRowInfo from "../../components/common/SelectedRowInfo";
 import moment from "moment";
 
@@ -238,6 +240,14 @@ export default function DocketReport() {
     }
   };
 
+  const handleStickerPrint = () => {
+    if (!selectedRow) {
+      showError("Please select a docket to print stickers");
+      return;
+    }
+    printStickerFromRow({ row: selectedRow, company });
+  };
+
   return (
     <MainLayout>
       <PageBody title="Docket Report">
@@ -361,6 +371,21 @@ export default function DocketReport() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Tooltip title="Print Sticker">
+              <IconButton
+                onClick={handleStickerPrint}
+                size="small"
+                sx={{
+                  color: "#7e22ce",
+                  border: "1.5px solid #d8b4fe",
+                  borderRadius: 2,
+                  padding: "6px",
+                  "&:hover": { background: "#f3e8ff" },
+                }}
+              >
+                <LocalOfferIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
             <Button
               variant="contained"
               endIcon={<ArrowDropDownIcon />}
