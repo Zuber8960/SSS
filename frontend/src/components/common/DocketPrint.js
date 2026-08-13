@@ -1,4 +1,5 @@
 import moment from "moment";
+import QRCode from "qrcode";
 import { getTenantConfig } from "../../utils/tenantService";
 
 const fmt = (val) => val || "";
@@ -14,7 +15,7 @@ const fmtAmt = (val) => {
   return Number.isFinite(n) ? n.toFixed(2) : "0.00";
 };
 
-const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, copyLabel }) => {
+const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, copyLabel, qrDataUrl }) => {
   const tenantConfig = getTenantConfig();
   const logoUrl = tenantConfig?.logo_url || "";
 
@@ -50,7 +51,7 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
           </div>
           <div class="cn-block">
             <div class="cn-title">CONSIGNMENT</div>
-            <div class="cn-barcode">&#9632;&#9632;&#9632;&#9632;&#9632;&#9632;&#9632;&#9632;&#9632;</div>
+            ${qrDataUrl ? `<img src="${qrDataUrl}" class="cn-qr" alt="QR" />` : ""}
             <div class="cn-no">${fmt(form.docket_no)}</div>
             <div class="cn-billed">${fmt(form.pay_type)}</div>
           </div>
@@ -190,7 +191,7 @@ const PRINT_CSS = `
   .company-contact { font-size: 8px; font-weight: 800; }
   .cn-block { text-align: right; min-width: 100px; }
   .cn-title { font-size: 9px; font-weight: 900; border: 1.5px solid #222; padding: 1px 4px; background: #eee; letter-spacing: 0.5px; }
-  .cn-barcode { font-size: 12px; letter-spacing: -2px; color: #222; }
+  .cn-qr { width: 64px; height: 64px; display: block; margin: 2px auto; }
   .cn-no { font-size: 11px; font-weight: 900; letter-spacing: 0.5px; }
   .cn-billed { font-size: 8px; font-weight: 800; }
 
@@ -247,7 +248,7 @@ const DEFAULT_COPIES = [
  * @param {number|string[]} props.copies     - Number of copies OR array of copy labels.
  *                                             Defaults to ["Consignor Copy","Consignee Copy","Driver Copy"]
  */
-export function printDocket({ form, charges, ewbList, ewbNoDisplay, company, locations, copies }) {
+export async function printDocket({ form, charges, ewbList, ewbNoDisplay, company, locations, copies }) {
   const ewb = ewbList?.[0] || {};
   const printEwbNo = ewb.ewb_no || ewbNoDisplay || "";
 
@@ -256,7 +257,16 @@ export function printDocket({ form, charges, ewbList, ewbNoDisplay, company, loc
     localStorage.getItem("loc_code") || "";
   const currentLoc = (locations || []).find((l) => l.loc_code === currentLocCode) || {};
 
-  const slipData = { form, charges, ewb, printEwbNo, company, currentLoc };
+  let qrDataUrl = "";
+  if (form.docket_no) {
+    try {
+      qrDataUrl = await QRCode.toDataURL(String(form.docket_no), { width: 80, margin: 1 });
+    } catch (e) {
+      console.error("QR generation failed:", e);
+    }
+  }
+
+  const slipData = { form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl };
 
   // Resolve copy labels
   let copyLabels;

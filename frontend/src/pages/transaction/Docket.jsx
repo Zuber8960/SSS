@@ -336,12 +336,12 @@ export default function DocketPage() {
   const ewbPopulatedRef = useRef({ cnor: false, cnee: false });
   const chargesRef = useRef(null);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!form.docket_no) {
       showError("Please load docket details before printing.");
       return;
     }
-    printDocket({
+    await printDocket({
       form,
       charges: chargesRef.current?.getChargeList() ?? [],
       ewbList,
