@@ -142,6 +142,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
       children: [
         { path: "/reports/docket-enquiry", label: "Docket Enquiry", icon: <FindInPageIcon /> },
         { path: "/reports/docket-report", label: "All Docket Report", icon: <ListAltIcon /> },
+        { path: "/reports/manifest-report", label: "Manifest Report", icon: <UnarchiveIcon /> },
         { path: "/reports/invoice-report", label: "Invoice Report", icon: <RequestQuoteIcon /> },
       ],
     },
