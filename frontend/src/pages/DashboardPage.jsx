@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import MainLayout from "../layouts/MainLayout";
 import { PageBody } from "../components/common/MasterPage";
 import { fetchDashboardStats } from "../utils/dashboard";
+import GetAllDetailsPopup from "../components/common/GetAllDetailsPopup";
+import { Button } from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
 import "../styles/MasterPage.css";
 
 const COLORS = {
@@ -158,6 +161,7 @@ function ManifestStatusChart({ completed, inTransit }) {
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     fetchDashboardStats()
@@ -191,6 +195,26 @@ export default function DashboardPage() {
         padding: 24,
       }}>
         <PageBody title="Dashboard">
+
+          {/* Get All Details Button */}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
+            <Button
+              variant="contained"
+              startIcon={<SearchIcon />}
+              onClick={() => setDetailsOpen(true)}
+              sx={{
+                background: "linear-gradient(135deg, #7c3aed, #a855f7)",
+                "&:hover": { background: "linear-gradient(135deg, #6b21a8, #9333ea)" },
+                textTransform: "none",
+                fontWeight: 600,
+                borderRadius: 2,
+                padding: "8px 20px",
+                boxShadow: "0 4px 12px rgba(124, 58, 237, 0.3)",
+              }}
+            >
+              Search Engine
+            </Button>
+          </div>
 
           {/* Stat Cards — 2 rows × 4 columns */}
           {cards.map((row, ri) => (
@@ -246,6 +270,9 @@ export default function DashboardPage() {
 
         </PageBody>
       </div>
+
+      {/* Get All Details Popup */}
+      <GetAllDetailsPopup open={detailsOpen} onClose={() => setDetailsOpen(false)} />
     </MainLayout>
   );
 }

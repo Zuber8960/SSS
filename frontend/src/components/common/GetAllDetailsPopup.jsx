@@ -1,0 +1,371 @@
+import { useState, useEffect, useMemo } from "react";
+import {
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  TextField, Button, Tabs, Tab, Box, IconButton,
+  CircularProgress, Chip, InputAdornment
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import SearchIcon from "@mui/icons-material/Search";
+import { DataTable } from "./MasterPage";
+import { fetchAllDockets } from "../../utils/docket";
+import { fetchAllManifests } from "../../utils/manifest";
+import { fetchAllInvoices } from "../../utils/customerBill";
+import { fetchAllBusinessPartners } from "../../utils/businessPartner";
+import moment from "moment";
+
+const toDate = (v) => {
+  if (!v) return "";
+  const m = moment(v);
+  return m.isValid() ? m.format("DD-MM-YYYY") : v;
+};
+
+const fmtNum = (v) => {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? String(n) : "0";
+};
+
+const fmtAmt = (v) => {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n.toFixed(2) : "0.00";
+};
+
+// ── Column definitions per tab ──────────────────────────────────────────────
+const docketColumns = [
+  { key: "docket_no", label: "Docket No", minWidth: 110 },
+  { key: "docket_date", label: "Date", minWidth: 100 },
+  { key: "docket_loc", label: "From Loc", minWidth: 100 },
+  { key: "docket_pickup_town", label: "From Town", minWidth: 110 },
+  { key: "docket_to_loc", label: "To Loc", minWidth: 100 },
+  { key: "docket_dly_town", label: "To Town", minWidth: 110 },
+  { key: "cnor_name", label: "Consignor", minWidth: 140 },
+  { key: "cnee_name", label: "Consignee", minWidth: 140 },
+  { key: "docket_tot_pkgs", label: "Pkgs", minWidth: 70 },
+  { key: "docket_act_wt", label: "Wt", minWidth: 80 },
+  { key: "docket_pay_type", label: "Pay Type", minWidth: 90 },
+  { key: "docket_tot_amt", label: "Amount", minWidth: 100 },
+  { key: "delivery_status", label: "Status", minWidth: 110 },
+];
+
+const manifestColumns = [
+  { key: "mnf_no", label: "Manifest No", minWidth: 110 },
+  { key: "mnf_date", label: "Date", minWidth: 100 },
+  { key: "mnf_loc", label: "From Loc", minWidth: 100 },
+  { key: "mnf_to_loc", label: "To Loc", minWidth: 100 },
+  { key: "desp_veh_no", label: "Vehicle", minWidth: 120 },
+  { key: "loaded_by", label: "Driver", minWidth: 110 },
+  { key: "mnf_no_of_dwb", label: "Dockets", minWidth: 80 },
+  { key: "mnf_no_of_pkgs", label: "Pkgs", minWidth: 80 },
+  { key: "mnf_actual_wt", label: "Weight", minWidth: 90 },
+  { key: "mnf_from_town", label: "From Town", minWidth: 110 },
+  { key: "mnf_to_town", label: "To Town", minWidth: 110 },
+  {
+    key: "manifest_status", label: "Status", minWidth: 100,
+    render: (r) => (
+      <span style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        minWidth: "60px", height: "22px", borderRadius: "4px", fontSize: 11, fontWeight: 700, padding: "0 8px",
+        ...(r.manifest_status === "Arrived"
+          ? { background: "#e8f5e9", color: "#1b5e20", border: "1px solid #a5d6a7" }
+          : { background: "#fff7ed", color: "#ea580c", border: "1px solid #fed7aa" }),
+      }}>
+        {r.manifest_status}
+      </span>
+    ),
+  },
+];
+
+const invoiceColumns = [
+  { key: "invoice_no", label: "Invoice No", minWidth: 110 },
+  { key: "invoice_date", label: "Date", minWidth: 100 },
+  { key: "bp_name", label: "Customer", minWidth: 150 },
+  { key: "loc_code", label: "Branch", minWidth: 100 },
+  { key: "invoice_type", label: "Type", minWidth: 90 },
+  { key: "total_inv_amt", label: "Amount", minWidth: 110 },
+  { key: "created_by", label: "Created By", minWidth: 100 },
+];
+
+const customerColumns = [
+  { key: "bp_code", label: "Code", minWidth: 90 },
+  { key: "bp_name", label: "Name", minWidth: 180 },
+  { key: "bp_type", label: "Type", minWidth: 100 },
+  { key: "bp_addres", label: "Address", minWidth: 200 },
+  { key: "bp_city", label: "City", minWidth: 100 },
+  { key: "bp_state", label: "State", minWidth: 100 },
+  { key: "bp_pincode", label: "Pincode", minWidth: 90 },
+  { key: "bp_gstin", label: "GSTIN", minWidth: 150 },
+  { key: "bp_pan_no", label: "PAN", minWidth: 120 },
+  { key: "bp_status", label: "Status", minWidth: 90 },
+];
+
+const TAB_LABELS = {
+  docket: "📋 Dockets",
+  manifest: "🚛 Manifests",
+  invoice: "🧾 Invoices",
+  customer: "🏢 Customers",
+};
+
+export default function GetAllDetailsPopup({ open, onClose }) {
+  const [tab, setTab] = useState("docket");
+  const [searchText, setSearchText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  const [dockets, setDockets] = useState([]);
+  const [manifests, setManifests] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [customers, setCustomers] = useState([]);
+
+  // Load all data when popup opens
+  useEffect(() => {
+    if (!open) return;
+    if (loaded) return;
+
+    setLoading(true);
+    const loadAll = async () => {
+      try {
+        const [d, m, i, c] = await Promise.allSettled([
+          fetchAllDockets(true),
+          fetchAllManifests(),
+          fetchAllInvoices(),
+          fetchAllBusinessPartners(),
+        ]);
+
+        if (d.status === "fulfilled") setDockets(Array.isArray(d.value) ? d.value : []);
+        if (m.status === "fulfilled") setManifests(Array.isArray(m.value) ? m.value : []);
+        if (i.status === "fulfilled") setInvoices(Array.isArray(i.value) ? i.value : []);
+        if (c.status === "fulfilled") setCustomers(Array.isArray(c.value) ? c.value : []);
+
+        setLoaded(true);
+      } catch (err) {
+        console.error("Failed to load all details:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadAll();
+  }, [open, loaded]);
+
+  // Reset search when tab changes
+  const handleTabChange = (_, newTab) => {
+    setTab(newTab);
+    setSearchText("");
+  };
+
+  const handleClose = () => {
+    onClose();
+  };
+
+  // ── Filtered data per tab ────────────────────────────────────────────────
+  const filteredDockets = useMemo(() => {
+    const q = searchText.toLowerCase().trim();
+    if (!q) return dockets;
+    return dockets.filter((d) => [
+      d.docket_no, d.cnor_name, d.cnee_name,
+      d.docket_pickup_town, d.docket_dly_town,
+      d.docket_loc, d.docket_to_loc, d.delivery_status,
+    ].some((v) => String(v ?? "").toLowerCase().includes(q)));
+  }, [dockets, searchText]);
+
+  const filteredManifests = useMemo(() => {
+    const q = searchText.toLowerCase().trim();
+    if (!q) return manifests;
+    return manifests.filter((m) => [
+      m.mnf_no, m.mnf_loc, m.mnf_to_loc,
+      m.desp_veh_no, m.loaded_by, m.driver_mobile,
+      m.mnf_from_town, m.mnf_to_town,
+    ].some((v) => String(v ?? "").toLowerCase().includes(q)));
+  }, [manifests, searchText]);
+
+  const filteredInvoices = useMemo(() => {
+    const q = searchText.toLowerCase().trim();
+    if (!q) return invoices;
+    return invoices.filter((inv) => [
+      inv.invoice_no, inv.bp_name, inv.loc_code,
+      inv.invoice_type, inv.created_by,
+    ].some((v) => String(v ?? "").toLowerCase().includes(q)));
+  }, [invoices, searchText]);
+
+  const filteredCustomers = useMemo(() => {
+    const q = searchText.toLowerCase().trim();
+    if (!q) return customers;
+    return customers.filter((c) => [
+      c.bp_code, c.bp_name, c.bp_type, c.bp_city,
+      c.bp_state, c.bp_gstin, c.bp_pan_no,
+    ].some((v) => String(v ?? "").toLowerCase().includes(q)));
+  }, [customers, searchText]);
+
+  // ── Mapped rows for display ──────────────────────────────────────────────
+  const mappedDockets = useMemo(() =>
+    filteredDockets.map((d, i) => ({
+      ...d,
+      id: (d.docket_no || "") + "_" + (d.docket_date || "") + "_" + i,
+      docket_date: toDate(d.docket_date),
+      docket_tot_pkgs: d.docket_tot_pkgs ?? d.total_pkgs ?? "",
+      docket_act_wt: d.docket_act_wt ?? d.actual_wt ?? "",
+      docket_pickup_town: d.docket_pickup_town || d.docket_from_town || "",
+      docket_dly_town: d.docket_dly_town || d.docket_to_town || "",
+      delivery_status: d.delivery_status || "Pending",
+    })), [filteredDockets]);
+
+  const mappedManifests = useMemo(() =>
+    filteredManifests.map((m, i) => ({
+      ...m,
+      id: (m.mnf_no || "") + "_" + (m.mnf_loc || "") + "_" + (m.mnf_date || "") + "_" + i,
+      mnf_date: toDate(m.mnf_date),
+      mnf_no_of_dwb: fmtNum(m.mnf_no_of_dwb),
+      mnf_no_of_pkgs: fmtNum(m.mnf_no_of_pkgs),
+      mnf_actual_wt: fmtNum(m.mnf_actual_wt),
+      manifest_status: m.mnf_arrival_time ? "Arrived" : "In Transit",
+    })), [filteredManifests]);
+
+  const mappedInvoices = useMemo(() =>
+    filteredInvoices.map((inv, i) => ({
+      ...inv,
+      id: (inv.invoice_no || "") + "_" + (inv.invoice_date || "") + "_" + i,
+      invoice_date: toDate(inv.invoice_date),
+      total_inv_amt: fmtAmt(inv.total_inv_amt),
+      invoice_type: inv.invoice_type === "CM" ? "Complimentary" : inv.invoice_type === "C" ? "Regular" : inv.invoice_type || "",
+    })), [filteredInvoices]);
+
+  const mappedCustomers = useMemo(() =>
+    filteredCustomers.map((c, i) => ({
+      ...c,
+      id: (c.bp_code || "") + "_" + i,
+      bp_status: c.bp_status === "1" ? "Active" : c.bp_status === "0" ? "Inactive" : c.bp_status || "",
+    })), [filteredCustomers]);
+
+  const getCurrentData = () => {
+    switch (tab) {
+      case "docket": return { columns: docketColumns, rows: mappedDockets };
+      case "manifest": return { columns: manifestColumns, rows: mappedManifests };
+      case "invoice": return { columns: invoiceColumns, rows: mappedInvoices };
+      case "customer": return { columns: customerColumns, rows: mappedCustomers };
+      default: return { columns: [], rows: [] };
+    }
+  };
+
+  const { columns, rows } = getCurrentData();
+  const currentCount = rows.length;
+
+  return (
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="xl"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          width: "1100px",
+          height: "500px",
+          maxWidth: "calc(100vw - 32px)",
+          maxHeight: "calc(100vh - 32px)",
+          overflow: "hidden",
+          background: "linear-gradient(135deg, #faf5ff 0%, #f0f9ff 100%)",
+        },
+      }}
+    >
+      <DialogTitle sx={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "10px 24px", borderBottom: "1px solid #e9d5ff",
+        background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
+        color: "#fff",
+      }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <span style={{ fontSize: 22 }}>🔍</span>
+          <span style={{ fontSize: 18, fontWeight: 700 }}>Search Engine</span>
+        </Box>
+        <IconButton onClick={handleClose} size="small" sx={{ color: "#fff", "&:hover": { background: "rgba(255,255,255,0.15)" } }}>
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent sx={{ padding: "20px 24px", overflow: "hidden" }}>
+        {/* ── Search bar ── */}
+        <Box sx={{ display: "flex", gap: 2, alignItems: "center", margin: 2 }}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder={`Search ${TAB_LABELS[tab]?.toLowerCase() || "data"}...`}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ color: "#7c3aed", fontSize: 20 }} />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              "& .MuiInputBase-input": { fontSize: 14 },
+              "& .MuiOutlinedInput-notchedOutline": { borderColor: "#c4b5fd", borderWidth: 1.5 },
+              "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#7c3aed" },
+              "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#7c3aed" },
+            }}
+          />
+          <Chip
+            label={`${currentCount} result${currentCount !== 1 ? "s" : ""}`}
+            sx={{
+              background: "#f3e8ff", color: "#7c3aed", fontWeight: 600,
+              border: "1.5px solid #d8b4fe", fontSize: 13, height: 32,
+            }}
+          />
+        </Box>
+
+        {/* ── Tabs ── */}
+        <Tabs
+          value={tab}
+          onChange={handleTabChange}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            marginBottom: 2,
+            "& .MuiTab-root": {
+              fontSize: 13, fontWeight: 600, textTransform: "none",
+              minHeight: 40, padding: "6px 16px",
+            },
+            "& .Mui-selected": { color: "#7c3aed" },
+            "& .MuiTabs-indicator": { background: "#7c3aed" },
+          }}
+        >
+          <Tab value="docket" label={TAB_LABELS.docket} />
+          <Tab value="manifest" label={TAB_LABELS.manifest} />
+          <Tab value="invoice" label={TAB_LABELS.invoice} />
+          <Tab value="customer" label={TAB_LABELS.customer} />
+        </Tabs>
+
+        {/* ── Loading state ── */}
+        {loading && !loaded ? (
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: 2 }}>
+            <CircularProgress size={48} thickness={4} sx={{ color: "#7c3aed" }} />
+            <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Loading all data...</span>
+          </Box>
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={rows}
+            getKey={(row, i) => row.id || i}
+            actions={[]}
+            // autoHeight
+            // scroll={{ afterRows: 10, horizontal: true }}
+            isHeight={320}
+          />
+        )}
+      </DialogContent>
+
+      {/* <DialogActions sx={{ padding: "12px 24px", borderTop: "1px solid #e9d5ff", background: "#fff" }}>
+        <Button
+          onClick={handleClose}
+          variant="contained"
+          sx={{
+            background: "linear-gradient(135deg, #7c3aed, #a855f7)",
+            "&:hover": { background: "linear-gradient(135deg, #6b21a8, #9333ea)" },
+            textTransform: "none", fontWeight: 600, borderRadius: 2,
+          }}
+        >
+          Close
+        </Button>
+      </DialogActions> */}
+    </Dialog>
+  );
+}
