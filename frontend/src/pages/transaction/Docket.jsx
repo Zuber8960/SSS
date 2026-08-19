@@ -352,12 +352,12 @@ export default function DocketPage() {
     });
   };
 
-  const handleStickerPrint = () => {
+  const handleStickerPrint = async () => {
     if (!form.docket_no) {
       showError("Please load docket details before printing.");
       return;
     }
-    printSticker({ form, company });
+    await printSticker({ form, company });
   };
 
   const handleWeightBlur = (field, value) => {
@@ -754,6 +754,7 @@ export default function DocketPage() {
           delete payload.docket_no;
         }
         // Create new docket (POST) — backend strips rec_id: -1
+        if (!payload.docket_inv_date) payload.docket_inv_date = null;
         result = await createDocket(payload);
         savedDocketNo = result?.docket_no;
         isNewDocket = true;

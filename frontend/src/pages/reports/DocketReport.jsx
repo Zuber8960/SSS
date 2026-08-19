@@ -223,7 +223,7 @@ export default function DocketReport() {
         ? [{ ewb_no: d.ewb_no || d.eway_bill_no, ewb_valid: d.ewb_valid, vehicle_no: d.desp_veh_no || "" }]
         : [];
 
-      printDocket({
+      await printDocket({
         form,
         charges,
         ewbList,
@@ -240,12 +240,12 @@ export default function DocketReport() {
     }
   };
 
-  const handleStickerPrint = () => {
+  const handleStickerPrint = async () => {
     if (!selectedRow) {
       showError("Please select a docket to print stickers");
       return;
     }
-    printStickerFromRow({ row: selectedRow, company });
+    await printStickerFromRow({ row: selectedRow, company });
   };
 
   return (

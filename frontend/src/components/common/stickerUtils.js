@@ -2,7 +2,7 @@
 export const DEFAULT_STYLES = {
   sticker: {
     width: "3in",
-    height: "2.5in",
+    height: "3in",
     border: "2px solid #000",
     display: "flex",
     flexDirection: "column",
@@ -89,9 +89,9 @@ export function toInline(obj) {
 
 /**
  * Builds the HTML string for one sticker — used by the print window.
- * Accepts level1/level2/level3/level4 + optional styles override.
+ * Accepts level1/level2/level3/level4 + optional styles, qrDataUrl, supportNo.
  */
-export function buildStickerHtml({ level1, level2, level3, level4, styles }) {
+export function buildStickerHtml({ level1, level2, level3, level4, styles, qrDataUrl, supportNo }) {
   const S = mergeStyles(styles);
   const arrow = level3?.arrow ?? "&#8594;";
 
@@ -103,12 +103,33 @@ export function buildStickerHtml({ level1, level2, level3, level4, styles }) {
        </div>`
     : `<div style="${toInline(S.level3)}">${level3 ?? ""}</div>`;
 
+  const supportHtml = supportNo
+    ? `<div style="font-size:9px;font-weight:800;text-align:center;width:100%;margin-top:3px;border-top:1px solid #555;padding-top:3px;">Support: &#9990; ${supportNo}</div>`
+    : "";
+
+  if (qrDataUrl) {
+    return `
+      <div style="${toInline(S.sticker)}">
+        <div style="${toInline(S.level1)}">${level1 ?? ""}</div>
+        <div style="display:flex;align-items:center;gap:8px;width:100%;flex:1;">
+          <img src="${qrDataUrl}" style="width:75px;height:75px;flex-shrink:0;" alt="QR" />
+          <div style="flex:1;display:flex;flex-direction:column;gap:4px;min-width:0;overflow:hidden;">
+            <div style="${toInline(S.level2)}">${level2 ?? ""}</div>
+            ${level3Html}
+            <div style="${toInline(S.level4)}">${level4 ?? ""}</div>
+          </div>
+        </div>
+        ${supportHtml}
+      </div>`;
+  }
+
   return `
     <div style="${toInline(S.sticker)}">
       <div style="${toInline(S.level1)}">${level1 ?? ""}</div>
       <div style="${toInline(S.level2)}">${level2 ?? ""}</div>
       ${level3Html}
       <div style="${toInline(S.level4)}">${level4 ?? ""}</div>
+      ${supportHtml}
     </div>`;
 }
 
@@ -116,7 +137,7 @@ export function buildStickerHtml({ level1, level2, level3, level4, styles }) {
 export const STICKER_PRINT_CSS = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { background: #fff; font-family: Arial, sans-serif; }
-  @page { size: 3in 2.5in; margin: 0; }
+  @page { size: 3in 3in; margin: 0; }
   div { page-break-after: always; }
   div:last-child { page-break-after: avoid; }
   .print-btn {

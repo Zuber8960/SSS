@@ -48,6 +48,7 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
             <div class="company-contact">
               ${coEmail ? `&#9993; ${coEmail}` : ""}${coPhone ? ` &nbsp; &#9990; ${coPhone}` : ""}${locPhone && locPhone !== coPhone ? ` &nbsp; &#9990; ${locPhone}` : ""}
             </div>
+            <div class="company-contact">Support: &#9990; 9212312222</div>
           </div>
           <div class="cn-block">
             <div class="cn-title">CONSIGNMENT</div>
@@ -260,7 +261,22 @@ export async function printDocket({ form, charges, ewbList, ewbNoDisplay, compan
   let qrDataUrl = "";
   if (form.docket_no) {
     try {
-      qrDataUrl = await QRCode.toDataURL(String(form.docket_no), { width: 80, margin: 1 });
+      const qrPayload = [
+        `DN:${form.docket_no}`,
+        `DD:${fmtDate(form.docket_date)}`,
+        `FR:${form.docket_from_town || form.docket_loc || ""}`,
+        `TO:${form.docket_to_town || form.docket_to_loc || ""}`,
+        `PKGS:${form.tot_pkgs || ""}`,
+        `AWT:${form.act_wt || ""}`,
+        `CWT:${form.chrg_wt || ""}`,
+        `CNOR:${form.cnor_name || ""}`,
+        `CNEE:${form.cnee_name || ""}`,
+        `INV:${form.invoice_no || ""}`,
+        `INVDT:${fmtDate(form.invoice_date)}`,
+        `INVVAL:${form.invoice_value || ""}`,
+        `SUP:9212312222`,
+      ].join("|");
+      qrDataUrl = await QRCode.toDataURL(qrPayload, { width: 80, margin: 1, errorCorrectionLevel: "M" });
     } catch (e) {
       console.error("QR generation failed:", e);
     }

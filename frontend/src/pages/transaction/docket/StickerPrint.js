@@ -1,17 +1,18 @@
 import moment from "moment";
+import QRCode from "qrcode";
 import { getTenantConfig } from "../../../utils/tenantService";
 import { STICKER_PRINT_CSS, buildStickerHtml } from "../../../components/common/stickerUtils";
 
 const STICKER_STYLES = {
   level1: {
-    fontSize: 14,
-    fontWeight: 900,
+    fontSize: 10,
+    fontWeight: 700,
     textTransform: "uppercase",
     lineHeight: 1.2,
   },
   level2: {
-    fontSize: 11,
-    fontWeight: 700,
+    fontSize: 18,
+    fontWeight: 900,
   },
   routeRow: {
     gap: 4,
@@ -34,7 +35,9 @@ const STICKER_STYLES = {
   },
 };
 
-export function printSticker({ form, company }) {
+const SUPPORT_NO = "9212312222";
+
+export async function printSticker({ form, company }) {
   const {
     docket_no,
     docket_date,
@@ -43,6 +46,12 @@ export function printSticker({ form, company }) {
     docket_to_town,
     docket_to_loc,
     tot_pkgs,
+    act_wt,
+    chrg_wt,
+    cnor_name,
+    cnee_name,
+    invoice_no,
+    invoice_date,
   } = form;
 
   const tenantConfig = getTenantConfig();
@@ -52,7 +61,6 @@ export function printSticker({ form, company }) {
   const docketDate = docket_date
     ? moment(docket_date).format("DD-MMM-YY").toUpperCase()
     : "";
-  const level2 = `${docket_no || ""}&nbsp;&nbsp;&nbsp;${docketDate}`;
 
   const fromTown = (docket_from_town || "").toUpperCase();
   const fromLoc  = (docket_loc || "").toUpperCase();
@@ -63,13 +71,40 @@ export function printSticker({ form, company }) {
 
   const totalPkgs = parseInt(tot_pkgs) || 1;
 
+  // Generate QR code with all key shipment details
+  let qrDataUrl = "";
+  if (docket_no) {
+    try {
+      const fmtD = (v) => (v ? moment(v).format("DD-MM-YYYY") : "");
+      const qrPayload = [
+        `DN:${docket_no}`,
+        `DD:${fmtD(docket_date)}`,
+        `FR:${fromDisplay}`,
+        `TO:${toDisplay}`,
+        `PKGS:${tot_pkgs || ""}`,
+        `AWT:${act_wt || ""}`,
+        `CWT:${chrg_wt || ""}`,
+        `CNOR:${cnor_name || ""}`,
+        `CNEE:${cnee_name || ""}`,
+        `INV:${invoice_no || ""}`,
+        `INVDT:${fmtD(invoice_date)}`,
+        `SUP:${SUPPORT_NO}`,
+      ].join("|");
+      qrDataUrl = await QRCode.toDataURL(qrPayload, { width: 80, margin: 1, errorCorrectionLevel: "M" });
+    } catch (e) {
+      console.error("QR generation failed:", e);
+    }
+  }
+
   const stickersHtml = Array.from({ length: totalPkgs }, (_, i) =>
     buildStickerHtml({
       level1,
-      level2,
+      level2: docket_no || "",
       level3: { from: fromDisplay, to: toDisplay },
-      level4: `PKGS : ${i + 1}/${totalPkgs}`,
+      level4: `${docketDate ? docketDate + "  |  " : ""}PKGS: ${i + 1}/${totalPkgs}`,
       styles: STICKER_STYLES,
+      qrDataUrl,
+      supportNo: SUPPORT_NO,
     })
   ).join("");
 
