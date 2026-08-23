@@ -504,7 +504,7 @@ export function DataTable({
         overflowX: scroll?.horizontal ? "auto" : "visible",
       }}
     >
-      <div style={scroll?.horizontal ? { width: totalMinWidth } : { width: "100%" }}>
+      {/* <div style={scroll?.horizontal ? { width: totalMinWidth } : { width: "100%" }}> */}
       <DataGrid
         rows={muiRows}
         columns={muiColumns}
@@ -574,7 +574,7 @@ export function DataTable({
         sx={tableSx}
       />
       </div>
-    </div>
+    // </div>
   );
 }
 

@@ -458,9 +458,9 @@
 }
 
 /* Outer wrapper handles horizontal scroll — hide MUI's internal one */
-.dataTableWrapper .MuiDataGrid-scrollbar--horizontal {
+/* .dataTableWrapper .MuiDataGrid-scrollbar--horizontal {
   display: none;
-}
+} */
 
 /* .dataTableWrapper .MuiDataGrid-virtualScroller {
   scrollbar-width: thin;

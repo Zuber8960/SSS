@@ -149,6 +149,7 @@ export default function BusinessPartnerPage() {
   const [stateInput, setStateInput] = useState("");
   const [cityInput, setCityInput] = useState("");
   const [showBankDetails, setShowBankDetails] = useState(false);
+  const [showForm, setShowForm] = useState(false);
 
   const DATE_FIELDS = DATE_FORM_FIELDS;
 
@@ -172,6 +173,7 @@ export default function BusinessPartnerPage() {
     setStateInput("");
     setCityInput("");
     setShowBankDetails(false);
+    setShowForm(!showForm);
   };
 
   const buildPayload = (onlyDirty) => {
@@ -219,7 +221,7 @@ export default function BusinessPartnerPage() {
         setPartners(data);
         showSuccess("Business Partner saved successfully");
       }
-      clearForm();
+      setShowForm(false);
     } catch (error) {
       showError(error.message || "Failed to save business partner");
       console.error("Save business partner error:", error);
@@ -237,6 +239,7 @@ export default function BusinessPartnerPage() {
     const selectedType = bpTypes.find((t) => String(t.rec_id) === String(mapped.bp_type));
     const isCustomer = selectedType?.rec_name?.toLowerCase().includes("customer");
     setShowBankDetails(!isCustomer);
+    setShowForm(true);
   };
 
   const deletePartner = (recordId) => {
@@ -405,78 +408,83 @@ export default function BusinessPartnerPage() {
         <PageToolbar
           actions={[
             { label: "New", icon: <NoteAddIcon />, onClick: clearForm },
-            { label: "Save", icon: <SaveIcon />, onClick: savePartner },
+            ...(showForm ? [{ label: "Save", icon: <SaveIcon />, onClick: savePartner }] : []),
           ]}
           search={{ placeholder: "Search Partner...", value: searchText, onChange: setSearchText }}
         />
 
-        {/* Basic Details */}
-        <FormPanel>
-          {BASIC_FIELDS.map(renderField)}
-        </FormPanel>
+        {showForm && (
+          <>
+            {/* Basic Details */}
+            <FormPanel>
+              {BASIC_FIELDS.map(renderField)}
+            </FormPanel>
 
-        {/* KYC */}
-        <FormPanel>
-          <SectionHeader title="Identification (KYC)" />
-          {[1, 2, 3, 4].map((n) => (
-            <Box key={n} sx={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-              <Typography sx={{ fontSize: 13, fontWeight: 500, color: "#475569" }}>ID {n}</Typography>
-              <Box sx={{ display: "flex", gap: "6px" }}>
-                <FormControl size="small" sx={{ minWidth: 110 }}>
-                  <InputLabel sx={{ fontSize: 13 }}>Type</InputLabel>
-                  <Select
-                    label="Type"
-                    value={form[`bp_ind_id_type_${n}`] ?? ""}
-                    onChange={e => setField(`bp_ind_id_type_${n}`, e.target.value)}
-                    sx={{ fontSize: 13 }}
-                  >
-                    {ID_TYPES.map(t => <MenuItem key={t} value={t} sx={{ fontSize: 13 }}>{t}</MenuItem>)}
-                  </Select>
-                </FormControl>
-                <TextField
-                  size="small"
-                  label="Number"
-                  fullWidth
-                  value={form[`bp_ind_id_no_${n}`] ?? ""}
-                  onChange={e => setField(`bp_ind_id_no_${n}`, e.target.value)}
-                  sx={{ flex: "1 1 0", minWidth: 0, ...fieldSx }}
-                />
-              </Box>
-            </Box>
-          ))}
-        </FormPanel>
+            {/* KYC */}
+            <FormPanel>
+              <SectionHeader title="Identification (KYC)" />
+              {[1, 2, 3, 4].map((n) => (
+                <Box key={n} sx={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <Typography sx={{ fontSize: 13, fontWeight: 500, color: "#475569" }}>ID {n}</Typography>
+                  <Box sx={{ display: "flex", gap: "6px" }}>
+                    <FormControl size="small" sx={{ minWidth: 110 }}>
+                      <InputLabel sx={{ fontSize: 13 }}>Type</InputLabel>
+                      <Select
+                        label="Type"
+                        value={form[`bp_ind_id_type_${n}`] ?? ""}
+                        onChange={e => setField(`bp_ind_id_type_${n}`, e.target.value)}
+                        sx={{ fontSize: 13 }}
+                      >
+                        {ID_TYPES.map(t => <MenuItem key={t} value={t} sx={{ fontSize: 13 }}>{t}</MenuItem>)}
+                      </Select>
+                    </FormControl>
+                    <TextField
+                      size="small"
+                      label="Number"
+                      fullWidth
+                      value={form[`bp_ind_id_no_${n}`] ?? ""}
+                      onChange={e => setField(`bp_ind_id_no_${n}`, e.target.value)}
+                      sx={{ flex: "1 1 0", minWidth: 0, ...fieldSx }}
+                    />
+                  </Box>
+                </Box>
+              ))}
+            </FormPanel>
 
-        {/* Document Validity */}
-        <FormPanel>
-          <SectionHeader title="Document Validity" />
-          {[1, 2].map((n) => (
-            <Box key={n} sx={{ display: "contents" }}>
-              <MuiSelect label={`Doc Type ${n}`} name={`bp_ind_doc_type_${n}`} value={form[`bp_ind_doc_type_${n}`]} onChange={setField} options={DOC_TYPES} />
-              <TextField size="small" label="Valid From" type="date" fullWidth sx={fieldSx} value={form[`bp_ind_doc_${n}_from`]} onChange={e => setField(`bp_ind_doc_${n}_from`, e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
-              <TextField size="small" label="Valid To" type="date" fullWidth sx={fieldSx} value={form[`bp_ind_doc_${n}_to`]} onChange={e => setField(`bp_ind_doc_${n}_to`, e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
-            </Box>
-          ))}
-        </FormPanel>
+            {/* Document Validity */}
+            <FormPanel>
+              <SectionHeader title="Document Validity" />
+              {[1, 2].map((n) => (
+                <Box key={n} sx={{ display: "contents" }}>
+                  <MuiSelect label={`Doc Type ${n}`} name={`bp_ind_doc_type_${n}`} value={form[`bp_ind_doc_type_${n}`]} onChange={setField} options={DOC_TYPES} />
+                  <TextField size="small" label="Valid From" type="date" fullWidth sx={fieldSx} value={form[`bp_ind_doc_${n}_from`]} onChange={e => setField(`bp_ind_doc_${n}_from`, e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+                  <TextField size="small" label="Valid To" type="date" fullWidth sx={fieldSx} value={form[`bp_ind_doc_${n}_to`]} onChange={e => setField(`bp_ind_doc_${n}_to`, e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+                </Box>
+              ))}
+            </FormPanel>
 
-        {/* Bank Details — hidden for Customer type */}
-        {showBankDetails && (
-          <FormPanel>
-            <SectionHeader title="Bank Details" />
-            {BANK_FIELDS.map(renderField)}
-          </FormPanel>
+            {/* Bank Details — hidden for Customer type */}
+            {showBankDetails && (
+              <FormPanel>
+                <SectionHeader title="Bank Details" />
+                {BANK_FIELDS.map(renderField)}
+              </FormPanel>
+            )}
+
+            {/* Other Details */}
+            <FormPanel>
+              <SectionHeader title="Other Details" />
+              {OTHER_FIELDS.map(renderField)}
+            </FormPanel>
+          </>
         )}
-
-        {/* Other Details */}
-        <FormPanel>
-          <SectionHeader title="Other Details" />
-          {OTHER_FIELDS.map(renderField)}
-        </FormPanel>
 
         <DataTable
           columns={partnerColumns}
           rows={filteredPartners}
           getKey={(row) => row.record_id}
           actions={partnerActions}
+          isHeight={420}
         />
       </PageBody>
       <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
