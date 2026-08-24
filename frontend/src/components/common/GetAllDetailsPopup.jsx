@@ -11,6 +11,7 @@ import { fetchAllDockets } from "../../utils/docket";
 import { fetchAllManifests } from "../../utils/manifest";
 import { fetchAllInvoices } from "../../utils/customerBill";
 import { fetchAllBusinessPartners } from "../../utils/businessPartner";
+import { fetchPincodeByPincode } from "../../utils/pincodeMaster";
 import moment from "moment";
 
 const toDate = (v) => {
@@ -97,11 +98,24 @@ const customerColumns = [
   { key: "bp_status", label: "Status", minWidth: 90 },
 ];
 
+const pincodeColumns = [
+  { key: "pincode", label: "Pincode", minWidth: 100 },
+  { key: "office_name", label: "Office Name", minWidth: 200 },
+  { key: "district", label: "District", minWidth: 120 },
+  { key: "state_name", label: "State", minWidth: 120 },
+  { key: "state_code", label: "State Code", minWidth: 100 },
+  { key: "division_name", label: "Division", minWidth: 120 },
+  { key: "region_name", label: "Region", minWidth: 120 },
+  { key: "circle_name", label: "Circle", minWidth: 120 },
+  { key: "office_type", label: "Office Type", minWidth: 110 },
+];
+
 const TAB_LABELS = {
   docket: "📋 Dockets",
   manifest: "🚛 Manifests",
   invoice: "🧾 Invoices",
   customer: "🏢 Customers",
+  pincode: "📍 Pincode",
 };
 
 export default function GetAllDetailsPopup({ open, onClose }) {
@@ -114,8 +128,10 @@ export default function GetAllDetailsPopup({ open, onClose }) {
   const [manifests, setManifests] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [pincodes, setPincodes] = useState([]);
+  const [pincodeLoading, setPincodeLoading] = useState(false);
 
-  // Load all data when popup opens
+  // Load all data (EXCEPT pincodes — those are fetched on-demand on search)
   useEffect(() => {
     if (!open) return;
     if (loaded) return;
@@ -144,6 +160,35 @@ export default function GetAllDetailsPopup({ open, onClose }) {
     };
     loadAll();
   }, [open, loaded]);
+
+  // Fetch pincode from the API only when the user searches on the Pincode tab,
+  // so we never load the full ~1.5-lakh master into memory.
+  useEffect(() => {
+    if (tab !== "pincode") return;
+
+    const timer = setTimeout(async () => {
+      const q = searchText.trim();
+      if (!q) {
+        setPincodes([]);
+        setPincodeLoading(false);
+        return;
+      }
+
+      setPincodeLoading(true);
+      try {
+        const res = await fetchPincodeByPincode(q);
+        const list = Array.isArray(res) ? res : res ? [res] : [];
+        setPincodes(Array.isArray(list) ? list : []);
+      } catch (err) {
+        console.error("Pincode search failed:", err);
+        setPincodes([]);
+      } finally {
+        setPincodeLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [tab, searchText]);
 
   // Reset search when tab changes
   const handleTabChange = (_, newTab) => {
@@ -194,6 +239,9 @@ export default function GetAllDetailsPopup({ open, onClose }) {
     ].some((v) => String(v ?? "").toLowerCase().includes(q)));
   }, [customers, searchText]);
 
+  // Pincode rows are fetched pre-filtered from the backend (byPincode), so no client-side filter needed
+  const filteredPincodes = pincodes;
+
   // ── Mapped rows for display ──────────────────────────────────────────────
   const mappedDockets = useMemo(() =>
     filteredDockets.map((d, i) => ({
@@ -234,12 +282,19 @@ export default function GetAllDetailsPopup({ open, onClose }) {
       bp_status: c.bp_status === "1" ? "Active" : c.bp_status === "0" ? "Inactive" : c.bp_status || "",
     })), [filteredCustomers]);
 
+  const mappedPincodes = useMemo(() =>
+    filteredPincodes.map((p, i) => ({
+      ...p,
+      id: (p.pincode || "") + "_" + (p.office_name || "") + "_" + i,
+    })), [filteredPincodes]);
+
   const getCurrentData = () => {
     switch (tab) {
       case "docket": return { columns: docketColumns, rows: mappedDockets };
       case "manifest": return { columns: manifestColumns, rows: mappedManifests };
       case "invoice": return { columns: invoiceColumns, rows: mappedInvoices };
       case "customer": return { columns: customerColumns, rows: mappedCustomers };
+      case "pincode": return { columns: pincodeColumns, rows: mappedPincodes };
       default: return { columns: [], rows: [] };
     }
   };
@@ -332,24 +387,49 @@ export default function GetAllDetailsPopup({ open, onClose }) {
           <Tab value="manifest" label={TAB_LABELS.manifest} />
           <Tab value="invoice" label={TAB_LABELS.invoice} />
           <Tab value="customer" label={TAB_LABELS.customer} />
+          <Tab value="pincode" label={TAB_LABELS.pincode} />
         </Tabs>
 
-        {/* ── Loading state ── */}
-        {loading && !loaded ? (
-          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: 2 }}>
-            <CircularProgress size={48} thickness={4} sx={{ color: "#7c3aed" }} />
-            <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Loading all data...</span>
-          </Box>
+        {/* ── Loading / content state ── */}
+        {tab === "pincode" ? (
+          pincodeLoading ? (
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: 2 }}>
+              <CircularProgress size={48} thickness={4} sx={{ color: "#7c3aed" }} />
+              <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Searching pincode...</span>
+            </Box>
+          ) : rows.length === 0 ? (
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: 2 }}>
+              <span style={{ fontSize: 34 }}>📍</span>
+              <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>
+                {searchText.trim()
+                  ? "No pincode found for the entered value."
+                  : "Enter a pincode number above to search."}
+              </span>
+            </Box>
+          ) : (
+            <DataTable
+              columns={columns}
+              rows={rows}
+              getKey={(row, i) => row.id || i}
+              actions={[]}
+              isHeight={320}
+            />
+          )
         ) : (
-          <DataTable
-            columns={columns}
-            rows={rows}
-            getKey={(row, i) => row.id || i}
-            actions={[]}
-            // autoHeight
-            // scroll={{ afterRows: 10, horizontal: true }}
-            isHeight={320}
-          />
+          loading && !loaded ? (
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: 2 }}>
+              <CircularProgress size={48} thickness={4} sx={{ color: "#7c3aed" }} />
+              <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Loading all data...</span>
+            </Box>
+          ) : (
+            <DataTable
+              columns={columns}
+              rows={rows}
+              getKey={(row, i) => row.id || i}
+              actions={[]}
+              isHeight={320}
+            />
+          )
         )}
       </DialogContent>
 

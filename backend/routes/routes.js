@@ -23,6 +23,7 @@ const deliveryNoteRoutes = require("../modules/deliveryNote/deliveryNote.routes"
 const customerBillRoutes = require("../modules/customerBill/customerBill.routes");
 const cnsRoutes = require("../modules/manifest/cns.routes");
 const dashboardRoutes = require("../modules/dashboard/dashboard.routes");
+const pincodeMasterRoutes = require("../modules/pincodeMaster/pincodeMaster.routes");
 const { getStatesWithCities } = require("../common/commonCache");
 const axios = require('axios');
 const db = require('../config/db');
@@ -187,6 +188,7 @@ router.use('/deliveryNote', authMiddleware, deliveryNoteRoutes);
 router.use('/customerBill', authMiddleware, customerBillRoutes);
 router.use('/cns', authMiddleware, cnsRoutes);
 router.use('/dashboard', authMiddleware, dashboardRoutes);
+router.use('/pincodeMaster', authMiddleware, pincodeMasterRoutes);
 
 router.get('/stateCity', authMiddleware, async (req, res) => {
     try {
