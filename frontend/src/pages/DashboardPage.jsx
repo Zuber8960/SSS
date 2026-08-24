@@ -3,7 +3,6 @@ import MainLayout from "../layouts/MainLayout";
 import { PageBody } from "../components/common/MasterPage";
 import { fetchDashboardStats } from "../utils/dashboard";
 import GetAllDetailsPopup from "../components/common/GetAllDetailsPopup";
-import { Button } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import "../styles/MasterPage.css";
 
@@ -196,24 +195,57 @@ export default function DashboardPage() {
       }}>
         <PageBody title="Dashboard">
 
-          {/* Get All Details Button */}
+          {/* Search Engine Button */}
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
-            <Button
-              variant="contained"
-              startIcon={<SearchIcon />}
+            <button
+              type="button"
               onClick={() => setDetailsOpen(true)}
-              sx={{
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
+                e.currentTarget.style.boxShadow = "0 12px 30px rgba(124, 58, 237, 0.45)";
+                e.currentTarget.style.background = "linear-gradient(135deg, #6b21a8, #9333ea)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0) scale(1)";
+                e.currentTarget.style.boxShadow = "0 6px 18px rgba(124, 58, 237, 0.35)";
+                e.currentTarget.style.background = "linear-gradient(135deg, #7c3aed, #a855f7)";
+              }}
+              onMouseDown={(e) => { e.currentTarget.style.transform = "translateY(0) scale(0.96)"; }}
+              onMouseUp={(e) => { e.currentTarget.style.transform = "translateY(-2px) scale(1.02)"; }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "9px 22px",
+                border: "none",
+                borderRadius: 999,
                 background: "linear-gradient(135deg, #7c3aed, #a855f7)",
-                "&:hover": { background: "linear-gradient(135deg, #6b21a8, #9333ea)" },
-                textTransform: "none",
+                color: "#fff",
                 fontWeight: 600,
-                borderRadius: 2,
-                padding: "8px 20px",
-                boxShadow: "0 4px 12px rgba(124, 58, 237, 0.3)",
+                fontSize: 14,
+                letterSpacing: 0.3,
+                cursor: "pointer",
+                boxShadow: "0 6px 18px rgba(124, 58, 237, 0.35)",
+                transition: "all 0.25s ease",
               }}
             >
+              <span
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "rgba(255, 255, 255, 0.9)",
+                  color: "#7c3aed",
+                  flexShrink: 0,
+                }}
+              >
+                <SearchIcon style={{ fontSize: 17 }} />
+              </span>
               Search Engine
-            </Button>
+            </button>
           </div>
 
           {/* Stat Cards — 2 rows × 4 columns */}
