@@ -55,7 +55,7 @@ module.exports = {
   async getPincodeByPincode(pincode) {
     if (!filterValue(pincode)) return null;
     return db('sss.sst_pincode_master')
-      .whereILike('pincode', `%${String(pincode).trim()}%`)
+      .where('pincode', String(pincode).trim())
   },
 
   // Fetch distinct states available in the master table (useful for dropdowns).

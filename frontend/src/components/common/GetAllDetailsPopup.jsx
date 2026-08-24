@@ -12,6 +12,7 @@ import { fetchAllManifests } from "../../utils/manifest";
 import { fetchAllInvoices } from "../../utils/customerBill";
 import { fetchAllBusinessPartners } from "../../utils/businessPartner";
 import { fetchPincodeByPincode } from "../../utils/pincodeMaster";
+import { fetchAllLocations } from "../../utils/locationMaster";
 import moment from "moment";
 
 const toDate = (v) => {
@@ -28,6 +29,42 @@ const fmtNum = (v) => {
 const fmtAmt = (v) => {
   const n = parseFloat(v);
   return Number.isFinite(n) ? n.toFixed(2) : "0.00";
+};
+
+const fmtGeo = (v) => {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? String(n) : "—";
+};
+
+// ── Geo helpers for finding branch offices near a pincode ───────────────────
+const toRad = (deg) => (deg * Math.PI) / 180;
+
+const haversineKm = (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // Earth radius in km
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const findNearbyBranches = (lat, lon, branches = [], limit = 3) => {
+  const la = Number(lat);
+  const lo = Number(lon);
+  if (!Number.isFinite(la) || !Number.isFinite(lo)) return [];
+  const withCoords = branches.filter((b) => (
+    Number.isFinite(Number(b.latitude)) && Number.isFinite(Number(b.longitude))
+  ));
+  return withCoords
+    .map((b) => ({
+      loc_code: b.loc_code,
+      loc_name: b.loc_name || b.loc_code,
+      distance_km: Math.round(haversineKm(la, lo, Number(b.latitude), Number(b.longitude)) * 10) / 10,
+    }))
+    .sort((x, y) => x.distance_km - y.distance_km)
+    .slice(0, limit);
 };
 
 // ── Column definitions per tab ──────────────────────────────────────────────
@@ -100,14 +137,29 @@ const customerColumns = [
 
 const pincodeColumns = [
   { key: "pincode", label: "Pincode", minWidth: 100 },
-  { key: "office_name", label: "Office Name", minWidth: 200 },
+  { key: "office_name", label: "Post Office Name", minWidth: 170 },
   { key: "district", label: "District", minWidth: 120 },
   { key: "state_name", label: "State", minWidth: 120 },
   { key: "state_code", label: "State Code", minWidth: 100 },
+  { key: "latitude", label: "Latitude", minWidth: 100 },
+  { key: "longitude", label: "Longitude", minWidth: 110 },
   { key: "division_name", label: "Division", minWidth: 120 },
-  { key: "region_name", label: "Region", minWidth: 120 },
-  { key: "circle_name", label: "Circle", minWidth: 120 },
-  { key: "office_type", label: "Office Type", minWidth: 110 },
+  // { key: "region_name", label: "Region", minWidth: 120 },
+  // { key: "circle_name", label: "Circle", minWidth: 120 },
+  // { key: "office_type", label: "Office Type", minWidth: 110 },
+  {
+    key: "nearest_branch", label: "Nearest Branch", minWidth: 150,
+    render: (r) => (
+      <span style={{ fontWeight: 600, color: "#7c3aed" }}>{r.nearest_branch}</span>
+    ),
+  },
+  { key: "nearest_distance", label: "Distance (km)", minWidth: 90 },
+  {
+    key: "near_branches_text", label: "Near Branch Offices", minWidth: 220,
+    render: (r) => (
+      <span style={{ color: "#334155" }}>{r.near_branches_text}</span>
+    ),
+  },
 ];
 
 const TAB_LABELS = {
@@ -130,6 +182,7 @@ export default function GetAllDetailsPopup({ open, onClose }) {
   const [customers, setCustomers] = useState([]);
   const [pincodes, setPincodes] = useState([]);
   const [pincodeLoading, setPincodeLoading] = useState(false);
+  const [branches, setBranches] = useState([]);
 
   // Load all data (EXCEPT pincodes — those are fetched on-demand on search)
   useEffect(() => {
@@ -139,17 +192,28 @@ export default function GetAllDetailsPopup({ open, onClose }) {
     setLoading(true);
     const loadAll = async () => {
       try {
-        const [d, m, i, c] = await Promise.allSettled([
+        const [d, m, i, c, l] = await Promise.allSettled([
           fetchAllDockets(true),
           fetchAllManifests(),
           fetchAllInvoices(),
           fetchAllBusinessPartners(),
+          fetchAllLocations(),
         ]);
 
         if (d.status === "fulfilled") setDockets(Array.isArray(d.value) ? d.value : []);
         if (m.status === "fulfilled") setManifests(Array.isArray(m.value) ? m.value : []);
         if (i.status === "fulfilled") setInvoices(Array.isArray(i.value) ? i.value : []);
         if (c.status === "fulfilled") setCustomers(Array.isArray(c.value) ? c.value : []);
+
+        if (l.status === "fulfilled") {
+          const locs = Array.isArray(l.value) ? l.value : [];
+          // Prefer dedicated branch offices; fall back to any location with coordinates.
+          const branchRows = locs.filter((lo) => String(lo.loc_type || "").toUpperCase() === "BRANCH");
+          const usable = (branchRows.length ? branchRows : locs).filter(
+            (lo) => Number.isFinite(Number(lo.latitude)) && Number.isFinite(Number(lo.longitude))
+          );
+          setBranches(usable);
+        }
 
         setLoaded(true);
       } catch (err) {
@@ -283,10 +347,20 @@ export default function GetAllDetailsPopup({ open, onClose }) {
     })), [filteredCustomers]);
 
   const mappedPincodes = useMemo(() =>
-    filteredPincodes.map((p, i) => ({
-      ...p,
-      id: (p.pincode || "") + "_" + (p.office_name || "") + "_" + i,
-    })), [filteredPincodes]);
+    filteredPincodes.map((p, i) => {
+      const nearBranches = findNearbyBranches(p.latitude, p.longitude, branches);
+      return {
+        ...p,
+        id: (p.pincode || "") + "_" + (p.office_name || "") + "_" + i,
+        latitude: fmtGeo(p.latitude),
+        longitude: fmtGeo(p.longitude),
+        nearest_branch: nearBranches[0]?.loc_name || "—",
+        nearest_distance: nearBranches[0] ? String(nearBranches[0].distance_km) : "—",
+        near_branches_text: nearBranches.length
+          ? nearBranches.map((b) => `${b.loc_name} (${b.distance_km} km)`).join(", ")
+          : "—",
+      };
+    }), [filteredPincodes, branches]);
 
   const getCurrentData = () => {
     switch (tab) {

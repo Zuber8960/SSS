@@ -346,7 +346,11 @@ export function DataTable({
       renderCell: (params) => {
         const value = col.render ? col.render(params.row) : params.value;
         const displayValue = value ?? "";
-        const textValue = typeof displayValue === "string" ? displayValue : String(displayValue ?? "");
+        // Prefer the raw row string for the tooltip so custom render functions
+        // that return elements (e.g. <span>) still show a meaningful tooltip.
+        const textValue = typeof displayValue === "string"
+          ? displayValue
+          : (typeof params.value === "string" ? params.value : String(displayValue ?? ""));
 
         return (
           <Tooltip title={textValue || ""} placement="top" enterDelay={200} arrow>
