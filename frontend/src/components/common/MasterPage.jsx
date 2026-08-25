@@ -309,6 +309,12 @@ export function DataTable({
   autoHeight = false,
   isHeight,
   scroll,
+  // Row-click behaviour: when true, clicking a row toggles its selection
+  // (an already-selected row can be unchecked by clicking it again).
+  toggleRowSelectionOnClick = false,
+  // Per-row background colours by status (mimics StatusGrid's rowColors).
+  statusKey = "status",
+  rowColors = {},
 }) {
   const apiRef = useGridApiRef();
   const [paginationModel, setPaginationModel] = useState({
@@ -425,6 +431,22 @@ export function DataTable({
     ...row,
   }));
 
+  // Apply a per-column / optional global background colour based on status.
+  const hasRowColors = Object.keys(rowColors).length > 0;
+  const colorClassName = (status) =>
+    "dgt-row-" + String(status).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const getRowClassName = (params) =>
+    rowColors[params.status ?? params[statusKey]]
+      ? colorClassName(params[statusKey] ?? params.status)
+      : "";
+  const rowColorCss = hasRowColors
+    ? Object.entries(rowColors)
+        .map(([status, color]) =>
+          `.dgt-row-${String(status).toLowerCase().replace(/[^a-z0-9]+/g, "-")} { background-color: ${color} !important; }`
+        )
+        .join("\n")
+    : "";
+
   const tableSx = {
     border: "none",
     borderRadius: "16px",
@@ -508,11 +530,11 @@ export function DataTable({
         overflowX: scroll?.horizontal ? "auto" : "visible",
       }}
     >
-      {/* <div style={scroll?.horizontal ? { width: totalMinWidth } : { width: "100%" }}> */}
+      {hasRowColors && <style>{rowColorCss}</style>}
       <DataGrid
         rows={muiRows}
         columns={muiColumns}
-        disableRowSelectionOnClick={true}
+        disableRowSelectionOnClick={!toggleRowSelectionOnClick}
         disableColumnMenu={false}
         density="compact"
         rowHeight={55}
@@ -521,6 +543,7 @@ export function DataTable({
         hideFooter
         disableVirtualization={false}
         rowSelection={true}
+        {...(hasRowColors ? { getRowClassName } : {})}
         {...(singleClick ? {
           apiRef,
           onCellClick: (params) => {
@@ -552,14 +575,14 @@ export function DataTable({
           }
         } : {})}
         processRowUpdate={async (newRow, oldRow) => {
-          if (!editable) return newRow;
-
           if (onRowUpdate) return await onRowUpdate(newRow, oldRow);
 
           if (!onCellChange) return newRow;
 
           let updatedRow = newRow;
           for (const col of columns) {
+            // Only process columns that are editable (per-column or global).
+            if (!(col.editable ?? editable)) continue;
             if (newRow[col.key] !== oldRow[col.key]) {
               // onCellChange may be async (e.g. fetching remote data to auto-fill
               // other cells in the row). Await it so the returned row contains the

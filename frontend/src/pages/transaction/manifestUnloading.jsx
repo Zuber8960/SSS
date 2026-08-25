@@ -5,6 +5,7 @@ import { SaveIcon, ResetIcon } from "../../components/common/icons";
 
 import {
   PageBody,
+  DataTable,
 } from "../../components/common/MasterPage";
 
 const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiSelect-select": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
@@ -13,7 +14,6 @@ import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
-import StatusGrid from "../../components/common/StatusGrid";
 
 import { fetchManifestByNo, fetchManifestsByLocation } from "../../utils/manifest";
 import { fetchDocketByDocketNo } from "../../utils/docket";
@@ -32,37 +32,38 @@ const ROW_COLORS = {
 
 const docketColumns = [
   { key: "sr", label: "Sr", minWidth: 40 },
-  { key: "docket_no", label: "Docket No", minWidth: 130, type: "link" },
+  { key: "docket_no", label: "Docket No", minWidth: 130, render: (row) => (
+    <a href="#" style={{ textDecoration: "none", color: "#1565c0", fontWeight: "bold" }}>{row.docket_no}</a>
+  ) },
   { key: "booking_date", label: "Booking Date", minWidth: 110 },
   { key: "consignor", label: "Consignor", minWidth: 150 },
   { key: "consignee", label: "Consignee", minWidth: 150 },
   { key: "destination", label: "Destination", minWidth: 100 },
-  { key: "booked_pkgs", label: "Booked Pkgs", minWidth: 90, align: "center" },
-  { key: "received_pkgs", label: "Received Pkgs", minWidth: 100, type: "number", width: 70 },
-  { key: "short_qty", label: "Short", minWidth: 70, type: "readonly_number", width: 60 },
-  { key: "excess_qty", label: "Excess", minWidth: 70, type: "number", width: 60 },
-  { key: "damage_qty", label: "Damage", minWidth: 70, type: "number", width: 60 },
-  { key: "leak_qty", label: "Leakage", minWidth: 70, type: "number", width: 60 },
-  { key: "weight", label: "Weight", minWidth: 80, align: "right" },
-  { key: "status", label: "Status", minWidth: 100, type: "select", options: statusOptions },
-  { key: "remarks", label: "Remarks", minWidth: 140, type: "text", placeholder: "Remarks" },
+  { key: "booked_pkgs", label: "Booked Pkgs", minWidth: 90 },
+  { key: "received_pkgs", label: "Received Pkgs", minWidth: 100, type: "number", editable: true },
+  { key: "short_qty", label: "Short", minWidth: 70, type: "number" },
+  { key: "excess_qty", label: "Excess", minWidth: 70, type: "number", editable: true },
+  { key: "damage_qty", label: "Damage", minWidth: 70, type: "number", editable: true },
+  { key: "leak_qty", label: "Leakage", minWidth: 70, type: "number", editable: true },
+  { key: "weight", label: "Weight", minWidth: 80 },
+  { key: "status", label: "Status", minWidth: 100, editable: true, options: statusOptions },
+  { key: "remarks", label: "Remarks", minWidth: 140, editable: true, placeholder: "Remarks" },
   { key: "updated_by", label: "Updated By", minWidth: 100 },
   { key: "updated_time", label: "Updated Time", minWidth: 100 },
 ];
 
 // ------------------- MANIFEST LIST (top grid) COLUMNS -------------------
 const manifestListColumns = [
-  // { key: "sr", label: "Sr", minWidth: 40 },
-  { key: "manifest_no", label: "Manifest No", minWidth: 130, type: "link" },
-  { key: "manifest_date", label: "Manifest Date", minWidth: 110 },
-  { key: "origin_branch", label: "Origin Branch", minWidth: 120 },
+  { key: "manifest_no", label: "Manifest No", minWidth: 130, render: (row) => (
+    <a href="#" style={{ textDecoration: "none", color: "#1565c0", fontWeight: "bold" }}>{row.manifest_no}</a>
+  ) },
+  { key: "manifest_date", label: "Manifest Date", minWidth: 130 },
+  { key: "origin_branch", label: "Origin Branch", minWidth: 130 },
   { key: "dest_branch", label: "Dest Branch", minWidth: 120 },
   { key: "vehicle_no", label: "Vehicle No", minWidth: 120 },
   { key: "driver_name", label: "Driver Name", minWidth: 130 },
-  { key: "total_dockets", label: "Dockets", minWidth: 70, align: "center" },
-  { key: "total_packages", label: "Packages", minWidth: 80, align: "center" },
-  // { key: "manifest_status", label: "Status", minWidth: 100 },
-  // { key: "arrival_date", label: "Arrival Date", minWidth: 110 },
+  { key: "total_dockets", label: "Dockets", minWidth: 100 },
+  { key: "total_packages", label: "Packages", minWidth: 100 },
 ];
 
 const emptyForm = {
@@ -93,6 +94,9 @@ export default function ManifestUnloading() {
   const [form, setForm] = useState({ ...emptyForm });
   const [dockets, setDockets] = useState([]);
   const [searchMode] = useState(true);
+
+  // Search by vehicle number for the location-based manifest list grid
+  const [vehicleSearch, setVehicleSearch] = useState("");
 
   // State for the location-based manifest list grid on top
   const [locationManifests, setLocationManifests] = useState([]);
@@ -145,6 +149,15 @@ export default function ManifestUnloading() {
     fetchManifestsForLocation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ---- Filter manifests by vehicle no (live search) ----
+  const filteredManifests = useMemo(() => {
+    const q = vehicleSearch.trim().toLowerCase();
+    if (!q) return locationManifests;
+    return locationManifests.filter((m) =>
+      (m.vehicle_no || "").toLowerCase().includes(q)
+    );
+  }, [vehicleSearch, locationManifests]);
 
   // ---- Footer totals (original) ----
   const footerTotals = useMemo(() => {
@@ -204,6 +217,13 @@ export default function ManifestUnloading() {
     };
   };
 
+  // A docket is considered already saved & unloaded when its source has a
+  // non-empty `unloading_status` (set by the backend on a previous save).
+  const isAlreadyUnloaded = (row) => {
+    const st = row?.unloading_status;
+    return st != null && st !== "" && st !== 0;
+  };
+
   // ------------------- FETCH & LOAD BY MANIFEST NO -------------------
   const fetchAndLoadByManifestNo = async (mnfNo) => {
     if (!mnfNo) {
@@ -232,27 +252,28 @@ export default function ManifestUnloading() {
           const docketNo = detail.dwb_no || detail.docket_no || detail.docketId || "";
           if (!docketNo) continue;
 
+          // Fetch the docket; fall back to the manifest detail row on error.
+          let docketData = null;
           try {
-            const docketData = await fetchDocketByDocketNo(docketNo);
-            if (docketData) {
-              fetchedDockets.push(mapDocketToRow(docketData, fetchedDockets.length));
-            } else {
-              fetchedDockets.push(mapDocketToRow(detail, fetchedDockets.length));
-            }
+            const data = await fetchDocketByDocketNo(docketNo);
+            if (data) docketData = data;
           } catch {
-            fetchedDockets.push(mapDocketToRow(detail, fetchedDockets.length));
+            docketData = null;
           }
+
+          // Skip dockets that were already saved & unloaded so they are not
+          // shown again in the grid (and cannot be re-processed).
+          const source = docketData || detail;
+          if (isAlreadyUnloaded(source)) continue;
+
+          fetchedDockets.push(mapDocketToRow(source, fetchedDockets.length));
         }
 
-        if (fetchedDockets.length > 0) {
-          setDockets(fetchedDockets);
-        } else {
-          setDockets(manifestDetails.map((d, i) => mapDocketToRow(d, i)));
-        }
+        setDockets(fetchedDockets);
 
         setForm((prev) => ({
           ...prev,
-          total_dockets: fetchedDockets.length > 0 ? fetchedDockets.length : manifestDetails.length,
+          total_dockets: fetchedDockets.length,
         }));
       }
 
@@ -270,6 +291,36 @@ export default function ManifestUnloading() {
     await fetchAndLoadByManifestNo(manifestNo);
   };
 
+  // ------------------- LOCATION MANIFEST GRID SELECTION (check/uncheck) -------------------
+  // The DataGrid's selection model is an object { type, ids: Set }; normalise it.
+  // A single select loads that manifest; an uncheck yields an empty set and does
+  // nothing, preserving the "uncheck selected row without re-loading" behaviour.
+  const handleManifestSelectionChange = (model) => {
+    const ids = model?.ids instanceof Set ? model.ids
+      : new Set(Array.isArray(model) ? model : []);
+    const selectedIds = [...ids];
+
+    setLocationManifests((prev) =>
+      prev.map((m) => ({ ...m, selected: ids.has(m.id) }))
+    );
+
+    if (selectedIds.length === 1) {
+      const manifest = locationManifests.find((m) => m.id === selectedIds[0]);
+      if (manifest && manifest.manifest_no) {
+        handleLoadFromGrid(manifest.manifest_no);
+      }
+    }
+  };
+
+  // ------------------- DOCKET GRID SELECTION (check/uncheck) -------------------
+  const handleDocketSelectionChange = (model) => {
+    const ids = model?.ids instanceof Set ? model.ids
+      : new Set(Array.isArray(model) ? model : []);
+    setDockets((prev) =>
+      prev.map((d) => ({ ...d, selected: ids.has(d.id) }))
+    );
+  };
+
   // ------------------- BUTTON HANDLERS -------------------
   const handleClear = () => {
     setForm({ ...emptyForm });
@@ -282,12 +333,15 @@ export default function ManifestUnloading() {
       showError("No manifest loaded. Please search and load a manifest first.");
       return;
     }
-    if (dockets.length === 0) {
-      showError("No dockets to save");
+
+    // Only the selected (checked) dockets are saved.
+    const selectedDockets = dockets.filter((d) => d.selected);
+    if (selectedDockets.length === 0) {
+      showError("No dockets selected. Please check the dockets you want to save.");
       return;
     }
 
-    for (const d of dockets) {
+    for (const d of selectedDockets) {
       if (d.status !== "OK" && !d.remarks?.trim()) {
         showError(`Remarks are mandatory for Docket ${d.docket_no} with status: ${d.status}`);
         return;
@@ -310,7 +364,7 @@ export default function ManifestUnloading() {
         company_code: null,
         division_code: "1",
         record_created_by: "ADMIN",
-        dockets: dockets.map((d) => ({
+        dockets: selectedDockets.map((d) => ({
           docket_no: d.docket_no,
           dwb_loc: d.consignor || d.dwb_loc || form.origin_branch,
           dwb_to_loc: d.destination || d.dwb_to_loc || form.dest_branch,
@@ -333,10 +387,22 @@ export default function ManifestUnloading() {
       const Api = (await import("../../services/api")).default;
       await Api.post("/manifest/unloading", payload);
 
-      showSuccess(`Manifest ${form.manifest_no} unloading saved successfully.`);
-      // Clear the form after successful save
-      setForm({ ...emptyForm });
-      setDockets([]);
+      showSuccess(
+        `${selectedDockets.length} docket${selectedDockets.length > 1 ? "s" : ""} for Manifest ${form.manifest_no} saved successfully.`
+      );
+      // Removing the saved rows from the grid; keep the unsaved dockets
+      // loaded for further processing.
+      const remainingCount = dockets.length - selectedDockets.length;
+      setDockets((prev) => prev.filter((d) => !d.selected));
+
+      // If every docket of this manifest is now saved, the manifest is fully
+      // unloaded -> filter it out of the top manifests grid so it does not
+      // show up again for selection.
+      if (remainingCount <= 0) {
+        setLocationManifests((prev) =>
+          prev.filter((m) => (m.manifest_no || "") !== (form.manifest_no || ""))
+        );
+      }
     } catch (err) {
       showError(err.message || "Failed to save");
     } finally {
@@ -571,15 +637,23 @@ export default function ManifestUnloading() {
               <SaveIcon />
             </IconButton>
           </Tooltip>
+          <TextField
+            size="small"
+            label="Search by Vehicle No"
+            value={vehicleSearch}
+            onChange={(e) => setVehicleSearch(e.target.value)}
+            sx={{ ...fieldSx, minWidth: 220, marginLeft: "auto" }}
+            placeholder="Search by vehicle number..."
+          />
         </div>
 
         {/* ✅ LOCATION-BASED MANIFEST LIST GRID (TOP) */}
         <div style={styles.panel}>
           <div style={styles.panelTitle}>
             📦 Manifests for Your Location
-            {locationManifests.length > 0 && (
+            {filteredManifests.length > 0 && (
               <span style={{ marginLeft: 10, fontSize: 13, opacity: 0.8 }}>
-                ({locationManifests.length} manifests)
+                ({filteredManifests.length} {vehicleSearch ? "matching manifests" : "manifests"})
               </span>
             )}
           </div>
@@ -588,31 +662,23 @@ export default function ManifestUnloading() {
               <div style={{ textAlign: "center", padding: 20, color: "#999" }}>
                 Loading manifests...
               </div>
-            ) : locationManifests.length > 0 ? (
-              <StatusGrid
+            ) : filteredManifests.length > 0 ? (
+              <DataTable
                 columns={manifestListColumns}
-                rows={locationManifests}
-                checkboxSelection={true}
-                maxHeight={350}
-                headerColor="#7b1fa2"
-                minWidth={1200}
-                onSelectRow={(rowId) => {
-                  // Toggle selection: select the clicked row, deselect others
-                  setLocationManifests((prev) =>
-                    prev.map((m) => ({
-                      ...m,
-                      selected: m.id === rowId,
-                    }))
-                  );
-                  const manifest = locationManifests.find((m) => m.id === rowId);
-                  if (manifest && manifest.manifest_no) {
-                    handleLoadFromGrid(manifest.manifest_no);
-                  }
-                }}
+                rows={filteredManifests}
+                getKey={(row) => row.id}
+                checkboxSelection
+                disableMultipleRowSelection
+                toggleRowSelectionOnClick
+                onRowSelectionModelChange={handleManifestSelectionChange}
+                isHeight={220}
+                scroll={{ horizontal: true }}
               />
             ) : (
               <div style={{ textAlign: "center", padding: 20, color: "#999" }}>
-                No manifests found for your location.
+                {vehicleSearch.trim()
+                  ? `No manifests found for vehicle: ${vehicleSearch.trim()}`
+                  : "No manifests found for your location."}
               </div>
             )}
           </div>
@@ -643,21 +709,19 @@ export default function ManifestUnloading() {
           </div>
           <div style={styles.panelBody}>
             {dockets.length > 0 ? (
-              <StatusGrid
+              <DataTable
                 columns={docketColumns}
                 rows={dockets}
-                rowColors={ROW_COLORS}
+                getKey={(row) => row.id}
+                checkboxSelection
+                toggleRowSelectionOnClick
+                editable={false}
                 onCellChange={handleCellChange}
-                onSelectAll={(e) => {
-                  const checked = e.target.checked;
-                  setDockets((prev) => prev.map((x) => ({ ...x, selected: checked })));
-                }}
-                onSelectRow={(rowId) => {
-                  setDockets((prev) =>
-                    prev.map((x) => (x.id === rowId ? { ...x, selected: !x.selected } : x))
-                  );
-                }}
-                minWidth={2100}
+                onRowSelectionModelChange={handleDocketSelectionChange}
+                rowColors={ROW_COLORS}
+                statusKey="status"
+                isHeight={100}
+                scroll={{ horizontal: true }}
               />
             ) : (
               <div style={{ textAlign: "center", padding: 40, color: "#999" }}>
