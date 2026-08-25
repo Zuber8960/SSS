@@ -27,7 +27,9 @@ const getManifestByNo = async (mnf_no) => {
 
 const getManifestByLocation = async (loc) => {
   return db('sss.sst_mnf_hdr')
-    .where({ mnf_to_loc: loc });
+    .where({ mnf_to_loc: loc })
+    .where({mnf_arrival_time: null})
+
 };
 
 /* ================= GET MANIFEST DETAILS ================= */
