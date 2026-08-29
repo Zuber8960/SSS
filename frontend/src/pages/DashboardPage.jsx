@@ -1,9 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import MainLayout from "../layouts/MainLayout";
-import { PageBody } from "../components/common/MasterPage";
-import { fetchDashboardStats } from "../utils/dashboard";
+import { PageBody, DataTable } from "../components/common/MasterPage";
+import { fetchDashboardStats, fetchInTransitDockets } from "../utils/dashboard";
+import { fetchAllManifests } from "../utils/manifest";
 import GetAllDetailsPopup from "../components/common/GetAllDetailsPopup";
 import SearchIcon from "@mui/icons-material/Search";
+import {
+  Dialog, DialogTitle, DialogContent,
+  TextField, IconButton, Box, Chip, CircularProgress, InputAdornment,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import moment from "moment";
 import "../styles/MasterPage.css";
 
 const COLORS = {
@@ -14,13 +21,20 @@ const COLORS = {
   purple: "#7c3aed",
 };
 
-function StatCard({ label, value, subtext, color, icon }) {
+function StatCard({ label, value, subtext, color, icon, onClick }) {
   const c = COLORS[color] || COLORS.blue;
   return (
-    <div style={{
-      background: "#fff", borderRadius: 12, padding: 20,
-      borderTop: `4px solid ${c}`, boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-    }}>
+    <div
+      onClick={onClick}
+      style={{
+        background: "#fff", borderRadius: 12, padding: 20,
+        borderTop: `4px solid ${c}`, boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+        cursor: onClick ? "pointer" : "default",
+        transition: "box-shadow 0.15s ease",
+      }}
+      onMouseEnter={onClick ? (e) => { e.currentTarget.style.boxShadow = "0 4px 18px rgba(0,0,0,0.12)"; } : undefined}
+      onMouseLeave={onClick ? (e) => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.05)"; } : undefined}
+    >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 12 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>{label}</span>
         <div style={{ background: `${c}18`, padding: 8, borderRadius: 8, fontSize: 16 }}>{icon}</div>
@@ -157,10 +171,294 @@ function ManifestStatusChart({ completed, inTransit }) {
   );
 }
 
+const toDate = (v) => {
+  if (!v) return "";
+  const m = moment(v);
+  return m.isValid() ? m.format("DD-MM-YYYY") : v;
+};
+
+
+const inTransitDocketColumns = [
+  { key: "docket_no",         label: "Docket No",    minWidth: 120 },
+  { key: "docket_date",       label: "Date",         minWidth: 100 },
+  { key: "cnor_name",         label: "Consignor",    minWidth: 150 },
+  { key: "cnee_name",         label: "Consignee",    minWidth: 150 },
+  { key: "docket_loc",        label: "From Loc",     minWidth: 100 },
+  { key: "docket_pickup_town",label: "From Town",    minWidth: 120 },
+  { key: "docket_to_loc",     label: "To Loc",       minWidth: 100 },
+  { key: "docket_dly_town",   label: "To Town",      minWidth: 120 },
+  { key: "docket_pay_type",   label: "Pay Type",     minWidth: 90  },
+  { key: "docket_tot_pkgs",   label: "Pkgs",         minWidth: 70  },
+  { key: "docket_act_wt",     label: "Wt",           minWidth: 80  },
+  { key: "docket_tot_amt",    label: "Amount",       minWidth: 100 },
+  { key: "mnf_no",            label: "Manifest No",  minWidth: 110 },
+  { key: "desp_veh_no",       label: "Vehicle",      minWidth: 110 },
+];
+
+function InTransitDocketsPopup({ open, onClose }) {
+  const [dockets, setDockets] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [searchText, setSearchText] = useState("");
+
+  useEffect(() => {
+    if (!open || loaded) return;
+    setLoading(true);
+    fetchInTransitDockets()
+      .then((data) => {
+        setDockets(Array.isArray(data) ? data : []);
+        setLoaded(true);
+      })
+      .catch((err) => console.error("Failed to load in-transit dockets:", err))
+      .finally(() => setLoading(false));
+  }, [open, loaded]);
+
+  useEffect(() => {
+    if (!open) setSearchText("");
+  }, [open]);
+
+  const rows = useMemo(() => {
+    const q = searchText.toLowerCase().trim();
+    const filtered = q
+      ? dockets.filter((d) => [
+          d.docket_no, d.cnor_name, d.cnee_name,
+          d.docket_loc, d.docket_to_loc,
+          d.docket_pickup_town, d.docket_dly_town,
+          d.docket_pay_type, d.mnf_no, d.desp_veh_no,
+        ].some((v) => String(v ?? "").toLowerCase().includes(q)))
+      : dockets;
+    return filtered.map((d, i) => ({
+      ...d,
+      id: (d.docket_no || "") + "_" + i,
+      docket_date: toDate(d.docket_date),
+    }));
+  }, [dockets, searchText]);
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="xl"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          width: "1100px",
+          height: "500px",
+          maxWidth: "calc(100vw - 32px)",
+          maxHeight: "calc(100vh - 32px)",
+          overflow: "hidden",
+          background: "linear-gradient(135deg, #faf5ff 0%, #f0f9ff 100%)",
+        },
+      }}
+    >
+      <DialogTitle sx={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "10px 24px", borderBottom: "1px solid #fed7aa",
+        background: "linear-gradient(135deg, #ea580c, #f97316)",
+        color: "#fff",
+      }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <span style={{ fontSize: 22 }}>🚛</span>
+          <span style={{ fontSize: 18, fontWeight: 700 }}>In Transit Dockets</span>
+        </Box>
+        <IconButton onClick={onClose} size="small" sx={{ color: "#fff", "&:hover": { background: "rgba(255,255,255,0.15)" } }}>
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent sx={{ padding: "20px 24px", overflow: "hidden" }}>
+        <Box sx={{ display: "flex", gap: 2, alignItems: "center", margin: 2 }}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder="Search docket, consignor, consignee, town, manifest..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ color: "#ea580c", fontSize: 20 }} />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              "& .MuiInputBase-input": { fontSize: 14 },
+              "& .MuiOutlinedInput-notchedOutline": { borderColor: "#fed7aa", borderWidth: 1.5 },
+              "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#ea580c" },
+              "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#ea580c" },
+            }}
+          />
+          <Chip
+            label={`${rows.length} docket${rows.length !== 1 ? "s" : ""}`}
+            sx={{
+              background: "#fff7ed", color: "#ea580c", fontWeight: 600,
+              border: "1.5px solid #fed7aa", fontSize: 13, height: 32,
+            }}
+          />
+        </Box>
+
+        {loading && !loaded ? (
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: 2 }}>
+            <CircularProgress size={48} thickness={4} sx={{ color: "#ea580c" }} />
+            <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Loading dockets...</span>
+          </Box>
+        ) : (
+          <DataTable
+            columns={inTransitDocketColumns}
+            rows={rows}
+            getKey={(row, i) => row.id || i}
+            actions={[]}
+            isHeight={320}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const inTransitColumns = [
+  { key: "desp_veh_no",    label: "Vehicle No",   minWidth: 120 },
+  { key: "mnf_no",         label: "Manifest No",  minWidth: 120 },
+  { key: "mnf_date",       label: "Date",         minWidth: 100 },
+  { key: "mnf_loc",        label: "From Loc",     minWidth: 100 },
+  { key: "mnf_from_town",  label: "From Town",    minWidth: 120 },
+  { key: "mnf_to_loc",     label: "To Loc",       minWidth: 100 },
+  { key: "mnf_to_town",    label: "To Town",      minWidth: 120 },
+  { key: "loaded_by",      label: "Driver",       minWidth: 120 },
+  { key: "mnf_no_of_dwb",  label: "Dockets",      minWidth: 80  },
+  { key: "mnf_no_of_pkgs", label: "Pkgs",         minWidth: 80  },
+  { key: "mnf_actual_wt",  label: "Weight",       minWidth: 90  },
+];
+
+function InTransitVehiclesPopup({ open, onClose }) {
+  const [manifests, setManifests] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [searchText, setSearchText] = useState("");
+
+  useEffect(() => {
+    if (!open || loaded) return;
+    setLoading(true);
+    fetchAllManifests()
+      .then((data) => {
+        setManifests(Array.isArray(data) ? data : []);
+        setLoaded(true);
+      })
+      .catch((err) => console.error("Failed to load in-transit vehicles:", err))
+      .finally(() => setLoading(false));
+  }, [open, loaded]);
+
+  useEffect(() => {
+    if (!open) setSearchText("");
+  }, [open]);
+
+  const rows = useMemo(() => {
+    const inTransit = manifests.filter((m) => !m.mnf_arrival_time && m.desp_veh_no);
+    const q = searchText.toLowerCase().trim();
+    const filtered = q
+      ? inTransit.filter((m) => [
+          m.desp_veh_no, m.mnf_no, m.mnf_loc, m.mnf_to_loc,
+          m.mnf_from_town, m.mnf_to_town, m.loaded_by,
+        ].some((v) => String(v ?? "").toLowerCase().includes(q)))
+      : inTransit;
+    return filtered.map((m, i) => ({
+      ...m,
+      id: (m.mnf_no || "") + "_" + (m.mnf_loc || "") + "_" + i,
+      mnf_date: toDate(m.mnf_date),
+      mnf_no_of_dwb: m.mnf_no_of_dwb ?? "",
+      mnf_no_of_pkgs: m.mnf_no_of_pkgs ?? "",
+      mnf_actual_wt: m.mnf_actual_wt ?? "",
+    }));
+  }, [manifests, searchText]);
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="xl"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          width: "1100px",
+          height: "500px",
+          maxWidth: "calc(100vw - 32px)",
+          maxHeight: "calc(100vh - 32px)",
+          overflow: "hidden",
+          background: "linear-gradient(135deg, #faf5ff 0%, #f0f9ff 100%)",
+        },
+      }}
+    >
+      <DialogTitle sx={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "10px 24px", borderBottom: "1px solid #fed7aa",
+        background: "linear-gradient(135deg, #ea580c, #f97316)",
+        color: "#fff",
+      }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <span style={{ fontSize: 22 }}>🚚</span>
+          <span style={{ fontSize: 18, fontWeight: 700 }}>In Transit Vehicles</span>
+        </Box>
+        <IconButton onClick={onClose} size="small" sx={{ color: "#fff", "&:hover": { background: "rgba(255,255,255,0.15)" } }}>
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent sx={{ padding: "20px 24px", overflow: "hidden" }}>
+        {loading && !loaded ? (
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: 2 }}>
+            <CircularProgress size={48} thickness={4} sx={{ color: "#ea580c" }} />
+            <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Loading vehicles...</span>
+          </Box>
+        ) : (
+          <>
+            <Box sx={{ display: "flex", gap: 2, alignItems: "center", margin: 2 }}>
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="Search vehicle, manifest, town, driver..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon sx={{ color: "#ea580c", fontSize: 20 }} />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  "& .MuiInputBase-input": { fontSize: 14 },
+                  "& .MuiOutlinedInput-notchedOutline": { borderColor: "#fed7aa", borderWidth: 1.5 },
+                  "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#ea580c" },
+                  "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#ea580c" },
+                }}
+              />
+              <Chip
+                label={`${rows.length} vehicle${rows.length !== 1 ? "s" : ""}`}
+                sx={{ background: "#fff7ed", color: "#ea580c", fontWeight: 600, border: "1.5px solid #fed7aa", fontSize: 13, height: 32, flexShrink: 0 }}
+              />
+            </Box>
+            <DataTable
+              columns={inTransitColumns}
+              rows={rows}
+              getKey={(row, i) => row.id || i}
+              actions={[]}
+              isHeight={320}
+            />
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [inTransitVehiclesOpen, setInTransitVehiclesOpen] = useState(false);
+  const [inTransitDocketsOpen, setInTransitDocketsOpen] = useState(false);
 
   useEffect(() => {
     fetchDashboardStats()
@@ -174,13 +472,13 @@ export default function DashboardPage() {
   const cards = [
     [
       { label: "Total DOCKET Booked",   value: v("totalDockets"),       color: "blue",   icon: "📋" },
-      { label: "In Transit DOCKET",     value: v("inTransitDockets"),   color: "orange", icon: "🚛" },
+      { label: "In Transit DOCKET",     value: v("inTransitDockets"),   color: "orange", icon: "🚛", onClick: () => setInTransitDocketsOpen(true) },
       { label: "Undelivered Dockets",   value: v("undeliveredDockets"), color: "red",    icon: "📦" },
       { label: "Delivered Dockets",     value: v("deliveredDockets"),   color: "green",  icon: "✅" },
     ],
     [
       { label: "Delivered But Not Billed", value: v("deliveredNotBilled"),  color: "purple", icon: "💰" },
-      { label: "In Transit Vehicles",      value: v("inTransitVehicles"),   color: "orange", icon: "🚚" },
+      { label: "In Transit Vehicles",      value: v("inTransitVehicles"),   color: "orange", icon: "🚚", onClick: () => setInTransitVehiclesOpen(true) },
       { label: "Waiting For Dispatch",     value: v("waitingForDispatch"),  color: "blue",   icon: "⏳" },
       { label: "EWB Expiring Today",       value: v("ewbExpiringToday"),    color: "red",    icon: "⚠️" },
     ],
@@ -305,6 +603,12 @@ export default function DashboardPage() {
 
       {/* Get All Details Popup */}
       <GetAllDetailsPopup open={detailsOpen} onClose={() => setDetailsOpen(false)} />
+
+      {/* In Transit Dockets Popup */}
+      <InTransitDocketsPopup open={inTransitDocketsOpen} onClose={() => setInTransitDocketsOpen(false)} />
+
+      {/* In Transit Vehicles Popup */}
+      <InTransitVehiclesPopup open={inTransitVehiclesOpen} onClose={() => setInTransitVehiclesOpen(false)} />
     </MainLayout>
   );
 }

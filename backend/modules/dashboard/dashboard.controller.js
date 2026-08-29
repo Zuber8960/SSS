@@ -156,4 +156,57 @@ const getDashboardStats = async (tenant_id) => {
   };
 };
 
-module.exports = { getDashboardStats };
+const getInTransitVehicleLocations = async (tenant_id) => {
+  return db.raw(`
+    SELECT DISTINCT ON (scygd.vehicle_no)
+        scygd.id, scygd.vehicle_no, scygd.latitude, scygd.longitude
+    FROM sss.sst_cargo_yaan_gps_data scygd
+    WHERE scygd.vehicle_no IN (
+        SELECT desp_veh_no
+        FROM sss.sst_mnf_hdr
+        WHERE tenant_id = ?
+          AND record_status = 0
+          AND mnf_arrival_time IS NULL
+          AND desp_veh_no IS NOT NULL
+    )
+    ORDER BY scygd.vehicle_no, scygd.id DESC
+  `, [tenant_id]).then(r => r.rows);
+};
+
+const getInTransitDockets = async (tenant_id) => {
+  return db('sss.sst_mnf_dtl as md')
+    .join('sss.sst_mnf_hdr as mh', function () {
+      this.on('mh.mnf_no', 'md.mnf_no')
+        .andOn('mh.mnf_loc', 'md.mnf_loc')
+        .andOn('mh.mnf_date', 'md.mnf_date');
+    })
+    .join('sss.sst_docket as d', 'd.docket_no', 'md.dwb_no')
+    .leftJoin('sss.ssm_business_partner as cnor', 'cnor.record_id', 'd.cnor_id')
+    .leftJoin('sss.ssm_business_partner as cnee', 'cnee.record_id', 'd.cnee_id')
+    .where('mh.tenant_id', tenant_id)
+    .where('mh.record_status', 0)
+    .whereNull('mh.mnf_arrival_time')
+    .select(
+      'd.docket_no',
+      'd.docket_date',
+      'd.docket_loc',
+      'd.docket_pickup_town',
+      'd.docket_to_loc',
+      'd.docket_dly_town',
+      'd.docket_pay_type',
+      'd.docket_tot_pkgs',
+      'd.docket_act_wt',
+      'd.docket_chrg_wt',
+      'd.docket_tot_amt',
+      'd.docket_goods_desc',
+      'cnor.bp_name as cnor_name',
+      'cnee.bp_name as cnee_name',
+      'mh.mnf_no',
+      'mh.desp_veh_no',
+      'mh.mnf_loc as mnf_from_loc',
+      'mh.mnf_to_loc',
+    )
+    .orderBy('d.docket_date', 'desc');
+};
+
+module.exports = { getDashboardStats, getInTransitVehicleLocations, getInTransitDockets };
