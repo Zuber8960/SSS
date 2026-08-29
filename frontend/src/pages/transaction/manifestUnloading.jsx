@@ -322,9 +322,17 @@ export default function ManifestUnloading() {
   };
 
   // ------------------- BUTTON HANDLERS -------------------
+  // Incremented to force both grids (manifest list & dockets) to clear their
+  // internal checkbox/row selection when the form is cleared.
+  const [gridClearKey, setGridClearKey] = useState(0);
+
   const handleClear = () => {
     setForm({ ...emptyForm });
     setDockets([]);
+    setLocationManifests((prev) =>
+      prev.map((m) => ({ ...m, selected: false }))
+    );
+    setGridClearKey((k) => k + 1);
     showInfo("Form cleared");
   };
 
@@ -671,6 +679,7 @@ export default function ManifestUnloading() {
                 disableMultipleRowSelection
                 toggleRowSelectionOnClick
                 onRowSelectionModelChange={handleManifestSelectionChange}
+                key={`manifest-grid-${gridClearKey}`}
                 isHeight={220}
                 scroll={{ horizontal: true }}
               />
@@ -718,6 +727,7 @@ export default function ManifestUnloading() {
                 editable={false}
                 onCellChange={handleCellChange}
                 onRowSelectionModelChange={handleDocketSelectionChange}
+                key={`docket-grid-${gridClearKey}`}
                 rowColors={ROW_COLORS}
                 statusKey="status"
                 isHeight={100}

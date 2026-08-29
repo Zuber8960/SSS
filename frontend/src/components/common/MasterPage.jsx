@@ -532,6 +532,7 @@ export function DataTable({
     >
       {hasRowColors && <style>{rowColorCss}</style>}
       <DataGrid
+        apiRef={apiRef}
         rows={muiRows}
         columns={muiColumns}
         disableRowSelectionOnClick={!toggleRowSelectionOnClick}
@@ -545,7 +546,6 @@ export function DataTable({
         rowSelection={true}
         {...(hasRowColors ? { getRowClassName } : {})}
         {...(singleClick ? {
-          apiRef,
           onCellClick: (params) => {
             if (params.colDef.editable) {
               apiRef.current.startCellEditMode({ id: params.id, field: params.field });

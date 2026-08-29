@@ -69,7 +69,7 @@ const findNearbyBranches = (lat, lon, branches = [], limit = 3) => {
 
 // ── Column definitions per tab ──────────────────────────────────────────────
 const docketColumns = [
-  { key: "docket_no", label: "Docket No", minWidth: 110 },
+  { key: "docket_no", label: "Docket No", minWidth: 140 },
   { key: "docket_date", label: "Date", minWidth: 100 },
   { key: "docket_loc", label: "From Loc", minWidth: 100 },
   { key: "docket_pickup_town", label: "From Town", minWidth: 110 },
@@ -77,8 +77,8 @@ const docketColumns = [
   { key: "docket_dly_town", label: "To Town", minWidth: 110 },
   { key: "cnor_name", label: "Consignor", minWidth: 140 },
   { key: "cnee_name", label: "Consignee", minWidth: 140 },
-  { key: "docket_tot_pkgs", label: "Pkgs", minWidth: 70 },
-  { key: "docket_act_wt", label: "Wt", minWidth: 80 },
+  { key: "docket_tot_pkgs", label: "Pkgs", minWidth: 50 },
+  { key: "docket_act_wt", label: "Wt", minWidth: 70 },
   { key: "docket_pay_type", label: "Pay Type", minWidth: 90 },
   { key: "docket_tot_amt", label: "Amount", minWidth: 100 },
   { key: "delivery_status", label: "Status", minWidth: 110 },
