@@ -53,10 +53,13 @@ const docketColumns = [
 ];
 
 // ------------------- MANIFEST LIST (top grid) COLUMNS -------------------
+const manifestTypeLabels = { lp: "Local Pickup", lh: "Long Haul", ld: "Local Delivery" };
+
 const manifestListColumns = [
   { key: "manifest_no", label: "Manifest No", minWidth: 130, render: (row) => (
     <a href="#" style={{ textDecoration: "none", color: "#1565c0", fontWeight: "bold" }}>{row.manifest_no}</a>
   ) },
+  { key: "manifest_type", label: "Manifest Type", minWidth: 120 },
   { key: "manifest_date", label: "Manifest Date", minWidth: 130 },
   { key: "origin_branch", label: "Origin Branch", minWidth: 130 },
   { key: "dest_branch", label: "Dest Branch", minWidth: 120 },
@@ -123,6 +126,7 @@ export default function ManifestUnloading() {
             id: m.rec_id || m.mnf_no || i,
             sr: i + 1,
             manifest_no: m.mnf_no || m.manifest_no || "",
+            manifest_type: manifestTypeLabels[(m.mnf_type || m.manifest_type || "").toLowerCase()] || m.mnf_type || m.manifest_type || "",
             manifest_date: (m.mnf_date || m.manifest_date || "").substring(0, 10),
             origin_branch: m.mnf_loc || m.origin_branch || "",
             dest_branch: m.mnf_to_loc || m.dest_branch || "",
