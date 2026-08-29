@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { ToggleSwitch } from "../../components/common/MasterPage";
-import { IconButton, Tooltip } from "@mui/material";
+import { IconButton, Tooltip, Menu, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
 import PrintIcon from "@mui/icons-material/Print";
 import { EditIcon, SaveIcon, ResetIcon, SECTION_ICONS } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
@@ -335,15 +335,17 @@ export default function DocketPage() {
   const prevLocRef = useRef({ docket_loc: "", docket_to_loc: "" });
   const ewbPopulatedRef = useRef({ cnor: false, cnee: false });
   const chargesRef = useRef(null);
+  const [printAnchor, setPrintAnchor] = useState(null);
 
-  const handlePrint = async () => {
+  const handlePrint = async (withFreight) => {
     if (!form.docket_no) {
       showError("Please load docket details before printing.");
       return;
     }
+    const charges = withFreight ? (chargesRef.current?.getChargeList() ?? []) : [];
     await printDocket({
       form,
-      charges: chargesRef.current?.getChargeList() ?? [],
+      charges,
       ewbList,
       ewbNoDisplay,
       company,
@@ -1385,20 +1387,36 @@ export default function DocketPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <Tooltip title="Print Consignment">
               <IconButton
-                onClick={handlePrint}
+                onClick={(e) => setPrintAnchor(e.currentTarget)}
                 size="small"
                 sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}
               >
                 <PrintIcon />
               </IconButton>
             </Tooltip>
+            <Menu
+              anchorEl={printAnchor}
+              open={Boolean(printAnchor)}
+              onClose={() => setPrintAnchor(null)}
+              anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+              transformOrigin={{ vertical: "top", horizontal: "left" }}
+            >
+              <MenuItem onClick={() => { setPrintAnchor(null); handlePrint(true); }}>
+                <ListItemIcon><PrintIcon fontSize="small" /></ListItemIcon>
+                <ListItemText primaryTypographyProps={{ fontSize: 13 }}>Print with Freight</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { setPrintAnchor(null); handlePrint(false); }}>
+                <ListItemIcon><PrintIcon fontSize="small" /></ListItemIcon>
+                <ListItemText primaryTypographyProps={{ fontSize: 13 }}>Print without Freight</ListItemText>
+              </MenuItem>
+            </Menu>
             <Tooltip title="Print Sticker">
               <IconButton
                 onClick={handleStickerPrint}
                 size="small"
                 sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}
               >
-                <LocalOfferIcon />  
+                <LocalOfferIcon />
               </IconButton>
             </Tooltip>
           </div>
