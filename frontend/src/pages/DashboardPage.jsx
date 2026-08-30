@@ -544,6 +544,7 @@ export default function DashboardPage() {
               </span>
               Search Engine
             </button>
+
           </div>
 
           {/* Stat Cards — 2 rows × 4 columns */}
@@ -609,6 +610,7 @@ export default function DashboardPage() {
 
       {/* In Transit Vehicles Popup */}
       <InTransitVehiclesPopup open={inTransitVehiclesOpen} onClose={() => setInTransitVehiclesOpen(false)} />
+
     </MainLayout>
   );
 }

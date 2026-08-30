@@ -24,6 +24,9 @@ const customerBillRoutes = require("../modules/customerBill/customerBill.routes"
 const cnsRoutes = require("../modules/manifest/cns.routes");
 const dashboardRoutes = require("../modules/dashboard/dashboard.routes");
 const pincodeMasterRoutes = require("../modules/pincodeMaster/pincodeMaster.routes");
+const LocationMasterController = require('../modules/locationMaster/locationMaster.controller');
+const DocketController = require('../modules/docket/docket.controller');
+const ManifestController = require('../modules/manifest/manifest.controller');
 const { getStatesWithCities } = require("../common/commonCache");
 const axios = require('axios');
 const db = require('../config/db');
@@ -170,6 +173,40 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
+// Public read-only endpoints (no auth) — used by dev tools and unauthenticated contexts
+router.use('/pincodeMaster', pincodeMasterRoutes);
+
+router.get('/public/locations', async (req, res) => {
+  try {
+    const data = await LocationMasterController.getAllLocationData(null, null);
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error('Public locations error:', error);
+    res.status(500).json({ success: false, message: 'Error retrieving location data' });
+  }
+});
+
+router.get('/public/docket/:docketNo', async (req, res) => {
+  try {
+    const data = await DocketController.getDocketByRecId(null, null, req.params.docketNo);
+    if (data) res.json({ success: true, data });
+    else res.status(404).json({ success: false, message: 'Docket not found' });
+  } catch (error) {
+    console.error('Public docket error:', error);
+    res.status(500).json({ success: false, message: 'Error retrieving docket' });
+  }
+});
+
+router.get('/public/manifest/by-docket/:docketNo', async (req, res) => {
+  try {
+    const data = await ManifestController.getManifestsByDocketNo(req.params.docketNo);
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Public manifest error:', error);
+    res.status(500).json({ success: false, message: 'Error retrieving manifests' });
+  }
+});
+
 router.use('/tenant', tenantRoutes);
 router.use('/user', authMiddleware, userRoutes);
 router.use('/locationMaster', authMiddleware, locationMasterRoutes);
@@ -188,7 +225,7 @@ router.use('/deliveryNote', authMiddleware, deliveryNoteRoutes);
 router.use('/customerBill', authMiddleware, customerBillRoutes);
 router.use('/cns', authMiddleware, cnsRoutes);
 router.use('/dashboard', authMiddleware, dashboardRoutes);
-router.use('/pincodeMaster', authMiddleware, pincodeMasterRoutes);
+// pincodeMaster is mounted publicly above (no req.user dependency)
 
 router.get('/stateCity', authMiddleware, async (req, res) => {
     try {

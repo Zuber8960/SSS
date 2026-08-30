@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Button, Tabs, Tab, Box, IconButton,
+  Dialog, DialogTitle, DialogContent,
+  TextField, Tabs, Tab, Box, IconButton,
   CircularProgress, Chip, InputAdornment
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
@@ -11,8 +11,7 @@ import { fetchAllDockets } from "../../utils/docket";
 import { fetchAllManifests } from "../../utils/manifest";
 import { fetchAllInvoices } from "../../utils/customerBill";
 import { fetchAllBusinessPartners } from "../../utils/businessPartner";
-import { fetchPincodeByPincode } from "../../utils/pincodeMaster";
-import { fetchAllLocations } from "../../utils/locationMaster";
+import PincodeSearch from "./PincodeSearch";
 import moment from "moment";
 
 const toDate = (v) => {
@@ -31,41 +30,6 @@ const fmtAmt = (v) => {
   return Number.isFinite(n) ? n.toFixed(2) : "0.00";
 };
 
-const fmtGeo = (v) => {
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? String(n) : "—";
-};
-
-// ── Geo helpers for finding branch offices near a pincode ───────────────────
-const toRad = (deg) => (deg * Math.PI) / 180;
-
-const haversineKm = (lat1, lon1, lat2, lon2) => {
-  const R = 6371; // Earth radius in km
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-};
-
-const findNearbyBranches = (lat, lon, branches = [], limit = 3) => {
-  const la = Number(lat);
-  const lo = Number(lon);
-  if (!Number.isFinite(la) || !Number.isFinite(lo)) return [];
-  const withCoords = branches.filter((b) => (
-    Number.isFinite(Number(b.latitude)) && Number.isFinite(Number(b.longitude))
-  ));
-  return withCoords
-    .map((b) => ({
-      loc_code: b.loc_code,
-      loc_name: b.loc_name || b.loc_code,
-      distance_km: Math.round(haversineKm(la, lo, Number(b.latitude), Number(b.longitude)) * 10) / 10,
-    }))
-    .sort((x, y) => x.distance_km - y.distance_km)
-    .slice(0, limit);
-};
 
 // ── Column definitions per tab ──────────────────────────────────────────────
 const docketColumns = [
@@ -135,32 +99,6 @@ const customerColumns = [
   { key: "bp_status", label: "Status", minWidth: 90 },
 ];
 
-const pincodeColumns = [
-  { key: "pincode", label: "Pincode", minWidth: 100 },
-  { key: "office_name", label: "Post Office Name", minWidth: 170 },
-  { key: "district", label: "District", minWidth: 120 },
-  { key: "state_name", label: "State", minWidth: 120 },
-  { key: "state_code", label: "State Code", minWidth: 100 },
-  { key: "latitude", label: "Latitude", minWidth: 100 },
-  { key: "longitude", label: "Longitude", minWidth: 110 },
-  { key: "division_name", label: "Division", minWidth: 120 },
-  // { key: "region_name", label: "Region", minWidth: 120 },
-  // { key: "circle_name", label: "Circle", minWidth: 120 },
-  // { key: "office_type", label: "Office Type", minWidth: 110 },
-  {
-    key: "nearest_branch", label: "Nearest Branch", minWidth: 150,
-    render: (r) => (
-      <span style={{ fontWeight: 600, color: "#7c3aed" }}>{r.nearest_branch}</span>
-    ),
-  },
-  { key: "nearest_distance", label: "Distance (km)", minWidth: 90 },
-  {
-    key: "near_branches_text", label: "Near Branch Offices", minWidth: 220,
-    render: (r) => (
-      <span style={{ color: "#334155" }}>{r.near_branches_text}</span>
-    ),
-  },
-];
 
 const TAB_LABELS = {
   docket: "📋 Dockets",
@@ -180,9 +118,6 @@ export default function GetAllDetailsPopup({ open, onClose }) {
   const [manifests, setManifests] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [pincodes, setPincodes] = useState([]);
-  const [pincodeLoading, setPincodeLoading] = useState(false);
-  const [branches, setBranches] = useState([]);
 
   // Load all data (EXCEPT pincodes — those are fetched on-demand on search)
   useEffect(() => {
@@ -192,12 +127,11 @@ export default function GetAllDetailsPopup({ open, onClose }) {
     setLoading(true);
     const loadAll = async () => {
       try {
-        const [d, m, i, c, l] = await Promise.allSettled([
+        const [d, m, i, c] = await Promise.allSettled([
           fetchAllDockets(true),
           fetchAllManifests(),
           fetchAllInvoices(),
           fetchAllBusinessPartners(),
-          fetchAllLocations(),
         ]);
 
         if (d.status === "fulfilled") setDockets(Array.isArray(d.value) ? d.value : []);
@@ -205,15 +139,6 @@ export default function GetAllDetailsPopup({ open, onClose }) {
         if (i.status === "fulfilled") setInvoices(Array.isArray(i.value) ? i.value : []);
         if (c.status === "fulfilled") setCustomers(Array.isArray(c.value) ? c.value : []);
 
-        if (l.status === "fulfilled") {
-          const locs = Array.isArray(l.value) ? l.value : [];
-          // Prefer dedicated branch offices; fall back to any location with coordinates.
-          const branchRows = locs.filter((lo) => String(lo.loc_type || "").toUpperCase() === "BRANCH");
-          const usable = (branchRows.length ? branchRows : locs).filter(
-            (lo) => Number.isFinite(Number(lo.latitude)) && Number.isFinite(Number(lo.longitude))
-          );
-          setBranches(usable);
-        }
 
         setLoaded(true);
       } catch (err) {
@@ -225,34 +150,6 @@ export default function GetAllDetailsPopup({ open, onClose }) {
     loadAll();
   }, [open, loaded]);
 
-  // Fetch pincode from the API only when the user searches on the Pincode tab,
-  // so we never load the full ~1.5-lakh master into memory.
-  useEffect(() => {
-    if (tab !== "pincode") return;
-
-    const timer = setTimeout(async () => {
-      const q = searchText.trim();
-      if (!q) {
-        setPincodes([]);
-        setPincodeLoading(false);
-        return;
-      }
-
-      setPincodeLoading(true);
-      try {
-        const res = await fetchPincodeByPincode(q);
-        const list = Array.isArray(res) ? res : res ? [res] : [];
-        setPincodes(Array.isArray(list) ? list : []);
-      } catch (err) {
-        console.error("Pincode search failed:", err);
-        setPincodes([]);
-      } finally {
-        setPincodeLoading(false);
-      }
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [tab, searchText]);
 
   // Reset search when tab changes
   const handleTabChange = (_, newTab) => {
@@ -303,9 +200,6 @@ export default function GetAllDetailsPopup({ open, onClose }) {
     ].some((v) => String(v ?? "").toLowerCase().includes(q)));
   }, [customers, searchText]);
 
-  // Pincode rows are fetched pre-filtered from the backend (byPincode), so no client-side filter needed
-  const filteredPincodes = pincodes;
-
   // ── Mapped rows for display ──────────────────────────────────────────────
   const mappedDockets = useMemo(() =>
     filteredDockets.map((d, i) => ({
@@ -346,34 +240,17 @@ export default function GetAllDetailsPopup({ open, onClose }) {
       bp_status: c.bp_status === "1" ? "Active" : c.bp_status === "0" ? "Inactive" : c.bp_status || "",
     })), [filteredCustomers]);
 
-  const mappedPincodes = useMemo(() =>
-    filteredPincodes.map((p, i) => {
-      const nearBranches = findNearbyBranches(p.latitude, p.longitude, branches);
-      return {
-        ...p,
-        id: (p.pincode || "") + "_" + (p.office_name || "") + "_" + i,
-        latitude: fmtGeo(p.latitude),
-        longitude: fmtGeo(p.longitude),
-        nearest_branch: nearBranches[0]?.loc_name || "—",
-        nearest_distance: nearBranches[0] ? String(nearBranches[0].distance_km) : "—",
-        near_branches_text: nearBranches.length
-          ? nearBranches.map((b) => `${b.loc_name} (${b.distance_km} km)`).join(", ")
-          : "—",
-      };
-    }), [filteredPincodes, branches]);
-
   const getCurrentData = () => {
     switch (tab) {
       case "docket": return { columns: docketColumns, rows: mappedDockets };
       case "manifest": return { columns: manifestColumns, rows: mappedManifests };
       case "invoice": return { columns: invoiceColumns, rows: mappedInvoices };
       case "customer": return { columns: customerColumns, rows: mappedCustomers };
-      case "pincode": return { columns: pincodeColumns, rows: mappedPincodes };
       default: return { columns: [], rows: [] };
     }
   };
 
-  const { columns, rows } = getCurrentData();
+  const { columns, rows } = tab === "pincode" ? { columns: [], rows: [] } : getCurrentData();
   const currentCount = rows.length;
 
   return (
@@ -410,36 +287,38 @@ export default function GetAllDetailsPopup({ open, onClose }) {
       </DialogTitle>
 
       <DialogContent sx={{ padding: "20px 24px", overflow: "hidden" }}>
-        {/* ── Search bar ── */}
-        <Box sx={{ display: "flex", gap: 2, alignItems: "center", margin: 2 }}>
-          <TextField
-            size="small"
-            fullWidth
-            placeholder={`Search ${TAB_LABELS[tab]?.toLowerCase() || "data"}...`}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon sx={{ color: "#7c3aed", fontSize: 20 }} />
-                </InputAdornment>
-              ),
-            }}
-            sx={{
-              "& .MuiInputBase-input": { fontSize: 14 },
-              "& .MuiOutlinedInput-notchedOutline": { borderColor: "#c4b5fd", borderWidth: 1.5 },
-              "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#7c3aed" },
-              "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#7c3aed" },
-            }}
-          />
-          <Chip
-            label={`${currentCount} result${currentCount !== 1 ? "s" : ""}`}
-            sx={{
-              background: "#f3e8ff", color: "#7c3aed", fontWeight: 600,
-              border: "1.5px solid #d8b4fe", fontSize: 13, height: 32,
-            }}
-          />
-        </Box>
+        {/* ── Search bar (hidden on pincode tab — PincodeSearch has its own) ── */}
+        {tab !== "pincode" && (
+          <Box sx={{ display: "flex", gap: 2, alignItems: "center", margin: 2 }}>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder={`Search ${TAB_LABELS[tab]?.toLowerCase() || "data"}...`}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ color: "#7c3aed", fontSize: 20 }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                "& .MuiInputBase-input": { fontSize: 14 },
+                "& .MuiOutlinedInput-notchedOutline": { borderColor: "#c4b5fd", borderWidth: 1.5 },
+                "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#7c3aed" },
+                "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#7c3aed" },
+              }}
+            />
+            <Chip
+              label={`${currentCount} result${currentCount !== 1 ? "s" : ""}`}
+              sx={{
+                background: "#f3e8ff", color: "#7c3aed", fontWeight: 600,
+                border: "1.5px solid #d8b4fe", fontSize: 13, height: 32,
+              }}
+            />
+          </Box>
+        )}
 
         {/* ── Tabs ── */}
         <Tabs
@@ -466,44 +345,20 @@ export default function GetAllDetailsPopup({ open, onClose }) {
 
         {/* ── Loading / content state ── */}
         {tab === "pincode" ? (
-          pincodeLoading ? (
-            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: 2 }}>
-              <CircularProgress size={48} thickness={4} sx={{ color: "#7c3aed" }} />
-              <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Searching pincode...</span>
-            </Box>
-          ) : rows.length === 0 ? (
-            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: 2 }}>
-              <span style={{ fontSize: 34 }}>📍</span>
-              <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>
-                {searchText.trim()
-                  ? "No pincode found for the entered value."
-                  : "Enter a pincode number above to search."}
-              </span>
-            </Box>
-          ) : (
-            <DataTable
-              columns={columns}
-              rows={rows}
-              getKey={(row, i) => row.id || i}
-              actions={[]}
-              isHeight={320}
-            />
-          )
+          <PincodeSearch tableHeight={280} />
+        ) : loading && !loaded ? (
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: 2 }}>
+            <CircularProgress size={48} thickness={4} sx={{ color: "#7c3aed" }} />
+            <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Loading all data...</span>
+          </Box>
         ) : (
-          loading && !loaded ? (
-            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: 2 }}>
-              <CircularProgress size={48} thickness={4} sx={{ color: "#7c3aed" }} />
-              <span style={{ color: "#6b7280", fontSize: 14, fontWeight: 500 }}>Loading all data...</span>
-            </Box>
-          ) : (
-            <DataTable
-              columns={columns}
-              rows={rows}
-              getKey={(row, i) => row.id || i}
-              actions={[]}
-              isHeight={320}
-            />
-          )
+          <DataTable
+            columns={columns}
+            rows={rows}
+            getKey={(row, i) => row.id || i}
+            actions={[]}
+            isHeight={320}
+          />
         )}
       </DialogContent>
 

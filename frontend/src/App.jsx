@@ -25,6 +25,9 @@ import InvoiceReport from "./pages/reports/InvoiceReport";
 import ManifestReport from "./pages/reports/ManifestReport";
 import CustomerBill from "./pages/transaction/CustomerBill";
 import { isAuthenticated } from "./utils/authService";
+import DistanceCalculator from "./pages/dev/DistanceCalculator";
+import PincodeSearchPage from "./pages/dev/PincodeSearchPage";
+import DocketEnquiryPage from "./pages/dev/DocketEnquiryPage";
 
 const appRoutes = [
   { path: "/",                   element: <MasterPortal />,    protected: false },
@@ -53,6 +56,9 @@ const appRoutes = [
   { path: "/reports/docket-report", element: <DocketReport />, protected: true },
   { path: "/reports/invoice-report", element: <InvoiceReport />, protected: true },
   { path: "/reports/manifest-report", element: <ManifestReport />, protected: true },
+  { path: "/dev/distance-calculator", element: <DistanceCalculator />,  protected: false },
+  { path: "/dev/pincode-search",      element: <PincodeSearchPage />,   protected: false },
+  { path: "/dev/docket-enquiry",      element: <DocketEnquiryPage />,   protected: false },
 ];
 
 function ProtectedRoute({ children }) {

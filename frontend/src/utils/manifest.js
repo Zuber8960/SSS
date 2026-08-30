@@ -1,5 +1,8 @@
 import Api from '../services/Api';
 
+const TOKEN_KEY = 'authToken';
+const hasAuthToken = () => !!localStorage.getItem(TOKEN_KEY);
+
 // Create manifest (header + details in transaction)
 export const createManifest = (header, details) =>
   Api.post('/manifest', { header, details }).then(r => r.data);
@@ -29,5 +32,9 @@ export const deleteManifest = (mnfNo, mnfLoc, mnfDate) =>
   Api.delete(`/manifest/${encodeURIComponent(mnfNo)}/${encodeURIComponent(mnfLoc)}/${encodeURIComponent(mnfDate)}`).then(r => r.data);
 
 // Fetch manifests by docket number (for Docket Enquiry)
-export const fetchManifestsByDocketNo = (docketNo) =>
-  Api.get(`/manifest/by-docket/${encodeURIComponent(docketNo)}`).then(r => r.data.data || r.data || []);
+export const fetchManifestsByDocketNo = (docketNo) => {
+  const url = hasAuthToken()
+    ? `/manifest/by-docket/${encodeURIComponent(docketNo)}`
+    : `/public/manifest/by-docket/${encodeURIComponent(docketNo)}`;
+  return Api.get(url).then(r => r.data.data || r.data || []);
+};
