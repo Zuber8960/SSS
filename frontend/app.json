@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "cce9069e-7508-4fb9-9b2a-7bc26ab51e64"
+      }
+    },
+    "android": {
+      "package": "com.zuberahmad8steam.frontend"
+    }
+  }
+}

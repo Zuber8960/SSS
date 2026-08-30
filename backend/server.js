@@ -34,7 +34,7 @@ require('./config/db');
 
 // Start all GPS cron jobs
 const { initCronJobs } = require('./common/cronJobs');
-initCronJobs();
+// initCronJobs();
 
 
 // ✅ ROOT using process.cwd()

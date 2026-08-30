@@ -19,6 +19,7 @@
     "@mui/material": "^9.1.0",
     "@mui/x-data-grid": "^9.4.0",
     "axios": "^1.18.1",
+    "expo": "^57.0.18",
     "html5-qrcode": "^2.3.8",
     "jsqr": "^1.4.0",
     "leaflet": "^1.9.4",
