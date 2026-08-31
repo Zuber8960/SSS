@@ -22,7 +22,7 @@ export default function DocketEnquiryPage() {
           }}>Dev Tool</span>
         </div>
 
-        <DocketEnquirySearch showForm={false} />
+        <DocketEnquirySearch showForm={true} />
       </div>
     </div>
   );
