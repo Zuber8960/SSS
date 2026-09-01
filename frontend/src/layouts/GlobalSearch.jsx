@@ -11,7 +11,7 @@ export default function GlobalSearch() {
   const gradient = tenantConfig?.brand?.gradient || "linear-gradient(135deg, #7c3aed, #a855f7)";
 
   return (
-    <Tooltip title="Search Engine">
+    <>
       <button
         onClick={() => setOpen(true)}
         title="Search Engine"
@@ -46,6 +46,6 @@ export default function GlobalSearch() {
       </button>
 
       <GetAllDetailsPopup open={open} onClose={() => setOpen(false)} />
-    </Tooltip>
+    </>
   );
 }
