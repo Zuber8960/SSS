@@ -1,7 +1,25 @@
 import Api from '../services/Api';
 import { getTenantToken } from './tenantService';
+import { clearLocationsCache } from './locationMaster';
 
 const TOKEN_KEY = 'authToken';
+
+// Keys that hold tenant-specific session data and must be reset when
+// switching tenants or logging out, otherwise the previous tenant's
+// company/location will leak into the new session.
+export const TENANT_SCOPED_KEYS = [
+  'current_user',
+  'loc_code',
+  'division_code',
+  'company_code',
+  'header_branch_label',
+  'header_division_label',
+];
+
+export const clearTenantScopedStorage = () => {
+  TENANT_SCOPED_KEYS.forEach((k) => localStorage.removeItem(k));
+  clearLocationsCache();
+};
 
 export const loginUser = async (userId, password, loc_id, division_code) => {
   const tenantToken = getTenantToken();
@@ -28,8 +46,7 @@ export const getToken = () => localStorage.getItem(TOKEN_KEY);
 
 export const logout = () => {
   localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem("header_branch_label");
-  localStorage.removeItem("header_division_label");
+  clearTenantScopedStorage();
 };
 
 export const isAuthenticated = () => !!localStorage.getItem(TOKEN_KEY);

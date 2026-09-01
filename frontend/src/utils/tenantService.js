@@ -1,4 +1,5 @@
 import Api from '../services/Api';
+import { clearTenantScopedStorage } from './authService';
 
 const TENANT_KEY = 'tenantConfig';
 
@@ -10,6 +11,9 @@ const TENANT_TOKEN_KEY = 'tenantToken';
 export const tenantLogin = async (userId, password) => {
   const { data } = await Api.post('/tenant/login', { userId, password });
   if (data.success) {
+    // Reset any cached company/location data from a previously
+    // logged-in tenant so the new tenant starts clean.
+    clearTenantScopedStorage();
     localStorage.setItem(TENANT_KEY, JSON.stringify(data.config));
     if (data.tenantToken) localStorage.setItem(TENANT_TOKEN_KEY, data.tenantToken);
   }
