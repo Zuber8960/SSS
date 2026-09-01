@@ -2,6 +2,8 @@ import { useState, useCallback } from "react";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import Footer from "./Footer";
+import GlobalSearch from "./GlobalSearch";
+import AIChatBot from "./AIChatBot";
 import { PageTitleProvider } from "../contexts/PageTitleContext";
 
 export default function MainLayout({ children }) {
@@ -45,6 +47,8 @@ export default function MainLayout({ children }) {
           </div>
         </div>
       </div>
+      <AIChatBot />
+      <GlobalSearch />
     </PageTitleProvider>
   );
 }
