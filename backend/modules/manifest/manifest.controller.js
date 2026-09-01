@@ -2,10 +2,10 @@ const db = require('../../config/db');
 
 /* ================= GET ALL MANIFESTS ================= */
 
-const getAllManifests = async () => {
+const getAllManifests = async (tenant_id) => {
   return db('sss.sst_mnf_hdr')
     .select('*')
-    .where({ record_status: 0 })
+    .where({ record_status: 0, tenant_id })
     .orderBy('aud_date', 'desc');
 };
 

@@ -7,7 +7,8 @@ const db = require('../../config/db');
 
 router.get('/', async (req, res) => {
   try {
-    const data = await ManifestController.getAllManifests();
+    const { tenant_id } = req;
+    const data = await ManifestController.getAllManifests(tenant_id);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -146,9 +147,10 @@ router.post('/unloading', async (req, res) => {
 router.delete('/:no/:loc/:date', async (req, res) => {
   const trx = await db.transaction();
   try {
+     const { tenant_id } = req;
     const { no, loc, date } = req.params;
     await ManifestController.deleteManifest({
-      mnf_no: no, mnf_loc: loc, mnf_date: date
+      mnf_no: no, mnf_loc: loc, mnf_date: date, tenant_id
     }, trx);
     await trx.commit();
     res.json({ success: true, message: 'Manifest deleted successfully' });
