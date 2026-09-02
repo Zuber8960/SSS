@@ -91,6 +91,16 @@ const saveUnloading = async (unloadingData) => {
   }
 };
 
+/* ================= CHECK DOCKET IN UNLOADING TABLE ================= */
+
+const isDocketUnloaded = async (docketNo) => {
+  const row = await db('sss.sst_unloading_dtl')
+    .where({ docket_no: docketNo })
+    .first();
+  return !!row;
+};
+
 module.exports = {
-  saveUnloading
+  saveUnloading,
+  isDocketUnloaded
 };

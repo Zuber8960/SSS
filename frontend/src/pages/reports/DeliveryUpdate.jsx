@@ -19,6 +19,7 @@ import ImageIcon from "@mui/icons-material/Image";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import CloseIcon from "@mui/icons-material/Close";
 import { fetchDocketByDocketNo } from "../../utils/docket";
+import { checkDocketUnloaded } from "../../utils/manifest";
 import { saveDeliveryNote, updateDeliveryNote, fetchDeliveryNoteByDocketNo, uploadPodFile } from "../../utils/deliveryNote";
 
 const emptyForm = {
@@ -102,7 +103,20 @@ export default function DeliveryUpdate() {
       const docketData = await fetchDocketByDocketNo(docketNo);
 
       if (docketData && docketData.docket_no) {
+        // Check the manifest unloading table — if the docket is already
+        // unloaded, show a message and do not load anything into the UI.
+        const alreadyUnloaded = await checkDocketUnloaded(docketNo);
+        if (alreadyUnloaded) {
+          setForm({ ...emptyForm });
+          setDlyNoteNo("");
+          setDocketNumberInput("");
+          setIsDirty(false);
+          showError(`Docket #${docketNo} is already unloaded (present in Manifest Unloading). Data cannot be loaded.`);
+          return;
+        }
+
         const savedNote = await fetchDeliveryNoteByDocketNo(docketNo).catch(() => null);
+
         setDlyNoteNo(savedNote?.dly_note_no || "");
 
         setForm({
@@ -191,6 +205,12 @@ export default function DeliveryUpdate() {
 
       setIsDirty(false);
       showSuccess("Delivery note saved successfully");
+      // Clear the form after a successful save
+      setDocketNumberInput("");
+      setDlyNoteNo("");
+      setForm({ ...emptyForm });
+      setSelectedFiles([]);
+      setUploadedPods([]);
     } catch (err) {
       showError(err.message || "Failed to save delivery update");
       console.error("Save delivery error:", err);

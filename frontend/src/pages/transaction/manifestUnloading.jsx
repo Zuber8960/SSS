@@ -308,11 +308,25 @@ export default function ManifestUnloading() {
       prev.map((m) => ({ ...m, selected: ids.has(m.id) }))
     );
 
+    // Reusable: clears the form, dockets and any grid row selection.
+    const clearFormAndGrid = () => {
+      setForm({ ...emptyForm });
+      setDockets([]);
+      setLocationManifests((prev) =>
+        prev.map((m) => ({ ...m, selected: false }))
+      );
+      setGridClearKey((k) => k + 1);
+    };
+
     if (selectedIds.length === 1) {
       const manifest = locationManifests.find((m) => m.id === selectedIds[0]);
       if (manifest && manifest.manifest_no) {
         handleLoadFromGrid(manifest.manifest_no);
       }
+    } else if (selectedIds.length === 0) {
+      // Manifest row was unchecked -> clear the form and dockets.
+      clearFormAndGrid();
+      showInfo("Manifest selection cleared. Form has been reset.");
     }
   };
 
@@ -413,6 +427,20 @@ export default function ManifestUnloading() {
       if (remainingCount <= 0) {
         setLocationManifests((prev) =>
           prev.filter((m) => (m.manifest_no || "") !== (form.manifest_no || ""))
+        );
+      }
+
+      // After a successful save, clear the form, dockets and the manifest
+      // row selection in the top grid so the user starts fresh.
+      setForm({ ...emptyForm });
+      setDockets([]);
+      setLocationManifests((prev) =>
+        prev.map((m) => ({ ...m, selected: false }))
+      );
+      setGridClearKey((k) => k + 1);
+      if (remainingCount > 0) {
+        showInfo(
+          `Saved. ${remainingCount} docket(s) still pending for this manifest — re-select the manifest to continue.`
         );
       }
     } catch (err) {

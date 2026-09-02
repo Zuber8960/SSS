@@ -38,3 +38,9 @@ export const fetchManifestsByDocketNo = (docketNo) => {
     : `/public/manifest/by-docket/${encodeURIComponent(docketNo)}`;
   return Api.get(url).then(r => r.data.data || r.data || []);
 };
+
+// Check if a docket already exists in the manifest unloading table (sst_unloading_dtl)
+export const checkDocketUnloaded = (docketNo) =>
+  Api.get(`/manifest/unloading/by-docket/${encodeURIComponent(docketNo)}`)
+    .then(r => !!r.data?.exists)
+    .catch(() => false);

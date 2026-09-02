@@ -17,6 +17,18 @@ router.get('/', async (req, res) => {
 
 /* ================= GET BY KEY ================= */
 
+/* ================= CHECK DOCKET ALREADY UNLOADED (must be before /:no/:loc/:date) ================= */
+
+router.get('/unloading/by-docket/:docketNo', async (req, res) => {
+  try {
+    const { docketNo } = req.params;
+    const exists = await UnloadingController.isDocketUnloaded(docketNo);
+    res.json({ success: true, exists });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.get('/:no/:loc/:date', async (req, res) => {
   try {
     const { no, loc, date } = req.params;
