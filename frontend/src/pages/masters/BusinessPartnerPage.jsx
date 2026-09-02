@@ -271,6 +271,7 @@ export default function BusinessPartnerPage() {
     { key: "bp_registration_no", label: "Registration No" },
     { key: "bp_tan_no", label: "TAN No" },
     { key: "bp_bank_name", label: "Bank" },
+    { key: "loc_code", label: "Location", render: (row) => { const loc = locations.find((l) => String(l.loc_code) === String(row.loc_code)); return loc ? `${loc.loc_code} - ${loc.loc_name}` : (row.loc_code ?? ""); } },
     { key: "bp_status", label: "Status", render: (row) => row.bp_status === "1" || row.bp_status === 1 ? "Active" : row.bp_status === "0" || row.bp_status === 0 ? "Inactive" : "" },
   ];
 
