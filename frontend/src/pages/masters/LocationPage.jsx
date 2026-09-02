@@ -69,6 +69,7 @@ export default function LocationPage() {
       longitude: form.longitude ? Number(form.longitude) : null,
       latitude: form.latitude ? Number(form.latitude) : null,
       loc_code: form.loc_code ? form.loc_code : null,
+      loc_closed_on:null
     };
     try {
       if (isEditing && originalLocation?.loc_code) {
