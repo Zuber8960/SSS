@@ -19,7 +19,7 @@ import ImageIcon from "@mui/icons-material/Image";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import CloseIcon from "@mui/icons-material/Close";
 import { fetchDocketByDocketNo } from "../../utils/docket";
-import { saveDeliveryNote, updateDeliveryNote, fetchDeliveryNoteByDocketNo } from "../../utils/deliveryNote";
+import { saveDeliveryNote, updateDeliveryNote, fetchDeliveryNoteByDocketNo, uploadPodFile } from "../../utils/deliveryNote";
 
 const emptyForm = {
   docket_no: "",
@@ -135,13 +135,14 @@ export default function DeliveryUpdate() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (podsOverride) => {
     if (!docketNumberInput.trim()) {
       showError("Please enter a Docket Number");
       return;
     }
 
-    if (selectedFiles.length === 0 && uploadedPods.length === 0) {
+    const podsList = Array.isArray(podsOverride) ? podsOverride : uploadedPods;
+    if (selectedFiles.length === 0 && podsList.length === 0) {
       showError("Please upload one POD file before saving the delivery update");
       return;
     }
@@ -155,6 +156,14 @@ export default function DeliveryUpdate() {
 
     try {
       showLoading();
+      // Resolve POD as a server URL:
+      //  - prefer an already-uploaded POD (server URL)
+      //  - else upload the selected file to the backend now
+      let podUrl = podsList.find((p) => p.url && !p.url.startsWith("blob:"))?.url || null;
+      if (!podUrl && selectedFiles.length > 0) {
+        podUrl = await uploadPodFile(selectedFiles[0]);
+        if (!podUrl) throw new Error(`Failed to upload POD file: ${selectedFiles[0].name}`);
+      }
       const payload = {
         company_code: localStorage.getItem("current_user") ? JSON.parse(localStorage.getItem("current_user")).company_code : null,
         division_code: localStorage.getItem("current_user") ? JSON.parse(localStorage.getItem("current_user")).division_code : null,
@@ -169,7 +178,7 @@ export default function DeliveryUpdate() {
         delivery_status: form.delivery_status,
         delivery_remarks: form.delivery_remarks || "",
         received_by: form.received_by || "",
-        pod_url: uploadedPods[0]?.url || selectedFiles[0]?.name || null,
+        pod_url: podUrl,
         record_updated_by: localStorage.getItem("current_user") ? JSON.parse(localStorage.getItem("current_user")).user_id : null,
       };
 
@@ -228,21 +237,33 @@ export default function DeliveryUpdate() {
 
     try {
       setIsUploading(true);
-      const newPods = selectedFiles.map((file, idx) => ({
-        id: Date.now() + idx,
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        uploadedAt: new Date().toISOString(),
-        url: URL.createObjectURL(file),
-        docket_no: docketNumberInput || form.docket_no || "N/A",
-      }));
+      // Actually upload each file to the backend server (multer → backend/uploads/pod)
+      const newPods = await Promise.all(
+        selectedFiles.map(async (file, idx) => {
+          const serverUrl = await uploadPodFile(file);
+          if (!serverUrl) throw new Error(`Server did not return a URL for: ${file.name}`);
+          return {
+            id: Date.now() + idx,
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            uploadedAt: new Date().toISOString(),
+            url: serverUrl,
+            docket_no: docketNumberInput || form.docket_no || "N/A",
+          };
+        })
+      );
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      setUploadedPods((prev) => [...prev, ...newPods]);
+      const allPods = [...uploadedPods, ...newPods];
+      setUploadedPods(allPods);
       setSelectedFiles([]);
       showSuccess(`${newPods.length} POD file(s) uploaded successfully`);
+
+      // Auto-save the delivery note so the new POD URL is persisted immediately.
+      // (Without this, the note keeps the old/dead pod_url until "Save" is clicked.)
+      if (docketNumberInput.trim()) {
+        await handleSave(allPods);
+      }
     } catch (err) {
       showError(err.message || "Failed to upload POD files");
     } finally {

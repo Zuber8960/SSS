@@ -17,3 +17,12 @@ export const updateDeliveryNote = (dlyNoteNo, payload) =>
 
 export const deleteDeliveryNote = (dlyNoteNo) =>
   Api.delete(`/deliveryNote/${encodeURIComponent(dlyNoteNo)}`).then((r) => r.data);
+
+// Upload a POD file to the backend (stored in backend/uploads/pod, served at /uploads/pod/...)
+export const uploadPodFile = (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return Api.post('/deliveryNote/pod', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then((r) => r.data?.data?.url || r.data?.url || null);
+};

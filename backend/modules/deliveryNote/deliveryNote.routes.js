@@ -1,6 +1,39 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const DeliveryNoteController = require('./deliveryNote.controller');
+
+// ── POD file upload (stored under backend/uploads/pod, served at /uploads/pod/...) ──
+const POD_DIR = path.join(__dirname, '..', '..', 'uploads', 'pod');
+fs.mkdirSync(POD_DIR, { recursive: true });
+
+const podStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, POD_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.jpg';
+    cb(null, `pod_${Date.now()}_${Math.round(Math.random() * 1e6)}${ext}`);
+  },
+});
+
+const podUpload = multer({
+  storage: podStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'application/pdf'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error(`File type not supported: ${file.mimetype}`));
+  },
+});
+
+// Upload POD file → returns { url: "/uploads/pod/<filename>" }
+router.post('/pod', podUpload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: 'No POD file received' });
+  }
+  res.status(201).json({ success: true, data: { url: `/uploads/pod/${req.file.filename}` } });
+});
 
 router.get('/', async (req, res) => {
   try {

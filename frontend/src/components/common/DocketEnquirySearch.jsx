@@ -72,10 +72,45 @@ function StatusChip({ status, size = "md" }) {
   );
 }
 
-const isImageUrl = (url) => /\.(jpe?g|png|gif|webp|bmp)(\?.*)?$/i.test(url || "");
+// File URLs must NOT include the /app routes prefix — static /uploads is served at the server root
+const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/app\/?$/, "");
+
+/** Resolve stored pod_url into an openable URL:
+ *  - http(s)/data:            → use as-is
+ *  - "/uploads/pod/<file>"    → prefix with API base (server root, no /app)
+ *  - blob:                    → dead URL (old bug: never actually uploaded)
+ *  - bare filename            → legacy, prefix with API base uploads/pod/ */
+function resolvePodUrl(url) {
+  if (!url) return { url: "", dead: true };
+  if (/^blob:/i.test(url)) return { url, dead: true };
+  if (/^(https?:|data:)/i.test(url)) return { url, dead: false };
+  if (/^\/?uploads\//i.test(url)) return { url: `${API_BASE}/${url.replace(/^\/+/, "")}`, dead: false };
+  return { url: `${API_BASE}/uploads/pod/${url.replace(/^\/+/, "")}`, dead: false };
+}
+
+const isImageSrc = (url) =>
+  /^data:image\//i.test(url) || /\.(jpe?g|png|gif|webp|bmp)(\?.*)?$/i.test(url);
 
 function PodViewer({ podUrl }) {
-  if (!podUrl) return null;
+  const resolved = resolvePodUrl(podUrl);
+  if (!podUrl || resolved.dead) {
+    return (
+      <div style={{
+        marginTop: 10, padding: 14, borderRadius: 12, background: "#fff7ed",
+        border: "1px solid #fdba74",
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#b45309", marginBottom: 4 }}>
+          ⚠️ POD file not available
+        </div>
+        <div style={{ fontSize: 12, color: "#92400e" }}>
+          This POD was saved with an older version that did not upload the file to the server.
+          Please re-upload the POD from the Delivery Update page.
+        </div>
+      </div>
+    );
+  }
+  const url = resolved.url;
+  const isPdfSrc = /^data:application\/pdf/i.test(url) || /\.pdf(\?.*)?$/i.test(url);
   return (
     <div style={{
       marginTop: 10, padding: 14, borderRadius: 12, background: "#f0fdf4",
@@ -84,21 +119,28 @@ function PodViewer({ podUrl }) {
       <div style={{ fontSize: 13, fontWeight: 700, color: "#15803d", marginBottom: 8 }}>
         📄 Proof of Delivery (POD)
       </div>
-      {isImageUrl(podUrl) ? (
-        <a href={podUrl} target="_blank" rel="noreferrer">
+      {isImageSrc(url) ? (
+        <a href={url} target="_blank" rel="noreferrer">
           <img
-            src={podUrl}
+            src={url}
             alt="POD"
             style={{ maxWidth: "100%", maxHeight: 360, borderRadius: 8, border: "1px solid #bbf7d0", cursor: "zoom-in" }}
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
         </a>
-      ) : (
-        <a href={podUrl} target="_blank" rel="noreferrer"
+      ) : isPdfSrc ? (
+        <embed
+          src={url}
+          type="application/pdf"
+          style={{ width: "100%", height: 420, borderRadius: 8, border: "1px solid #bbf7d0" }}
+        />
+      ) : null}
+      <div style={{ marginTop: 8 }}>
+        <a href={url} target="_blank" rel="noreferrer"
            style={{ color: "#15803d", fontWeight: 600, fontSize: 13, textDecoration: "underline" }}>
-          View POD Document
+          Open POD in new tab
         </a>
-      )}
+      </div>
     </div>
   );
 }
