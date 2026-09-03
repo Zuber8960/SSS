@@ -14,6 +14,7 @@ import { fetchDeliveryNoteByDocketNo } from "../../utils/deliveryNote";
 import { SearchIcon, ResetIcon } from "./icons";
 import { IconButton, TextField, Tooltip } from "@mui/material";
 import RouteMap from "./RouteMap";
+import VehicleTrackingModal from "./VehicleTrackingModal";
 
 const docketFields = [
   { label: "From Location",   name: "from_loc", span: 1 },
@@ -221,6 +222,7 @@ export default function DocketEnquirySearch({ showForm = true }) {
   const [deliveryNote, setDeliveryNote]     = useState(null);
   const [currentStatus, setCurrentStatus]   = useState(null);
   const [ewbValid, setEwbValid]             = useState("");
+  const [trackingModal, setTrackingModal]   = useState({ open: false, vehicleNo: null });
 
   const manifestColumns = makeManifestColumns(setMapRow);
   const searchInputRef  = useRef(null);
@@ -336,7 +338,19 @@ export default function DocketEnquirySearch({ showForm = true }) {
           <span style={{ fontSize: 13, fontWeight: 800, color: "#6b21a8", letterSpacing: 0.5 }}>
             CURRENT STATUS:
           </span>
-          <StatusChip status={currentStatus} size="lg" />
+          {currentStatus === "In Transit" && manifests.length > 0 && manifests[0]?.desp_veh_no ? (
+            <button
+              onClick={() => setTrackingModal({ open: true, vehicleNo: manifests[0].desp_veh_no })}
+              style={{
+                background: "none", border: "none", padding: 0, cursor: "pointer",
+              }}
+              title="Click to view vehicle tracking details"
+            >
+              <StatusChip status={currentStatus} size="lg" />
+            </button>
+          ) : (
+            <StatusChip status={currentStatus} size="lg" />
+          )}
           {currentStatus === "Delivered" && deliveryNote?.delivery_date && (
             <span style={{ fontSize: 13, color: "#15803d", fontWeight: 600 }}>
               Delivered on {deliveryNote.delivery_date.substring(0, 10)}
@@ -402,6 +416,12 @@ export default function DocketEnquirySearch({ showForm = true }) {
           onClose={() => setMapRow(null)}
         />
       )}
+
+      <VehicleTrackingModal
+        open={trackingModal.open}
+        vehicleNo={trackingModal.vehicleNo}
+        onClose={() => setTrackingModal({ open: false, vehicleNo: null })}
+      />
 
       <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
       <LoadingOverlay isLoading={isLoading} message="Fetching data..." />
