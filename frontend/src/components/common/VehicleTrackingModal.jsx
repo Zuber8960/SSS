@@ -36,6 +36,7 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
         if (trackingData) {
           setData(trackingData);
         } else {
+          console.log('getting error')
           setError('No tracking data available for this vehicle');
         }
       })
