@@ -44,3 +44,13 @@ export const checkDocketUnloaded = (docketNo) =>
   Api.get(`/manifest/unloading/by-docket/${encodeURIComponent(docketNo)}`)
     .then(r => !!r.data?.exists)
     .catch(() => false);
+
+// Fetch vehicle tracking data
+export const fetchVehicleTrackingData = (vehicleNo) => {
+    const url = hasAuthToken()
+        ? `/manifest/tracking/${encodeURIComponent(vehicleNo)}`
+        : `/public/manifest/tracking/${encodeURIComponent(vehicleNo)}`;
+  return Api.get(url)
+    .then(r => r.data.data || r.data || null)
+    .catch(() => null);
+}

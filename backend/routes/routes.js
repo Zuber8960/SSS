@@ -208,6 +208,15 @@ router.get('/public/manifest/by-docket/:docketNo', async (req, res) => {
   }
 });
 
+router.get('/public/manifest/tracking/:vehicleNo', async (req, res) => {
+  try {
+    const data = await ManifestController.getVehicleTrackingData(req.params.vehicleNo);
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error retrieving tracking data' });
+  }
+});
+
 router.use('/tenant', tenantRoutes);
 router.use('/user', authMiddleware, userRoutes);
 router.use('/locationMaster', authMiddleware, locationMasterRoutes);

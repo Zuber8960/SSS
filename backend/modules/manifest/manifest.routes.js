@@ -154,6 +154,18 @@ router.post('/unloading', async (req, res) => {
   }
 });
 
+/* ================= GET VEHICLE TRACKING DATA ================= */
+
+router.get('/tracking/:vehicleNo', async (req, res) => {
+  try {
+    const { vehicleNo } = req.params;
+    const data = await ManifestController.getVehicleTrackingData(vehicleNo);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 /* ================= DELETE ================= */
 
 router.delete('/:no/:loc/:date', async (req, res) => {

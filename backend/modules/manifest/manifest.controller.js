@@ -196,6 +196,61 @@ const deleteManifest = async (keys, trx = db) => {
     .update({ record_status: 1 });
 };
 
+/* ================= GET VEHICLE TRACKING DATA ================= */
+
+const getVehicleTrackingData = async (vehicleNo) => {
+  try {
+    const result = await db.raw(`
+      SELECT
+        A.desp_veh_no,
+        CASE WHEN A.desp_doc_type='TV' THEN 'Own'
+             WHEN A.desp_doc_type='LH' THEN 'Market'
+             WHEN A.desp_doc_type='TC' THEN 'Vendor'
+        END AS vehicle_type,
+        A.desp_doc_no,
+        A.desp_doc_date,
+        A.mnf_loc AS from_loc,
+        A.mnf_from_town AS from_town,
+        A.mnf_to_loc AS to_loc,
+        A.mnf_to_town AS to_town,
+        B.distance,
+        B.transit_time_hrs,
+        A.aud_date + (B.transit_time_hrs * INTERVAL '1 hour') AS expected_arrival_time,
+        C.latitude,
+        C.longitude,
+        C.location,
+        CASE WHEN sss.fn_distance(D.latitude, D.longitude, C.latitude, C.longitude) * 1.41 > B.distance
+             THEN B.distance
+             ELSE sss.fn_distance(D.latitude, D.longitude, C.latitude, C.longitude) * 1.41
+        END AS distance_covered,
+        CASE WHEN (B.distance - sss.fn_distance(D.latitude, D.longitude, C.latitude, C.longitude) * 1.41) > 31
+             THEN NOW() + ((CEIL((B.distance - sss.fn_distance(D.latitude, D.longitude, C.latitude, C.longitude) * 1.41) / 20) + 5.5) * INTERVAL '1 hour')
+             ELSE NULL
+        END AS revised_eta,
+        CASE WHEN (B.distance - sss.fn_distance(D.latitude, D.longitude, C.latitude, C.longitude) * 1.41) <= 30 THEN 'Arrived'
+             WHEN (NOW() + ((CEIL((B.distance - sss.fn_distance(D.latitude, D.longitude, C.latitude, C.longitude) * 1.41) / 20) + 5.5) * INTERVAL '1 hour')) >
+                  (A.aud_date + (B.transit_time_hrs * INTERVAL '1 hour')) THEN 'Delay'
+             ELSE 'Early'
+        END AS trip_status
+      FROM
+        sss.sst_mnf_hdr A
+        INNER JOIN sss.ssm_distance B ON A.mnf_loc = B.from_loc AND A.mnf_to_loc = B.to_loc
+        INNER JOIN sss.sst_cargo_yaan_gps_data C ON A.desp_veh_no = C.vehicle_no
+        INNER JOIN sss.ssm_location D ON A.mnf_loc = D.loc_code
+      WHERE
+        A.mnf_arrival_time IS NULL
+        AND A.desp_veh_no = ?
+        AND C.id = (SELECT MAX(id) FROM sss.sst_cargo_yaan_gps_data WHERE vehicle_no = A.desp_veh_no)
+      LIMIT 1
+    `, [vehicleNo]);
+
+    return result.rows?.[0] || null;
+  } catch (err) {
+    console.error('Error fetching vehicle tracking data:', err.message);
+    return null;
+  }
+};
+
 module.exports = {
   getAllManifests,
   getManifestByKey,
@@ -207,5 +262,6 @@ module.exports = {
   updateManifestDetails,
   getManifestsByDocketNo,
   deleteManifest,
-  getManifestByLocation
+  getManifestByLocation,
+  getVehicleTrackingData,
 };
