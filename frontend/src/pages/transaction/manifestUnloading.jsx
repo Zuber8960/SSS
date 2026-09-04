@@ -8,7 +8,7 @@ import {
   DataTable,
 } from "../../components/common/MasterPage";
 
-const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiSelect-select": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
+const fieldSx = { "& .MuiInputBase-input": { fontSize: 12 }, "& .MuiSelect-select": { fontSize: 12 }, "& .MuiInputLabel-root": { fontSize: 12 } };
 
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
@@ -31,42 +31,42 @@ const ROW_COLORS = {
 };
 
 const docketColumns = [
-  { key: "sr", label: "Sr", minWidth: 40 },
-  { key: "docket_no", label: "Docket No", minWidth: 130, render: (row) => (
+  { key: "sr", label: "Sr", minWidth: 36 },
+  { key: "docket_no", label: "Docket No", minWidth: 118, render: (row) => (
     <a href="#" style={{ textDecoration: "none", color: "#1565c0", fontWeight: "bold" }}>{row.docket_no}</a>
   ) },
-  { key: "booking_date", label: "Booking Date", minWidth: 110 },
-  { key: "consignor", label: "Consignor", minWidth: 150 },
-  { key: "consignee", label: "Consignee", minWidth: 150 },
-  { key: "destination", label: "Destination", minWidth: 100 },
-  { key: "booked_pkgs", label: "Booked Pkgs", minWidth: 90 },
-  { key: "received_pkgs", label: "Received Pkgs", minWidth: 100, type: "number", editable: true },
-  { key: "short_qty", label: "Short", minWidth: 70, type: "number" },
-  { key: "excess_qty", label: "Excess", minWidth: 70, type: "number", editable: true },
-  { key: "damage_qty", label: "Damage", minWidth: 70, type: "number", editable: true },
-  { key: "leak_qty", label: "Leakage", minWidth: 70, type: "number", editable: true },
-  { key: "weight", label: "Weight", minWidth: 80 },
-  { key: "status", label: "Status", minWidth: 100, editable: true, options: statusOptions },
-  { key: "remarks", label: "Remarks", minWidth: 140, editable: true, placeholder: "Remarks" },
-  { key: "updated_by", label: "Updated By", minWidth: 100 },
-  { key: "updated_time", label: "Updated Time", minWidth: 100 },
+  { key: "booking_date", label: "Booking Date", minWidth: 100 },
+  { key: "consignor", label: "Consignor", minWidth: 135 },
+  { key: "consignee", label: "Consignee", minWidth: 135 },
+  { key: "destination", label: "Destination", minWidth: 90 },
+  { key: "booked_pkgs", label: "Booked Pkgs", minWidth: 82 },
+  { key: "received_pkgs", label: "Received Pkgs", minWidth: 90, type: "number", editable: true },
+  { key: "short_qty", label: "Short", minWidth: 64, type: "number" },
+  { key: "excess_qty", label: "Excess", minWidth: 64, type: "number", editable: true },
+  { key: "damage_qty", label: "Damage", minWidth: 64, type: "number", editable: true },
+  { key: "leak_qty", label: "Leakage", minWidth: 64, type: "number", editable: true },
+  { key: "weight", label: "Weight", minWidth: 72 },
+  { key: "status", label: "Status", minWidth: 90, editable: true, options: statusOptions },
+  { key: "remarks", label: "Remarks", minWidth: 126, editable: true, placeholder: "Remarks" },
+  { key: "updated_by", label: "Updated By", minWidth: 90 },
+  { key: "updated_time", label: "Updated Time", minWidth: 90 },
 ];
 
 // ------------------- MANIFEST LIST (top grid) COLUMNS -------------------
 const manifestTypeLabels = { lp: "Local Pickup", lh: "Long Haul", ld: "Local Delivery" };
 
 const manifestListColumns = [
-  { key: "manifest_no", label: "Manifest No", minWidth: 130, render: (row) => (
+  { key: "manifest_no", label: "Manifest No", minWidth: 118, render: (row) => (
     <a href="#" style={{ textDecoration: "none", color: "#1565c0", fontWeight: "bold" }}>{row.manifest_no}</a>
   ) },
-  { key: "manifest_type", label: "Manifest Type", minWidth: 120 },
-  { key: "manifest_date", label: "Manifest Date", minWidth: 130 },
-  { key: "origin_branch", label: "Origin Branch", minWidth: 130 },
-  { key: "dest_branch", label: "Dest Branch", minWidth: 120 },
-  { key: "vehicle_no", label: "Vehicle No", minWidth: 120 },
-  { key: "driver_name", label: "Driver Name", minWidth: 130 },
-  { key: "total_dockets", label: "Dockets", minWidth: 100 },
-  { key: "total_packages", label: "Packages", minWidth: 100 },
+  { key: "manifest_type", label: "Manifest Type", minWidth: 108 },
+  { key: "manifest_date", label: "Manifest Date", minWidth: 118 },
+  { key: "origin_branch", label: "Origin Branch", minWidth: 118 },
+  { key: "dest_branch", label: "Dest Branch", minWidth: 108 },
+  { key: "vehicle_no", label: "Vehicle No", minWidth: 108 },
+  { key: "driver_name", label: "Driver Name", minWidth: 118 },
+  { key: "total_dockets", label: "Dockets", minWidth: 90 },
+  { key: "total_packages", label: "Packages", minWidth: 90 },
 ];
 
 const emptyForm = {
@@ -534,23 +534,23 @@ export default function ManifestUnloading() {
   const sectionCardStyles = {
     sectionCard: {
       background: "#fffefe",
-      borderRadius: 12,
+      borderRadius: 11,
       border: "1px solid #e9e5f0",
       boxShadow: "0 2px 12px rgba(126, 34, 206, 0.06)",
       overflow: "hidden",
-      marginBottom: 16,
+      marginBottom: 5,
     },
     sectionHeader: {
       display: "flex",
       alignItems: "center",
-      gap: 10,
-      padding: "14px 20px",
+      gap: 7,
+      padding: "5px 10px",
       background: "linear-gradient(135deg, #f6f3ff 0%, #f0ecf9 100%)",
       borderBottom: "1px solid #e9e5f0",
     },
-    sectionIcon: { fontSize: 18, lineHeight: 1 },
+    sectionIcon: { fontSize: 16, lineHeight: 1 },
     sectionTitle: {
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: 700,
       color: "#4a3466",
       textTransform: "uppercase",
@@ -561,11 +561,11 @@ export default function ManifestUnloading() {
 
   const renderFormSection = () => {
     const horizontalStyle = {
-      padding: "14px 16px",
+      padding: "5px 9px",
       display: "flex",
       flexWrap: "wrap",
-      gap: 10,
-      alignItems: "flex-start",
+      gap: 5,
+      alignItems: "center",
     };
 
     return (
@@ -576,26 +576,26 @@ export default function ManifestUnloading() {
         </div>
         <div style={horizontalStyle}>
           {/* Manifest No — searchable */}
-          <TextField size="small" label="Manifest No" sx={{ ...fieldSx, minWidth: 150 }}
+          <TextField size="small" label="Manifest No" sx={{ ...fieldSx, minWidth: 135 }}
             value={form.manifest_no}
             onChange={(e) => setForm((p) => ({ ...p, manifest_no: e.target.value }))}
             onKeyDown={handleManifestNoKeyDown}
             onBlur={handleManifestNoBlur}
             disabled={!searchMode} />
-          <TextField size="small" label="Manifest Date" type="date" sx={{ ...fieldSx, minWidth: 150 }}
+          <TextField size="small" label="Manifest Date" type="date" sx={{ ...fieldSx, minWidth: 135 }}
             value={form.manifest_date}
             onChange={(e) => setForm((p) => ({ ...p, manifest_date: e.target.value }))}
             slotProps={{ inputLabel: { shrink: true } }} disabled />
-          <TextField size="small" label="Origin Branch" sx={{ ...fieldSx, minWidth: 130 }}
+          <TextField size="small" label="Origin Branch" sx={{ ...fieldSx, minWidth: 118 }}
             value={form.origin_branch} disabled
             onChange={(e) => setForm((p) => ({ ...p, origin_branch: e.target.value }))} />
-          <TextField size="small" label="Destination Branch" sx={{ ...fieldSx, minWidth: 130 }}
+          <TextField size="small" label="Destination Branch" sx={{ ...fieldSx, minWidth: 118 }}
             value={form.dest_branch} disabled
             onChange={(e) => setForm((p) => ({ ...p, dest_branch: e.target.value }))} />
-          <TextField size="small" label="Vehicle No" sx={{ ...fieldSx, minWidth: 130 }}
+          <TextField size="small" label="Vehicle No" sx={{ ...fieldSx, minWidth: 118 }}
             value={form.vehicle_no} disabled
             onChange={(e) => setForm((p) => ({ ...p, vehicle_no: e.target.value }))} />
-          <TextField size="small" label="Vehicle Type" sx={{ ...fieldSx, minWidth: 110 }}
+          <TextField size="small" label="Vehicle Type" sx={{ ...fieldSx, minWidth: 100 }}
             value={form.vehicle_type} disabled
             onChange={(e) => setForm((p) => ({ ...p, vehicle_type: e.target.value }))} />
           <TextField size="small" label="Driver Name" sx={{ ...fieldSx, minWidth: 130 }}
@@ -604,28 +604,28 @@ export default function ManifestUnloading() {
           <TextField size="small" label="Driver Mobile" sx={{ ...fieldSx, minWidth: 120 }}
             value={form.driver_mobile} disabled
             onChange={(e) => setForm((p) => ({ ...p, driver_mobile: e.target.value }))} />
-          <TextField size="small" label="Arrival Date" type="date" sx={{ ...fieldSx, minWidth: 150 }}
+          <TextField size="small" label="Arrival Date" type="date" sx={{ ...fieldSx, minWidth: 135 }}
             value={form.arrival_date}
             onChange={(e) => setForm((p) => ({ ...p, arrival_date: e.target.value }))}
             slotProps={{ inputLabel: { shrink: true } }} />
-          <TextField size="small" label="Arrival Time" type="time" sx={{ ...fieldSx, minWidth: 130 }}
+          <TextField size="small" label="Arrival Time" type="time" sx={{ ...fieldSx, minWidth: 118 }}
             value={form.arrival_time}
             onChange={(e) => setForm((p) => ({ ...p, arrival_time: e.target.value }))}
             slotProps={{ inputLabel: { shrink: true } }} />
-          <TextField size="small" label="Seal No" sx={{ ...fieldSx, minWidth: 120 }}
+          <TextField size="small" label="Seal No" sx={{ ...fieldSx, minWidth: 108 }}
             value={form.seal_no}
             onChange={(e) => setForm((p) => ({ ...p, seal_no: e.target.value }))} />
-          <TextField size="small" label="Unloading Dock No" sx={{ ...fieldSx, minWidth: 130 }}
+          <TextField size="small" label="Unloading Dock No" sx={{ ...fieldSx, minWidth: 118 }}
             value={form.dock_no}
             onChange={(e) => setForm((p) => ({ ...p, dock_no: e.target.value }))} />
-          <TextField size="small" label="Total Dockets" type="number" sx={{ ...fieldSx, minWidth: 110 }}
+          <TextField size="small" label="Total Dockets" type="number" sx={{ ...fieldSx, minWidth: 100 }}
             value={form.total_dockets} disabled />
-          <TextField size="small" label="Total Packages" type="number" sx={{ ...fieldSx, minWidth: 110 }}
+          <TextField size="small" label="Total Packages" type="number" sx={{ ...fieldSx, minWidth: 100 }}
             value={form.total_packages} disabled />
-          <TextField size="small" label="Total Weight" type="number" sx={{ ...fieldSx, minWidth: 110 }}
+          <TextField size="small" label="Total Weight" type="number" sx={{ ...fieldSx, minWidth: 100 }}
             value={form.total_weight} disabled />
-          <TextField size="small" label="Arrival Remarks" sx={{ ...fieldSx, flex: "1 1 50%", minWidth: 200 }}
-            value={form.arrival_remarks} multiline rows={2}
+          <TextField size="small" label="Arrival Remarks" sx={{ ...fieldSx, flex: "1 1 50%", minWidth: 180 }}
+            value={form.arrival_remarks} multiline rows={1}
             onChange={(e) => setForm((p) => ({ ...p, arrival_remarks: e.target.value }))} />
         </div>
       </div>
@@ -638,26 +638,31 @@ export default function ManifestUnloading() {
       background: "#fff",
       borderRadius: 8,
       boxShadow: "0 2px 8px rgba(0,0,0,.08)",
-      marginBottom: 15,
+      marginBottom: 5,
       overflow: "hidden",
+      display: "flex",
+      flexDirection: "column",
+      flexShrink: 0,
     },
     panelTitle: {
       background: "#1565c0",
       color: "#fff",
-      padding: "10px 15px",
-      fontSize: 16,
+      padding: "4px 10px",
+      fontSize: 12,
       fontWeight: 600,
     },
-    panelBody: { padding: 15 },
+    panelBody: { padding: 5 },
     footer: {
       background: "#fff",
-      padding: 15,
+      padding: "5px 9px",
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
       boxShadow: "0 -2px 8px rgba(0,0,0,.08)",
       borderRadius: "0 0 8px 8px",
-      marginTop: 15,
+      marginTop: 5,
+      flexShrink: 0,
+      fontSize: 12,
     },
     footerBold: { color: "#1565c0", fontWeight: "bold" },
   };
@@ -665,8 +670,66 @@ export default function ManifestUnloading() {
   return (
     <MainLayout>
       <PageBody title="Manifest Unloading">
+        {/* ✅ COMPACT FLEX LAYOUT — fills the viewport, no page-level vertical scroll.
+            Grids scroll internally; only the layout footer stays below the fold.
+            The former CSS `zoom: 0.9` hack has been replaced by real scaled-down
+            sizes (fonts, paddings, row heights, grid heights) so the page renders
+            correctly and visually balanced at 100% browser zoom. */}
+        <style>{`
+          .manifestUnloadingCompact .dataTableWrapper { margin-bottom: 0 !important; }
+          /* Restore a usable horizontal scrollbar for the grids on this page
+             (MasterPage.css squashes .dataTableWrapper scrollbars to 1px). */
+          .manifestUnloadingCompact .dataTableWrapper::-webkit-scrollbar {
+            height: 10px;
+            width: 10px;
+          }
+          .manifestUnloadingCompact .dataTableWrapper::-webkit-scrollbar-thumb {
+            background: #b9b3c9;
+            border-radius: 6px;
+          }
+          .manifestUnloadingCompact .dataTableWrapper::-webkit-scrollbar-track {
+            background: #f1eef7;
+          }
+          .manifestUnloadingCompact .MuiDataGrid-virtualScroller::-webkit-scrollbar {
+            height: 8px !important;
+          }
+          /* Page-level vertical scroll: when the stacked sections exceed the
+             viewport (small screens / dockets panel grows), the footer and
+             every section remain reachable instead of being clipped. */
+          .manifestUnloadingCompact::-webkit-scrollbar {
+            width: 10px;
+          }
+          .manifestUnloadingCompact::-webkit-scrollbar-thumb {
+            background: #c4bcd8;
+            border-radius: 6px;
+          }
+          .manifestUnloadingCompact::-webkit-scrollbar-track {
+            background: #f1eef7;
+          }
+          .pageBody:has(.manifestUnloadingCompact) {
+            /* Un-zoomed element: 100vh here is the REAL viewport height. */
+            height: calc(100vh - 125px);
+            min-height: 0;
+            padding-top: 12px;
+            padding-bottom: 12px;
+            box-sizing: border-box;
+            overflow: hidden;
+          }
+        `}</style>
+        <div
+          className="manifestUnloadingCompact"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            // Fills the pageBody (which is sized to the real viewport) exactly.
+            // Vertical scroll here ensures the footer and all sections stay
+            // reachable when the content is taller than the viewport.
+            height: "100%",
+            overflowY: "auto",
+          }}
+        >
         {/* ✅ TOOLBAR */}
-        <div className="pageToolbar" style={{ alignItems: "center" }}>
+        <div className="pageToolbar" style={{ alignItems: "center", flexShrink: 0 }}>
           <Tooltip title="Clear">
             <IconButton onClick={handleClear} size="small" sx={{ color: "#dc2626", "&:hover": { background: "#fee2e2" } }}>
               <ResetIcon />
@@ -682,7 +745,7 @@ export default function ManifestUnloading() {
             label="Search by Vehicle No"
             value={vehicleSearch}
             onChange={(e) => setVehicleSearch(e.target.value)}
-            sx={{ ...fieldSx, minWidth: 220, marginLeft: "auto" }}
+            sx={{ ...fieldSx, minWidth: 200, marginLeft: "auto" }}
             placeholder="Search by vehicle number..."
           />
         </div>
@@ -692,7 +755,7 @@ export default function ManifestUnloading() {
           <div style={styles.panelTitle}>
             📦 Manifests for Your Location
             {filteredManifests.length > 0 && (
-              <span style={{ marginLeft: 10, fontSize: 13, opacity: 0.8 }}>
+              <span style={{ marginLeft: 10, fontSize: 12, opacity: 0.8 }}>
                 ({filteredManifests.length} {vehicleSearch ? "matching manifests" : "manifests"})
               </span>
             )}
@@ -712,11 +775,12 @@ export default function ManifestUnloading() {
                 toggleRowSelectionOnClick
                 onRowSelectionModelChange={handleManifestSelectionChange}
                 key={`manifest-grid-${gridClearKey}`}
-                isHeight={220}
+                isHeight={184}
+                rowHeight={32}
                 scroll={{ horizontal: true }}
               />
             ) : (
-              <div style={{ textAlign: "center", padding: 20, color: "#999" }}>
+              <div style={{ textAlign: "center", padding: 12, color: "#999" }}>
                 {vehicleSearch.trim()
                   ? `No manifests found for vehicle: ${vehicleSearch.trim()}`
                   : "No manifests found for your location."}
@@ -739,16 +803,16 @@ export default function ManifestUnloading() {
         </div>
 
         {/* ✅ DOCKET GRID (original StatusGrid with row colors) */}
-        <div style={styles.panel}>
+        <div style={{ ...styles.panel, flex: "1 1 auto", flexShrink: 1, minHeight: 210 }}>
           <div style={styles.panelTitle}>
             Manifest Docket Details
             {dockets.length > 0 && (
-              <span style={{ marginLeft: 10, fontSize: 13, opacity: 0.8 }}>
+              <span style={{ marginLeft: 10, fontSize: 12, opacity: 0.8 }}>
                 ({dockets.length} dockets)
               </span>
             )}
           </div>
-          <div style={styles.panelBody}>
+          <div style={{ ...styles.panelBody, flex: 1}}>
             {dockets.length > 0 ? (
               <DataTable
                 columns={docketColumns}
@@ -762,11 +826,12 @@ export default function ManifestUnloading() {
                 key={`docket-grid-${gridClearKey}`}
                 rowColors={ROW_COLORS}
                 statusKey="status"
-                isHeight={100}
+                isHeight={172}
+                rowHeight={32}
                 scroll={{ horizontal: true }}
               />
             ) : (
-              <div style={{ textAlign: "center", padding: 40, color: "#999" }}>
+              <div style={{ textAlign: "center", padding: 16, color: "#999" }}>
                 {form.manifest_no
                   ? "No dockets found for this manifest."
                   : "Select a manifest from the top grid or enter a Manifest Number and press Enter to load dockets."}
@@ -797,6 +862,7 @@ export default function ManifestUnloading() {
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
         <LoadingOverlay isLoading={isLoading} message="Please wait..." />
+        </div>
       </PageBody>
     </MainLayout>
   );
