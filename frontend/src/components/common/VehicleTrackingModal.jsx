@@ -226,9 +226,9 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
                 </h4>
                 <Divider sx={{ mb: 1.5 }} />
                 <Grid container spacing={1.5}>
-                  <FormField label="Current Location" value={data.location} fullWidth span={2} />
                   <FormField label="Latitude" value={data.latitude ? parseFloat(data.latitude).toFixed(6) : '-'} />
                   <FormField label="Longitude" value={data.longitude ? parseFloat(data.longitude).toFixed(6) : '-'} />
+                  <FormField label="Current Location" value={data.location} fullWidth span={2} />
                 </Grid>
               </CardContent>
             </Card>
