@@ -211,6 +211,8 @@ export default function DocketReport() {
         invoice_date:     full.docket_inv_date  || d.docket_inv_date,
         invoice_value:    full.docket_inv_value || d.docket_inv_value,
         remark:           full.docket_remark    || d.docket_remark,
+        prepare_by :      full.prepare_by || d.prepare_by,
+        prepare_date:     full.prepare_date || d.prepare_date,
       };
 
       let charges = [];
