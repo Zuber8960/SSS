@@ -1,7 +1,7 @@
 import QRCode from "qrcode";
 import { getTenantConfig } from "../../../utils/tenantService";
 import { STICKER_PRINT_CSS, buildStickerHtml } from "../../../components/common/stickerUtils";
-import { openPrintDocument } from "../../../utils/printBridge";
+import { printStickers } from "../../../utils/printBridge";
 
 const STICKER_STYLES = {
   level1: {
@@ -57,9 +57,7 @@ export async function printStickerFromRow({ row, company }) {
 
   // Generate QR code with all key shipment details
   let qrDataUrl = "";
-  if (row.docket_no) {
-    try {
-      const qrPayload = [
+  const qrPayload = [
         `DN:${row.docket_no}`,
         `DD:${docketDate}`,
         `FR:${fromTown}`,
@@ -72,7 +70,9 @@ export async function printStickerFromRow({ row, company }) {
         `INV:${row.docket_inv_no || ""}`,
         `INVDT:${row.docket_inv_date || ""}`,
         `SUP:${SUPPORT_NO}`,
-      ].join("|");
+  ].join("|");
+  if (row.docket_no) {
+    try {
       qrDataUrl = await QRCode.toDataURL(qrPayload, { width: 80, margin: 1, errorCorrectionLevel: "M" });
     } catch (e) {
       console.error("QR generation failed:", e);
@@ -91,6 +91,19 @@ export async function printStickerFromRow({ row, company }) {
     })
   ).join("");
 
+  const stickers = Array.from({ length: totalPkgs }, (_, i) => ({
+    company: level1,
+    docketNo: row.docket_no || "",
+    fromTown,
+    fromCode: row.docket_loc || "",
+    toTown,
+    toCode: row.docket_to_loc || "",
+    date: docketDate,
+    pkgLabel: `PKGS: ${i + 1}/${totalPkgs}`,
+    support: SUPPORT_NO,
+    qrData: qrPayload,
+  }));
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -106,5 +119,5 @@ export async function printStickerFromRow({ row, company }) {
   ${stickersHtml}
 </body>
 </html>`;
-  openPrintDocument({ html, title: `Sticker - ${row.docket_no || ""}`, features: "width=420,height=500" });
+  printStickers({ stickers, html, title: `Sticker - ${row.docket_no || ""}` });
 }
