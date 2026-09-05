@@ -21,6 +21,11 @@ const destIcon = new L.Icon({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
   iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34],
 });
+const vehicleIcon = new L.Icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-gold.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconSize: [30, 45], iconAnchor: [15, 45], popupAnchor: [1, -34],
+});
 
 function FitBounds({ coords }) {
   const map = useMap();
@@ -61,6 +66,8 @@ async function getRoute(from, to) {
  *   subtitle    {string}  — extra info shown beside the title (e.g. vehicle no)
  *   onClose     {func}    — if provided, shows a close button and calls this on click
  *   routeColor  {string}  — polyline colour (default: "#7e22ce")
+ *   currentLat  {number}  — current vehicle latitude (optional)
+ *   currentLng  {number}  — current vehicle longitude (optional)
  */
 export default function RouteMap({
   fromCity,
@@ -71,6 +78,8 @@ export default function RouteMap({
   subtitle,
   onClose,
   routeColor = "#7e22ce",
+  currentLat,
+  currentLng,
 }) {
   const [status,    setStatus]    = useState("loading");
   const [fromCoord, setFromCoord] = useState(null);
@@ -147,6 +156,11 @@ export default function RouteMap({
             </Marker>
             {route.length > 1 && (
               <Polyline positions={route} pathOptions={{ color: routeColor, weight: 4, opacity: 0.8 }} />
+            )}
+            {currentLat && currentLng && (
+              <Marker position={[currentLat, currentLng]} icon={vehicleIcon}>
+                <Popup>Current Vehicle Location 🚛</Popup>
+              </Marker>
             )}
             <FitBounds coords={[fromCoord, toCoord]} />
           </MapContainer>
