@@ -1,6 +1,7 @@
 import QRCode from "qrcode";
 import { getTenantConfig } from "../../../utils/tenantService";
 import { STICKER_PRINT_CSS, buildStickerHtml } from "../../../components/common/stickerUtils";
+import { openPrintDocument } from "../../../utils/printBridge";
 
 const STICKER_STYLES = {
   level1: {
@@ -90,8 +91,7 @@ export async function printStickerFromRow({ row, company }) {
     })
   ).join("");
 
-  const printWindow = window.open("", "_blank", "width=420,height=500");
-  printWindow.document.write(`<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8"/>
@@ -105,6 +105,6 @@ export async function printStickerFromRow({ row, company }) {
   </button>
   ${stickersHtml}
 </body>
-</html>`);
-  printWindow.document.close();
+</html>`;
+  openPrintDocument({ html, title: `Sticker - ${row.docket_no || ""}`, features: "width=420,height=500" });
 }

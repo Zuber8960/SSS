@@ -34,6 +34,7 @@ import { fetchAllLocations, fetchLocationTowns } from "../../utils/locationMaste
 import { EditIcon, SaveIcon, NoteAddIcon, ResetIcon, PrintIcon } from "../../components/common/icons";
 import { IconButton, Tooltip, Button } from "@mui/material";
 import { getTenantConfig } from "../../utils/tenantService";
+import { openPrintDocument } from "../../utils/printBridge";
 import logoImgFallback from "../../images/logo.png";
 import {
   createManifest,
@@ -1026,17 +1027,12 @@ export default function ManifestPage() {
       </html>
     `;
 
-      const printWindow = window.open("", "_blank", "width=900,height=700");
-      if (printWindow) {
-        printWindow.document.write(printContent);
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => {
-          printWindow.print();
-        }, 500);
-      } else {
-        showError("Popup blocked. Please allow popups for this site.");
-      }
+      openPrintDocument({
+        html: printContent,
+        title: `Manifest #${form.manifest_no}`,
+        features: "width=900,height=700",
+        autoPrint: true,
+      });
     } catch (err) {
       showError("Print failed: " + (err.message || "Unknown error"));
       console.error("Print error:", err);

@@ -1,4 +1,5 @@
 import { getTenantConfig } from "../../utils/tenantService";
+import { openPrintDocument } from "../../utils/printBridge";
 
 const toDate = (v) => {
   if (!v) return "";
@@ -110,8 +111,9 @@ export function printManifest({ header, details, locationsMap }) {
 </body>
 </html>`;
 
-  const w = window.open("", "_blank", "width=1000,height=1200");
-  if (!w) { alert("Popup blocked. Please allow popups for printing."); return; }
-  w.document.write(html);
-  w.document.close();
+  openPrintDocument({
+    html,
+    title: `Manifest ${h.mnf_no || ""}`,
+    features: "width=1000,height=1200",
+  });
 }

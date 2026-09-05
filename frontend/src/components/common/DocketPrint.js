@@ -1,6 +1,7 @@
 import moment from "moment";
 import QRCode from "qrcode";
 import { getTenantConfig } from "../../utils/tenantService";
+import { openPrintDocument } from "../../utils/printBridge";
 
 const fmt = (val) => val || "";
 
@@ -301,8 +302,7 @@ export async function printDocket({ form, charges, ewbList, ewbNoDisplay, compan
   const page1Labels = [copyLabels[0] || "Consignor Copy", copyLabels[1] || "Consignee Copy"];
   const page2Labels = [copyLabels[2] || "Lorry Copy",     copyLabels[3] || "File Copy"];
 
-  const printWindow = window.open("", "_blank", "width=900,height=1200");
-  printWindow.document.write(`<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8"/>
@@ -318,6 +318,10 @@ export async function printDocket({ form, charges, ewbList, ewbNoDisplay, compan
     ${page2Labels.map((label) => buildSlipHtml({ ...slipData, copyLabel: label })).join("")}
   </div>
 </body>
-</html>`);
-  printWindow.document.close();
+</html>`;
+  openPrintDocument({
+    html,
+    title: `Consignment - ${form.docket_no || ""}`,
+    features: "width=900,height=1200",
+  });
 }
