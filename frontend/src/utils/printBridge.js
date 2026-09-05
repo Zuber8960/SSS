@@ -31,3 +31,16 @@ export function openPrintDocument({ html, title = "Document", features = "width=
 
   return { handledByNative: false, printWindow };
 }
+/**
+ * Sends structured sticker data to a React Native printer, with the existing
+ * printable HTML as the browser fallback.
+ */
+export function printStickers({ stickers, html, title = "Stickers", features = "width=420,height=500" }) {
+  const nativeWebView = window.ReactNativeWebView;
+  if (nativeWebView?.postMessage) {
+    nativeWebView.postMessage(JSON.stringify({ type: "PRINT_STICKERS", stickers }));
+    return { handledByNative: true };
+  }
+
+  return openPrintDocument({ html, title, features });
+}

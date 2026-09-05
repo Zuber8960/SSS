@@ -2,7 +2,7 @@ import moment from "moment";
 import QRCode from "qrcode";
 import { getTenantConfig } from "../../../utils/tenantService";
 import { STICKER_PRINT_CSS, buildStickerHtml } from "../../../components/common/stickerUtils";
-import { openPrintDocument } from "../../../utils/printBridge";
+import { printStickers } from "../../../utils/printBridge";
 
 const STICKER_STYLES = {
   level1: {
@@ -74,10 +74,8 @@ export async function printSticker({ form, company }) {
 
   // Generate QR code with all key shipment details
   let qrDataUrl = "";
-  if (docket_no) {
-    try {
-      const fmtD = (v) => (v ? moment(v).format("DD-MM-YYYY") : "");
-      const qrPayload = [
+  const fmtD = (v) => (v ? moment(v).format("DD-MM-YYYY") : "");
+  const qrPayload = [
         `DN:${docket_no}`,
         `DD:${fmtD(docket_date)}`,
         `FR:${fromDisplay}`,
@@ -90,7 +88,9 @@ export async function printSticker({ form, company }) {
         `INV:${invoice_no || ""}`,
         `INVDT:${fmtD(invoice_date)}`,
         `SUP:${SUPPORT_NO}`,
-      ].join("|");
+  ].join("|");
+  if (docket_no) {
+    try {
       qrDataUrl = await QRCode.toDataURL(qrPayload, { width: 80, margin: 1, errorCorrectionLevel: "M" });
     } catch (e) {
       console.error("QR generation failed:", e);
@@ -109,6 +109,19 @@ export async function printSticker({ form, company }) {
     })
   ).join("");
 
+  const stickers = Array.from({ length: totalPkgs }, (_, i) => ({
+    company: level1,
+    docketNo: docket_no || "",
+    fromTown,
+    fromCode: fromLoc,
+    toTown,
+    toCode: toLoc,
+    date: docketDate,
+    pkgLabel: `PKGS: ${i + 1}/${totalPkgs}`,
+    support: SUPPORT_NO,
+    qrData: qrPayload,
+  }));
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -124,5 +137,5 @@ export async function printSticker({ form, company }) {
   ${stickersHtml}
 </body>
 </html>`;
-  openPrintDocument({ html, title: `Sticker - ${docket_no || ""}`, features: "width=420,height=500" });
+  printStickers({ stickers, html, title: `Sticker - ${docket_no || ""}` });
 }
