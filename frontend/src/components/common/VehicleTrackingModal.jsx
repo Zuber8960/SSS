@@ -243,6 +243,8 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
                   title={`${data.from_town} → ${data.to_town}`}
                   subtitle={`🚛 ${data.desp_veh_no} | Currently at: ${data.location || 'En route'}`}
                   routeColor="#7e22ce"
+                  currentLat={parseFloat(data.latitude)}
+                  currentLng={parseFloat(data.longitude)}
                 />
               </Box>
             )}
