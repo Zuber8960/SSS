@@ -234,7 +234,7 @@ const getVehicleTrackingData = async (vehicleNo) => {
         END AS trip_status
       FROM
         sss.sst_mnf_hdr A
-        INNER JOIN sss.ssm_distance B ON A.mnf_loc = B.from_loc AND A.mnf_to_loc = B.to_loc
+        INNER JOIN sss.ssm_distance B ON A.mnf_loc = B.from_loc AND A.mnf_to_loc = B.to_loc AND a.mnf_from_town = b.from_town AND a.mnf_to_town = b.to_town
         INNER JOIN sss.sst_cargo_yaan_gps_data C ON A.desp_veh_no = C.vehicle_no
         INNER JOIN sss.ssm_location D ON A.mnf_loc = D.loc_code
       WHERE

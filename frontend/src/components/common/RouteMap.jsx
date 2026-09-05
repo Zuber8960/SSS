@@ -21,10 +21,12 @@ const destIcon = new L.Icon({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
   iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34],
 });
-const vehicleIcon = new L.Icon({
-  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-gold.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [30, 45], iconAnchor: [15, 45], popupAnchor: [1, -34],
+const vehicleIcon = new L.DivIcon({
+  html: `<div style="width: 44px; height: 44px; background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); border-radius: 50%; box-shadow: 0 3px 10px rgba(0,0,0,0.4); border: 3px solid white; display: flex; align-items: center; justify-content: center; font-size: 20px;">🚚</div>`,
+  iconSize: [44, 44],
+  iconAnchor: [22, 22],
+  popupAnchor: [0, -28],
+  className: ''
 });
 
 function FitBounds({ coords }) {
@@ -52,6 +54,22 @@ async function getRoute(from, to) {
   const data = await res.json();
   if (data.code !== "Ok") throw new Error("Route not found");
   return data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+}
+
+function getClosestPointOnRoute(lat, lng, route) {
+  let closestPoint = route[0];
+  let minDistance = Infinity;
+
+  for (let i = 0; i < route.length; i++) {
+    const dx = route[i][0] - lat;
+    const dy = route[i][1] - lng;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestPoint = route[i];
+    }
+  }
+  return closestPoint;
 }
 
 /**
@@ -157,8 +175,8 @@ export default function RouteMap({
             {route.length > 1 && (
               <Polyline positions={route} pathOptions={{ color: routeColor, weight: 4, opacity: 0.8 }} />
             )}
-            {currentLat && currentLng && (
-              <Marker position={[currentLat, currentLng]} icon={vehicleIcon}>
+            {currentLat && currentLng && route.length > 0 && (
+              <Marker position={getClosestPointOnRoute(currentLat, currentLng, route)} icon={vehicleIcon}>
                 <Popup>Current Vehicle Location 🚛</Popup>
               </Marker>
             )}

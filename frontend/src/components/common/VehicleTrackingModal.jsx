@@ -81,16 +81,16 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
         background: 'linear-gradient(135deg, #7e22ce 0%, #6b21a8 100%)',
         color: 'white',
         fontWeight: 700,
-        fontSize: 18,
+        fontSize: 16,
         display: 'flex',
         alignItems: 'center',
         gap: 1,
-        py: 2.5,
+        py: 1.5,
       }}>
         🚛 IN TRANSIT VEHICLE TRACKING
       </DialogTitle>
 
-      <DialogContent sx={{ p: 3 }}>
+      <DialogContent sx={{ p: 2 }}>
         {loading && (
           <Box sx={{
             display: 'flex',
@@ -112,16 +112,16 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
         )}
 
         {data && (
-          <Box sx={{ display: 'grid', gap: 1.5 }}>
+          <Box sx={{ display: 'grid', gap: 1 }}>
             {/* Vehicle Info Card */}
             <Card sx={{
-              border: '2px solid #e9d5ff',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              border: '1px solid #e9d5ff',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
             }}>
-              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-                  <h4 style={{ margin: 0, color: '#7e22ce', fontSize: 14, fontWeight: 700 }}>
-                    VEHICLE INFORMATION
+              <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <h4 style={{ margin: 0, color: '#7e22ce', fontSize: 12, fontWeight: 700 }}>
+                    VEHICLE INFO
                   </h4>
                   <Chip
                     label={data.trip_status}
@@ -130,8 +130,8 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
                     sx={{ fontWeight: 700 }}
                   />
                 </Box>
-                <Divider sx={{ mb: 1.5 }} />
-                <Grid container spacing={1.5}>
+                <Divider sx={{ mb: 1, mt: 0.5 }} />
+                <Grid container spacing={1}>
                   <FormField label="Vehicle No" value={data.desp_veh_no} />
                   <FormField label="Vehicle Type" value={data.vehicle_type} />
                   <FormField label="Dispatch No" value={data.desp_doc_no} />
@@ -146,7 +146,7 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
               boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
             }}>
               <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                <h4 style={{ margin: 0, marginBottom: 8, color: '#7e22ce', fontSize: 14, fontWeight: 700 }}>
+                <h4 style={{ margin: 0, marginBottom: 4, color: '#7e22ce', fontSize: 12, fontWeight: 700 }}>
                   ROUTE INFORMATION
                 </h4>
                 <Divider sx={{ mb: 1.5 }} />
@@ -158,7 +158,7 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
                 </Grid>
 
                 {/* Progress Bar */}
-                <Box sx={{ mt: 2, p: 1.5, background: '#f3e8ff', borderRadius: 1.5 }}>
+                <Box sx={{ mt: 1, p: 1, background: '#f3e8ff', borderRadius: 1 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'center' }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#7e22ce' }}>JOURNEY PROGRESS</span>
                     <span style={{ fontSize: 11, fontWeight: 600, color: '#6b7280' }}>
@@ -178,16 +178,16 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
                       }
                     }}
                   />
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mt: 1.5 }}>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mt: 1 }}>
                     <Box>
-                      <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, marginBottom: 3 }}>DISTANCE COVERED</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#06b6d4' }}>
+                      <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, marginBottom: 2 }}>DISTANCE COVERED</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#06b6d4' }}>
                         {formatDistance(data.distance_covered)}
                       </div>
                     </Box>
                     <Box>
-                      <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, marginBottom: 3 }}>DISTANCE LEFT</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#f59e0b' }}>
+                      <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, marginBottom: 2 }}>DISTANCE LEFT</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b' }}>
                         {formatDistance(data.distance - (data.distance_covered || 0))}
                       </div>
                     </Box>
@@ -202,11 +202,11 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
               boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
             }}>
               <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                <h4 style={{ margin: 0, marginBottom: 8, color: '#7e22ce', fontSize: 14, fontWeight: 700 }}>
+                <h4 style={{ margin: 0, marginBottom: 4, color: '#7e22ce', fontSize: 12, fontWeight: 700 }}>
                   TRAVEL METRICS
                 </h4>
-                <Divider sx={{ mb: 1.5 }} />
-                <Grid container spacing={1.5}>
+                <Divider sx={{ mb: 1, mt: 0.5 }} />
+                <Grid container spacing={1}>
                   <FormField label="Total Distance (KMS)" value={formatDistance(data.distance)} />
                   <FormField label="Trip Duration" value={data.transit_time_hrs ? `${data.transit_time_hrs} hrs` : '-'} />
                   <FormField label="Expected Arrival" value={formatTime(data.expected_arrival_time)} />
@@ -221,25 +221,25 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
               boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
             }}>
               <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                <h4 style={{ margin: 0, marginBottom: 8, color: '#7e22ce', fontSize: 14, fontWeight: 700 }}>
+                <h4 style={{ margin: 0, marginBottom: 4, color: '#7e22ce', fontSize: 12, fontWeight: 700 }}>
                   CURRENT LOCATION & GPS
                 </h4>
                 <Divider sx={{ mb: 1.5 }} />
-                <Grid container spacing={1.5}>
+                <Grid container spacing={1}>
                   <FormField label="Latitude" value={data.latitude ? parseFloat(data.latitude).toFixed(6) : '-'} />
                   <FormField label="Longitude" value={data.longitude ? parseFloat(data.longitude).toFixed(6) : '-'} />
-                  <FormField label="Current Location" value={data.location} fullWidth span={2} />
+                  <FormField label="Current Location" value={data.location} fullWidth />
                 </Grid>
               </CardContent>
             </Card>
 
             {/* Map View using RouteMap */}
             {data.from_town && data.to_town && (
-              <Box sx={{ mt: 1.5 }}>
+              <Box sx={{ mt: 1 }}>
                 <RouteMap
                   fromCity={data.from_town}
                   toCity={data.to_town}
-                  height={300}
+                  height={400}
                   title={`${data.from_town} → ${data.to_town}`}
                   subtitle={`🚛 ${data.desp_veh_no} | Currently at: ${data.location || 'En route'}`}
                   routeColor="#7e22ce"
@@ -252,7 +252,7 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
         )}
       </DialogContent>
 
-      <DialogActions sx={{ p: 2.5, background: '#f9fafb', borderTop: '1px solid #e5e7eb' }}>
+      <DialogActions sx={{ p: 1.5, background: '#f9fafb', borderTop: '1px solid #e5e7eb' }}>
         <Button
           onClick={onClose}
           variant="contained"
@@ -274,14 +274,14 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
   );
 }
 
-function FormField({ label, value, fullWidth = false }) {
+function FormField({ label, value, fullWidth = false, size = "small" }) {
   return (
     <Grid item xs={fullWidth ? 12 : 6}>
       <TextField
         label={label}
         value={value || '-'}
         fullWidth
-        size="small"
+        size={size}
         InputProps={{
           readOnly: true,
           sx: {
