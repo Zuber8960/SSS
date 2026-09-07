@@ -35,7 +35,7 @@ const podStorage = multer.diskStorage({
 const ALLOWED_EXT = /\.(jpe?g|png|gif|heic|heif|pdf)$/i;
 const podUpload = multer({
   storage: podStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB (images are compressed client-side first)
   fileFilter: (req, file, cb) => {
     const allowed = [
       "image/jpeg", "image/png", "image/jpg", "image/gif",

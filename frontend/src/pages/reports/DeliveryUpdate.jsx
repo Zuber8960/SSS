@@ -256,8 +256,10 @@ export default function DeliveryUpdate() {
         showError(`File type not supported: ${file.name} (${fileType || "unknown type"})`);
         return false;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        showError(`File too large (max 5MB): ${file.name}`);
+      // Images over 5MB are allowed here — they are compressed in the browser
+      // before upload (see compressImageFile in utils/deliveryNote.js).
+      if (fileType === "application/pdf" && file.size > 5 * 1024 * 1024) {
+        showError(`PDF too large (max 5MB): ${file.name}`);
         return false;
       }
       return true;
@@ -450,7 +452,7 @@ export default function DeliveryUpdate() {
               Click to select POD files
             </p>
             <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>
-              Supports: JPG, PNG, GIF, PDF (Max 5MB each)
+              Supports: JPG, PNG, GIF, PDF (Max 5MB each). Camera photos are auto-compressed.
             </p>
           </Box>
 

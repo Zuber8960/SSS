@@ -27,7 +27,9 @@ Api.interceptors.response.use(
       localStorage.removeItem(TOKEN_KEY);
       window.location.href = '/';
     }
-    const message = error.response?.data?.message || error.message;
+    const message =
+      error.response?.data?.message ||
+      `${error.message || 'Request failed'}${error.config?.url ? ` (${error.config?.method?.toUpperCase()} ${error.config.url})` : ''}`;
     return Promise.reject(new Error(message));
   }
 );

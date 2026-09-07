@@ -9,6 +9,7 @@ app.use(express.json());
 
 // ✅ Serve static uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use(express.urlencoded({ limit: '50mb', extended: true, parameterLimit: 100000 }));
 
 console.log('FRONTEND_URL =', process.env.FRONTEND_URL);
 
