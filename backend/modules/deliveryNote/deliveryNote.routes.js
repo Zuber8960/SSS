@@ -12,27 +12,59 @@ fs.mkdirSync(POD_DIR, { recursive: true });
 const podStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, POD_DIR),
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
+    // Mobile camera captures often have no extension — derive it from the mimetype.
+    let ext = path.extname(file.originalname || "");
+    if (!ext) {
+      const mimeExtMap = {
+        "image/jpeg": ".jpg",
+        "image/jpg": ".jpg",
+        "image/png": ".png",
+        "image/gif": ".gif",
+        "image/heic": ".heic",
+        "image/heif": ".heif",
+        "application/pdf": ".pdf",
+      };
+      ext = mimeExtMap[file.mimetype] || ".jpg";
+    }
     cb(null, `pod_${Date.now()}_${Math.round(Math.random() * 1e6)}${ext}`);
   },
 });
 
+// Camera captures on mobile can report an empty mimetype or image/heic (iPhone).
+// Accept those and fall back to the file extension.
+const ALLOWED_EXT = /\.(jpe?g|png|gif|heic|heif|pdf)$/i;
 const podUpload = multer({
   storage: podStorage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
   fileFilter: (req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'application/pdf'];
-    if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error(`File type not supported: ${file.mimetype}`));
+    const allowed = [
+      "image/jpeg", "image/png", "image/jpg", "image/gif",
+      "image/heic", "image/heif", "application/pdf",
+      "", // Android Chrome camera capture often sends an empty mimetype
+    ];
+    if (allowed.includes(file.mimetype) && ALLOWED_EXT.test(file.originalname || "")) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type not supported: ${file.mimetype || "unknown"} (${file.originalname || "unnamed"})`));
+    }
   },
 });
 
 // Upload POD file → returns { url: "/uploads/pod/<filename>" }
-router.post('/pod', podUpload.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ success: false, message: 'No POD file received' });
-  }
-  res.status(201).json({ success: true, data: { url: `/uploads/pod/${req.file.filename}` } });
+router.post('/pod', (req, res) => {
+  podUpload.single('file')(req, res, (err) => {
+    if (err) {
+      const isSize = err.code === 'LIMIT_FILE_SIZE';
+      return res.status(isSize ? 413 : 400).json({
+        success: false,
+        message: isSize ? 'File too large (max 5MB)' : err.message,
+      });
+    }
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No POD file received' });
+    }
+    res.status(201).json({ success: true, data: { url: `/uploads/pod/${req.file.filename}` } });
+  });
 });
 
 router.get('/', async (req, res) => {

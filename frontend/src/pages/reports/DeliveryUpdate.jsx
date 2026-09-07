@@ -77,8 +77,28 @@ export default function DeliveryUpdate() {
     "image/png",
     "image/jpg",
     "image/gif",
+    "image/heic", // iPhone camera photos
+    "image/heif", // iPhone camera photos
     "application/pdf",
   ];
+
+  // Mobile browsers (especially Android Chrome camera capture) often return
+  // an empty file.type. Infer it from the file extension so camera shots
+  // are not wrongly rejected.
+  const resolveFileType = (file) => {
+    if (file.type) return file.type;
+    const ext = (file.name.split(".").pop() || "").toLowerCase();
+    const extTypeMap = {
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      gif: "image/gif",
+      heic: "image/heic",
+      heif: "image/heif",
+      pdf: "application/pdf",
+    };
+    return extTypeMap[ext] || "";
+  };
 
   const toDate = (val) => {
     if (!val) return "";
@@ -231,8 +251,9 @@ export default function DeliveryUpdate() {
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
     const validFiles = files.filter((file) => {
-      if (!allowedFileTypes.includes(file.type)) {
-        showError(`File type not supported: ${file.name}`);
+      const fileType = resolveFileType(file);
+      if (!allowedFileTypes.includes(fileType)) {
+        showError(`File type not supported: ${file.name} (${fileType || "unknown type"})`);
         return false;
       }
       if (file.size > 5 * 1024 * 1024) {
@@ -420,7 +441,7 @@ export default function DeliveryUpdate() {
               ref={fileInputRef}
               type="file"
               multiple
-              accept=".jpg,.jpeg,.png,.gif,.pdf"
+              accept="image/*,application/pdf,.heic,.heif"
               onChange={handleFileSelect}
               style={{ display: "none" }}
             />
