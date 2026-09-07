@@ -11,12 +11,19 @@ const fmtDate = (val) => {
   return m.isValid() ? m.format("DD-MM-YYYY") : val;
 };
 
+const fmtDateOnly = (val) => {
+  if (!val) return "";
+  const m = moment(val);
+  return m.isValid() ? m.format("DD-MM-YYYY") : val;
+};
+
 const fmtAmt = (val) => {
   const n = parseFloat(val);
   return Number.isFinite(n) ? n.toFixed(2) : "0.00";
 };
 
 const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, copyLabel, qrDataUrl }) => {
+  console.log(form);
   const tenantConfig = getTenantConfig();
   const logoUrl = tenantConfig?.logo_url || "";
 
@@ -161,8 +168,18 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
         </div>
 
         <div class="copy-footer">
-          <span class="copy-label">${copyLabel}</span>
-          <span class="auth-sign">Auth. Sign.</span>
+        <span class="copy-label">${copyLabel}</span>
+        <span class="auth-sign">Auth. Sign.</span>
+        <div class="prepare-info">
+          <div class="prepare-item">
+            <span class="prepare-label">Prepare By:</span>
+            <span class="prepare-value">${fmt(form.prepare_by)}</span>
+          </div>
+          <div class="prepare-item">
+            <span class="prepare-label">Prepare Date:</span>
+            <span class="prepare-value">${fmtDateOnly(form.prepare_date)}</span>
+          </div>
+        </div>
         </div>
       </div>
     </div>
@@ -223,7 +240,11 @@ const PRINT_CSS = `
   .total-row td { font-weight: 900; background: #f0f0f0; font-size: 8.5px; }
   .company-footer { font-size: 7.5px; text-align: center; font-weight: 900; }
 
-  .copy-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1.5px solid #444; padding-top: 2px; margin-top: 2px; }
+  .copy-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1.5px solid #444; padding-top: 2px; margin-top: 2px; gap: 4px; }
+  .prepare-info { display: flex; gap: 8px; flex: 1; justify-content: flex-end;}
+  .prepare-item { display: flex; gap: 2px; align-items: center; }
+  .prepare-label { font-size: 8px; font-weight: 900; }
+  .prepare-value { font-size: 8px; font-weight: 800; }
   .copy-label { font-size: 10px; font-weight: 900; color: #c00; letter-spacing: 0.5px; }
   .auth-sign { font-size: 8px; font-weight: 800; }
 

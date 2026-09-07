@@ -169,6 +169,7 @@ const getDocketByRecId = async (rec_id, tenant_id, docketNo) => {
     .leftJoin('sss.sst_docket_ewb as e', 'd.docket_no', 'e.docket_no')
     .leftJoin('sss.ssm_business_partner as cnor', 'd.cnor_id', 'cnor.record_id')
     .leftJoin('sss.ssm_business_partner as cnee', 'd.cnee_id', 'cnee.record_id')
+    .leftJoin('sss.ssm_user as u', db.raw('CAST(d.aud_user AS INTEGER)'), 'u.rec_id')
     .select(
       'd.*', 'e.ewb_no',
       'cnor.record_id as cnor_id',
@@ -184,7 +185,9 @@ const getDocketByRecId = async (rec_id, tenant_id, docketNo) => {
       'cnee.bp_city as cnee_city',
       'cnee.bp_state as cnee_state',
       'cnee.bp_pincode as cnee_pincode',
-      'cnee.bp_gstin as cnee_gstin'
+      'cnee.bp_gstin as cnee_gstin',
+      'u.user_name as prepare_by',
+      'd.aud_date as prepare_date'
     );
   if (rec_id) query.andWhere({ 'd.rec_id': rec_id, 'd.record_status': 0 })
   if (docketNo) query.andWhere({ 'd.docket_no': docketNo });
@@ -197,6 +200,7 @@ const getDocketByNo = async (docket_no, tenant_id) => {
     .leftJoin('sss.sst_docket_ewb as e', 'd.docket_no', 'e.docket_no')
     .leftJoin('sss.ssm_business_partner as cnor', 'd.cnor_id', 'cnor.record_id')
     .leftJoin('sss.ssm_business_partner as cnee', 'd.cnee_id', 'cnee.record_id')
+    .leftJoin('sss.ssm_user as u', db.raw('CAST(d.aud_user AS INTEGER)'), 'u.rec_id')
     .where({ 'd.docket_no': docket_no, 'd.record_status': 0 })
     .select(
       'd.*', 'e.ewb_no',
@@ -213,7 +217,9 @@ const getDocketByNo = async (docket_no, tenant_id) => {
       'cnee.bp_city as cnee_city',
       'cnee.bp_state as cnee_state',
       'cnee.bp_pincode as cnee_pincode',
-      'cnee.bp_gstin as cnee_gstin'
+      'cnee.bp_gstin as cnee_gstin',
+      'u.user_name as prepare_by',
+      'd.aud_date as prepare_date'
     );
   if (tenant_id) query.andWhere({ 'd.tenant_id': tenant_id });
   return query.first();
