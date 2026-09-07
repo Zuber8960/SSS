@@ -26,7 +26,7 @@ export const deleteDeliveryNote = (dlyNoteNo) =>
  */
 export const compressImageFile = async (file, maxBytes = 4 * 1024 * 1024) => {
   const isImage = /^image\//i.test(file.type) || /\.(jpe?g|png|gif|heic|heif)$/i.test(file.name);
-  if (!isImage || file.size <= maxBytes) return file;
+  if (!isImage) return file;
 
   try {
     // Load the image (createImageBitmap handles most types; fall back to <img>)
@@ -84,6 +84,7 @@ export const compressImageFile = async (file, maxBytes = 4 * 1024 * 1024) => {
 // which would otherwise fail with a 413 from the backend's size limit.
 export const uploadPodFile = async (file) => {
   const compressed = await compressImageFile(file);
+  console.log(`Uploading POD file: ${file.name} before compression  ==> (${file.size/1000} kB), after compression ==> (${compressed.size/1000} kB)`);
   const formData = new FormData();
   formData.append('file', compressed);
   return Api.post('/deliveryNote/pod', formData, {
