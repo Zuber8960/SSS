@@ -24,9 +24,20 @@ const fieldSx = {
     "& .MuiInputLabel-root": { fontSize: 13 },
 };
 
+// India boundary limits (verified: India spans approx 8°4'N–37°6'N latitude
+// and 68°7'E–97°25'E longitude as per Google Maps / Survey of India)
+const INDIA_LAT_MIN = 8.1;
+const INDIA_LAT_MAX = 37.1;
+const INDIA_LON_MIN = 68.1;
+const INDIA_LON_MAX = 97.4;
+
+const isValidNumber = (value) => value !== "" && value !== null && !isNaN(Number(value));
+
 const emptyForm = {
     loc_code: "",
     town_name: "",
+    latitude: "",
+    longitude: "",
     old_town_name: "",
     old_loc_code: "",
 };
@@ -73,6 +84,8 @@ export default function AddTown() {
         setForm({
             loc_code: selectedLocation,
             town_name: "",
+            latitude: "",
+            longitude: "",
             old_town_name: "",
             old_loc_code: "",
         });
@@ -119,7 +132,9 @@ export default function AddTown() {
 
     const saveTown = async () => {
         const locCode = form.loc_code || selectedLocation;
-        const townName = form.town_name?.trim();
+        const townName = form.town_name?.trim().toUpperCase();
+        const latitude = form.latitude?.toString().trim();
+        const longitude = form.longitude?.toString().trim();
 
         if (!locCode) {
             showError("Please select a location");
@@ -131,14 +146,44 @@ export default function AddTown() {
             return;
         }
 
+        if (latitude === "" || latitude === null || latitude === undefined) {
+            showError("Latitude is required");
+            return;
+        }
+
+        if (longitude === "" || longitude === null || longitude === undefined) {
+            showError("Longitude is required");
+            return;
+        }
+
+        if (!isValidNumber(latitude)) {
+            showError("Latitude must be a valid number");
+            return;
+        }
+
+        if (!isValidNumber(longitude)) {
+            showError("Longitude must be a valid number");
+            return;
+        }
+
+        if (latitude !== "" && (Number(latitude) < INDIA_LAT_MIN || Number(latitude) > INDIA_LAT_MAX)) {
+            showError(`Latitude must be within India's boundary (${INDIA_LAT_MIN} to ${INDIA_LAT_MAX})`);
+            return;
+        }
+
+        if (longitude !== "" && (Number(longitude) < INDIA_LON_MIN || Number(longitude) > INDIA_LON_MAX)) {
+            showError(`Longitude must be within India's boundary (${INDIA_LON_MIN} to ${INDIA_LON_MAX})`);
+            return;
+        }
+
         try {
             if (isEditing && form.old_town_name) {
                 const fromLoc = form.old_loc_code || selectedLocation;
-                await updateTownLocation(form.old_town_name, fromLoc, locCode, townName);
+                await updateTownLocation(form.old_town_name, fromLoc, locCode, townName, latitude, longitude);
                 showSuccess("Town location updated successfully");
 
             } else {
-                await addTownToLocation(locCode, townName);
+                await addTownToLocation(locCode, townName, latitude, longitude);
                 showSuccess("Town added successfully");
             }
 
@@ -158,6 +203,8 @@ export default function AddTown() {
         setForm({
             loc_code: locCode,
             town_name: row.town_name || "",
+            latitude: row.latitude ?? "",
+            longitude: row.longitude ?? "",
             old_town_name: row.town_name || "",
             old_loc_code: locCode,
         });
@@ -229,7 +276,31 @@ export default function AddTown() {
                         fullWidth
                         sx={fieldSx}
                         value={form.town_name}
-                        onChange={(e) => setField("town_name", e.target.value)}
+                        onChange={(e) => setField("town_name", e.target.value.toUpperCase())}
+                    />
+                    <TextField
+                        size="small"
+                        label="Latitude"
+                        fullWidth
+                        sx={fieldSx}
+                        type="number"
+                        inputProps={{ step: "any", min: INDIA_LAT_MIN, max: INDIA_LAT_MAX }}
+                        value={form.latitude}
+                        onChange={(e) => setField("latitude", e.target.value)}
+                        helperText="India: 8.1 to 37.1"
+                        FormHelperTextProps={{ sx: { fontSize: 11 } }}
+                    />
+                    <TextField
+                        size="small"
+                        label="Longitude"
+                        fullWidth
+                        sx={fieldSx}
+                        type="number"
+                        inputProps={{ step: "any", min: INDIA_LON_MIN, max: INDIA_LON_MAX }}
+                        value={form.longitude}
+                        onChange={(e) => setField("longitude", e.target.value)}
+                        helperText="India: 68.1 to 97.4"
+                        FormHelperTextProps={{ sx: { fontSize: 11 } }}
                     />
                 </FormPanel>
 
@@ -237,6 +308,8 @@ export default function AddTown() {
                     columns={[
                         { key: "town_name", label: "Town Name" },
                         { key: "loc_code", label: "Location Code" },
+                        { key: "latitude", label: "Latitude" },
+                        { key: "longitude", label: "Longitude" },
                     ]}
                     rows={filteredTowns}
                     getKey={(row) => `${row.loc_code}-${row.town_name}`}

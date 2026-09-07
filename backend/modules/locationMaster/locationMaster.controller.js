@@ -49,30 +49,50 @@ module.exports = {
         return query.orderBy('town_name', 'asc');
     },
 
-    async addTownToLocation(locCode, townName, company_code) {
+    async addTownToLocation(locCode, townName, company_code, latitude, longitude) {
         if (!locCode || !townName) {
             throw new Error('loc_code and town_name are required');
+        }
+        if (latitude === undefined || latitude === null || latitude === '' || isNaN(Number(latitude))) {
+            throw new Error('latitude is required and must be a valid number');
+        }
+        if (longitude === undefined || longitude === null || longitude === '' || isNaN(Number(longitude))) {
+            throw new Error('longitude is required and must be a valid number');
         }
 
         const record = {
             loc_code: locCode,
             town_name: townName,
             company_code: company_code || null,
+            latitude: Number(latitude),
+            longitude: Number(longitude),
         };
 
-        return db('sss.ssm_location_town').insert(record).returning('*');
+        const res = await db('sss.ssm_location_town').insert(record).returning('*');
+        // await db.raw(`CALL sss.ins_ssm_distance()`);
+        return res;
     },
 
-    async updateTownLocation(townName, fromLocCode, toLocCode, company_code, new_town_name) {
+    async updateTownLocation(townName, fromLocCode, toLocCode, company_code, new_town_name, latitude, longitude) {
 
         const query = db('sss.ssm_location_town').where({ town_name: townName, loc_code: fromLocCode });
         if (company_code) query.andWhere({ company_code });
 
-        if (new_town_name) {
-            return query.update({ town_name: new_town_name }).returning('*');
+        if (latitude === undefined || latitude === null || latitude === '' || isNaN(Number(latitude))) {
+            throw new Error('latitude is required and must be a valid number');
+        }
+        if (longitude === undefined || longitude === null || longitude === '' || isNaN(Number(longitude))) {
+            throw new Error('longitude is required and must be a valid number');
         }
 
-        return query.update({ loc_code: toLocCode }).returning('*');
+        const updates = {
+            latitude: Number(latitude),
+            longitude: Number(longitude),
+        };
+        if (new_town_name) updates.town_name = new_town_name;
+        else if (toLocCode) updates.loc_code = toLocCode;
+
+        return query.update(updates).returning('*');
     },
 
     async deleteTownFromLocation(locCode, townName, company_code) {

@@ -74,8 +74,8 @@ router.get('/towns', async (req, res) => {
 router.post('/towns', async (req, res) => {
     try {
         const { tenant_id } = req;
-        const { loc_code, town_name } = req.body;
-        const data = await LocationMasterController.addTownToLocation(loc_code, town_name, tenant_id);
+        const { loc_code, town_name, latitude, longitude } = req.body;
+        const data = await LocationMasterController.addTownToLocation(loc_code, town_name, tenant_id, latitude, longitude);
         res.status(201).json({ success: true, data });
     } catch (error) {
         console.error('Location Town error:', error);
@@ -87,9 +87,9 @@ router.put('/towns/:townName', async (req, res) => {
     try {
         const { tenant_id } = req;
         const townName = decodeURIComponent(req.params.townName);
-        const { from_loc_code, to_loc_code, town_name, new_town_name } = req.body;
+        const { from_loc_code, to_loc_code, town_name, new_town_name, latitude, longitude } = req.body;
         const targetTown = town_name || townName;
-        const data = await LocationMasterController.updateTownLocation(targetTown, from_loc_code, to_loc_code, tenant_id, new_town_name);
+        const data = await LocationMasterController.updateTownLocation(targetTown, from_loc_code, to_loc_code, tenant_id, new_town_name, latitude, longitude);
         if (!data || data.length === 0) {
             return res.status(404).json({ success: false, message: 'Town location not found' });
         }
