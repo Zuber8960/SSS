@@ -54,3 +54,10 @@ export const fetchVehicleTrackingData = (vehicleNo) => {
     .then(r => r.data.data || r.data || null)
     .catch(() => null);
 }
+
+// Fetch town coordinates by town name(s)
+export const fetchTownCoordinates = (townNames) => {
+  return Api.post(`/public/town/coordinates`, { townNames })
+    .then(r => r.data.data || r.data || {})
+    .catch(() => ({}));
+}

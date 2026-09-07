@@ -3,6 +3,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
+const publicRoutes = require('./public.routes');
 const userRoutes = require("../modules/userMaster/user.routes");
 const locationMasterRoutes = require("../modules/locationMaster/locationMaster.routes");
 const companyMasterRoutes = require("../modules/companyMaster/companyMaster.routes");
@@ -31,12 +32,15 @@ const ManifestController = require('../modules/manifest/manifest.controller');
 const { getStatesWithCities } = require("../common/commonCache");
 const axios = require('axios');
 const db = require('../config/db');
+/* ================= PUBLIC ROUTES ================= */
+router.use('/public', publicRoutes);
+
+/* ================= LOGIN ================= */
 
 router.post('/login', async (req, res) => {
   try {
     const { userId, password, tenantToken, loc_id, division_code } = req.body;
 
-    // Validate input
     if (!userId || !password) {
       return res.status(400).json({
         success: false,
@@ -44,31 +48,26 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Resolve tenant_id from tenant JWT
-    let tenant_id = null,locId,divisionId;
+    let tenant_id = null, locId, divisionId;
     if (tenantToken) {
       const secret = process.env.JWT_SECRET || 'your_jwt_secret_key';
       const decoded = jwt.verify(tenantToken, secret);
       tenant_id = decoded.tenant_id ?? null;
-    };
+    }
 
-
-    // Authenticate user from database
     const user = await UserController.authenticateUser(userId, password, tenant_id);
 
     if (user) {
-      // Fetch first loc_code for this tenant from ssm_location
       let query = db('sss.ssm_location')
         .where({ tenant_id: user.tenant_id })
         .orderBy('record_id', 'asc')
         .select('loc_id')
         .first();
-      query.where({loc_code: loc_id});
+      query.where({ loc_code: loc_id });
       const locRow = await query;
       locId = locRow?.loc_id || '000';
       divisionId = division_code > 0 ? division_code : '0';
 
-      // Generate JWT token
       const secret = process.env.JWT_SECRET || 'your_jwt_secret_key';
       const token = jwt.sign(
         {
@@ -84,7 +83,6 @@ router.post('/login', async (req, res) => {
         secret,
         { expiresIn: '24h' }
       );
-
 
       const authGet = await axios.get(
         'https://api.whitebooks.in/ewaybillapi/v1.03/authenticate',
@@ -136,12 +134,13 @@ router.post('/login', async (req, res) => {
   }
 });
 
+/* ================= RESET PASSWORD ================= */
+
 router.post('/reset-password', async (req, res) => {
   try {
     const { user_id, email_id, mobile_no, new_password } = req.body;
     console.log('Reset password request:', { user_id, email_id, mobile_no });
 
-    // Validate input
     if (!user_id || !email_id || !mobile_no || !new_password) {
       return res.status(400).json({
         success: false,
@@ -149,7 +148,6 @@ router.post('/reset-password', async (req, res) => {
       });
     }
 
-    // Find user by user_id, email_id, and mobile_no
     const { err, user } = await UserController.getUserByCredentials(user_id, email_id, mobile_no);
     if (err.msg) {
       return res.status(400).json({
@@ -158,7 +156,6 @@ router.post('/reset-password', async (req, res) => {
       });
     }
 
-    // Update user's password
     await UserController.updateUserPassword(user.rec_id, new_password);
 
     res.status(200).json({
@@ -174,48 +171,10 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-// Public read-only endpoints (no auth) — used by dev tools and unauthenticated contexts
+/* ================= PINCODE MASTER (read-only) ================= */
+
 router.use('/pincodeMaster', pincodeMasterRoutes);
 
-router.get('/public/locations', async (req, res) => {
-  try {
-    const data = await LocationMasterController.getAllLocationData(null, null);
-    res.status(200).json({ success: true, data });
-  } catch (error) {
-    console.error('Public locations error:', error);
-    res.status(500).json({ success: false, message: 'Error retrieving location data' });
-  }
-});
-
-router.get('/public/docket/:docketNo', async (req, res) => {
-  try {
-    const data = await DocketController.getDocketByRecId(null, null, req.params.docketNo);
-    if (data) res.json({ success: true, data });
-    else res.status(404).json({ success: false, message: 'Docket not found' });
-  } catch (error) {
-    console.error('Public docket error:', error);
-    res.status(500).json({ success: false, message: 'Error retrieving docket' });
-  }
-});
-
-router.get('/public/manifest/by-docket/:docketNo', async (req, res) => {
-  try {
-    const data = await ManifestController.getManifestsByDocketNo(req.params.docketNo);
-    res.json({ success: true, data });
-  } catch (error) {
-    console.error('Public manifest error:', error);
-    res.status(500).json({ success: false, message: 'Error retrieving manifests' });
-  }
-});
-
-router.get('/public/manifest/tracking/:vehicleNo', async (req, res) => {
-  try {
-    const data = await ManifestController.getVehicleTrackingData(req.params.vehicleNo);
-    res.json({ success: true, data });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Error retrieving tracking data' });
-  }
-});
 
 router.use('/tenant', tenantRoutes);
 router.use('/user', authMiddleware, userRoutes);

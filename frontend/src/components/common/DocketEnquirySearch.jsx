@@ -9,7 +9,7 @@ import CommonAlertDialog from "./CommonAlertDialog";
 import useLoading from "./UseLoading";
 import LoadingOverlay from "./LoadingOverlay";
 import { getDocketByRecId } from "../../utils/docket";
-import { fetchManifestsByDocketNo } from "../../utils/manifest";
+import { fetchManifestsByDocketNo, fetchTownCoordinates } from "../../utils/manifest";
 import { fetchDeliveryNoteByDocketNo } from "../../utils/deliveryNote";
 import { SearchIcon, ResetIcon } from "./icons";
 import { IconButton, TextField, Tooltip } from "@mui/material";
@@ -160,7 +160,7 @@ const manifestBaseColumns = [
   { key: "mnf_actual_wt",  label: "Weight" },
 ];
 
-function makeManifestColumns(setMapRow) {
+function makeManifestColumns(setMapRow, setMapRowCoords) {
   return [
     ...manifestBaseColumns,
     {
@@ -169,6 +169,12 @@ function makeManifestColumns(setMapRow) {
       minWidth: 160,
       render: (row) => {
         const arrived = !!row.mnf_arrival_time;
+        const handleMapClick = async () => {
+          setMapRow(row);
+          const towns = [row.mnf_from_town || row.mnf_loc, row.mnf_to_town || row.mnf_to_loc];
+          const coords = await fetchTownCoordinates(towns);
+          setMapRowCoords(coords);
+        };
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{
@@ -189,7 +195,7 @@ function makeManifestColumns(setMapRow) {
               <Tooltip title={`Show route: ${row.mnf_from_town || row.mnf_loc} → ${row.mnf_to_town || row.mnf_to_loc}`}>
                 <IconButton
                   size="small"
-                  onClick={() => setMapRow(row)}
+                  onClick={handleMapClick}
                   sx={{ padding: "3px", color: "#1a73e8", "&:hover": { background: "#e8f0fe" } }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -219,12 +225,13 @@ export default function DocketEnquirySearch({ showForm = true }) {
   const [manifests, setManifests]           = useState([]);
   const [docketFound, setDocketFound]       = useState(false);
   const [mapRow, setMapRow]                 = useState(null);
+  const [mapRowCoords, setMapRowCoords]     = useState(null);
   const [deliveryNote, setDeliveryNote]     = useState(null);
   const [currentStatus, setCurrentStatus]   = useState(null);
   const [ewbValid, setEwbValid]             = useState("");
   const [trackingModal, setTrackingModal]   = useState({ open: false, vehicleNo: null });
 
-  const manifestColumns = makeManifestColumns(setMapRow);
+  const manifestColumns = makeManifestColumns(setMapRow, setMapRowCoords);
   const searchInputRef  = useRef(null);
 
   const handleSearch = async () => {
@@ -280,6 +287,8 @@ export default function DocketEnquirySearch({ showForm = true }) {
     setForm({ ...emptyForm });
     setManifests([]);
     setDocketFound(false);
+    setMapRow(null);
+    setMapRowCoords(null);
     setDeliveryNote(null);
     setCurrentStatus(null);
     setEwbValid("");
@@ -411,9 +420,11 @@ export default function DocketEnquirySearch({ showForm = true }) {
         <RouteMap
           fromCity={mapRow.mnf_from_town || mapRow.mnf_loc}
           toCity={mapRow.mnf_to_town || mapRow.mnf_to_loc}
+          fromCoord={mapRowCoords?.[mapRow.mnf_from_town || mapRow.mnf_loc] ? [mapRowCoords[mapRow.mnf_from_town || mapRow.mnf_loc].latitude, mapRowCoords[mapRow.mnf_from_town || mapRow.mnf_loc].longitude] : null}
+          toCoord={mapRowCoords?.[mapRow.mnf_to_town || mapRow.mnf_to_loc] ? [mapRowCoords[mapRow.mnf_to_town || mapRow.mnf_to_loc].latitude, mapRowCoords[mapRow.mnf_to_town || mapRow.mnf_to_loc].longitude] : null}
           title={`In Transit — ${mapRow.mnf_from_town || mapRow.mnf_loc} → ${mapRow.mnf_to_town || mapRow.mnf_to_loc}`}
           subtitle={mapRow.desp_veh_no ? `Vehicle: ${mapRow.desp_veh_no}` : undefined}
-          onClose={() => setMapRow(null)}
+          onClose={() => { setMapRow(null); setMapRowCoords(null); }}
         />
       )}
 

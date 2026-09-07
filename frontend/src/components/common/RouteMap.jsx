@@ -44,6 +44,7 @@ async function geocode(city, country = "India") {
     { headers: { "Accept-Language": "en", "User-Agent": "logistics-erp" } }
   );
   const data = await res.json();
+  console.log(q, data);
   if (!data.length) throw new Error(`Could not find location: ${city}`);
   return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
 }
@@ -78,6 +79,8 @@ function getClosestPointOnRoute(lat, lng, route) {
  * Props:
  *   fromCity    {string}  — origin city/town name
  *   toCity      {string}  — destination city/town name
+ *   fromCoord   {array}   — [latitude, longitude] for origin (optional, skips geocoding)
+ *   toCoord     {array}   — [latitude, longitude] for destination (optional, skips geocoding)
  *   country     {string}  — country for geocoding context (default: "India")
  *   height      {number}  — map height in px (default: 400)
  *   title       {string}  — header title (optional, auto-generated if omitted)
@@ -90,6 +93,8 @@ function getClosestPointOnRoute(lat, lng, route) {
 export default function RouteMap({
   fromCity,
   toCity,
+  fromCoord,
+  toCoord,
   country   = "India",
   height    = 400,
   title,
@@ -100,26 +105,33 @@ export default function RouteMap({
   currentLng,
 }) {
   const [status,    setStatus]    = useState("loading");
-  const [fromCoord, setFromCoord] = useState(null);
-  const [toCoord,   setToCoord]   = useState(null);
+  const [resolvedFromCoord, setResolvedFromCoord] = useState(null);
+  const [resolvedToCoord,   setResolvedToCoord]   = useState(null);
   const [route,     setRoute]     = useState([]);
   const [errMsg,    setErrMsg]    = useState("");
 
   useEffect(() => {
     if (!fromCity || !toCity) { setStatus("error"); setErrMsg("Origin and destination are required"); return; }
     let cancelled = false;
-    Promise.all([geocode(fromCity, country), geocode(toCity, country)])
-      .then(([from, to]) => {
+
+    const from = fromCoord || null;
+    const to = toCoord || null;
+
+    Promise.all([
+      from ? Promise.resolve(from) : geocode(fromCity, country),
+      to ? Promise.resolve(to) : geocode(toCity, country)
+    ])
+      .then(([fromResolved, toResolved]) => {
         if (cancelled) return;
-        setFromCoord(from);
-        setToCoord(to);
-        return getRoute(from, to)
+        setResolvedFromCoord(fromResolved);
+        setResolvedToCoord(toResolved);
+        return getRoute(fromResolved, toResolved)
           .then((pts) => { if (!cancelled) { setRoute(pts); setStatus("ready"); } })
-          .catch(()  => { if (!cancelled) { setRoute([from, to]); setStatus("ready"); } });
+          .catch(()  => { if (!cancelled) { setRoute([fromResolved, toResolved]); setStatus("ready"); } });
       })
       .catch((e) => { if (!cancelled) { setErrMsg(e.message); setStatus("error"); } });
     return () => { cancelled = true; };
-  }, [fromCity, toCity, country]);
+  }, [fromCity, toCity, fromCoord, toCoord, country]);
 
   const headerTitle = title || `${fromCity} → ${toCity}`;
 
@@ -160,16 +172,16 @@ export default function RouteMap({
             {errMsg}
           </div>
         )}
-        {status === "ready" && fromCoord && toCoord && (
-          <MapContainer center={fromCoord} zoom={6} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
+        {status === "ready" && resolvedFromCoord && resolvedToCoord && (
+          <MapContainer center={resolvedFromCoord} zoom={6} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <Marker position={fromCoord} icon={originIcon}>
+            <Marker position={resolvedFromCoord} icon={originIcon}>
               <Popup>{fromCity} (Origin)</Popup>
             </Marker>
-            <Marker position={toCoord} icon={destIcon}>
+            <Marker position={resolvedToCoord} icon={destIcon}>
               <Popup>{toCity} (Destination)</Popup>
             </Marker>
             {route.length > 1 && (
@@ -180,7 +192,7 @@ export default function RouteMap({
                 <Popup>Current Vehicle Location 🚛</Popup>
               </Marker>
             )}
-            <FitBounds coords={[fromCoord, toCoord]} />
+            <FitBounds coords={[resolvedFromCoord, resolvedToCoord]} />
           </MapContainer>
         )}
       </div>

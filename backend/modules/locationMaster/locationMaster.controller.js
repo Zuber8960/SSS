@@ -105,5 +105,24 @@ module.exports = {
         if (company_code) query.andWhere({ company_code });
 
         return query.del();
+    },
+
+    async getTownCoordinates(townNames) {
+        if (!townNames || !Array.isArray(townNames) || townNames.length === 0) {
+            throw new Error('townNames array is required');
+        }
+        const rows = await db('sss.ssm_location_town')
+            .select('town_name', db.raw('MAX(latitude) as latitude'), db.raw('MAX(longitude) as longitude'))
+            .whereIn('town_name', townNames)
+            .groupBy('town_name');
+
+        const result = {};
+        rows.forEach(row => {
+            result[row.town_name] = {
+                latitude: parseFloat(row.latitude),
+                longitude: parseFloat(row.longitude),
+            };
+        });
+        return result;
     }
 };

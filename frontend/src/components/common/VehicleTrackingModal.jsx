@@ -16,13 +16,14 @@ import {
   LinearProgress,
   Alert,
 } from '@mui/material';
-import { fetchVehicleTrackingData } from '../../utils/manifest';
+import { fetchVehicleTrackingData, fetchTownCoordinates } from '../../utils/manifest';
 import RouteMap from './RouteMap';
 
 function VehicleTrackingModal({ open, vehicleNo, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [townCoordinates, setTownCoordinates] = useState({});
 
   useEffect(() => {
     if (!open || !vehicleNo) return;
@@ -35,10 +36,17 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
       .then(trackingData => {
         if (trackingData) {
           setData(trackingData);
+          if (trackingData.from_town && trackingData.to_town) {
+            return fetchTownCoordinates([trackingData.from_town, trackingData.to_town]);
+          }
         } else {
           console.log('getting error')
           setError('No tracking data available for this vehicle');
         }
+        return {};
+      })
+      .then(coords => {
+        setTownCoordinates(coords);
       })
       .catch(err => {
         setError(err.message || 'Failed to fetch tracking data');
@@ -221,6 +229,8 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
                 <RouteMap
                   fromCity={data.from_town}
                   toCity={data.to_town}
+                  fromCoord={townCoordinates[data.from_town] ? [townCoordinates[data.from_town].latitude, townCoordinates[data.from_town].longitude] : null}
+                  toCoord={townCoordinates[data.to_town] ? [townCoordinates[data.to_town].latitude, townCoordinates[data.to_town].longitude] : null}
                   height={200}
                   title={`${data.from_town} → ${data.to_town}`}
                   subtitle={`🚛 ${data.desp_veh_no} | Currently at: ${data.location || 'En route'}`}

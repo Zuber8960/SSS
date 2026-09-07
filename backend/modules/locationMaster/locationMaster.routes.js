@@ -59,6 +59,17 @@ router.delete('/:recId', async (req, res) => {
     }
 });
 
+router.post('/coordinates', async (req, res) => {
+    try {
+        const { townNames } = req.body;
+        const data = await LocationMasterController.getTownCoordinates(townNames);
+        res.status(200).json({ success: true, data });
+    } catch (error) {
+        console.error('Location Town coordinates error:', error);
+        res.status(500).json({ success: false, message: 'Error retrieving town coordinates' });
+    }
+});
+
 router.get('/towns', async (req, res) => {
     try {
         const { loc_code } = req.query;
