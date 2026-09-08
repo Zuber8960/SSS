@@ -12,7 +12,7 @@ export const updateDocket = (docketNo, data) => Api.put(`/docket/${encodeURIComp
 export const updateDocketByRecId = (recId, data, docketNo) => Api.put(`/docket/rec/${encodeURIComponent(recId)}?docketNo=${encodeURIComponent(docketNo)}`, data).then(r => r.data.data || r.data);
 export const getDocketByRecId = (recId, docketNo) => {
   if (!hasAuthToken() && docketNo) {
-    return Api.get(`/public/docket/d/${encodeURIComponent(docketNo)}`).then(r => r.data.data || r.data);
+    return Api.get(`/public/docket/${encodeURIComponent(docketNo)}`).then(r => r.data.data || r.data);
   }
   return Api.get(`/docket/rec/${encodeURIComponent(recId)}?docketNo=${docketNo ? encodeURIComponent(docketNo) :''}`).then(r => r.data.data || r.data);
 };

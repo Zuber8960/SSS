@@ -5,6 +5,7 @@ const fs = require('fs');
 const LocationMasterController = require('../modules/locationMaster/locationMaster.controller');
 const DocketController = require('../modules/docket/docket.controller');
 const ManifestController = require('../modules/manifest/manifest.controller');
+const deliveryNoteController = require('../modules/deliveryNote/deliveryNote.controller');
 
 /* ================= PUBLIC LOCATIONS ================= */
 
@@ -20,7 +21,7 @@ router.get('/locations', async (req, res) => {
 
 /* ================= PUBLIC DOCKET ================= */
 
-router.get('/docket/d/:docketNo', async (req, res) => {
+router.get('/docket/:docketNo', async (req, res) => {
   try {
     const data = await DocketController.getDocketByRecId(null, null, req.params.docketNo);
     if (data) res.json({ success: true, data });
@@ -40,6 +41,20 @@ router.get('/manifest/by-docket/:docketNo', async (req, res) => {
   } catch (error) {
     console.error('Public manifest error:', error);
     res.status(500).json({ success: false, message: 'Error retrieving manifests' });
+  }
+});
+
+
+router.get('/deliveryNote/docket/:docketNo', async (req, res) => {
+  try {
+    const { docketNo } = req.params;
+    const data = await deliveryNoteController.getDeliveryNoteByDocketNo(docketNo, null);
+    if (!data) {
+      return res.status(404).json({ success: false, message: 'Delivery note not found for this docket' });
+    }
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

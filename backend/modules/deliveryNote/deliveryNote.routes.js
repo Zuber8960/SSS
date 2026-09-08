@@ -70,7 +70,7 @@ router.post('/pod', (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const filters = {
-      company_code: req.query.company_code || req.headers['x-company-code'] || null,
+      company_code: req.tenant_id || null,
       division_code: req.query.division_code || null,
       dly_note_no: req.query.dly_note_no || null,
       docket_no: req.query.docket_no || null,
@@ -86,8 +86,8 @@ router.get('/', async (req, res) => {
 router.get('/docket/:docketNo', async (req, res) => {
   try {
     const { docketNo } = req.params;
-    const company_code = req.headers['x-company-code'] || null;
-    const data = await DeliveryNoteController.getDeliveryNoteByDocketNo(docketNo, company_code);
+    const { tenant_id } = req;
+    const data = await DeliveryNoteController.getDeliveryNoteByDocketNo(docketNo, tenant_id);
     if (!data) {
       return res.status(404).json({ success: false, message: 'Delivery note not found for this docket' });
     }
@@ -100,8 +100,8 @@ router.get('/docket/:docketNo', async (req, res) => {
 router.get('/:dlyNoteNo', async (req, res) => {
   try {
     const { dlyNoteNo } = req.params;
-    const company_code = req.headers['x-company-code'] || null;
-    const data = await DeliveryNoteController.getDeliveryNoteByDlyNoteNo(dlyNoteNo, company_code);
+    const { tenant_id } = req;
+    const data = await DeliveryNoteController.getDeliveryNoteByDlyNoteNo(dlyNoteNo, tenant_id);
     if (!data) {
       return res.status(404).json({ success: false, message: 'Delivery note not found' });
     }
@@ -113,8 +113,9 @@ router.get('/:dlyNoteNo', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
+    const { tenant_id } = req;
     const payload = req.body;
-    const data = await DeliveryNoteController.saveDeliveryNote(payload);
+    const data = await DeliveryNoteController.saveDeliveryNote(payload, tenant_id);
     res.status(201).json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -124,8 +125,8 @@ router.post('/', async (req, res) => {
 router.put('/:dlyNoteNo', async (req, res) => {
   try {
     const { dlyNoteNo } = req.params;
-    const company_code = req.headers['x-company-code'] || null;
-    const data = await DeliveryNoteController.updateDeliveryNote(dlyNoteNo, req.body, company_code);
+    const { tenant_id } = req;
+    const data = await DeliveryNoteController.updateDeliveryNote(dlyNoteNo, req.body, tenant_id);
     if (!data) {
       return res.status(404).json({ success: false, message: 'Delivery note not found' });
     }
@@ -138,8 +139,8 @@ router.put('/:dlyNoteNo', async (req, res) => {
 router.delete('/:dlyNoteNo', async (req, res) => {
   try {
     const { dlyNoteNo } = req.params;
-    const company_code = req.headers['x-company-code'] || null;
-    const deletedCount = await DeliveryNoteController.deleteDeliveryNote(dlyNoteNo, company_code);
+    const { tenant_id } = req;
+    const deletedCount = await DeliveryNoteController.deleteDeliveryNote(dlyNoteNo, tenant_id);
     if (!deletedCount) {
       return res.status(404).json({ success: false, message: 'Delivery note not found' });
     }

@@ -1,13 +1,20 @@
 import Api from '../services/Api';
 
+const TOKEN_KEY = 'authToken';
+const hasAuthToken = () => !!localStorage.getItem(TOKEN_KEY);
+
 export const fetchDeliveryNotes = (params = {}) =>
   Api.get('/deliveryNote', { params }).then((r) => r.data.data || r.data || []);
 
 export const fetchDeliveryNoteByDlyNoteNo = (dlyNoteNo) =>
   Api.get(`/deliveryNote/${encodeURIComponent(dlyNoteNo)}`).then((r) => r.data.data || r.data || null);
 
-export const fetchDeliveryNoteByDocketNo = (docketNo) =>
-  Api.get(`/deliveryNote/docket/${encodeURIComponent(docketNo)}`).then((r) => r.data.data || r.data || null);
+export const fetchDeliveryNoteByDocketNo = (docketNo) => {
+  if (!hasAuthToken()) {
+      return Api.get(`/public/deliveryNote/docket/${encodeURIComponent(docketNo)}`).then((r) => r.data.data || r.data || null);
+    }
+  return Api.get(`/deliveryNote/docket/${encodeURIComponent(docketNo)}`).then((r) => r.data.data || r.data || null);
+};
 
 export const saveDeliveryNote = (payload) =>
   Api.post('/deliveryNote', payload).then((r) => r.data.data || r.data);

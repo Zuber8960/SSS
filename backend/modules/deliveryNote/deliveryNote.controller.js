@@ -49,12 +49,14 @@ module.exports = {
     return query.orderBy('record_id', 'desc').first();
   },
 
-  async saveDeliveryNote(payload) {
+  async saveDeliveryNote(payload, company_code) {
     const record = sanitizeDeliveryNote({
       ...payload,
       record_created_on: new Date(),
       record_updated_on: null,
     });
+
+    if (company_code) record.company_code = company_code;
 
     const [inserted] = await db('sss.sst_dly_note').insert(record).returning('*');
     return inserted;

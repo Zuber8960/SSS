@@ -102,14 +102,14 @@ async function getAllInvoices(filters = {}) {
   return query.orderBy('invoice_date', 'desc').orderBy('invoice_no', 'desc');
 }
 
-async function getInvoiceDetail(invoiceNo, invoiceDate, invoiceLoc) {
+async function getInvoiceDetail(invoiceNo, invoiceDate, invoiceLoc, company_code = null) {
   const query = db('sss.sst_invoice_dtl')
-    .where({ invoice_no: invoiceNo, invoice_date: invoiceDate, invoice_loc: invoiceLoc })
-    .orderBy('inv_sr_no', 'asc');
-  return query;
+    .where({ invoice_no: invoiceNo, invoice_date: invoiceDate, invoice_loc: invoiceLoc });
+  if (company_code) query.andWhere({ company_code });
+  return query.orderBy('inv_sr_no', 'asc');
 }
 
-async function getFullInvoice(invoiceNo, invoiceDate, invoiceLoc, company_code) {
+async function getFullInvoice(invoiceNo, invoiceDate, invoiceLoc, company_code = null) {
   const headerQuery = db('sss.sst_invoice_hdr')
     .where({ invoice_no: invoiceNo, invoice_date: invoiceDate, loc_code: invoiceLoc });
   if (company_code) headerQuery.andWhere({ company_code });
@@ -117,13 +117,13 @@ async function getFullInvoice(invoiceNo, invoiceDate, invoiceLoc, company_code) 
   const header = await headerQuery.first();
   if (!header) return null;
 
-  const details = await getInvoiceDetail(invoiceNo, invoiceDate, invoiceLoc);
+  const details = await getInvoiceDetail(invoiceNo, invoiceDate, invoiceLoc, company_code);
   return { ...header, details };
 }
 
 /* ================= SAVE (header + details) ================= */
 
-async function saveInvoice(payload = {}) {
+async function saveInvoice(payload = {}, company_code = null) {
   const { header = {}, details = [] } = payload;
 
   let headerWithNo = { ...header };
@@ -138,6 +138,7 @@ async function saveInvoice(payload = {}) {
     invoice_no: headerWithNo.invoice_no,
     loc_code: headerWithNo.loc_code,
     invoice_date: headerWithNo.invoice_date,
+    company_code: company_code,
   };
 
   const trx = await db.transaction();
@@ -161,6 +162,7 @@ async function saveInvoice(payload = {}) {
         .returning('*');
     } else {
       // Insert new header with auto-generated invoice_no
+      headerWithNo.company_code = company_code;
       [savedHeader] = await trx('sss.sst_invoice_hdr')
         .insert(sanitizeHeader(headerWithNo))
         .returning('*');
@@ -171,11 +173,13 @@ async function saveInvoice(payload = {}) {
       invoice_no: savedHeader.invoice_no,
       invoice_date: savedHeader.invoice_date,
       invoice_loc: savedHeader.loc_code,
+      company_code: company_code,
     };
     await trx('sss.sst_invoice_dtl').where(detailKeys).del();
 
     // Insert details
     if (Array.isArray(details) && details.length > 0) {
+      if (company_code) details.forEach(d => d.company_code = company_code);
       const detailRows = details.map((d, index) =>
         sanitizeDetail({
           ...d,
@@ -196,9 +200,9 @@ async function saveInvoice(payload = {}) {
 
 /* ================= UPDATE / DELETE ================= */
 
-async function updateInvoice(invoiceNo, invoiceDate, invoiceLoc, payload = {}) {
+async function updateInvoice(invoiceNo, invoiceDate, invoiceLoc, payload = {}, company_code = null) {
   const { header = {}, details = [] } = payload;
-  const keys = { invoice_no: invoiceNo, invoice_date: invoiceDate, loc_code: invoiceLoc };
+  const keys = { invoice_no: invoiceNo, invoice_date: invoiceDate, loc_code: invoiceLoc, company_code };
 
   const trx = await db.transaction();
 

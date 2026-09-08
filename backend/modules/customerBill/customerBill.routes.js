@@ -7,7 +7,7 @@ const CustomerBillController = require('./customerBill.controller');
 router.get('/', async (req, res) => {
   try {
     const filters = {
-      company_code: req.headers['x-company-code'] || null,
+      company_code: req.tenant_id || null,
       division_code: req.query.division_code || null,
       loc_code: req.query.loc_code || null,
       invoice_no: req.query.invoice_no || null,
@@ -27,7 +27,7 @@ router.get('/', async (req, res) => {
 router.get('/:invoiceNo/:invoiceDate/:invoiceLoc', async (req, res) => {
   try {
     const { invoiceNo, invoiceDate, invoiceLoc } = req.params;
-    const company_code = req.headers['x-company-code'] || null;
+    const company_code = req.tenant_id || null;
     const data = await CustomerBillController.getFullInvoice(
       Number(invoiceNo),
       invoiceDate,
@@ -48,10 +48,12 @@ router.get('/:invoiceNo/:invoiceDate/:invoiceLoc', async (req, res) => {
 router.get('/:invoiceNo/:invoiceDate/:invoiceLoc/details', async (req, res) => {
   try {
     const { invoiceNo, invoiceDate, invoiceLoc } = req.params;
+    const company_code = req.tenant_id || null;
     const data = await CustomerBillController.getInvoiceDetail(
       Number(invoiceNo),
       invoiceDate,
-      invoiceLoc
+      invoiceLoc,
+      company_code
     );
     res.status(200).json({ success: true, data });
   } catch (error) {
@@ -63,7 +65,8 @@ router.get('/:invoiceNo/:invoiceDate/:invoiceLoc/details', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const data = await CustomerBillController.saveInvoice(req.body);
+    const { tenant_id } = req;
+    const data = await CustomerBillController.saveInvoice(req.body, tenant_id);
     res.status(201).json({ success: true, message: 'Invoice saved successfully', data });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -75,11 +78,13 @@ router.post('/', async (req, res) => {
 router.put('/:invoiceNo/:invoiceDate/:invoiceLoc', async (req, res) => {
   try {
     const { invoiceNo, invoiceDate, invoiceLoc } = req.params;
+    const { tenant_id } = req;
     const data = await CustomerBillController.updateInvoice(
       Number(invoiceNo),
       invoiceDate,
       invoiceLoc,
-      req.body
+      req.body,
+      tenant_id
     );
     if (!data) {
       return res.status(404).json({ success: false, message: 'Invoice not found' });
