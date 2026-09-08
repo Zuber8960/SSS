@@ -11,10 +11,12 @@ import LoadingOverlay from "../../components/common/LoadingOverlay";
 import { fetchAllDockets, fetchCharges, fetchDocketByDocketNo } from "../../utils/docket";
 import { fetchAllLocations } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
+import { fetchAllUsers } from "../../utils/userAPI";
 import { RefreshIcon, PrintIcon } from "../../components/common/icons";
-import { IconButton, Tooltip, Button, TextField, Menu, MenuItem, ListItemIcon, ListItemText, Autocomplete } from "@mui/material";
+import { IconButton, Tooltip, Button, TextField, Menu, MenuItem, ListItemIcon, ListItemText, Autocomplete, FormControlLabel, Checkbox } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
+import TuneIcon from "@mui/icons-material/Tune";
 import { printDocket } from "../../components/common/DocketPrint";
 import { printDocketOnDT } from "./docketReport/DocketPrintOnDT";
 import { printDocketsOnDt } from "../../utils/printBridge";
@@ -42,6 +44,8 @@ const docketColumns = [
   { key: "docket_rate_uom", label: "Rate UOM", minWidth: 90 },
   { key: "docket_tot_amt", label: "Total Amount", minWidth: 110 },
   { key: "delivery_status", label: "Delivery Status", minWidth: 130 },
+  { key: "aud_user_name", label: "Created By", minWidth: 130 },
+  { key: "aud_date", label: "Created Date", minWidth: 130 },
   { key: "docket_remark", label: "Remarks", minWidth: 150 },
 ];
 
@@ -66,11 +70,29 @@ export default function DocketReport() {
   const [printAnchor, setPrintAnchor]   = useState(null);
   const [company, setCompany]           = useState(null);
   const [locations, setLocations]     = useState([]);
+  const [users, setUsers]             = useState([]);
   const [searchText, setSearchText]   = useState("");
   const [fromTown, setFromTown]       = useState("");
   const [toTown, setToTown]           = useState("");
   const [dateFrom, setDateFrom]       = useState("");
   const [dateTo, setDateTo]           = useState("");
+  const [audUser, setAudUser]         = useState("");
+  const [audDateFrom, setAudDateFrom] = useState("");
+  const [audDateTo, setAudDateTo]     = useState("");
+  const [deliveryStatus, setDeliveryStatus] = useState("");
+  const [filterAnchor, setFilterAnchor] = useState(null);
+  const [activeFilters, setActiveFilters] = useState(() => {
+    const saved = localStorage.getItem("docketReportFilters");
+    return saved ? JSON.parse(saved) : {
+      search: true,
+      fromTown: true,
+      toTown: true,
+      dateRange: true,
+      audUser: false,
+      audDate: false,
+      deliveryStatus: false,
+    };
+  });
 
   // Used only by the Refresh button — shows loading indicator
   const loadDockets = async () => {
@@ -97,6 +119,9 @@ export default function DocketReport() {
     fetchAllCompanies()
       .then((data) => { if (data?.length) setCompany(data[0]); })
       .catch((err) => console.error("Failed to load company:", err));
+    fetchAllUsers()
+      .then((data) => setUsers(Array.isArray(data) ? data : []))
+      .catch((err) => console.error("Failed to load users:", err));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -106,6 +131,14 @@ export default function DocketReport() {
       (d) => (d.docket_loc || "").toLowerCase() === branchCode.toLowerCase()
     );
   }, [allDockets, branchCode]);
+
+  const userMap = useMemo(() => {
+    const map = {};
+    users.forEach((u) => {
+      map[u.rec_id] = u.user_name || u.rec_id;
+    });
+    return map;
+  }, [users]);
 
   const mappedDockets = useMemo(() => branchDockets.map((d, index) => {
     const row = {
@@ -117,10 +150,12 @@ export default function DocketReport() {
       docket_pickup_town: d.docket_pickup_town || d.docket_from_town || "",
       docket_dly_town:    d.docket_dly_town || d.docket_to_town || "",
       delivery_status:    d.delivery_status || "Pending",
+      aud_user_name:      userMap[d.aud_user] || d.aud_user || "",
+      aud_date:           toDate(d.aud_date),
     };
     row.id = row.docket_no + (row.docket_date || "") + index;
     return row;
-  }), [branchDockets]);
+  }), [branchDockets, userMap]);
 
   const fromTownOptions = useMemo(() =>
     [...new Set(mappedDockets.map((r) => r.docket_pickup_town).filter(Boolean))].sort()
@@ -128,6 +163,22 @@ export default function DocketReport() {
 
   const toTownOptions = useMemo(() =>
     [...new Set(mappedDockets.map((r) => r.docket_dly_town).filter(Boolean))].sort()
+  , [mappedDockets]);
+
+  const audUserOptions = useMemo(() => {
+    const uniqueIds = [...new Set(branchDockets.map((r) => r.aud_user).filter(Boolean))];
+    return uniqueIds.map((id) => ({
+      id,
+      label: userMap[id] || id,
+    })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [branchDockets, userMap]);
+
+  const audDateOptions = useMemo(() =>
+    [...new Set(branchDockets.map((r) => r.aud_date).filter(Boolean))].sort()
+  , [branchDockets]);
+
+  const deliveryStatusOptions = useMemo(() =>
+    [...new Set(mappedDockets.map((r) => r.delivery_status).filter(Boolean))].sort()
   , [mappedDockets]);
 
   const gridRows = useMemo(() => {
@@ -146,6 +197,17 @@ export default function DocketReport() {
           if (dt && rd.isAfter(dt, "day"))  return false;
         }
       }
+      if (audUser && !String(row.aud_user ?? "").toLowerCase().includes(audUser.toLowerCase())) return false;
+      if (audDateFrom || audDateTo) {
+        const ad = row.aud_date ? moment(row.aud_date, "DD-MM-YYYY") : null;
+        if (ad && ad.isValid()) {
+          const adf = audDateFrom ? moment(audDateFrom, "YYYY-MM-DD") : null;
+          const adt = audDateTo ? moment(audDateTo, "YYYY-MM-DD") : null;
+          if (adf && ad.isBefore(adf, "day")) return false;
+          if (adt && ad.isAfter(adt, "day")) return false;
+        }
+      }
+      if (deliveryStatus && !String(row.delivery_status ?? "").toLowerCase().includes(deliveryStatus.toLowerCase())) return false;
       if (q && ![
         row.docket_no, row.cnor_name, row.cnee_name,
         row.docket_pickup_town, row.docket_dly_town,
@@ -153,7 +215,7 @@ export default function DocketReport() {
       ].some((v) => String(v ?? "").toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [mappedDockets, searchText, fromTown, toTown, dateFrom, dateTo]);
+  }, [mappedDockets, searchText, fromTown, toTown, dateFrom, dateTo, audUser, audDateFrom, audDateTo, deliveryStatus]);
 
   const handleRefresh = () => {
     setSelectedRow(null);
@@ -292,6 +354,12 @@ export default function DocketReport() {
     await printStickerFromRow({ row: selectedRow, company });
   };
 
+  const handleFilterToggle = (filterKey) => {
+    const updated = { ...activeFilters, [filterKey]: !activeFilters[filterKey] };
+    setActiveFilters(updated);
+    localStorage.setItem("docketReportFilters", JSON.stringify(updated));
+  };
+
 
   const handlePrintOnDT = async (withFreight) => {
     if (!selectedRow) {
@@ -379,102 +447,265 @@ export default function DocketReport() {
               </IconButton>
             </Tooltip>
 
-            <TextField
-              size="small"
-              placeholder="Search docket, consignor, town..."
-              value={searchText}
-              onChange={(e) => { setSearchText(e.target.value); setSelectedRow(null); }}
-              sx={{
-                flex: "1 1 180px",
-                minWidth: 160,
-                "& .MuiInputBase-input": { fontSize: 13 },
-                "& .MuiOutlinedInput-notchedOutline": { borderColor: "#7e22ce" },
-                "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#7e22ce" },
-              }}
-            />
+            <Tooltip title="Filter Options">
+              <IconButton
+                onClick={(e) => setFilterAnchor(e.currentTarget)}
+                size="small"
+                sx={{
+                  color: "#7e22ce",
+                  border: "1.5px solid #d8b4fe",
+                  borderRadius: 2,
+                  padding: "6px",
+                  "&:hover": { background: "#f3e8ff" },
+                }}
+              >
+                <TuneIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
 
-            <Autocomplete
-              size="small"
-              options={fromTownOptions}
-              value={fromTown || null}
-              onChange={(_, val) => { setFromTown(val || ""); setSelectedRow(null); }}
-              slotProps={{
-                popupIndicator: { sx: { padding: "1px", minWidth: 16, width: 16, "& .MuiSvgIcon-root": { fontSize: 11 } } },
-                clearIndicator: { sx: { display: "none" } },
-                paper: { sx: {
-                  "& .MuiAutocomplete-option": { fontSize: 13, minHeight: "32px !important", padding: "4px 10px" },
-                  "& .MuiAutocomplete-listbox": {
-                    scrollbarWidth: "thin",
-                    "&::-webkit-scrollbar": { width: "1px" },
-                    "&::-webkit-scrollbar-thumb": { background: "rgba(168,85,247,0.9)", borderRadius: "999px" },
-                    "&::-webkit-scrollbar-track": { background: "#f3e8ff" },
-                  },
-                } },
-              }}
-              sx={{ flex: "1 1 140px", minWidth: 130 }}
-              renderInput={(params) => (
-                <TextField {...params} placeholder="From Town" sx={{ "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiOutlinedInput-notchedOutline": { borderColor: "#7e22ce" } }} />
-              )}
-            />
-
-            <Autocomplete
-              size="small"
-              options={toTownOptions}
-              value={toTown || null}
-              onChange={(_, val) => { setToTown(val || ""); setSelectedRow(null); }}
-              slotProps={{
-                popupIndicator: { sx: { padding: "1px", minWidth: 16, width: 16, "& .MuiSvgIcon-root": { fontSize: 11 } } },
-                clearIndicator: { sx: { display: "none" } },
-                paper: { sx: {
-                  "& .MuiAutocomplete-option": { fontSize: 13, minHeight: "32px !important", padding: "4px 10px" },
-                  "& .MuiAutocomplete-listbox": {
-                    scrollbarWidth: "thin",
-                    "&::-webkit-scrollbar": { width: "1px" },
-                    "&::-webkit-scrollbar-thumb": { background: "rgba(168,85,247,0.9)", borderRadius: "999px" },
-                    "&::-webkit-scrollbar-track": { background: "#f3e8ff" },
-                  },
-                } },
-              }}
-              sx={{ flex: "1 1 140px", minWidth: 130 }}
-              renderInput={(params) => (
-                <TextField {...params} placeholder="To Town" sx={{ "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiOutlinedInput-notchedOutline": { borderColor: "#7e22ce" } }} />
-              )}
-            />
-
-            <div style={{
-              position: "relative",
-              display: "flex", alignItems: "center",
-              border: "1.5px solid #c4b5fd", borderRadius: 6,
-              padding: "4px 8px", background: "#fff", flex: "1 1 260px", minWidth: 240,
-            }}>
-              <span style={{
-                position: "absolute", top: -9, left: 8,
-                background: "#fff", padding: "0 4px",
-                fontSize: 11, fontWeight: 600, color: "#7e22ce",
-                letterSpacing: "0.3px", lineHeight: 1, whiteSpace: "nowrap",
-              }}>Docket Date Range</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 4, width: "100%" }}>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => { setDateFrom(e.target.value); setSelectedRow(null); }}
-                  style={{ border: "none", outline: "none", fontSize: 13, color: "#374151", background: "transparent", width: "100%", colorScheme: "light" }}
+            <Menu
+              anchorEl={filterAnchor}
+              open={Boolean(filterAnchor)}
+              onClose={() => setFilterAnchor(null)}
+            >
+              <MenuItem>
+                <FormControlLabel
+                  control={<Checkbox checked={activeFilters.search} onChange={() => handleFilterToggle("search")} />}
+                  label="Search"
                 />
-                <span style={{ fontSize: 12, color: "#7e22ce", fontWeight: 700, padding: "0 2px" }}>→</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => { setDateTo(e.target.value); setSelectedRow(null); }}
-                  style={{ border: "none", outline: "none", fontSize: 13, color: "#374151", background: "transparent", width: "100%", colorScheme: "light" }}
+              </MenuItem>
+              <MenuItem>
+                <FormControlLabel
+                  control={<Checkbox checked={activeFilters.fromTown} onChange={() => handleFilterToggle("fromTown")} />}
+                  label="From Town"
                 />
-                {(dateFrom || dateTo) && (
-                  <span
-                    onClick={() => { setDateFrom(""); setDateTo(""); setSelectedRow(null); }}
-                    style={{ cursor: "pointer", fontSize: 14, color: "#9ca3af", lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
-                  >×</span>
+              </MenuItem>
+              <MenuItem>
+                <FormControlLabel
+                  control={<Checkbox checked={activeFilters.toTown} onChange={() => handleFilterToggle("toTown")} />}
+                  label="To Town"
+                />
+              </MenuItem>
+              <MenuItem>
+                <FormControlLabel
+                  control={<Checkbox checked={activeFilters.dateRange} onChange={() => handleFilterToggle("dateRange")} />}
+                  label="Date Range"
+                />
+              </MenuItem>
+              <MenuItem>
+                <FormControlLabel
+                  control={<Checkbox checked={activeFilters.audUser} onChange={() => handleFilterToggle("audUser")} />}
+                  label="Created By (User)"
+                />
+              </MenuItem>
+              <MenuItem>
+                <FormControlLabel
+                  control={<Checkbox checked={activeFilters.audDate} onChange={() => handleFilterToggle("audDate")} />}
+                  label="Created Date"
+                />
+              </MenuItem>
+              <MenuItem>
+                <FormControlLabel
+                  control={<Checkbox checked={activeFilters.deliveryStatus} onChange={() => handleFilterToggle("deliveryStatus")} />}
+                  label="Delivery Status"
+                />
+              </MenuItem>
+            </Menu>
+
+            {activeFilters.search && (
+              <TextField
+                size="small"
+                placeholder="Search docket, consignor, town..."
+                value={searchText}
+                onChange={(e) => { setSearchText(e.target.value); setSelectedRow(null); }}
+                sx={{
+                  flex: "1 1 180px",
+                  minWidth: 160,
+                  "& .MuiInputBase-input": { fontSize: 13 },
+                  "& .MuiOutlinedInput-notchedOutline": { borderColor: "#7e22ce" },
+                  "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#7e22ce" },
+                }}
+              />
+            )}
+
+            {activeFilters.fromTown && (
+              <Autocomplete
+                size="small"
+                options={fromTownOptions}
+                value={fromTown || null}
+                onChange={(_, val) => { setFromTown(val || ""); setSelectedRow(null); }}
+                slotProps={{
+                  popupIndicator: { sx: { padding: "1px", minWidth: 16, width: 16, "& .MuiSvgIcon-root": { fontSize: 11 } } },
+                  clearIndicator: { sx: { display: "none" } },
+                  paper: { sx: {
+                    "& .MuiAutocomplete-option": { fontSize: 13, minHeight: "32px !important", padding: "4px 10px" },
+                    "& .MuiAutocomplete-listbox": {
+                      scrollbarWidth: "thin",
+                      "&::-webkit-scrollbar": { width: "1px" },
+                      "&::-webkit-scrollbar-thumb": { background: "rgba(168,85,247,0.9)", borderRadius: "999px" },
+                      "&::-webkit-scrollbar-track": { background: "#f3e8ff" },
+                    },
+                  } },
+                }}
+                sx={{ flex: "1 1 140px", minWidth: 130 }}
+                renderInput={(params) => (
+                  <TextField {...params} placeholder="From Town" sx={{ "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiOutlinedInput-notchedOutline": { borderColor: "#7e22ce" } }} />
                 )}
+              />
+            )}
+
+            {activeFilters.toTown && (
+              <Autocomplete
+                size="small"
+                options={toTownOptions}
+                value={toTown || null}
+                onChange={(_, val) => { setToTown(val || ""); setSelectedRow(null); }}
+                slotProps={{
+                  popupIndicator: { sx: { padding: "1px", minWidth: 16, width: 16, "& .MuiSvgIcon-root": { fontSize: 11 } } },
+                  clearIndicator: { sx: { display: "none" } },
+                  paper: { sx: {
+                    "& .MuiAutocomplete-option": { fontSize: 13, minHeight: "32px !important", padding: "4px 10px" },
+                    "& .MuiAutocomplete-listbox": {
+                      scrollbarWidth: "thin",
+                      "&::-webkit-scrollbar": { width: "1px" },
+                      "&::-webkit-scrollbar-thumb": { background: "rgba(168,85,247,0.9)", borderRadius: "999px" },
+                      "&::-webkit-scrollbar-track": { background: "#f3e8ff" },
+                    },
+                  } },
+                }}
+                sx={{ flex: "1 1 140px", minWidth: 130 }}
+                renderInput={(params) => (
+                  <TextField {...params} placeholder="To Town" sx={{ "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiOutlinedInput-notchedOutline": { borderColor: "#7e22ce" } }} />
+                )}
+              />
+            )}
+
+            {activeFilters.dateRange && (
+              <div style={{
+                position: "relative",
+                display: "flex", alignItems: "center",
+                border: "1.5px solid #c4b5fd", borderRadius: 6,
+                padding: "4px 8px", background: "#fff", flex: "1 1 260px", minWidth: 240,
+              }}>
+                <span style={{
+                  position: "absolute", top: -9, left: 8,
+                  background: "#fff", padding: "0 4px",
+                  fontSize: 11, fontWeight: 600, color: "#7e22ce",
+                  letterSpacing: "0.3px", lineHeight: 1, whiteSpace: "nowrap",
+                }}>Docket Date Range</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, width: "100%" }}>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => { setDateFrom(e.target.value); setSelectedRow(null); }}
+                    style={{ border: "none", outline: "none", fontSize: 13, color: "#374151", background: "transparent", width: "100%", colorScheme: "light" }}
+                  />
+                  <span style={{ fontSize: 12, color: "#7e22ce", fontWeight: 700, padding: "0 2px" }}>→</span>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => { setDateTo(e.target.value); setSelectedRow(null); }}
+                    style={{ border: "none", outline: "none", fontSize: 13, color: "#374151", background: "transparent", width: "100%", colorScheme: "light" }}
+                  />
+                  {(dateFrom || dateTo) && (
+                    <span
+                      onClick={() => { setDateFrom(""); setDateTo(""); setSelectedRow(null); }}
+                      style={{ cursor: "pointer", fontSize: 14, color: "#9ca3af", lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
+                    >×</span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+
+            {activeFilters.audUser && (
+              <Autocomplete
+                size="small"
+                options={audUserOptions}
+                getOptionLabel={(option) => option.label || ""}
+                value={audUserOptions.find((o) => o.id === audUser) || null}
+                onChange={(_, val) => { setAudUser(val?.id || ""); setSelectedRow(null); }}
+                slotProps={{
+                  popupIndicator: { sx: { padding: "1px", minWidth: 16, width: 16, "& .MuiSvgIcon-root": { fontSize: 11 } } },
+                  clearIndicator: { sx: { display: "none" } },
+                  paper: { sx: {
+                    "& .MuiAutocomplete-option": { fontSize: 13, minHeight: "32px !important", padding: "4px 10px" },
+                    "& .MuiAutocomplete-listbox": {
+                      scrollbarWidth: "thin",
+                      "&::-webkit-scrollbar": { width: "1px" },
+                      "&::-webkit-scrollbar-thumb": { background: "rgba(168,85,247,0.9)", borderRadius: "999px" },
+                      "&::-webkit-scrollbar-track": { background: "#f3e8ff" },
+                    },
+                  } },
+                }}
+                sx={{ flex: "1 1 140px", minWidth: 130 }}
+                renderInput={(params) => (
+                  <TextField {...params} placeholder="Created By" sx={{ "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiOutlinedInput-notchedOutline": { borderColor: "#7e22ce" } }} />
+                )}
+              />
+            )}
+
+            {activeFilters.audDate && (
+              <div style={{
+                position: "relative",
+                display: "flex", alignItems: "center",
+                border: "1.5px solid #c4b5fd", borderRadius: 6,
+                padding: "4px 8px", background: "#fff", flex: "1 1 260px", minWidth: 240,
+              }}>
+                <span style={{
+                  position: "absolute", top: -9, left: 8,
+                  background: "#fff", padding: "0 4px",
+                  fontSize: 11, fontWeight: 600, color: "#7e22ce",
+                  letterSpacing: "0.3px", lineHeight: 1, whiteSpace: "nowrap",
+                }}>Created Date Range</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, width: "100%" }}>
+                  <input
+                    type="date"
+                    value={audDateFrom}
+                    onChange={(e) => { setAudDateFrom(e.target.value); setSelectedRow(null); }}
+                    style={{ border: "none", outline: "none", fontSize: 13, color: "#374151", background: "transparent", width: "100%", colorScheme: "light" }}
+                  />
+                  <span style={{ fontSize: 12, color: "#7e22ce", fontWeight: 700, padding: "0 2px" }}>→</span>
+                  <input
+                    type="date"
+                    value={audDateTo}
+                    onChange={(e) => { setAudDateTo(e.target.value); setSelectedRow(null); }}
+                    style={{ border: "none", outline: "none", fontSize: 13, color: "#374151", background: "transparent", width: "100%", colorScheme: "light" }}
+                  />
+                  {(audDateFrom || audDateTo) && (
+                    <span
+                      onClick={() => { setAudDateFrom(""); setAudDateTo(""); setSelectedRow(null); }}
+                      style={{ cursor: "pointer", fontSize: 14, color: "#9ca3af", lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
+                    >×</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeFilters.deliveryStatus && (
+              <Autocomplete
+                size="small"
+                options={deliveryStatusOptions}
+                value={deliveryStatus || null}
+                onChange={(_, val) => { setDeliveryStatus(val || ""); setSelectedRow(null); }}
+                slotProps={{
+                  popupIndicator: { sx: { padding: "1px", minWidth: 16, width: 16, "& .MuiSvgIcon-root": { fontSize: 11 } } },
+                  clearIndicator: { sx: { display: "none" } },
+                  paper: { sx: {
+                    "& .MuiAutocomplete-option": { fontSize: 13, minHeight: "32px !important", padding: "4px 10px" },
+                    "& .MuiAutocomplete-listbox": {
+                      scrollbarWidth: "thin",
+                      "&::-webkit-scrollbar": { width: "1px" },
+                      "&::-webkit-scrollbar-thumb": { background: "rgba(168,85,247,0.9)", borderRadius: "999px" },
+                      "&::-webkit-scrollbar-track": { background: "#f3e8ff" },
+                    },
+                  } },
+                }}
+                sx={{ flex: "1 1 140px", minWidth: 130 }}
+                renderInput={(params) => (
+                  <TextField {...params} placeholder="Delivery Status" sx={{ "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiOutlinedInput-notchedOutline": { borderColor: "#7e22ce" } }} />
+                )}
+              />
+            )}
 
             <div style={{
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
@@ -484,7 +715,7 @@ export default function DocketReport() {
             }}>
               <span style={{ fontSize: 18, fontWeight: 700, color: "#7e22ce" }}>{gridRows.length}</span>
               <span style={{ fontSize: 10, fontWeight: 500, color: "#9333ea", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                {(searchText.trim() || fromTown || toTown || dateFrom || dateTo) ? "filtered" : "dockets"}
+                {(searchText.trim() || fromTown || toTown || dateFrom || dateTo || audUser || audDateFrom || audDateTo || deliveryStatus) ? "filtered" : "dockets"}
               </span>
             </div>
           </div>
