@@ -20,7 +20,7 @@ router.get('/locations', async (req, res) => {
 
 /* ================= PUBLIC DOCKET ================= */
 
-router.get('/docket/:docketNo', async (req, res) => {
+router.get('/docket/d/:docketNo', async (req, res) => {
   try {
     const data = await DocketController.getDocketByRecId(null, null, req.params.docketNo);
     if (data) res.json({ success: true, data });
