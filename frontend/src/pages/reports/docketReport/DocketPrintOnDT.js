@@ -1,7 +1,7 @@
 import moment from "moment";
 import QRCode from "qrcode";
 import { getTenantConfig } from "../../../utils/tenantService";
-import { openPrintDocument } from "../../../utils/printBridge";
+import { printDocketOnDt } from "../../../utils/printBridge";
 
 const fmt = (val) => val || "";
 
@@ -277,6 +277,92 @@ export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, co
   }
 
   const slipData = { form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl };
+
+  // Company/location details (same as used in the slip HTML) for native payloads
+  const coCompany = company?.company_name || getTenantConfig()?.tenant_name || "";
+  const coLocAddr = [currentLoc.loc_address, currentLoc.loc_town, currentLoc.loc_state, currentLoc.loc_postal_code].filter(Boolean).join(", ");
+  const coLocPhone = currentLoc.mobile_no || currentLoc.telephone_no || "";
+  const coGstin = company?.gstin_no || "";
+  const coPan = company?.pan_no || "";
+  const coPhone = company?.mobile_no || "";
+  const coEmail = company?.email_id || "";
+  const logoUrl = getTenantConfig()?.logo_url || "";
+
+  // Structured slip data for the native (React Native WebView) DT printer,
+  // built the same way as the docket label/sticker print payloads.
+  const qrPayload = [
+    `DN:${form.docket_no || ""}`,
+    `DD:${fmtDate(form.docket_date)}`,
+    `FR:${form.docket_from_town || form.docket_loc || ""}`,
+    `TO:${form.docket_to_town || form.docket_to_loc || ""}`,
+    `PKGS:${form.tot_pkgs || ""}`,
+    `AWT:${form.act_wt || ""}`,
+    `CWT:${form.chrg_wt || ""}`,
+    `CNOR:${form.cnor_name || ""}`,
+    `CNEE:${form.cnee_name || ""}`,
+    `INV:${form.invoice_no || ""}`,
+    `INVDT:${fmtDate(form.invoice_date)}`,
+    `SUP:9212312222`,
+  ].join("|");
+
+  const totalFreight = charges.reduce((s, c) => s + (parseFloat(c.charge_amt) || 0), 0);
+  const gstPct = 0;
+  const gstAmt = (totalFreight * gstPct) / 100;
+
+  const slips = copies.map((copyName) => ({
+    copyName: copyName || "",
+    company: coCompany,
+    companyAddress: coLocAddr,
+    companyGstin: coGstin,
+    companyPan: coPan,
+    companyEmail: coEmail,
+    companyPhone: coPhone,
+    locationPhone: coLocPhone,
+    logoUrl: logoUrl,
+    docketNo: form.docket_no || "",
+    docketDate: fmtDate(form.docket_date),
+    fromTown: form.docket_from_town || form.docket_loc || "",
+    toTown: form.docket_to_town || form.docket_to_loc || "",
+    transitType: form.transit_type || "",
+    loadType: form.load_type || "",
+    payType: form.pay_type || "",
+    cnorName: form.cnor_name || "",
+    cnorAddress: [
+      form.cnor_address, form.cnor_city, form.cnor_state,
+      form.cnor_pincode ? ` - ${form.cnor_pincode}` : "",
+    ].filter(Boolean).join(", "),
+    cnorGstin: form.cnor_gstin || "",
+    cneeName: form.cnee_name || "",
+    cneeAddress: [
+      form.cnee_address, form.cnee_city, form.cnee_state,
+      form.cnee_pincode ? ` - ${form.cnee_pincode}` : "",
+    ].filter(Boolean).join(", "),
+    cneeGstin: form.cnee_gstin || "",
+    dlyType: form.dly_type || "",
+    actWt: form.act_wt || "",
+    chrgWt: form.chrg_wt || "",
+    totPkgs: form.tot_pkgs || "",
+    goodsDesc: form.goods_desc || "",
+    invoiceNo: form.invoice_no || "",
+    invoiceDate: fmtDate(form.invoice_date),
+    invoiceValue: form.invoice_value || "",
+    ewbNo: printEwbNo || "",
+    ewbValid: fmtDate(ewb.ewb_valid),
+    remark: form.remark || "",
+    charges: charges.map((c) => ({
+      name: c.charge_name || c.charge_code || "",
+      amount: fmtAmt(c.charge_amt),
+    })),
+    totalFreight: fmtAmt(totalFreight),
+    gstPct,
+    gstAmt: fmtAmt(gstAmt),
+    grandTotal: fmtAmt(totalFreight + gstAmt),
+    prepareBy: form.prepare_by || "",
+    prepareDate: fmtDate(form.prepare_date),
+    qrData: qrPayload,
+    qrImage: qrDataUrl || "",
+  }));
+
   const slipsHtml = copies.map((copyName) => buildSlipHtml({...slipData, copyName})).join("");
 
   const html = `<!DOCTYPE html>
@@ -292,7 +378,8 @@ export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, co
 </body>
 </html>`;
 
-  openPrintDocument({
+  printDocketOnDt({
+    slips,
     html,
     title: `Consignment - ${form.docket_no || ""}`,
     features: "width=1200,height=800",

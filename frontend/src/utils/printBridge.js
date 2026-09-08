@@ -44,3 +44,19 @@ export function printStickers({ stickers, html, title = "Stickers", features = "
 
   return openPrintDocument({ html, title, features });
 }
+
+/**
+ * Sends structured 3-inch (DT printer) docket slip data to a React Native
+ * printer, with the existing printable HTML as the browser fallback.
+ * Native code should handle `PRINT_ON_DT` from `onMessage` and print each
+ * entry of `slips` on the thermal printer.
+ */
+export function printDocketOnDt({ slips, html, title = "Consignment", features = "width=1200,height=800" }) {
+  const nativeWebView = window.ReactNativeWebView;
+  if (nativeWebView?.postMessage) {
+    nativeWebView.postMessage(JSON.stringify({ type: "PRINT_ON_DT", slips, title }));
+    return { handledByNative: true };
+  }
+
+  return openPrintDocument({ html, title, features });
+}
