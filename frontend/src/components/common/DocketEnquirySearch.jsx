@@ -17,18 +17,18 @@ import RouteMap from "./RouteMap";
 import VehicleTrackingModal from "./VehicleTrackingModal";
 
 const docketFields = [
-  { label: "From Location",   name: "from_loc", span: 1 },
-  { label: "From Town",       name: "from_town", span: 1 },
-  { label: "To Location",     name: "to_loc", span: 1 },
-  { label: "To Town",         name: "to_town", span: 1 },
-  { label: "Docket No",       name: "docket_no", span: 1 },
-  { label: "Docket Date",     name: "docket_date",  type: "date", span: 1 },
-  { label: "Consignor",       name: "consignor", span: 2 },
-  { label: "Consignee",       name: "consignee", span: 2 },
-  { label: "Total Packages",  name: "total_pkgs",   type: "number", span: 1 },
-  { label: "Actual Weight",   name: "actual_wt",    type: "number", span: 1 },
-  { label: "Charged Weight",  name: "charged_wt",   type: "number", span: 1 },
-  { label: "E-Way Bill No",   name: "eway_bill_no", span: 1 },
+  { label: "From Location", name: "from_loc", span: 1 },
+  { label: "From Town", name: "from_town", span: 1 },
+  { label: "To Location", name: "to_loc", span: 1 },
+  { label: "To Town", name: "to_town", span: 1 },
+  { label: "Docket No", name: "docket_no", span: 1 },
+  { label: "Docket Date", name: "docket_date", type: "date", span: 1 },
+  { label: "Consignor", name: "consignor", span: 2 },
+  { label: "Consignee", name: "consignee", span: 2 },
+  { label: "Total Packages", name: "total_pkgs", type: "number", span: 1 },
+  { label: "Actual Weight", name: "actual_wt", type: "number", span: 1 },
+  { label: "Charged Weight", name: "charged_wt", type: "number", span: 1 },
+  { label: "E-Way Bill No", name: "eway_bill_no", span: 1 },
 ];
 
 const emptyForm = {
@@ -39,10 +39,10 @@ const emptyForm = {
 
 /* ── Current Status helpers ─────────────────────────────── */
 const STATUS_META = {
-  "In Transit":              { color: "#ea580c", bg: "#fff7ed", border: "#fdba74", icon: "🚛" },
-  "Arrived at Destination":  { color: "#1d4ed8", bg: "#eff6ff", border: "#93c5fd", icon: "📍" },
-  "Out for Delivery":        { color: "#7e22ce", bg: "#f3e8ff", border: "#d8b4fe", icon: "🛵" },
-  "Delivered":               { color: "#15803d", bg: "#dcfce7", border: "#86efac", icon: "✅" },
+  "In Transit": { color: "#ea580c", bg: "#fff7ed", border: "#fdba74", icon: "🚛" },
+  "Arrived at Destination": { color: "#1d4ed8", bg: "#eff6ff", border: "#93c5fd", icon: "📍" },
+  "Out for Delivery": { color: "#7e22ce", bg: "#f3e8ff", border: "#d8b4fe", icon: "🛵" },
+  "Delivered": { color: "#15803d", bg: "#dcfce7", border: "#86efac", icon: "✅" },
 };
 
 function computeCurrentStatus(note, manifestList) {
@@ -138,7 +138,7 @@ function PodViewer({ podUrl }) {
       ) : null}
       <div style={{ marginTop: 8 }}>
         <a href={url} target="_blank" rel="noreferrer"
-           style={{ color: "#15803d", fontWeight: 600, fontSize: 13, textDecoration: "underline" }}>
+          style={{ color: "#15803d", fontWeight: 600, fontSize: 13, textDecoration: "underline" }}>
           Open POD in new tab
         </a>
       </div>
@@ -147,17 +147,17 @@ function PodViewer({ podUrl }) {
 }
 
 const manifestBaseColumns = [
-  { key: "mnf_no",         label: "Manifest No" },
-  { key: "mnf_date",       label: "Manifest Date" },
-  { key: "mnf_loc",        label: "From Location" },
-  { key: "mnf_to_loc",     label: "To Location" },
-  { key: "mnf_from_town",  label: "From Town" },
-  { key: "mnf_to_town",    label: "To Town" },
-  { key: "desp_veh_no",    label: "Vehicle No" },
-  { key: "loaded_by",      label: "Driver Name" },
-  { key: "mnf_type",       label: "Manifest Type" },
+  { key: "mnf_no", label: "Manifest No" },
+  { key: "mnf_date", label: "Manifest Date" },
+  { key: "mnf_loc", label: "From Location" },
+  { key: "mnf_to_loc", label: "To Location" },
+  { key: "mnf_from_town", label: "From Town" },
+  { key: "mnf_to_town", label: "To Town" },
+  { key: "desp_veh_no", label: "Vehicle No" },
+  { key: "loaded_by", label: "Driver Name" },
+  { key: "mnf_type", label: "Manifest Type" },
   { key: "mnf_no_of_pkgs", label: "Packages" },
-  { key: "mnf_actual_wt",  label: "Weight" },
+  { key: "mnf_actual_wt", label: "Weight" },
 ];
 
 function makeManifestColumns(setMapRow, setMapRowCoords) {
@@ -181,7 +181,7 @@ function makeManifestColumns(setMapRow, setMapRowCoords) {
               display: "inline-flex", alignItems: "center", gap: 5,
               padding: "3px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600,
               background: arrived ? "#dcfce7" : "#fff7ed",
-              color:      arrived ? "#15803d" : "#ea580c",
+              color: arrived ? "#15803d" : "#ea580c",
               whiteSpace: "nowrap",
             }}>
               <span style={{
@@ -199,7 +199,7 @@ function makeManifestColumns(setMapRow, setMapRowCoords) {
                   sx={{ padding: "3px", color: "#1a73e8", "&:hover": { background: "#e8f0fe" } }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z"/>
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z" />
                   </svg>
                 </IconButton>
               </Tooltip>
@@ -221,18 +221,18 @@ export default function DocketEnquirySearch({ showForm = true }) {
   const { isLoading, showLoading, hideLoading } = useLoading();
 
   const [searchDocketNo, setSearchDocketNo] = useState("");
-  const [form, setForm]                     = useState({ ...emptyForm });
-  const [manifests, setManifests]           = useState([]);
-  const [docketFound, setDocketFound]       = useState(false);
-  const [mapRow, setMapRow]                 = useState(null);
-  const [mapRowCoords, setMapRowCoords]     = useState(null);
-  const [deliveryNote, setDeliveryNote]     = useState(null);
-  const [currentStatus, setCurrentStatus]   = useState(null);
-  const [ewbValid, setEwbValid]             = useState("");
-  const [trackingModal, setTrackingModal]   = useState({ open: false, vehicleNo: null });
+  const [form, setForm] = useState({ ...emptyForm });
+  const [manifests, setManifests] = useState([]);
+  const [docketFound, setDocketFound] = useState(false);
+  const [mapRow, setMapRow] = useState(null);
+  const [mapRowCoords, setMapRowCoords] = useState(null);
+  const [deliveryNote, setDeliveryNote] = useState(null);
+  const [currentStatus, setCurrentStatus] = useState(null);
+  const [ewbValid, setEwbValid] = useState("");
+  const [trackingModal, setTrackingModal] = useState({ open: false, vehicleNo: null });
 
   const manifestColumns = makeManifestColumns(setMapRow, setMapRowCoords);
-  const searchInputRef  = useRef(null);
+  const searchInputRef = useRef(null);
 
   const handleSearch = async () => {
     const docketNo = searchDocketNo.trim();
@@ -242,19 +242,19 @@ export default function DocketEnquirySearch({ showForm = true }) {
       const docketData = await getDocketByRecId(null, docketNo);
       if (docketData?.docket_no) {
         setForm({
-          docket_no:    docketData.docket_no || "",
-          docket_date:  docketData.docket_date ? docketData.docket_date.substring(0, 10) : "",
-          from_loc:     docketData.docket_loc || "",
-          from_town:    docketData.docket_pickup_town || docketData.from_town || "",
-          to_loc:       docketData.docket_to_loc || docketData.to_loc || "",
-          to_town:      docketData.docket_dly_town || docketData.to_town || "",
-          consignor:    docketData.cnor_name || "",
-          consignee:    docketData.cnee_name || "",
-          total_pkgs:   docketData.docket_tot_pkgs ?? docketData.total_pkgs ?? "",
-          actual_wt:    docketData.docket_act_wt ?? docketData.actual_wt ?? "",
-          charged_wt:   docketData.docket_chrg_wt || "",
+          docket_no: docketData.docket_no || "",
+          docket_date: docketData.docket_date ? docketData.docket_date.substring(0, 10) : "",
+          from_loc: docketData.docket_loc || "",
+          from_town: docketData.docket_pickup_town || docketData.from_town || "",
+          to_loc: docketData.docket_to_loc || docketData.to_loc || "",
+          to_town: docketData.docket_dly_town || docketData.to_town || "",
+          consignor: docketData.cnor_name || "",
+          consignee: docketData.cnee_name || "",
+          total_pkgs: docketData.docket_tot_pkgs ?? docketData.total_pkgs ?? "",
+          actual_wt: docketData.docket_act_wt ?? docketData.actual_wt ?? "",
+          charged_wt: docketData.docket_chrg_wt || "",
           eway_bill_no: docketData.eway_bill_no || docketData.ewb_no || "",
-          remarks:      docketData.docket_remark || "",
+          remarks: docketData.docket_remark || "",
         });
         // E-Way Bill expiry (used when docket is In Transit)
         setEwbValid(docketData.ewb_valid || "");
@@ -394,9 +394,8 @@ export default function DocketEnquirySearch({ showForm = true }) {
           )}
         </FormPanel>
       )}
-
-      {/* POD image — only when Delivered */}
-      {docketFound && currentStatus === "Delivered" && (
+      {/* POD image — show whenever a POD file is uploaded (not just when Delivered) */}
+      {docketFound && (deliveryNote?.pod_url || currentStatus === "Delivered") && (
         <PodViewer podUrl={deliveryNote?.pod_url} />
       )}
 
