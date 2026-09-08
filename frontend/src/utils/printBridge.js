@@ -60,3 +60,18 @@ export function printDocketOnDt({ slips, html, title = "Consignment", features =
 
   return openPrintDocument({ html, title, features });
 }
+
+/**
+ * Sends multiple selected docket rows to the native (React Native WebView) DT
+ * printer in one message. Native code should handle `PRINT_ON_DT` with a
+ * `dockets` array and print each entry on the thermal printer.
+ * (Browser fallback throws — batch DT printing is only meaningful in the app.)
+ */
+export function printDocketsOnDt({ dockets }) {
+  const nativeWebView = window.ReactNativeWebView;
+  if (nativeWebView?.postMessage) {
+    nativeWebView.postMessage(JSON.stringify({ type: "PRINT_ON_DT", dockets }));
+    return { handledByNative: true };
+  }
+  return { handledByNative: false };
+}
