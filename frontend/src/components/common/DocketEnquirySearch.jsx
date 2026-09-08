@@ -76,17 +76,34 @@ function StatusChip({ status, size = "md" }) {
 // File URLs must NOT include the /app routes prefix — static /uploads is served at the server root
 const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/app\/?$/, "");
 
-/** Resolve stored pod_url into an openable URL:
- *  - http(s)/data:            → use as-is
- *  - "/uploads/pod/<file>"    → prefix with API base (server root, no /app)
- *  - blob:                    → dead URL (old bug: never actually uploaded)
- *  - bare filename            → legacy, prefix with API base uploads/pod/ */
+/**
+ * Resolve stored pod_url into an openable URL.
+ * POD files are served through the API (/app/public/pod-file/<file>) instead of
+ * static /uploads — static /uploads is NOT reachable in production where only
+ * /app is proxied to the backend (that caused blank screens on "Open POD").
+ * Accepted stored values:
+ *  - http(s)/data:                → if it points at /uploads/pod/<f>, rewrite to the API route; else use as-is
+ *  - "/uploads/pod/<file>"        → API route: <API_BASE>/app/public/pod-file/<file>
+ *  - blob:                        → dead URL (old bug: never actually uploaded)
+ *  - bare filename (pod_*.jpg)    → API route
+ */
 function resolvePodUrl(url) {
   if (!url) return { url: "", dead: true };
   if (/^blob:/i.test(url)) return { url, dead: true };
-  if (/^(https?:|data:)/i.test(url)) return { url, dead: false };
-  if (/^\/?uploads\//i.test(url)) return { url: `${API_BASE}/${url.replace(/^\/+/, "")}`, dead: false };
-  return { url: `${API_BASE}/uploads/pod/${url.replace(/^\/+/, "")}`, dead: false };
+  if (/^(data:)/i.test(url)) return { url, dead: false };
+  if (/^https?:/i.test(url)) {
+    // Legacy absolute URL pointing at static /uploads — rewrite to the API route
+    const m = url.match(/\/uploads\/pod\/([^/?#]+)/i);
+    if (m) return { url: `${API_BASE}/app/public/pod-file/${m[1]}`, dead: false };
+    return { url, dead: false };
+  }
+  if (/^\/?uploads\/pod\//i.test(url)) {
+    return { url: `${API_BASE}/app/public/pod-file/${url.replace(/^\/?uploads\/pod\//i, "")}`, dead: false };
+  }
+  if (/^\/?uploads\//i.test(url)) {
+    return { url: `${API_BASE}/${url.replace(/^\/+/, "")}`, dead: false };
+  }
+  return { url: `${API_BASE}/app/public/pod-file/${url.replace(/^\/+/, "")}`, dead: false };
 }
 
 const isImageSrc = (url) =>
