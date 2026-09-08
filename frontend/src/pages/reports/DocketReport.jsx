@@ -17,6 +17,7 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import { printDocket } from "../../components/common/DocketPrint";
 import { printDocketOnDT } from "./docketReport/DocketPrintOnDT";
+import { printDocketsOnDt } from "../../utils/printBridge";
 import { printStickerFromRow } from "./docketReport/StickerPrint";
 import SelectedRowInfo from "../../components/common/SelectedRowInfo";
 import moment from "moment";
@@ -61,6 +62,7 @@ export default function DocketReport() {
 
   const [allDockets, setAllDockets]   = useState([]);
   const [selectedRow, setSelectedRow]   = useState(null);
+  const [selectedRows, setSelectedRows] = useState([]);
   const [printAnchor, setPrintAnchor]   = useState(null);
   const [company, setCompany]           = useState(null);
   const [locations, setLocations]     = useState([]);
@@ -161,10 +163,49 @@ export default function DocketReport() {
   const handleRowSelection = (selectionModel) => {
     // MUI DataGrid v9: selectionModel = { type: 'include'|'exclude', ids: Set<GridRowId> }
     const ids = [...(selectionModel?.ids ?? selectionModel ?? [])];
-    if (ids.length > 0) {
-      setSelectedRow(gridRows.find((r) => r.id === ids[ids.length - 1]) || null);
+    const rows = gridRows.filter((r) => ids.includes(r.id));
+    setSelectedRows(rows);
+    if (rows.length > 0) {
+      setSelectedRow(rows[rows.length - 1]);
     } else {
       setSelectedRow(null);
+    }
+  };
+
+  // Batch "Print on DT": sends every checkbox-selected docket row to the
+  // native DT printer in one message ({ type: 'PRINT_ON_DT', dockets: [...] }).
+  // Falls back to the single-docket flow when nothing is checkbox-selected.
+  const handlePrintOnDtBatch = async () => {
+    const rows = selectedRows.length > 0 ? selectedRows : selectedRow ? [selectedRow] : [];
+
+    if (rows.length === 0) {
+      showError("Please select at least one docket to print");
+      return;
+    }
+
+    // Single selection — keep the existing full-slip DT print flow
+    if (rows.length === 1 && selectedRows.length === 0) {
+      return handlePrintOnDT(true);
+    }
+
+    const dockets = rows.map((d) => ({
+      docketNo:     d.docket_no || "",
+      docketDate:   d.docket_date || "",
+      fromLocation: d.docket_loc || "",
+      toLocation:   d.docket_to_loc || "",
+      fromTown:     d.docket_pickup_town || "",
+      toTown:       d.docket_dly_town || "",
+      totPkgs:      String(d.docket_tot_pkgs ?? ""),
+      actWt:        String(d.docket_act_wt ?? ""),
+      chrgWt:       String(d.docket_chrg_wt ?? ""),
+      cnorName:     d.cnor_name || "",
+      cneeName:     d.cnee_name || "",
+      payType:      d.docket_pay_type || "",
+    }));
+
+    const res = printDocketsOnDt({ dockets });
+    if (!res.handledByNative) {
+      showError("DT printing is only available inside the app (WebView)");
     }
   };
 
@@ -498,7 +539,7 @@ export default function DocketReport() {
             <Button
               variant="contained"
               startIcon={<PrintIcon />}
-              onClick={() => handlePrintOnDT(true)}
+              onClick={() => handlePrintOnDtBatch()}
               sx={{
                 background: "#16a34a",
                 color: "white",
@@ -526,7 +567,6 @@ export default function DocketReport() {
             autoHeight
             scroll={{ afterRows: 10, horizontal: true }}
             checkboxSelection
-            disableMultipleRowSelection
             onRowSelectionModelChange={handleRowSelection}
           />
         </div>
