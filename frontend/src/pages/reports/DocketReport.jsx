@@ -16,6 +16,7 @@ import { IconButton, Tooltip, Button, TextField, Menu, MenuItem, ListItemIcon, L
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import { printDocket } from "../../components/common/DocketPrint";
+import { printDocketOnDT } from "./docketReport/DocketPrintOnDT";
 import { printStickerFromRow } from "./docketReport/StickerPrint";
 import SelectedRowInfo from "../../components/common/SelectedRowInfo";
 import moment from "moment";
@@ -250,6 +251,81 @@ export default function DocketReport() {
     await printStickerFromRow({ row: selectedRow, company });
   };
 
+
+  const handlePrintOnDT = async (withFreight) => {
+    if (!selectedRow) {
+      showError("Please select a docket to print");
+      return;
+    }
+    try {
+      showLoading();
+      const d = selectedRow;
+
+      const full = await fetchDocketByDocketNo(d.docket_no);
+
+      const form = {
+        docket_no:        full.docket_no        || d.docket_no,
+        docket_date:      full.docket_date      || d.docket_date,
+        docket_loc:       full.docket_loc       || d.docket_loc,
+        docket_from_town: full.docket_from_town || d.docket_pickup_town || d.docket_from_town,
+        docket_to_loc:    full.docket_to_loc    || d.docket_to_loc,
+        docket_to_town:   full.docket_to_town   || d.docket_dly_town   || d.docket_to_town,
+        pay_type:         full.docket_pay_type  || d.docket_pay_type,
+        pay_loc:          full.docket_pay_loc   || d.docket_pay_loc,
+        transit_type:     full.docket_transit_type || d.docket_transit_type,
+        load_type:        full.docket_load_type    || d.docket_load_type,
+        cnor_name:        full.cnor_name    || d.cnor_name,
+        cnor_address:     full.cnor_address || d.cnor_address,
+        cnor_city:        full.cnor_city    || d.cnor_city,
+        cnor_state:       full.cnor_state   || d.cnor_state,
+        cnor_pincode:     full.cnor_pincode || d.cnor_pincode,
+        cnor_gstin:       full.cnor_gstin   || d.cnor_gstin,
+        cnee_name:        full.cnee_name    || d.cnee_name,
+        cnee_address:     full.cnee_address || d.cnee_address,
+        cnee_city:        full.cnee_city    || d.cnee_city,
+        cnee_state:       full.cnee_state   || d.cnee_state,
+        cnee_pincode:     full.cnee_pincode || d.cnee_pincode,
+        cnee_gstin:       full.cnee_gstin   || d.cnee_gstin,
+        dly_type:         full.docket_dly_type  || d.docket_dly_type,
+        act_wt:           full.docket_act_wt    || d.docket_act_wt,
+        chrg_wt:          full.docket_chrg_wt   || d.docket_chrg_wt,
+        tot_pkgs:         full.docket_tot_pkgs  || d.docket_tot_pkgs,
+        goods_desc:       full.docket_goods_desc || d.docket_goods_desc,
+        invoice_no:       full.docket_inv_no    || d.docket_inv_no,
+        invoice_date:     full.docket_inv_date  || d.docket_inv_date,
+        invoice_value:    full.docket_inv_value || d.docket_inv_value,
+        remark:           full.docket_remark    || d.docket_remark,
+        prepare_by :      full.prepare_by || d.prepare_by,
+        prepare_date:     full.prepare_date || d.prepare_date,
+      };
+
+      let charges = [];
+      if (withFreight) {
+        const result = await fetchCharges(d.docket_no);
+        charges = Array.isArray(result) ? result : [];
+      }
+
+      const ewbList = d.ewb_no || d.eway_bill_no
+        ? [{ ewb_no: d.ewb_no || d.eway_bill_no, ewb_valid: d.ewb_valid, vehicle_no: d.desp_veh_no || "" }]
+        : [];
+
+      await printDocketOnDT({
+        form,
+        charges,
+        ewbList,
+        ewbNoDisplay: d.ewb_no || d.eway_bill_no || "",
+        company,
+        locations,
+        copies: ["Consignor Copy", "Consignee Copy", "Lorry Copy", "File Copy"],
+      });
+    } catch (err) {
+      showError(err.message || "Failed to print docket");
+      console.error("Print docket 3 inch error:", err);
+    } finally {
+      hideLoading();
+    }
+  };
+
   return (
     <MainLayout>
       <PageBody title="Docket Report">
@@ -419,6 +495,21 @@ export default function DocketReport() {
                 <ListItemText primaryTypographyProps={{ fontSize: 13 }}>Print without Freight</ListItemText>
               </MenuItem>
             </Menu>
+            <Button
+              variant="contained"
+              startIcon={<PrintIcon />}
+              onClick={() => handlePrintOnDT(true)}
+              sx={{
+                background: "#16a34a",
+                color: "white",
+                textTransform: "none",
+                fontWeight: 600,
+                borderRadius: 2,
+                "&:hover": { background: "#15803d" },
+              }}
+            >
+              Print on DT
+            </Button>
           </div>
         </div>
 
