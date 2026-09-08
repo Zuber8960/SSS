@@ -124,7 +124,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/transaction/hire-voucher",     label: "Hire Voucher",    icon: <ReceiptLongIcon /> },
         { path: "/transaction/manifest-unloading", label: "Manifest Unloading", icon: <UnarchiveIcon /> },
         { path: "/transaction/customer-bill", label: "Customer Bill", icon: <ReceiptLongIcon /> },
-        { path: "/reports/delivery-update", label: "Delivery Update", icon: <SystemUpdateAltIcon /> },
+        { path: "/transaction/delivery-update", label: "Delivery Update", icon: <SystemUpdateAltIcon /> },
       ],
     },
     {
