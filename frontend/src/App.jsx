@@ -52,7 +52,7 @@ const appRoutes = [
   { path: "/transaction/manifest-unloading", element: <ManifestUnloading />, protected: true },
   { path: "/reports/docket-enquiry", element: <DocketEnquiry />, protected: true },
   { path: "/transaction/customer-bill", element: <CustomerBill />, protected: true },
-  { path: "/reports/delivery-update", element: <DeliveryUpdate />, protected: true },
+  { path: "/transaction/delivery-update", element: <DeliveryUpdate />, protected: true },
   { path: "/reports/docket-report", element: <DocketReport />, protected: true },
   { path: "/reports/invoice-report", element: <InvoiceReport />, protected: true },
   { path: "/reports/manifest-report", element: <ManifestReport />, protected: true },
