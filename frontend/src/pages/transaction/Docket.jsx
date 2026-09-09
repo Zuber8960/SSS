@@ -344,7 +344,11 @@ export default function DocketPage() {
     }
     const charges = withFreight ? (chargesRef.current?.getChargeList() ?? []) : [];
     await printDocket({
-      form,
+      form: {
+        ...form,
+        prepare_by: form.prepare_by || "",
+        prepare_date: form.prepare_date,
+      },
       charges,
       ewbList,
       ewbNoDisplay,
@@ -901,6 +905,8 @@ export default function DocketPage() {
             goods_subgrp:        docketData.docket_goods_subgrp || "",
             goods_desc:          docketData.docket_goods_desc   || "",
             remark:              docketData.docket_remark       || "",
+            prepare_by:          docketData.prepare_by          || "",
+            prepare_date:        toDate(docketData.prepare_date),
           };
           setDirtyFields(new Set());
           // Update prevLocRef before setForm so the location-change effect
