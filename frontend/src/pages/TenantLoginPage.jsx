@@ -9,6 +9,10 @@ import {
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import LockIcon from "@mui/icons-material/Lock";
+import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import LinearProgress from "@mui/material/LinearProgress";
 import axios from "axios";
 import backgroundImage from "../images/tanent-img.png";
 import { fetchAllTenants, tenantLogin } from "../utils/tenantService";
@@ -199,6 +203,26 @@ export default function TenantLoginPage() {
     setChangePwdOpen(false);
     setErrors({});
   };
+
+  // ── Password strength (0–4) for the change-password dialog ──
+  const cpStrength = (() => {
+    const pwd = cpNew;
+    if (!pwd) return 0;
+    let score = 0;
+    if (pwd.length >= 6) score++;
+    if (pwd.length >= 10) score++;
+    if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score++;
+    if (/\d/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+    return Math.min(score, 4);
+  })();
+  const strengthMeta = [
+    { label: "", color: "#e0e0e0" },
+    { label: "Weak", color: "#ef4444" },
+    { label: "Fair", color: "#f59e0b" },
+    { label: "Good", color: "#22c55e" },
+    { label: "Strong", color: "#16a34a" },
+  ][cpStrength];
 
   const handleChangePassword = async () => {
     const e = {};
@@ -548,10 +572,52 @@ export default function TenantLoginPage() {
         maxWidth="xs"
         fullWidth
         disableRestoreFocus
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            overflow: "hidden",
+            border: `1px solid ${primaryColor}22`,
+            boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+          },
+        }}
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>Change Password</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ pt: 1 }}>
+        {/* Gradient header */}
+        <Box
+          sx={{
+            background: gradient,
+            color: "#fff",
+            px: 3,
+            py: 2.5,
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+          }}
+        >
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "rgba(255,255,255,0.18)",
+              backdropFilter: "blur(4px)",
+              flexShrink: 0,
+            }}
+          >
+            <LockIcon sx={{ fontSize: 22 }} />
+          </Box>
+          <Box>
+            <Typography fontWeight={700} fontSize={17}>Change Password</Typography>
+            <Typography fontSize={12} sx={{ opacity: 0.9 }}>
+              Keep your account secure with a strong password
+            </Typography>
+          </Box>
+        </Box>
+
+        <DialogContent sx={{ px: 3, pt: 3, pb: 1 }}>
+          <Stack spacing={2}>
             <TextField
               label="User ID"
               size="small"
@@ -560,6 +626,14 @@ export default function TenantLoginPage() {
               error={errors.userId}
               disabled={cpLoading}
               fullWidth
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <PersonOutlineOutlinedIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
             />
             <TextField
               label="Current Password"
@@ -571,34 +645,66 @@ export default function TenantLoginPage() {
               disabled={cpLoading}
               fullWidth
               InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <LockIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                  </InputAdornment>
+                ),
                 endAdornment: (
                   <InputAdornment position="end">
                     <IconButton size="small" onClick={() => setCpShowCurrent(!cpShowCurrent)} edge="end">
-                      {cpShowCurrent ? <VisibilityOff /> : <Visibility />}
+                      {cpShowCurrent ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                     </IconButton>
                   </InputAdornment>
                 ),
               }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
             />
-            <TextField
-              label="New Password"
-              type={cpShowNew ? "text" : "password"}
-              size="small"
-              value={cpNew}
-              onChange={(e) => { setCpNew(e.target.value); setErrors(p => ({ ...p, cpNew: false })); }}
-              error={errors.cpNew}
-              disabled={cpLoading}
-              fullWidth
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setCpShowNew(!cpShowNew)} edge="end">
-                      {cpShowNew ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
+            <Box>
+              <TextField
+                label="New Password"
+                type={cpShowNew ? "text" : "password"}
+                size="small"
+                value={cpNew}
+                onChange={(e) => { setCpNew(e.target.value); setErrors(p => ({ ...p, cpNew: false })); }}
+                error={errors.cpNew}
+                disabled={cpLoading}
+                fullWidth
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LockIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={() => setCpShowNew(!cpShowNew)} edge="end">
+                        {cpShowNew ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+              />
+              {cpNew && (
+                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 1 }}>
+                  <LinearProgress
+                    variant="determinate"
+                    value={(cpStrength / 4) * 100}
+                    sx={{
+                      flexGrow: 1,
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: "#eee",
+                      "& .MuiLinearProgress-bar": { backgroundColor: strengthMeta.color, borderRadius: 3 },
+                    }}
+                  />
+                  <Typography fontSize={11} fontWeight={700} sx={{ color: strengthMeta.color, minWidth: 44, textAlign: "right" }}>
+                    {strengthMeta.label}
+                  </Typography>
+                </Stack>
+              )}
+            </Box>
             <TextField
               label="Confirm New Password"
               type={cpShowConfirm ? "text" : "password"}
@@ -609,26 +715,56 @@ export default function TenantLoginPage() {
               disabled={cpLoading}
               fullWidth
               InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    {cpConfirm && cpNew === cpConfirm
+                      ? <CheckCircleIcon fontSize="small" sx={{ color: "#16a34a" }} />
+                      : <LockIcon fontSize="small" sx={{ color: "text.secondary" }} />}
+                  </InputAdornment>
+                ),
                 endAdornment: (
                   <InputAdornment position="end">
                     <IconButton size="small" onClick={() => setCpShowConfirm(!cpShowConfirm)} edge="end">
-                      {cpShowConfirm ? <VisibilityOff /> : <Visibility />}
+                      {cpShowConfirm ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                     </IconButton>
                   </InputAdornment>
                 ),
               }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+              helperText={
+                cpConfirm
+                  ? cpNew === cpConfirm
+                    ? "Passwords match"
+                    : "Passwords do not match yet"
+                  : undefined
+              }
+              FormHelperTextProps={{ sx: { ml: 0.5 } }}
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={closeChangePwd} disabled={cpLoading} sx={{ textTransform: "none" }}>
+
+        <DialogActions sx={{ px: 3, pb: 2.5, pt: 1, gap: 1 }}>
+          <Button
+            onClick={closeChangePwd}
+            disabled={cpLoading}
+            variant="outlined"
+            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600, borderColor: `${primaryColor}55`, color: primaryColor }}
+          >
             Cancel
           </Button>
           <Button
             variant="contained"
             onClick={handleChangePassword}
             disabled={cpLoading}
-            sx={{ background: buttonColor, "&:hover": { background: buttonColor, filter: "brightness(0.9)" }, textTransform: "none", fontWeight: 700 }}
+            disableElevation
+            sx={{
+              borderRadius: 2,
+              textTransform: "none",
+              fontWeight: 700,
+              px: 3,
+              background: gradient,
+              "&:hover": { background: gradient, filter: "brightness(1.08)" },
+            }}
           >
             {cpLoading ? <CircularProgress size={20} color="inherit" /> : "Update Password"}
           </Button>
