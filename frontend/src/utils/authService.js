@@ -42,6 +42,17 @@ export const resetPassword = (userId, email, mobileNo, newPassword) =>
     new_password: newPassword,
   }).then(r => r.data);
 
+// Change password using the current password (used on the tenant login page)
+export const changePassword = (userId, currentPassword, newPassword) => {
+  const tenantToken = getTenantToken();
+  return Api.post('/change-password', {
+    user_id: userId,
+    current_password: currentPassword,
+    new_password: newPassword,
+    ...(tenantToken && { tenantToken }),
+  }).then(r => r.data);
+};
+
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 
 export const logout = () => {

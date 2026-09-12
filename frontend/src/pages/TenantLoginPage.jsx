@@ -4,6 +4,7 @@ import {
   Box, Stack, Typography, TextField, Button,
   Paper, CircularProgress, InputAdornment, IconButton,
   FormControl, InputLabel, Select, MenuItem,
+  Dialog, DialogTitle, DialogContent, DialogActions,
 } from "@mui/material";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
@@ -11,7 +12,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import axios from "axios";
 import backgroundImage from "../images/tanent-img.png";
 import { fetchAllTenants, tenantLogin } from "../utils/tenantService";
-import { loginUser } from "../utils/authService";
+import { loginUser, changePassword } from "../utils/authService";
 import { updateUser } from "../utils/userAPI";
 import CommonAlertDialog from "../components/common/CommonAlertDialog";
 import useAlert from "../components/common/UseAlert";
@@ -41,6 +42,17 @@ export default function TenantLoginPage() {
   const [selectedDivision, setSelectedDivision] = useState("");
   const [locations, setLocations] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState("");
+
+  // ── Change password dialog state ──
+  const [changePwdOpen, setChangePwdOpen] = useState(false);
+  const [cpUserId, setCpUserId] = useState("");
+  const [cpCurrent, setCpCurrent] = useState("");
+  const [cpNew, setCpNew] = useState("");
+  const [cpConfirm, setCpConfirm] = useState("");
+  const [cpShowCurrent, setCpShowCurrent] = useState(false);
+  const [cpShowNew, setCpShowNew] = useState(false);
+  const [cpShowConfirm, setCpShowConfirm] = useState(false);
+  const [cpLoading, setCpLoading] = useState(false);
 
   useEffect(() => {
     if (!tenantVerified) return;
@@ -171,6 +183,61 @@ export default function TenantLoginPage() {
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") tenantVerified ? handleAppLogin() : handleTenantLogin();
+  };
+
+  const openChangePwd = () => {
+    setCpUserId(userId); // prefill with the User ID typed on the sign-in form, if any
+    setCpCurrent("");
+    setCpNew("");
+    setCpConfirm("");
+    setErrors({});
+    setChangePwdOpen(true);
+  };
+
+  const closeChangePwd = () => {
+    if (cpLoading) return;
+    setChangePwdOpen(false);
+    setErrors({});
+  };
+
+  const handleChangePassword = async () => {
+    const e = {};
+    if (!cpUserId) e.userId = true;
+    if (!cpCurrent) e.password = true;
+    if (!cpNew) e.cpNew = true;
+    if (!cpConfirm) e.cpConfirm = true;
+    if (Object.keys(e).length) {
+      setErrors(p => ({ ...p, ...e }));
+      showError("All fields are required");
+      return;
+    }
+    if (cpNew !== cpConfirm) {
+      setErrors(p => ({ ...p, cpConfirm: true }));
+      showError("New password and confirm password do not match");
+      return;
+    }
+    if (cpNew === cpCurrent) {
+      setErrors(p => ({ ...p, cpNew: true }));
+      showError("New password must be different from the current password");
+      return;
+    }
+    setCpLoading(true);
+    try {
+      const result = await changePassword(cpUserId, cpCurrent, cpNew);
+      if (result.success) {
+        showSuccess("Password changed successfully. Please sign in with your new password.");
+        setChangePwdOpen(false);
+        setUserId(cpUserId);
+        setPassword("");
+      } else {
+        showError(result.message || "Failed to change password");
+      }
+    } catch (err) {
+      console.log(err);
+      showError(err.message || "Failed to change password");
+    } finally {
+      setCpLoading(false);
+    }
   };
 
   const brand = config?.brand || {};
@@ -446,21 +513,127 @@ export default function TenantLoginPage() {
                     {loading ? <CircularProgress size={20} color="inherit" /> : "Sign In"}
                   </Button>
 
-                  <Button
-                    startIcon={<ArrowBackIcon />}
-                    onClick={() => navigate("/")}
-                    sx={{ color: primaryColor, textTransform: "none", fontSize: 13 }}
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={1}
+                    justifyContent="space-between"
+                    alignItems={{ xs: "stretch", sm: "center" }}
                   >
-                    Back to organisation selection
-                  </Button>
+                    <Button
+                      startIcon={<ArrowBackIcon />}
+                      onClick={() => navigate("/")}
+                      sx={{ color: primaryColor, textTransform: "none", fontSize: 13 }}
+                    >
+                      Back to organisation selection
+                    </Button>
+                    <Button
+                      onClick={openChangePwd}
+                      sx={{ color: buttonColor, textTransform: "none", fontSize: 13, fontWeight: 600}}
+                    >
+                      Change Password
+                    </Button>
+                  </Stack>
                 </Stack>
               )}
-          </Paper>
+            </Paper>
+          </Box>
         </Box>
-      </Box>
 
-      <Footer />
-    </Box >
+        <Footer />
+      </Box >
+      {/* ── Change Password dialog ── */}
+      <Dialog
+        open={changePwdOpen}
+        onClose={closeChangePwd}
+        maxWidth="xs"
+        fullWidth
+        disableRestoreFocus
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>Change Password</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <TextField
+              label="User ID"
+              size="small"
+              value={cpUserId}
+              onChange={(e) => { setCpUserId(e.target.value); setErrors(p => ({ ...p, userId: false })); }}
+              error={errors.userId}
+              disabled={cpLoading}
+              fullWidth
+            />
+            <TextField
+              label="Current Password"
+              type={cpShowCurrent ? "text" : "password"}
+              size="small"
+              value={cpCurrent}
+              onChange={(e) => { setCpCurrent(e.target.value); setErrors(p => ({ ...p, password: false })); }}
+              error={errors.password}
+              disabled={cpLoading}
+              fullWidth
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setCpShowCurrent(!cpShowCurrent)} edge="end">
+                      {cpShowCurrent ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <TextField
+              label="New Password"
+              type={cpShowNew ? "text" : "password"}
+              size="small"
+              value={cpNew}
+              onChange={(e) => { setCpNew(e.target.value); setErrors(p => ({ ...p, cpNew: false })); }}
+              error={errors.cpNew}
+              disabled={cpLoading}
+              fullWidth
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setCpShowNew(!cpShowNew)} edge="end">
+                      {cpShowNew ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <TextField
+              label="Confirm New Password"
+              type={cpShowConfirm ? "text" : "password"}
+              size="small"
+              value={cpConfirm}
+              onChange={(e) => { setCpConfirm(e.target.value); setErrors(p => ({ ...p, cpConfirm: false })); }}
+              error={errors.cpConfirm}
+              disabled={cpLoading}
+              fullWidth
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setCpShowConfirm(!cpShowConfirm)} edge="end">
+                      {cpShowConfirm ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={closeChangePwd} disabled={cpLoading} sx={{ textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleChangePassword}
+            disabled={cpLoading}
+            sx={{ background: buttonColor, "&:hover": { background: buttonColor, filter: "brightness(0.9)" }, textTransform: "none", fontWeight: 700 }}
+          >
+            {cpLoading ? <CircularProgress size={20} color="inherit" /> : "Update Password"}
+          </Button>
+        </DialogActions>
+      </Dialog>
       <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
     </>
   );

@@ -74,6 +74,28 @@ const getUserByCredentials = async (userId, email, mobile_no) => {
   }
   return {err, user};
 }
+/**
+ * Verify a user's current password (for change-password flow).
+ * Returns the user record when the password matches, otherwise null.
+ * Mirrors the legacy plain-text fallback used in authenticateUser.
+ */
+const verifyUserPassword = async (userId, password, tenant_id) => {
+  const conditions = { user_id: userId, record_status: 0 };
+  if (tenant_id) conditions.tenant_id = tenant_id;
+  const user = await db('sss.ssm_user').where(conditions).first();
+
+  if (!user || user.user_status === 'I') return null;
+
+  let passwordMatch = await bcrypt.compare(password, user.password_hash || '');
+  if (!passwordMatch) {
+    passwordMatch = user.password_hash === password; // legacy plain-text passwords
+  }
+  return passwordMatch ? user : null;
+};
+
+/**
+ * Get user by user_id (login ID)
+ */
 
 /**
  * Update user
@@ -159,5 +181,6 @@ module.exports = {
   deleteUser,
   authenticateUser,
   updateUserPassword,
-  getUserByCredentials
+  getUserByCredentials,
+  verifyUserPassword
 };

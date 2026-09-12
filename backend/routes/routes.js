@@ -171,6 +171,60 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
+/* ================= CHANGE PASSWORD ================= */
+
+router.post('/change-password', async (req, res) => {
+  try {
+    const { user_id, current_password, new_password, tenantToken } = req.body;
+
+    if (!user_id || !current_password || !new_password) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID, current password and new password are required'
+      });
+    }
+
+    // Scope the lookup to the verified tenant when a tenant token is present
+    let tenant_id = null;
+    if (tenantToken) {
+      try {
+        const secret = process.env.JWT_SECRET || 'your_jwt_secret_key';
+        tenant_id = jwt.verify(tenantToken, secret).tenant_id ?? null;
+      } catch {
+        tenant_id = null;
+      }
+    }
+
+    const user = await UserController.verifyUserPassword(user_id, current_password, tenant_id);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid User ID or current password'
+      });
+    }
+
+    if (current_password === new_password) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be different from the current password'
+      });
+    }
+
+    await UserController.updateUserPassword(user.rec_id, new_password);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error changing password'
+    });
+  }
+});
+
 /* ================= PINCODE MASTER (read-only) ================= */
 
 router.use('/pincodeMaster', pincodeMasterRoutes);
