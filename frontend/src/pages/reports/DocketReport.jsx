@@ -246,9 +246,7 @@ export default function DocketReport() {
     }
 
     // Single selection — keep the existing full-slip DT print flow
-    if (rows.length === 1 && selectedRows.length === 0) {
-      return handlePrintOnDT(true);
-    }
+    
 
     const dockets = rows.map((d) => ({
       docketNo:     d.docket_no || "",
@@ -266,9 +264,13 @@ export default function DocketReport() {
     }));
 
     const res = printDocketsOnDt({ dockets });
-    if (!res.handledByNative) {
-      showError("DT printing is only available inside the app (WebView)");
+    // if (!res.handledByNative) {
+    //   showError("DT printing is only available inside the app (WebView)");
+    // }
+    if (selectedRows.length === 1) {
+      return handlePrintOnDT(true);
     }
+
   };
 
   const handlePrint = async (withFreight) => {
