@@ -129,7 +129,7 @@ const deleteUser = async (recId) => {
  * @param {string} password - Plain text password
  * @returns {Object} - User object if authenticated, null otherwise
  */
-const authenticateUser = async (userId, password, tenant_id) => {
+const authenticateUser = async (userId, password, tenant_id, loc_id) => {
   try {
     // Query user by user_id and active status
     let conditions = { user_id: userId, record_status: 0 };
@@ -152,6 +152,10 @@ const authenticateUser = async (userId, password, tenant_id) => {
     // If password_hash is not a valid bcrypt hash, compare directly (for legacy passwords)
     if (!passwordMatch) {
       passwordMatch = user.password_hash === password;      
+    }
+
+    if (user.is_admin === 'N' && user.loc_code !== loc_id) {
+      return { success: false, message: 'Invalid location for this user' };
     }
 
     if (passwordMatch) {

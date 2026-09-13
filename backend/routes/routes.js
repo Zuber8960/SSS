@@ -55,7 +55,14 @@ router.post('/login', async (req, res) => {
       tenant_id = decoded.tenant_id ?? null;
     }
 
-    const user = await UserController.authenticateUser(userId, password, tenant_id);
+    const user = await UserController.authenticateUser(userId, password, tenant_id, loc_id);
+    if (user && user.success === false) {
+      return res.status(401).json({
+        success: false,
+        message: user.message
+      });
+    }
+
 
     if (user) {
       let query = db('sss.ssm_location')
