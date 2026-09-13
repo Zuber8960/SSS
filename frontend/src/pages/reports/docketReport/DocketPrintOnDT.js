@@ -83,68 +83,78 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
         </div>
       </div>
 
-      <table class="details-table-3inch">
-        <tr>
-          <td class="detail-label-3inch">Delivery Type</td>
-          <td>${fmt(form.dly_type)}</td>
-          <td class="detail-label-3inch">Actual Wt</td>
-          <td>${fmt(form.act_wt)} Kg</td>
-          <td class="detail-label-3inch">Charged Wt</td>
-          <td>${fmt(form.chrg_wt)} Kg</td>
-        </tr>
-        <tr>
-          <td class="detail-label-3inch">Packages</td>
-          <td>${fmt(form.tot_pkgs)}</td>
-          <td class="detail-label-3inch">Goods</td>
-          <td colspan="3">${fmt(form.goods_desc)}</td>
-        </tr>
-        <tr>
-          <td class="detail-label-3inch">Inv No</td>
-          <td>${fmt(form.invoice_no)}</td>
-          <td class="detail-label-3inch">Inv Date</td>
-          <td>${fmtDate(form.invoice_date)}</td>
-          <td class="detail-label-3inch">Inv Value</td>
-          <td>${fmt(form.invoice_value)}</td>
-        </tr>
-        <tr>
-          <td class="detail-label-3inch">E-Way Bill</td>
-          <td>${fmt(printEwbNo)}</td>
-          <td class="detail-label-3inch">Valid</td>
-          <td colspan="3">${fmtDate(ewb.ewb_valid)}</td>
-        </tr>
-        <tr>
-          <td class="detail-label-3inch" colspan="6">Remark</td>
-        </tr>
-        <tr>
-          <td colspan="6">${fmt(form.remark)}</td>
-        </tr>
-      </table>
-
-      <table class="charges-table-3inch">
-        <thead>
-          <tr><th>Freight Details</th><th>Amount</th></tr>
-        </thead>
-        <tbody>
-          ${charges.map((c) => `
+      <div class="content-row-3inch">
+        <div class="details-col-3inch">
+          <table class="details-table-3inch">
             <tr>
-              <td>${c.charge_name || c.charge_code}</td>
-              <td class="amt-cell-3inch">₹ ${fmtAmt(c.charge_amt)}</td>
+              <td class="detail-label-3inch">Delivery Type</td>
+              <td>${fmt(form.dly_type)}</td>
+              <td class="detail-label-3inch">Actual Wt</td>
+              <td>${fmt(form.act_wt)} Kg</td>
             </tr>
-          `).join("")}
-          <tr class="total-row-3inch">
-            <td>Total Freight</td>
-            <td class="amt-cell-3inch">₹ ${fmtAmt(totalFreight)}</td>
-          </tr>
-          <tr class="total-row-3inch">
-            <td>GST ${gstPct}%</td>
-            <td class="amt-cell-3inch">₹ ${fmtAmt(gstAmt)}</td>
-          </tr>
-          <tr class="grand-total-row-3inch">
-            <td>Grand Total</td>
-            <td class="amt-cell-3inch">₹ ${fmtAmt(totalFreight + gstAmt)}</td>
-          </tr>
-        </tbody>
-      </table>
+            <tr>
+              <td class="detail-label-3inch">Packages</td>
+              <td>${fmt(form.tot_pkgs)}</td>
+              <td class="detail-label-3inch">Charged Wt</td>
+              <td>${fmt(form.chrg_wt)} Kg</td>
+            </tr>
+            <tr>
+              <td class="detail-label-3inch">Inv No</td>
+              <td>${fmt(form.invoice_no)}</td>
+              <td class="detail-label-3inch">Inv Date</td>
+              <td>${fmtDate(form.invoice_date)}</td>
+            </tr>
+            <tr>
+              <td class="detail-label-3inch">Inv Value</td>
+              <td>${fmt(form.invoice_value)}</td>
+              <td class="detail-label-3inch">E-Way Bill</td>
+              <td>${fmt(printEwbNo)}</td>
+            </tr>
+            <tr>
+              <td class="detail-label-3inch">Valid</td>
+              <td colspan="3">${fmtDate(ewb.ewb_valid)}</td>
+            </tr>
+            <tr>
+              <td class="detail-label-3inch">Goods</td>
+              <td colspan="3">${fmt(form.goods_desc)}</td>
+            </tr>
+            <tr>
+              <td class="detail-label-3inch">Remark</td>
+              <td colspan="3">${fmt(form.remark)}</td>
+            </tr>
+          </table>
+        </div>
+
+        <table class="charges-table-3inch">
+          <colgroup>
+            <col style="width: 65%;">
+            <col style="width: 35%;">
+          </colgroup>
+          <thead>
+            <tr><th>Freight Details</th><th style="text-align: right;">Amount</th></tr>
+          </thead>
+          <tbody>
+            ${charges.map((c) => `
+              <tr>
+                <td>${c.charge_name || c.charge_code}</td>
+                <td style="text-align: right;">₹ ${fmtAmt(c.charge_amt)}</td>
+              </tr>
+            `).join("")}
+            <tr class="total-row-3inch">
+              <td>Total Freight</td>
+              <td style="text-align: right;">₹ ${fmtAmt(totalFreight)}</td>
+            </tr>
+            <tr class="total-row-3inch">
+              <td>GST ${gstPct}%</td>
+              <td style="text-align: right;">₹ ${fmtAmt(gstAmt)}</td>
+            </tr>
+            <tr class="grand-total-row-3inch">
+              <td>Grand Total</td>
+              <td style="text-align: right;">₹ ${fmtAmt(totalFreight + gstAmt)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <div class="footer-3inch">
         <div class="footer-left-3inch">
@@ -186,12 +196,12 @@ const PRINT_CSS_3INCH = `
     transform: rotate(90deg);
     transform-origin: center;
     width: fit-content;
-    margin: 40mm auto;
+    margin: 120mm auto;
     height: fit-content;
   }
 
   .slip-3inch:first-of-type {
-    margin-top: 20mm;
+    margin-top: 60mm;
   }
 
   .slip-3inch:last-of-type {
@@ -223,14 +233,16 @@ const PRINT_CSS_3INCH = `
   .party-addr-3inch { font-size: 5.5px; font-weight: 800; line-height: 1.1; margin-bottom: 0.5px; }
   .party-gstin-3inch { font-size: 5.5px; font-weight: 800; }
 
-  .details-table-3inch { width: 100%; border-collapse: collapse; font-size: 6px; margin-bottom: 1.5px; }
+  .content-row-3inch { display: flex; gap: 2px; margin-bottom: 1.5px; }
+  .details-col-3inch { flex: 1; }
+  .details-table-3inch { width: 100%; border-collapse: collapse; font-size: 6px; }
   .details-table-3inch td { border: 0.5px solid #555; padding: 0.5px 2px; font-weight: 800; }
-  .detail-label-3inch { background: #e8e8e8; font-weight: 900; width: 18%; }
+  .detail-label-3inch { background: #e8e8e8; font-weight: 900; width: 22%; }
 
-  .charges-table-3inch { width: 100%; border-collapse: collapse; font-size: 6px; margin-bottom: 1.5px; }
+  .charges-table-3inch { flex: 0.65; border-collapse: collapse; font-size: 6px; }
   .charges-table-3inch th { border: 0.5px solid #555; padding: 0.5px 2px; background: #e8e8e8; font-weight: 900; text-align: left; }
   .charges-table-3inch td { border: 0.5px solid #555; padding: 0.5px 2px; font-weight: 800; }
-  .amt-cell-3inch { text-align: right; font-weight: 900; }
+  .amt-cell-3inch { font-weight: 900; }
   .total-row-3inch { background: #f0f0f0; font-weight: 900; font-size: 6.5px; }
   .grand-total-row-3inch { background: #7e22ce; color: white; font-weight: 900; font-size: 6.5px; }
 
