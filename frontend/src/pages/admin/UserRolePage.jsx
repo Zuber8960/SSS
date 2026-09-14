@@ -69,7 +69,10 @@ export default function UserRolePage() {
           fetchAllUserRoles(), fetchAllUsers(), fetchAllRoles(),
         ]);
         setMappings(mappingData);
-        setUserOptions(userData.map((u) => ({ label: u.user_id, value: u.user_id })));
+        setUserOptions(userData.map((u) => ({
+          label: u.user_name ? `${u.user_name}- (${u.user_id})` : u.user_id,
+          value: u.user_id,
+        })));
         setRoleOptions(roleData.map((r) => ({ label: r.role_name, value: r.role_code })));
       } catch (err) {
         showError(err.message || "Failed to load data");
