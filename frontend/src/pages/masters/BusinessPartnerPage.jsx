@@ -43,6 +43,8 @@ const BASIC_FIELDS = [
   { name: "bp_city",            label: "City",            type: "city-auto" },
   { name: "bp_pincode",         label: "Pincode",         type: "text" },
   { name: "bp_gstin",           label: "GSTIN",           type: "text" },
+  { name: "bp_mobile1",         label: "Mobile No 1",     type: "text" },
+  { name: "bp_mobile2",         label: "Mobile No 2",     type: "text" },
   { name: "loc_code",           label: "Location",        type: "select",  options: "locationOptions" },
 ];
 
@@ -76,6 +78,8 @@ const emptyForm = {
   bp_city: "",
   bp_pincode: "",
   bp_gstin: "",
+  bp_mobile1: "",
+  bp_mobile2: "",
   loc_code: "",
   bp_ind_id_type_1: "", bp_ind_id_no_1: "",
   bp_ind_id_type_2: "", bp_ind_id_no_2: "",
@@ -260,6 +264,8 @@ export default function BusinessPartnerPage() {
         String(x.bp_name ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
         String(x.bp_pan_no ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
         String(x.bp_registration_no ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
+        String(x.bp_mobile1 ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
+        String(x.bp_mobile2 ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
         String(x.bp_type_name ?? "").toLowerCase().includes(searchText.toLowerCase())
       )
     : partners;
@@ -270,6 +276,8 @@ export default function BusinessPartnerPage() {
     { key: "bp_pan_no", label: "PAN No" },
     { key: "bp_registration_no", label: "Registration No" },
     { key: "bp_tan_no", label: "TAN No" },
+    { key: "bp_mobile1", label: "Mobile No 1" },
+    { key: "bp_mobile2", label: "Mobile No 2" },
     { key: "bp_bank_name", label: "Bank" },
     { key: "loc_code", label: "Location", render: (row) => { const loc = locations.find((l) => String(l.loc_code) === String(row.loc_code)); return loc ? `${loc.loc_code} - ${loc.loc_name}` : (row.loc_code ?? ""); } },
     { key: "bp_status", label: "Status", render: (row) => row.bp_status === "1" || row.bp_status === 1 ? "Active" : row.bp_status === "0" || row.bp_status === 0 ? "Inactive" : "" },
