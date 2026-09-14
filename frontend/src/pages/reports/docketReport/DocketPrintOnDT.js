@@ -210,7 +210,7 @@ const PRINT_CSS_3INCH = `
 
   .slip-3inch:last-of-type {
     page-break-after: avoid;
-    margin-bottom: 0;
+    margin-bottom: 65mm;
   }
 
   .top-section-3inch { display: flex; gap: 2px; margin-bottom: 1.5px; width: 100%; }
