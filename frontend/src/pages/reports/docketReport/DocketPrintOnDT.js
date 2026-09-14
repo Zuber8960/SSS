@@ -33,22 +33,24 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
 
   return `
     <div class="slip-3inch">
-      <div class="header-row-3inch">
-        <div class="logo-col-3inch">
-          ${logoUrl ? `<img src="${logoUrl}" alt="logo" class="co-logo-3inch" />` : ""}
-        </div>
-        <div class="company-block-3inch">
-          <div class="company-name-3inch">${fmt(coName)}</div>
-          ${locAddr ? `<div class="company-addr-3inch">${locAddr}</div>` : ""}
-          <div class="company-contact-3inch">
-            ${coGstin ? `GSTIN: ${coGstin}` : ""}${coPan ? ` | PAN: ${coPan}` : ""}
+      <div class="top-section-3inch">
+        <div class="header-row-3inch">
+          <div class="logo-col-3inch">
+            ${logoUrl ? `<img src="${logoUrl}" alt="logo" class="co-logo-3inch" />` : ""}
           </div>
-          <div class="company-contact-3inch">
-            ${coEmail ? `✉ ${coEmail}` : ""}${coPhone ? ` | ☎ ${coPhone}` : ""}${locPhone && locPhone !== coPhone ? ` | ☎ ${locPhone}` : ""}
+          <div class="company-block-3inch">
+            <div class="company-name-3inch">${fmt(coName)}</div>
+            ${locAddr ? `<div class="company-addr-3inch">${locAddr}</div>` : ""}
+            <div class="company-contact-3inch">
+              ${coGstin ? `GSTIN: ${coGstin}` : ""}${coPan ? ` | PAN: ${coPan}` : ""}
+            </div>
+            <div class="company-contact-3inch">
+              ${coEmail ? `✉ ${coEmail}` : ""}${coPhone ? ` | ☎ ${coPhone}` : ""}${locPhone && locPhone !== coPhone ? ` | ☎ ${locPhone}` : ""}
+            </div>
           </div>
         </div>
+
         <div class="cn-block-3inch">
-          <div class="cn-title-3inch">CONSIGNMENT</div>
           ${qrDataUrl ? `<img src="${qrDataUrl}" class="cn-qr-3inch" alt="QR" />` : ""}
           <div class="cn-no-3inch">${fmt(form.docket_no)}</div>
           <div class="cn-date-3inch">${fmtDate(form.docket_date)}</div>
@@ -68,23 +70,23 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
         </tr>
       </table>
 
-      <div class="party-row-3inch">
-        <div class="party-box-3inch">
-          <div class="party-title-3inch">CONSIGNOR</div>
-          <div class="party-name-3inch">${fmt(form.cnor_name)}</div>
-          <div class="party-addr-3inch">${fmt(form.cnor_address)}${form.cnor_city ? ", " + form.cnor_city : ""}${form.cnor_state ? ", " + form.cnor_state : ""}${form.cnor_pincode ? " - " + form.cnor_pincode : ""}</div>
-          <div class="party-gstin-3inch">GSTIN: ${fmt(form.cnor_gstin)}</div>
-        </div>
-        <div class="party-box-3inch">
-          <div class="party-title-3inch">CONSIGNEE</div>
-          <div class="party-name-3inch">${fmt(form.cnee_name)}</div>
-          <div class="party-addr-3inch">${fmt(form.cnee_address)}${form.cnee_city ? ", " + form.cnee_city : ""}${form.cnee_state ? ", " + form.cnee_state : ""}${form.cnee_pincode ? " - " + form.cnee_pincode : ""}</div>
-          <div class="party-gstin-3inch">GSTIN: ${fmt(form.cnee_gstin)}</div>
-        </div>
-      </div>
+      <div class="main-content-row-3inch">
+        <div class="left-col-3inch">
+          <div class="party-row-3inch">
+            <div class="party-box-3inch">
+              <div class="party-title-3inch">CONSIGNOR</div>
+              <div class="party-name-3inch">${fmt(form.cnor_name)}</div>
+              <div class="party-addr-3inch">${fmt(form.cnor_address)}${form.cnor_city ? ", " + form.cnor_city : ""}${form.cnor_state ? ", " + form.cnor_state : ""}${form.cnor_pincode ? " - " + form.cnor_pincode : ""}</div>
+              <div class="party-gstin-3inch">GSTIN: ${fmt(form.cnor_gstin)}</div>
+            </div>
+            <div class="party-box-3inch">
+              <div class="party-title-3inch">CONSIGNEE</div>
+              <div class="party-name-3inch">${fmt(form.cnee_name)}</div>
+              <div class="party-addr-3inch">${fmt(form.cnee_address)}${form.cnee_city ? ", " + form.cnee_city : ""}${form.cnee_state ? ", " + form.cnee_state : ""}${form.cnee_pincode ? " - " + form.cnee_pincode : ""}</div>
+              <div class="party-gstin-3inch">GSTIN: ${fmt(form.cnee_gstin)}</div>
+            </div>
+          </div>
 
-      <div class="content-row-3inch">
-        <div class="details-col-3inch">
           <table class="details-table-3inch">
             <tr>
               <td class="detail-label-3inch">Delivery Type</td>
@@ -125,40 +127,42 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
           </table>
         </div>
 
-        <table class="charges-table-3inch">
-          <colgroup>
-            <col style="width: 65%;">
-            <col style="width: 35%;">
-          </colgroup>
-          <thead>
-            <tr><th>Freight Details</th><th style="text-align: right;">Amount</th></tr>
-          </thead>
-          <tbody>
-            ${charges.map((c) => `
-              <tr>
-                <td>${c.charge_name || c.charge_code}</td>
-                <td style="text-align: right;">₹ ${fmtAmt(c.charge_amt)}</td>
+        <div class="freight-col-3inch">
+          <table class="charges-table-3inch">
+            <colgroup>
+              <col style="width: 65%;">
+              <col style="width: 35%;">
+            </colgroup>
+            <thead>
+              <tr><th>Freight Details</th><th style="text-align: right;">Amount</th></tr>
+            </thead>
+            <tbody>
+              ${charges.map((c) => `
+                <tr>
+                  <td>${c.charge_name || c.charge_code}</td>
+                  <td style="text-align: right;">₹ ${fmtAmt(c.charge_amt)}</td>
+                </tr>
+              `).join("")}
+              <tr class="total-row-3inch">
+                <td>Total Freight</td>
+                <td style="text-align: right;">₹ ${fmtAmt(totalFreight)}</td>
               </tr>
-            `).join("")}
-            <tr class="total-row-3inch">
-              <td>Total Freight</td>
-              <td style="text-align: right;">₹ ${fmtAmt(totalFreight)}</td>
-            </tr>
-            <tr class="total-row-3inch">
-              <td>GST ${gstPct}%</td>
-              <td style="text-align: right;">₹ ${fmtAmt(gstAmt)}</td>
-            </tr>
-            <tr class="grand-total-row-3inch">
-              <td>Grand Total</td>
-              <td style="text-align: right;">₹ ${fmtAmt(totalFreight + gstAmt)}</td>
-            </tr>
-          </tbody>
-        </table>
+              <tr class="total-row-3inch">
+                <td>GST ${gstPct}%</td>
+                <td style="text-align: right;">₹ ${fmtAmt(gstAmt)}</td>
+              </tr>
+              <tr class="grand-total-row-3inch">
+                <td>Grand Total</td>
+                <td style="text-align: right;">₹ ${fmtAmt(totalFreight + gstAmt)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div class="footer-3inch">
-        <div class="footer-left-3inch">
-          <div class="footer-copy-label-3inch">${copyName || ''}</div>
+        <div class="footer-copy-label-3inch">${copyName || ''}</div>
+        <div class="footer-prepared-wrapper-3inch">
           <div class="footer-prepared-3inch">
             <span class="prepared-label-3inch">Prepared By:</span>
             <span class="prepared-value-3inch">${fmt(form.prepare_by)}</span>
@@ -168,7 +172,7 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
             <span class="prepared-value-3inch">${fmtDate(form.prepare_date)}</span>
           </div>
         </div>
-        <div class="footer-right-3inch">
+        <div class="footer-auth-sign-3inch">
           <span class="auth-sign-3inch">Auth. Sign.</span>
         </div>
       </div>
@@ -196,12 +200,12 @@ const PRINT_CSS_3INCH = `
     transform: rotate(90deg);
     transform-origin: center;
     width: fit-content;
-    margin: 120mm auto;
+    margin: 130mm auto;
     height: fit-content;
   }
 
   .slip-3inch:first-of-type {
-    margin-top: 60mm;
+    margin-top: 65mm;
   }
 
   .slip-3inch:last-of-type {
@@ -209,54 +213,56 @@ const PRINT_CSS_3INCH = `
     margin-bottom: 0;
   }
 
-  .header-row-3inch { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #222; padding-bottom: 2px; margin-bottom: 2px; gap: 3px; }
+  .top-section-3inch { display: flex; gap: 2px; margin-bottom: 1.5px; width: 100%; }
+  .header-row-3inch { display: flex; justify-content: space-between; align-items: flex-start; flex: 1; padding-bottom: 2px; margin-bottom: 1px; gap: 3px; }
   .logo-col-3inch { display: flex; align-items: center; justify-content: center; min-width: 30px; }
   .co-logo-3inch { max-height: 30px; max-width: 50px; object-fit: contain; }
   .company-block-3inch { flex: 1; }
   .company-name-3inch { font-size: 8px; font-weight: 900; letter-spacing: 0.2px; margin-bottom: 1px; }
   .company-addr-3inch { font-size: 6px; font-weight: 800; margin-bottom: 0.5px; }
   .company-contact-3inch { font-size: 6px; font-weight: 800; margin-bottom: 0.5px; }
-  .cn-block-3inch { text-align: right; min-width: 80px; }
+  .cn-block-3inch { flex: 0.25; text-align: center; align-self: flex-start; }
   .cn-title-3inch { font-size: 7px; font-weight: 900; border: 0.5px solid #222; padding: 0.5px 2px; background: #eee; margin-bottom: 1px; }
   .cn-qr-3inch { width: 50px; height: 50px; display: block; margin: 1px auto; }
   .cn-no-3inch { font-size: 10px; font-weight: 900; letter-spacing: 0.3px; margin-bottom: 0.5px; }
   .cn-date-3inch { font-size: 6px; font-weight: 800; }
 
-  .route-table-3inch { width: 100%; border-collapse: collapse; margin-bottom: 1.5px; font-size: 6px; }
+  .route-table-3inch { width: 80%; border-collapse: collapse; margin-bottom: 0px; font-size: 6px; }
   .route-table-3inch th { border: 0.5px solid #555; padding: 0.5px 2px; text-align: left; background: #e8e8e8; font-weight: 900; }
   .route-table-3inch td { border: 0.5px solid #555; padding: 0.5px 2px; text-align: left; font-weight: 800; }
 
-  .party-row-3inch { display: flex; gap: 2px; margin-bottom: 1.5px; }
-  .party-box-3inch { flex: 1; border: 0.5px solid #555; padding: 1.5px 2px; font-size: 6px; }
-  .party-title-3inch { font-size: 6px; font-weight: 900; background: #e8e8e8; margin: -1.5px -2px 1px -2px; padding: 0.5px 2px; }
-  .party-name-3inch { font-size: 6.5px; font-weight: 900; margin-bottom: 0.5px; }
-  .party-addr-3inch { font-size: 5.5px; font-weight: 800; line-height: 1.1; margin-bottom: 0.5px; }
-  .party-gstin-3inch { font-size: 5.5px; font-weight: 800; }
+  .main-content-row-3inch { display: flex; gap: 1px; margin-bottom: 0px; align-items: flex-start; }
+  .left-col-3inch { flex: 1; }
+  .freight-col-3inch { flex: 0.25; margin-top: -22px;}
+  .party-row-3inch { display: flex; gap: 2px; margin-bottom: 1.5px; margin-top: 0px; }
+  .party-box-3inch { flex: 1; border: 0.5px solid #555; padding: 3px 1.5px; font-size: 5px; min-height: 40px; }
+  .party-title-3inch { font-size: 5px; font-weight: 900; background: #e8e8e8; margin: 0px; padding: 0.5px 1.5px; }
+  .party-name-3inch { font-size: 5.5px; font-weight: 900; margin-bottom: 0.3px; }
+  .party-addr-3inch { font-size: 4.5px; font-weight: 800; line-height: 1; margin-bottom: 0.3px; }
+  .party-gstin-3inch { font-size: 4.5px; font-weight: 800; }
 
-  .content-row-3inch { display: flex; gap: 2px; margin-bottom: 1.5px; }
-  .details-col-3inch { flex: 1; }
-  .details-table-3inch { width: 100%; border-collapse: collapse; font-size: 6px; }
+  .details-table-3inch { width: 100%; border-collapse: collapse; font-size: 6px; margin-top: 0px; }
   .details-table-3inch td { border: 0.5px solid #555; padding: 0.5px 2px; font-weight: 800; }
   .detail-label-3inch { background: #e8e8e8; font-weight: 900; width: 22%; }
 
-  .charges-table-3inch { flex: 0.65; border-collapse: collapse; font-size: 6px; }
+  .charges-table-3inch { width: 100%; border-collapse: collapse; font-size: 6px; }
   .charges-table-3inch th { border: 0.5px solid #555; padding: 0.5px 2px; background: #e8e8e8; font-weight: 900; text-align: left; }
   .charges-table-3inch td { border: 0.5px solid #555; padding: 0.5px 2px; font-weight: 800; }
   .amt-cell-3inch { font-weight: 900; }
   .total-row-3inch { background: #f0f0f0; font-weight: 900; font-size: 6.5px; }
   .grand-total-row-3inch { background: #7e22ce; color: white; font-weight: 900; font-size: 6.5px; }
 
-  .footer-3inch { display: flex; justify-content: space-between; border-top: 0.5px solid #444; padding-top: 1px; margin-top: 1px; font-size: 6px; }
-  .footer-left-3inch { flex: 1; }
-  .footer-right-3inch { text-align: right; }
-  .footer-copy-label-3inch { font-weight: 900; font-size: 7px; margin-bottom: 1px; color: #c00; }
-  .footer-prepared-3inch { display: flex; gap: 2px; font-weight: 800; margin-bottom: 0.5px; }
+  .footer-3inch { display: flex; flex-direction: row; justify-content: space-between; align-items: center; border-top: 0.5px solid #444; padding-top: 1px; margin-top: 1px; font-size: 6px; gap: 8px; }
+  .footer-copy-label-3inch { font-weight: 900; font-size: 7px; color: #c00; flex: 0.2; }
+  .footer-prepared-wrapper-3inch { display: flex; flex-direction: row; gap: 8px; flex: 0.6; }
+  .footer-prepared-3inch { display: flex; gap: 2px; font-weight: 800; }
+  .footer-auth-sign-3inch { flex: 0.2; text-align: right; }
   .prepared-label-3inch { font-weight: 900; }
   .prepared-value-3inch { font-weight: 800; }
   .auth-sign-3inch { font-weight: 800; }
 `;
 
-export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, company, locations, copies = ["Consignor Copy", "Consignee Copy", "Lorry Copy", "File Copy"] }) {
+export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, company, locations, copies = ["Consignor Copy"] }) {
   const ewb = ewbList?.[0] || {};
   const printEwbNo = ewb.ewb_no || ewbNoDisplay || "";
 
