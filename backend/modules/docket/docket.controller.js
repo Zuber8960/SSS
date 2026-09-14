@@ -179,6 +179,7 @@ const getDocketByRecId = async (rec_id, tenant_id, docketNo) => {
       'cnor.bp_state as cnor_state',
       'cnor.bp_pincode as cnor_pincode',
       'cnor.bp_gstin as cnor_gstin',
+      db.raw('COALESCE(d.cnor_mob, cnor.bp_mobile1) as cnor_mob'),
       'cnee.record_id as cnee_id',
       'cnee.bp_name as cnee_name',
       'cnee.bp_addres as cnee_address',
@@ -186,6 +187,7 @@ const getDocketByRecId = async (rec_id, tenant_id, docketNo) => {
       'cnee.bp_state as cnee_state',
       'cnee.bp_pincode as cnee_pincode',
       'cnee.bp_gstin as cnee_gstin',
+      db.raw('COALESCE(d.cnee_mob, cnee.bp_mobile1) as cnee_mob'),
       'u.user_name as prepare_by',
       'd.aud_date as prepare_date'
     );
@@ -211,6 +213,7 @@ const getDocketByNo = async (docket_no, tenant_id) => {
       'cnor.bp_state as cnor_state',
       'cnor.bp_pincode as cnor_pincode',
       'cnor.bp_gstin as cnor_gstin',
+      db.raw('COALESCE(d.cnor_mob, cnor.bp_mobile1) as cnor_mob'),
       'cnee.record_id as cnee_id',
       'cnee.bp_name as cnee_name',
       'cnee.bp_addres as cnee_address',
@@ -218,6 +221,7 @@ const getDocketByNo = async (docket_no, tenant_id) => {
       'cnee.bp_state as cnee_state',
       'cnee.bp_pincode as cnee_pincode',
       'cnee.bp_gstin as cnee_gstin',
+      db.raw('COALESCE(d.cnee_mob, cnee.bp_mobile1) as cnee_mob'),
       'u.user_name as prepare_by',
       'd.aud_date as prepare_date'
     );
@@ -240,6 +244,7 @@ const NUMERIC_DOCKET_FIELDS = [
   'docket_crtns', 'docket_bndls', 'docket_bags',
   'docket_loose', 'docket_other', 'docket_tot_pkgs',
   'dim_length', 'dim_breadth', 'dim_height',
+  'cnor_mob', 'cnee_mob',
 ];
 
 const sanitizeDocketData = (data) => {

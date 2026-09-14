@@ -38,6 +38,7 @@ const headerFields = [
   { label: "Cnor City", name: "cnor_city" },
   { label: "Cnor State", name: "cnor_state" },
   { label: "Cnor Pincode", name: "cnor_pincode" },
+  { label: "Cnor Mobile", name: "cnor_mob" },
   { label: "Cnor GSTIN", name: "cnor_gstin" },
 
   { label: "Cnsee Name", name: "cnee_name" },
@@ -45,6 +46,7 @@ const headerFields = [
   { label: "Cnsee City", name: "cnee_city" },
   { label: "Cnsee State", name: "cnee_state" },
   { label: "Cnsee Pincode", name: "cnee_pincode" },
+  { label: "Cnsee Mobile", name: "cnee_mob" },
   { label: "Cnsee GSTIN", name: "cnee_gstin" },
 
   { label: "Docket No", name: "docket_no" },
@@ -172,14 +174,14 @@ const formSections = [
   {
     title: "Consignor Details",
     icon: SECTION_ICONS.consignor,
-    fields: ["cnor_name", "cnor_address", "cnor_city", "cnor_state", "cnor_pincode", "cnor_gstin"],
+    fields: ["cnor_name", "cnor_address", "cnor_city", "cnor_state", "cnor_pincode", "cnor_gstin", "cnor_mob"],
     half: true,
     columns: 2,
   },
   {
     title: "Consignee Details",
     icon: SECTION_ICONS.consignee,
-    fields: ["cnee_name", "cnee_address", "cnee_city", "cnee_state", "cnee_pincode", "cnee_gstin"],
+    fields: ["cnee_name", "cnee_address", "cnee_city", "cnee_state", "cnee_pincode", "cnee_gstin", "cnee_mob"],
     half: true,
     columns: 2,
   },
@@ -259,6 +261,7 @@ const emptyForm = {
   cnor_state: "",
   cnor_pincode: "",
   cnor_gstin: "",
+  cnor_mob: "",
   cnee_id: null,
   cnee_name: "",
   cnee_address: "",
@@ -266,6 +269,7 @@ const emptyForm = {
   cnee_state: "",
   cnee_pincode: "",
   cnee_gstin: "",
+  cnee_mob: "",
   transit_type: "",
   load_type: "",
   pay_type: "",
@@ -424,10 +428,11 @@ export default function DocketPage() {
       [`${prefix}_state`]:   bp.bp_state    || prev[`${prefix}_state`],
       [`${prefix}_pincode`]: bp.bp_pincode  || prev[`${prefix}_pincode`],
       [`${prefix}_gstin`]:   bp.bp_gstin    || prev[`${prefix}_gstin`],
+      [`${prefix}_mob`]:     bp.bp_mobile1  || prev[`${prefix}_mob`],
     }));
     setDirtyFields((prev) => {
       const s = new Set(prev);
-      [`${prefix}_id`, `${prefix}_name`, `${prefix}_address`, `${prefix}_city`, `${prefix}_state`, `${prefix}_pincode`, `${prefix}_gstin`].forEach((k) => s.add(k));
+      [`${prefix}_id`, `${prefix}_name`, `${prefix}_address`, `${prefix}_city`, `${prefix}_state`, `${prefix}_pincode`, `${prefix}_gstin`, `${prefix}_mob`].forEach((k) => s.add(k));
       return s;
     });
   };
@@ -655,6 +660,8 @@ export default function DocketPage() {
         cc:                  "docket_cc",
         cnor_id:             "cnor_id",
         cnee_id:             "cnee_id",
+        cnor_mob:            "cnor_mob",
+        cnee_mob:            "cnee_mob",
         act_wt:              "docket_act_wt",
         chrg_wt:             "docket_chrg_wt",
         no_cb:               "docket_crtns",
@@ -862,6 +869,7 @@ export default function DocketPage() {
             cnor_state:          docketData.cnor_state          || "",
             cnor_pincode:        docketData.cnor_pincode        || "",
             cnor_gstin:          docketData.cnor_gstin          || "",
+            cnor_mob:            docketData.cnor_mob            ?? "",
             cnee_id:             docketData.cnee_id             ?? null,
             cnee_name:           docketData.cnee_name           || "",
             cnee_address:        docketData.cnee_address        || "",
@@ -869,6 +877,7 @@ export default function DocketPage() {
             cnee_state:          docketData.cnee_state          || "",
             cnee_pincode:        docketData.cnee_pincode        || "",
             cnee_gstin:          docketData.cnee_gstin          || "",
+            cnee_mob:            docketData.cnee_mob            ?? "",
             transit_type:        docketData.docket_transit_type || "",
             load_type:           docketData.docket_load_type    || "",
             pay_type:            docketData.docket_pay_type     || "",
@@ -1154,7 +1163,7 @@ export default function DocketPage() {
         }
         // Clear cnor when from-location changes (unless EWB-populated)
         if (name === "docket_loc" && !ewbPopulatedRef.current.cnor) {
-          updated = { ...updated, cnor_id: null, cnor_name: "", cnor_address: "", cnor_city: "", cnor_state: "", cnor_pincode: "", cnor_gstin: "" };
+          updated = { ...updated, cnor_id: null, cnor_name: "", cnor_address: "", cnor_city: "", cnor_state: "", cnor_pincode: "", cnor_gstin: "", cnor_mob: "" };
           setDirtyFields((prev) => {
             const s = new Set(prev);
             ["cnor_id","cnor_name","cnor_address","cnor_city","cnor_state","cnor_pincode","cnor_gstin"].forEach(k => s.add(k));
@@ -1163,10 +1172,10 @@ export default function DocketPage() {
         }
         // Clear cnee when to-location changes (unless EWB-populated)
         if (name === "docket_to_loc" && !ewbPopulatedRef.current.cnee) {
-          updated = { ...updated, cnee_id: null, cnee_name: "", cnee_address: "", cnee_city: "", cnee_state: "", cnee_pincode: "", cnee_gstin: "" };
+          updated = { ...updated, cnee_id: null, cnee_name: "", cnee_address: "", cnee_city: "", cnee_state: "", cnee_pincode: "", cnee_gstin: "", cnee_mob: "" };
           setDirtyFields((prev) => {
             const s = new Set(prev);
-            ["cnee_id","cnee_name","cnee_address","cnee_city","cnee_state","cnee_pincode","cnee_gstin"].forEach(k => s.add(k));
+            ["cnee_id","cnee_name","cnee_address","cnee_city","cnee_state","cnee_pincode","cnee_gstin","cnee_mob"].forEach(k => s.add(k));
             return s;
           });
         }

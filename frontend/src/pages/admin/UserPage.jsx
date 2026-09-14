@@ -213,10 +213,10 @@ export default function UserPage() {
             value={form.mobile_no} onChange={(e) => setField("mobile_no", e.target.value)} />
           <MuiSelect label="Status" name="user_status" value={form.user_status} onChange={setField}
             options={[{ label: "Active", value: "A" }, { label: "Inactive", value: "I" }]} />
-          <MuiSelect label="Location" name="location_id" value={form.location_id} onChange={setField}
-            options={locationOptions} />
           <MuiSelect label="Division Code" name="division_code" value={form.division_code} onChange={setField}
             options={divisionOptions} />
+          <MuiSelect label="Location" name="location_id" value={form.location_id} onChange={setField}
+            options={locationOptions} />
           <MuiSelect label="Admin User" name="is_admin" value={form.is_admin} onChange={setField}
             options={[{ label: "Yes", value: "Y" }, { label: "No", value: "N" }]}
             disabled={!isSuperAdmin} />
