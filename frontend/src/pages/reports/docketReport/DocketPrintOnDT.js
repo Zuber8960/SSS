@@ -77,13 +77,13 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
               <div class="party-title-3inch">CONSIGNOR</div>
               <div class="party-name-3inch">${fmt(form.cnor_name)}</div>
               <div class="party-addr-3inch">${fmt(form.cnor_address)}${form.cnor_city ? ", " + form.cnor_city : ""}${form.cnor_state ? ", " + form.cnor_state : ""}${form.cnor_pincode ? " - " + form.cnor_pincode : ""}</div>
-              <div class="party-gstin-3inch">GSTIN: ${fmt(form.cnor_gstin)}</div>
+              <div class="party-gstin-3inch">GSTIN: ${fmt(form.cnor_gstin)}${form.cnor_mob ? " MOB: " + fmt(form.cnor_mob) : ""}</div>
             </div>
             <div class="party-box-3inch">
               <div class="party-title-3inch">CONSIGNEE</div>
               <div class="party-name-3inch">${fmt(form.cnee_name)}</div>
               <div class="party-addr-3inch">${fmt(form.cnee_address)}${form.cnee_city ? ", " + form.cnee_city : ""}${form.cnee_state ? ", " + form.cnee_state : ""}${form.cnee_pincode ? " - " + form.cnee_pincode : ""}</div>
-              <div class="party-gstin-3inch">GSTIN: ${fmt(form.cnee_gstin)}</div>
+              <div class="party-gstin-3inch">GSTIN: ${fmt(form.cnee_gstin)}${form.cnee_mob ? " MOB: " + fmt(form.cnee_mob) : ""}</div>
             </div>
           </div>
 
@@ -350,12 +350,14 @@ export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, co
       form.cnor_pincode ? ` - ${form.cnor_pincode}` : "",
     ].filter(Boolean).join(", "),
     cnorGstin: form.cnor_gstin || "",
+    cnorMob: form.cnor_mob || "",
     cneeName: form.cnee_name || "",
     cneeAddress: [
       form.cnee_address, form.cnee_city, form.cnee_state,
       form.cnee_pincode ? ` - ${form.cnee_pincode}` : "",
     ].filter(Boolean).join(", "),
     cneeGstin: form.cnee_gstin || "",
+    cneeMob: form.cnee_mob || "",
     dlyType: form.dly_type || "",
     actWt: form.act_wt || "",
     chrgWt: form.chrg_wt || "",

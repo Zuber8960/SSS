@@ -91,14 +91,14 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
             <div class="party-title">CONSIGNOR</div>
             <div class="party-name">${fmt(form.cnor_name)}</div>
             <div class="party-addr">${fmt(form.cnor_address)}${form.cnor_city ? ", " + form.cnor_city : ""}${form.cnor_state ? ", " + form.cnor_state : ""}${form.cnor_pincode ? " - " + form.cnor_pincode : ""}</div>
-            <div class="party-gstin">GSTIN: ${fmt(form.cnor_gstin)}</div>
+            <div class="party-gstin">GSTIN: ${fmt(form.cnor_gstin)}${form.cnor_mob ? " &nbsp; MOB: " + fmt(form.cnor_mob) : ""}</div>
             <div class="party-state">STATE: ${fmt(form.cnor_state)} &nbsp;&nbsp; STATE CODE: ${fmt(form.cnor_gstin ? form.cnor_gstin.substring(0, 2) : "")}</div>
           </div>
           <div class="party-box">
             <div class="party-title">CONSIGNEE</div>
             <div class="party-name">${fmt(form.cnee_name)}</div>
             <div class="party-addr">${fmt(form.cnee_address)}${form.cnee_city ? ", " + form.cnee_city : ""}${form.cnee_state ? ", " + form.cnee_state : ""}${form.cnee_pincode ? " - " + form.cnee_pincode : ""}</div>
-            <div class="party-gstin">GSTIN: ${fmt(form.cnee_gstin)}</div>
+            <div class="party-gstin">GSTIN: ${fmt(form.cnee_gstin)}${form.cnee_mob ? " &nbsp; MOB: " + fmt(form.cnee_mob) : ""}</div>
             <div class="party-state">STATE: ${fmt(form.cnee_state)} &nbsp;&nbsp; STATE CODE: ${fmt(form.cnee_gstin ? form.cnee_gstin.substring(0, 2) : "")}</div>
           </div>
         </div>
