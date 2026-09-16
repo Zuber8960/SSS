@@ -1,6 +1,11 @@
-import { useState } from "react";
-import { NoteAddIcon, SaveIcon, DeleteIcon } from "../../components/common/icons";
+import { useState, useEffect } from "react";
+import { NoteAddIcon, SaveIcon, DeleteIcon, RefreshIcon, EditIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
+import { fetchAllMenus } from "../../utils/menuMaster";
+import { fetchAllRoles } from "../../utils/roleMaster";
+import { fetchAllRoleMenus, createRoleMenu, updateRoleMenu, deleteRoleMenu } from "../../utils/roleMenu";
+import CommonAlertDialog from "../../components/common/CommonAlertDialog";
+import useAlert from "../../components/common/UseAlert";
 import {
   PageBody,
   PageToolbar,
@@ -11,13 +16,57 @@ import { FormControl, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, 
 
 const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiSelect-select": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
 
-function MuiSelect({ label, name, value, onChange, options }) {
+function MuiSelect({ label, name, value, onChange, options, multiple = false }) {
   return (
     <FormControl fullWidth size="small" sx={fieldSx}>
       <InputLabel>{label}</InputLabel>
-      <Select label={label} size="small" value={value ?? ""} onChange={(e) => onChange(name, e.target.value)} sx={{ fontSize: 13 }}>
+      <Select
+        label={label}
+        size="small"
+        multiple={multiple}
+        value={multiple ? (value ?? []) : (value ?? "")}
+        onChange={(e) => onChange(name, e.target.value)}
+        sx={{ fontSize: 13, "& .MuiSelect-select": { paddingTop: "4px", paddingBottom: "4px" } }}
+        MenuProps={{
+          PaperProps: {
+            sx: {
+              maxHeight: 260,
+              "& .MuiMenuItem-root": {
+                fontSize: 13,
+                minHeight: 28,
+                paddingTop: "2px",
+                paddingBottom: "2px",
+                gap: 0.5,
+              },
+              "& .MuiList-root": { padding: 0 },
+              "& .MuiCheckbox-root": { padding: 0, mr: 1 },
+            },
+          },
+        }}
+        {...(multiple
+          ? {
+              renderValue: (selected) =>
+                options
+                  .filter((opt) => selected.includes(opt.value))
+                  .map((opt) => (typeof opt === "object" ? opt.label : opt))
+                  .join(", "),
+            }
+          : {})}
+      >
         {options.map((opt) => (
-          <MenuItem key={typeof opt === "object" ? opt.value : opt} value={typeof opt === "object" ? opt.value : opt} sx={{ fontSize: 13 }}>
+          <MenuItem
+            key={typeof opt === "object" ? opt.value : opt}
+            value={typeof opt === "object" ? opt.value : opt}
+            sx={{ fontSize: 13, minHeight: 28, py: "2px" }}
+            disableGutters={false}
+          >
+            {multiple && (
+              <Checkbox
+                size="small"
+                checked={multiple ? (value ?? []).includes(typeof opt === "object" ? opt.value : opt) : false}
+                sx={{ p: 0, mr: 1, "&.Mui-checked": { color: "#7e22ce" } }}
+              />
+            )}
             {typeof opt === "object" ? opt.label : opt}
           </MenuItem>
         ))}
@@ -26,55 +75,156 @@ function MuiSelect({ label, name, value, onChange, options }) {
   );
 }
 
-const roles = ["ADMIN", "BRANCH", "FLEET", "ACCOUNTS"];
+const ynToBool = (v) => v === "Y" || v === true;
+const boolToYn = (v) => (v ? "Y" : "N");
 
-const menus = [
-  { menuId: 1, menuName: "Dashboard" },
-  { menuId: 101, menuName: "User Master" },
-  { menuId: 102, menuName: "Role Master" },
-  { menuId: 103, menuName: "Menu Master" },
-  { menuId: 104, menuName: "User Role Mapping" },
-  { menuId: 105, menuName: "Role Menu Mapping" },
-  { menuId: 201, menuName: "Company Master" },
-  { menuId: 202, menuName: "Division Master" },
-  { menuId: 203, menuName: "Location Master" },
-  { menuId: 301, menuName: "Vehicle Master" },
-  { menuId: 401, menuName: "Docket Entry" },
-];
+const toFormModel = (row) => ({
+  recId: row.rec_id,
+  roleCode: row.role_code,
+  menuId: row.menu_id,
+  viewYn: ynToBool(row.view_yn),
+  addYn: ynToBool(row.add_yn),
+  editYn: ynToBool(row.edit_yn),
+  deleteYn: ynToBool(row.delete_yn),
+});
 
-const roleColumns = [
-  { key: "roleCode", label: "Role" },
-  { key: "menuName", label: "Menu", render: (row) => menus.find((x) => String(x.menuId) === String(row.menuId))?.menuName || "" },
-  { key: "viewYn", label: "View", render: (row) => (row.viewYn ? "Y" : "N") },
-  { key: "addYn", label: "Add", render: (row) => (row.addYn ? "Y" : "N") },
-  { key: "editYn", label: "Edit", render: (row) => (row.editYn ? "Y" : "N") },
-  { key: "deleteYn", label: "Delete", render: (row) => (row.deleteYn ? "Y" : "N") },
-];
-
-const emptyForm = { roleCode: "", menuId: "", viewYn: true, addYn: false, editYn: false, deleteYn: false };
+const emptyForm = { recId: null, roleCode: "", menuIds: [], viewYn: true, addYn: false, editYn: false, deleteYn: false };
 
 export default function RoleMenuPage() {
+  const [roles, setRoles] = useState([]);
+  const [menus, setMenus] = useState([]);
   const [mappings, setMappings] = useState([]);
   const [form, setForm] = useState(emptyForm);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const { dialog, closeAlert, showSuccess, showError, showWarning } = useAlert();
 
   const setField = (name, value) => setForm((prev) => ({ ...prev, [name]: value }));
 
+  const loadMasterData = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const [roleData, menuData] = await Promise.all([fetchAllRoles(), fetchAllMenus()]);
+      setRoles(roleData);
+      setMenus(menuData);
+    } catch (err) {
+      setError(err.message || "Failed to load roles/menus");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadMappings = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const data = await fetchAllRoleMenus();
+      setMappings(data.map(toFormModel));
+    } catch (err) {
+      setError(err.message || "Failed to load role menu mappings");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        const [roleData, menuData, mappingData] = await Promise.all([fetchAllRoles(), fetchAllMenus(), fetchAllRoleMenus()]);
+        if (!ignore) {
+          setRoles(roleData);
+          setMenus(menuData);
+          setMappings(mappingData.map(toFormModel));
+        }
+      } catch (err) {
+        if (!ignore) setError(err.message || "Failed to load data");
+      }
+    })();
+    return () => { ignore = true; };
+  }, []);
+
+  const roleColumns = [
+    { key: "roleCode", label: "Role" },
+    { key: "menuId", label: "Menu", render: (row) => menus.find((x) => String(x.menu_id) === String(row.menuId))?.menu_name || "" },
+    { key: "viewYn", label: "View", render: (row) => (row.viewYn ? "Y" : "N") },
+    { key: "addYn", label: "Add", render: (row) => (row.addYn ? "Y" : "N") },
+    { key: "editYn", label: "Edit", render: (row) => (row.editYn ? "Y" : "N") },
+    { key: "deleteYn", label: "Delete", render: (row) => (row.deleteYn ? "Y" : "N") },
+  ];
+
   const clearForm = () => setForm(emptyForm);
 
-  const saveMapping = () => {
-    if (!form.roleCode) { alert("Select Role"); return; }
-    if (!form.menuId) { alert("Select Menu"); return; }
-    setMappings([...mappings, { ...form }]);
-    clearForm();
+  const saveMapping = async () => {
+    if (!form.roleCode) { showError("Select Role"); return; }
+    if (!form.menuIds.length) { showError("Select at least one Menu"); return; }
+
+    try {
+      setLoading(true);
+      const flags = {
+        view_yn: boolToYn(form.viewYn),
+        add_yn: boolToYn(form.addYn),
+        edit_yn: boolToYn(form.editYn),
+        delete_yn: boolToYn(form.deleteYn),
+      };
+
+      if (form.recId) {
+        // PUT — update existing mapping
+        const updated = await updateRoleMenu(form.recId, {
+          role_code: form.roleCode,
+          menu_id: form.menuIds[0],
+          ...flags,
+        });
+        setMappings((prev) => prev.map((m) => (m.recId === form.recId ? toFormModel(updated[0]) : m)));
+        showSuccess("Role menu mapping updated successfully");
+      } else {
+        // POST — create one mapping per selected menu
+        const created = [];
+        for (const menuId of form.menuIds) {
+          const res = await createRoleMenu({ role_code: form.roleCode, menu_id: menuId, ...flags });
+          created.push(toFormModel(res[0]));
+        }
+        setMappings((prev) => [...prev, ...created]);
+        showSuccess("Role menu mapping(s) created successfully");
+      }
+      clearForm();
+    } catch (err) {
+      showError(err.response?.data?.message || err.message || "Failed to save mapping");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const deleteMapping = (index) => {
-    if (!window.confirm("Delete Mapping ?")) return;
-    setMappings(mappings.filter((_, i) => i !== index));
+  const editMapping = (row) => {
+    setForm({
+      recId: row.recId,
+      roleCode: row.roleCode,
+      menuIds: [row.menuId],
+      viewYn: row.viewYn,
+      addYn: row.addYn,
+      editYn: row.editYn,
+      deleteYn: row.deleteYn,
+    });
   };
 
-  const roleOptions = roles.map((r) => ({ label: r, value: r }));
-  const menuOptions = menus.map((m) => ({ label: m.menuName, value: m.menuId }));
+  const deleteMapping = (row) => {
+    showWarning("Confirm Delete", `Delete mapping for role '${row.roleCode}'?`, async () => {
+      try {
+        setLoading(true);
+        await deleteRoleMenu(row.recId);
+        setMappings((prev) => prev.filter((m) => m.recId !== row.recId));
+        showSuccess("Mapping deleted successfully");
+      } catch (err) {
+        showError(err.response?.data?.message || err.message || "Failed to delete mapping");
+      } finally {
+        setLoading(false);
+      }
+    });
+  };
+
+  const roleOptions = roles.map((r) => ({ label: r.role_name ? `${r.role_name} (${r.role_code})` : r.role_code, value: r.role_code }));
+  const menuOptions = menus.map((m) => ({ label: m.menu_name, value: m.menu_id }));
 
   return (
     <MainLayout>
@@ -83,12 +233,15 @@ export default function RoleMenuPage() {
           actions={[
             { label: "New", icon: <NoteAddIcon />, onClick: clearForm },
             { label: "Save", icon: <SaveIcon />, onClick: saveMapping },
+            { label: "Refresh", icon: <RefreshIcon />, onClick: () => { loadMasterData(); loadMappings(); } },
           ]}
         />
+        {loading && <div className="alertBox info">Loading...</div>}
+        {error && <div className="alertBox error">{error}</div>}
 
         <FormPanel>
           <MuiSelect label="Role" name="roleCode" value={form.roleCode} onChange={setField} options={roleOptions} />
-          <MuiSelect label="Menu" name="menuId" value={form.menuId} onChange={setField} options={menuOptions} />
+          <MuiSelect label="Menu" name="menuIds" value={form.menuIds} onChange={setField} options={menuOptions} multiple />
         </FormPanel>
 
         <div style={{ padding: "8px 0 12px 4px" }}>
@@ -118,9 +271,14 @@ export default function RoleMenuPage() {
         <DataTable
           columns={roleColumns}
           rows={mappings}
-          getKey={(_, index) => index}
-          actions={[{ label: "Delete", icon: <DeleteIcon />, onClick: (_, index) => deleteMapping(index) }]}
+          getKey={(row) => row.recId}
+          actions={[
+            { label: "Edit", icon: <EditIcon />, onClick: editMapping },
+            { label: "Delete", icon: <DeleteIcon />, onClick: deleteMapping },
+          ]}
+          isHeight={420}
         />
+        <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
       </PageBody>
     </MainLayout>
   );
