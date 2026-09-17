@@ -236,41 +236,45 @@ export default function DocketReport() {
 
   // Batch "Print on DT": sends every checkbox-selected docket row to the
   // native DT printer in one message ({ type: 'PRINT_ON_DT', dockets: [...] }).
-  // Falls back to the single-docket flow when nothing is checkbox-selected.
+  // Falls back to web printing when not in native WebView.
   const handlePrintOnDtBatch = async () => {
-    const rows = selectedRows.length > 0 ? selectedRows : selectedRow ? [selectedRow] : [];
+    const rows = selectedRows.length > 0 ? selectedRows : [];
 
     if (rows.length === 0) {
-      showError("Please select at least one docket to print");
+      showError("Please select at least one docket.");
       return;
     }
 
-    // Single selection — keep the existing full-slip DT print flow
-    
+    const docketNumbers = rows.map(d => d.docket_no).filter(Boolean);
 
-    const dockets = rows.map((d) => ({
-      docketNo:     d.docket_no || "",
-      docketDate:   d.docket_date || "",
-      fromLocation: d.docket_loc || "",
-      toLocation:   d.docket_to_loc || "",
-      fromTown:     d.docket_pickup_town || "",
-      toTown:       d.docket_dly_town || "",
-      totPkgs:      String(d.docket_tot_pkgs ?? ""),
-      actWt:        String(d.docket_act_wt ?? ""),
-      chrgWt:       String(d.docket_chrg_wt ?? ""),
-      cnorName:     d.cnor_name || "",
-      cneeName:     d.cnee_name || "",
-      payType:      d.docket_pay_type || "",
-    }));
+    if (window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(
+        JSON.stringify({
+          type: 'PRINT_ON_DT',
+          docketNumbers
+        })
+      );
+    } else {
+      const dockets = rows.map((d) => ({
+        docketNo:     d.docket_no || "",
+        docketDate:   d.docket_date || "",
+        fromLocation: d.docket_loc || "",
+        toLocation:   d.docket_to_loc || "",
+        fromTown:     d.docket_pickup_town || "",
+        toTown:       d.docket_dly_town || "",
+        totPkgs:      String(d.docket_tot_pkgs ?? ""),
+        actWt:        String(d.docket_act_wt ?? ""),
+        chrgWt:       String(d.docket_chrg_wt ?? ""),
+        cnorName:     d.cnor_name || "",
+        cneeName:     d.cnee_name || "",
+        payType:      d.docket_pay_type || "",
+      }));
+      printDocketsOnDt({ dockets });
 
-    const res = printDocketsOnDt({ dockets });
-    // if (!res.handledByNative) {
-    //   showError("DT printing is only available inside the app (WebView)");
-    // }
-    if (selectedRows.length === 1) {
-      return handlePrintOnDT(true);
+      if (selectedRows.length === 1) {
+        return handlePrintOnDT(true);
+      }
     }
-
   };
 
   const handlePrint = async (withFreight) => {
