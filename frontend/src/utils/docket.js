@@ -28,3 +28,10 @@ export const saveEwayBillToDB = (ewbData) => Api.post('/docket/ewayfile/db', ewb
 export const updateEwayBillByRecId = (recId, data) => Api.put(`/docket/ewayfile/db/${encodeURIComponent(recId)}`, data).then(r => r.data.data || r.data);
 export const fetchAllEwayBillsFromDB = () => Api.get('/docket/ewayfile/db').then(r => r.data.data || r.data || []);
 export const findOrCreateBp = (payload) => Api.post('/docket/bp/find-or-create', payload).then(r => r.data);
+
+export const fetchPublicDocketByDocketNo = (docketNo) => {
+  if (!hasAuthToken()) {
+    return Api.get(`/public/docket/${encodeURIComponent(docketNo)}`).then(r => r.data.data || r.data);
+  }
+  return Api.get(`/docket/${encodeURIComponent(docketNo)}`).then(r => r.data.data || r.data);
+};

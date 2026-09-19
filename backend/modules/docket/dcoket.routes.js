@@ -250,12 +250,12 @@ router.post('/', async (req, res) => {
     const firstDigit = String(Math.floor(Math.random() * 10));
     let docket_no = req.body.docket_no?.length > 0 ? req.body.docket_no : null;
     if (!docket_no) {
-      const [updatedRow] = await trx('sss.ssm_doc_control').where({ doc_type: 'DKT', loc_code, company_code: tenant_id })
+      const [updatedRow] = await trx('sss.ssm_doc_control').where({ doc_type: 'DKT', loc_code: req.body.docket_loc, company_code: tenant_id })
         .update({ last_upd_no: trx.raw('last_upd_no + 1') }).returning('last_upd_no');  
 
       // const nextId = updatedRow.last_upd_no;
       // docket_no = String(moment().format('YY')) + firstDigit + locId + divisionId + nextId
-      docket_no = loc_code + 'CN' + String(updatedRow.last_upd_no).padStart(6, '0')
+      docket_no = req.body.docket_loc + 'CN' + String(updatedRow.last_upd_no).padStart(6, '0')
     }
     // const rest = require('crypto').randomBytes(7).toString('hex').toUpperCase().slice(0, 13);
     // const docket_no = firstDigit + rest;
@@ -264,7 +264,7 @@ router.post('/', async (req, res) => {
       docket_no,
       tenant_id,
       division_code: divisionId,
-      aud_loc: loc_code || req.body.docket_loc,
+      aud_loc: req.body.docket_loc,
       docket_insurance: req.body.docket_insurance || req.body.docket_risk || 'N',
       docket_tot_amt: req.body.docket_tot_amt ?? null,
     };

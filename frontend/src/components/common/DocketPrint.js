@@ -288,22 +288,8 @@ export async function printDocket({ form, charges, ewbList, ewbNoDisplay, compan
   let qrDataUrl = "";
   if (form.docket_no) {
     try {
-      const qrPayload = [
-        `DN:${form.docket_no}`,
-        `DD:${fmtDate(form.docket_date)}`,
-        `FR:${form.docket_from_town || form.docket_loc || ""}`,
-        `TO:${form.docket_to_town || form.docket_to_loc || ""}`,
-        `PKGS:${form.tot_pkgs || ""}`,
-        `AWT:${form.act_wt || ""}`,
-        `CWT:${form.chrg_wt || ""}`,
-        `CNOR:${form.cnor_name || ""}`,
-        `CNEE:${form.cnee_name || ""}`,
-        `INV:${form.invoice_no || ""}`,
-        `INVDT:${fmtDate(form.invoice_date)}`,
-        `INVVAL:${form.invoice_value || ""}`,
-        `SUP:9212312222`,
-      ].join("|");
-      qrDataUrl = await QRCode.toDataURL(qrPayload, { width: 80, margin: 1, errorCorrectionLevel: "M" });
+      const docketUrl = `${window.location.origin}/docket-scan/${encodeURIComponent(form.docket_no)}`;
+      qrDataUrl = await QRCode.toDataURL(docketUrl, { width: 80, margin: 1, errorCorrectionLevel: "M" });
     } catch (e) {
       console.error("QR generation failed:", e);
     }

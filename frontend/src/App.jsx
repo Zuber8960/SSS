@@ -29,6 +29,7 @@ import DistanceCalculator from "./pages/dev/DistanceCalculator";
 import PincodeSearchPage from "./pages/dev/PincodeSearchPage";
 import DocketEnquiryPage from "./pages/dev/DocketEnquiryPage";
 import TermsAndConditions from "./pages/TermsAndConditions";
+import DocketScanView from "./pages/DocketScanView";
 
 const appRoutes = [
   { path: "/",                   element: <MasterPortal />,    protected: false },
@@ -61,6 +62,7 @@ const appRoutes = [
   { path: "/dev/pincode-search",      element: <PincodeSearchPage />,   protected: false },
   { path: "/dev/docket-enquiry",      element: <DocketEnquiryPage />,   protected: false },
   { path: "/common/terms-conditions", element: <TermsAndConditions />,  protected: true },
+  { path: "/docket-scan/:docketNo",   element: <DocketScanView />,      protected: false },
 ];
 
 function ProtectedRoute({ children }) {
