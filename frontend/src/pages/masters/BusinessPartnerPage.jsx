@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import moment from "moment";
+import { useEffect, useRef, useState } from "react";
 import { NoteAddIcon, SaveIcon, EditIcon, DeleteIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import {
@@ -8,24 +7,24 @@ import {
   FormPanel,
   DataTable,
 } from "../../components/common/MasterPage";
-import { Autocomplete, Box, FormControl, InputLabel, MenuItem, Select, TextField, Typography } from "@mui/material";
+import { Autocomplete, Box, Button, FormControl, InputLabel, MenuItem, Select, TextField } from "@mui/material";
 import {
   fetchAllBusinessPartners,
   fetchBpTypes,
   saveBusinessPartner as saveBusinessPartnerApi,
   updateBusinessPartner as updateBusinessPartnerApi,
   deleteBusinessPartner as deleteBusinessPartnerApi,
+  uploadBpDocument,
 } from "../../utils/businessPartner";
 import { fetchAllDivisionsApi } from "../../utils/divisionMaster";
 import { fetchAllLocations } from "../../utils/locationMaster";
 import { fetchStatesAndCities } from "../../utils/stateCity";
 import useAlert from "../../components/common/UseAlert";
+import { compressImageFile } from "../../utils/deliveryNote";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 
 const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiSelect-select": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
 
-const ID_TYPES = ["PAN", "AADHAR", "PASSPORT", "DL"];
-const DOC_TYPES = ["Agreement", "NDA"];
 
 // ── Field config arrays ──────────────────────────────────────────────────────
 const BASIC_FIELDS = [
@@ -35,8 +34,6 @@ const BASIC_FIELDS = [
   { name: "bp_name",            label: "BP Name",         type: "text" },
   { name: "bp_type",            label: "BP Type",         type: "select",  options: "bpTypeOptions" },
   { name: "bp_company_type",    label: "Company Type",    type: "select",  options: ["Private Ltd", "Public Ltd", "Partnership", "Proprietorship", "LLP"] },
-  { name: "bp_registration_no", label: "Registration No", type: "text" },
-  { name: "bp_tan_no",          label: "TAN No",          type: "text" },
   { name: "bp_deals_with",      label: "Deals With",      type: "select",  options: ["Service", "Item", "Both"] },
   { name: "bp_addres",          label: "Address",         type: "text" },
   { name: "bp_state",           label: "State",           type: "state-auto" },
@@ -55,11 +52,6 @@ const BANK_FIELDS = [
   { name: "bp_ifsc_code",   label: "IFSC Code",    type: "text" },
 ];
 
-const OTHER_FIELDS = [
-  { name: "bp_credit_days", label: "Credit Days", type: "number" },
-  { name: "bp_status",      label: "Status",      type: "select", options: [{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }] },
-  { name: "bp_closed_on",   label: "Closed On",   type: "date",   disabledWhenNew: true },
-];
 // ────────────────────────────────────────────────────────────────────────────
 
 const emptyForm = {
@@ -70,8 +62,6 @@ const emptyForm = {
   bp_name: "",
   bp_type: "",
   bp_company_type: "",
-  bp_registration_no: "",
-  bp_tan_no: "",
   bp_deals_with: "",
   bp_addres: "",
   bp_state: "",
@@ -85,18 +75,25 @@ const emptyForm = {
   bp_ind_id_type_2: "", bp_ind_id_no_2: "",
   bp_ind_id_type_3: "", bp_ind_id_no_3: "",
   bp_ind_id_type_4: "", bp_ind_id_no_4: "",
-  bp_ind_doc_type_1: "", bp_ind_doc_1_from: "", bp_ind_doc_1_to: "",
-  bp_ind_doc_type_2: "", bp_ind_doc_2_from: "", bp_ind_doc_2_to: "",
+  bp_ind_doc_type_1: "", bp_ind_doc_1_from: "", bp_ind_doc_1_to: "", bp_ind_doc_1_file: "",
   bp_bank_name: "",
   bp_acount_name: "",
   bp_account_no: "",
   bp_ifsc_code: "",
   bp_credit_days: "",
-  bp_status: "",
+  bp_status: "1",
   bp_closed_on: "",
 };
 
-const DATE_FORM_FIELDS = ["bp_closed_on", "bp_ind_doc_1_from", "bp_ind_doc_1_to", "bp_ind_doc_2_from", "bp_ind_doc_2_to"];
+const OTHER_FIELDS = [
+  { name: "bp_credit_days",     label: "Credit Days",     type: "number" },
+  { name: "bp_status",          label: "Status",          type: "select", options: [{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }] },
+  { name: "bp_closed_on",       label: "Closed On",       type: "date" },
+];
+
+const DOC_TYPE_OPTIONS = ["GST Certificate", "PAN Card", "Aadhaar Card", "MSME/Udyam Certificate", "Trade License", "Other"];
+
+const DATE_FORM_FIELDS = ["bp_closed_on", "bp_ind_doc_1_from", "bp_ind_doc_1_to"];
 
 const mapRowToForm = (row) => {
   const f = { ...emptyForm };
@@ -154,6 +151,29 @@ export default function BusinessPartnerPage() {
   const [cityInput, setCityInput] = useState("");
   const [showBankDetails, setShowBankDetails] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const docFileInput = useRef(null);
+
+  const handleDocUpload = async (file) => {
+    if (!file) return;
+    setUploadingDoc(true);
+    try {
+      // Compress images in-browser first (same as Delivery Update POD upload) —
+      // mobile camera photos are often >5MB. Non-image files pass through unchanged.
+      const compressed = await compressImageFile(file);
+      console.log(
+        `Uploading BP document: ${file.name} before compression ==> (${file.size / 1000} kB), after compression ==> (${compressed.size / 1000} kB)`
+      );
+      const url = await uploadBpDocument(compressed);
+      if (!url) throw new Error("Upload endpoint returned no URL");
+      setField("bp_ind_doc_1_file", url);
+    } catch (err) {
+      console.error("Document upload error:", err);
+      showError(err.message || `${file.name} could not be uploaded.`);
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
 
   const DATE_FIELDS = DATE_FORM_FIELDS;
 
@@ -263,7 +283,6 @@ export default function BusinessPartnerPage() {
     ? partners.filter((x) =>
         String(x.bp_name ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
         String(x.bp_pan_no ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
-        String(x.bp_registration_no ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
         String(x.bp_mobile1 ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
         String(x.bp_mobile2 ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
         String(x.bp_type_name ?? "").toLowerCase().includes(searchText.toLowerCase())
@@ -274,8 +293,6 @@ export default function BusinessPartnerPage() {
     { key: "bp_name", label: "BP Name" },
     { key: "bp_type_name", label: "BP Type" },
     { key: "bp_pan_no", label: "PAN No" },
-    { key: "bp_registration_no", label: "Registration No" },
-    { key: "bp_tan_no", label: "TAN No" },
     { key: "bp_mobile1", label: "Mobile No 1" },
     { key: "bp_mobile2", label: "Mobile No 2" },
     { key: "bp_bank_name", label: "Bank" },
@@ -429,49 +446,6 @@ export default function BusinessPartnerPage() {
               {BASIC_FIELDS.map(renderField)}
             </FormPanel>
 
-            {/* KYC */}
-            <FormPanel>
-              <SectionHeader title="Identification (KYC)" />
-              {[1, 2, 3, 4].map((n) => (
-                <Box key={n} sx={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                  <Typography sx={{ fontSize: 13, fontWeight: 500, color: "#475569" }}>ID {n}</Typography>
-                  <Box sx={{ display: "flex", gap: "6px" }}>
-                    <FormControl size="small" sx={{ minWidth: 110 }}>
-                      <InputLabel sx={{ fontSize: 13 }}>Type</InputLabel>
-                      <Select
-                        label="Type"
-                        value={form[`bp_ind_id_type_${n}`] ?? ""}
-                        onChange={e => setField(`bp_ind_id_type_${n}`, e.target.value)}
-                        sx={{ fontSize: 13 }}
-                      >
-                        {ID_TYPES.map(t => <MenuItem key={t} value={t} sx={{ fontSize: 13 }}>{t}</MenuItem>)}
-                      </Select>
-                    </FormControl>
-                    <TextField
-                      size="small"
-                      label="Number"
-                      fullWidth
-                      value={form[`bp_ind_id_no_${n}`] ?? ""}
-                      onChange={e => setField(`bp_ind_id_no_${n}`, e.target.value)}
-                      sx={{ flex: "1 1 0", minWidth: 0, ...fieldSx }}
-                    />
-                  </Box>
-                </Box>
-              ))}
-            </FormPanel>
-
-            {/* Document Validity */}
-            <FormPanel>
-              <SectionHeader title="Document Validity" />
-              {[1, 2].map((n) => (
-                <Box key={n} sx={{ display: "contents" }}>
-                  <MuiSelect label={`Doc Type ${n}`} name={`bp_ind_doc_type_${n}`} value={form[`bp_ind_doc_type_${n}`]} onChange={setField} options={DOC_TYPES} />
-                  <TextField size="small" label="Valid From" type="date" fullWidth sx={fieldSx} value={form[`bp_ind_doc_${n}_from`]} onChange={e => setField(`bp_ind_doc_${n}_from`, e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
-                  <TextField size="small" label="Valid To" type="date" fullWidth sx={fieldSx} value={form[`bp_ind_doc_${n}_to`]} onChange={e => setField(`bp_ind_doc_${n}_to`, e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
-                </Box>
-              ))}
-            </FormPanel>
-
             {/* Bank Details — hidden for Customer type */}
             {showBankDetails && (
               <FormPanel>
@@ -483,7 +457,51 @@ export default function BusinessPartnerPage() {
             {/* Other Details */}
             <FormPanel>
               <SectionHeader title="Other Details" />
-              {OTHER_FIELDS.map(renderField)}
+              <Box
+                sx={{
+                  gridColumn: "1 / -1",
+                  display: "flex",
+                  gap: 2,
+                  alignItems: "center",
+                  flexWrap: "nowrap",
+                  "& > .MuiFormControl-root": { flex: "1 1 0%", minWidth: 140 },
+                  "& > .MuiButton-root": { flex: "0 0 auto" },
+                }}
+              >
+                {OTHER_FIELDS.map(renderField)}
+                <MuiSelect
+                  label="Document Type"
+                  name="bp_ind_doc_type_1"
+                  value={form.bp_ind_doc_type_1}
+                  onChange={setField}
+                  options={DOC_TYPE_OPTIONS}
+                />
+                <input
+                  type="file"
+                  hidden
+                  ref={docFileInput}
+                  onChange={(e) => {
+                    handleDocUpload(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => docFileInput.current?.click()}
+                  disabled={uploadingDoc}
+                  sx={{ textTransform: "none", fontSize: 13, height: 40, whiteSpace: "nowrap" }}
+                >
+                  {uploadingDoc ? "Uploading..." : "Upload Document"}
+                </Button>
+                <TextField
+                  size="small"
+                  label="Uploaded File"
+                  sx={fieldSx}
+                  value={form.bp_ind_doc_1_file || ""}
+                  slotProps={{ input: { readOnly: true } }}
+                />
+              </Box>
             </FormPanel>
           </>
         )}

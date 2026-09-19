@@ -145,6 +145,7 @@ export default function UserRolePage() {
           rows={filteredMappings}
           getKey={(row) => `${row.user_id}_${row.role_code}`}
           actions={[{ label: "Delete", icon: <DeleteIcon />, onClick: handleDelete }]}
+          isHeight={420}
         />
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
       </PageBody>

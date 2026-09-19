@@ -92,6 +92,29 @@ router.get('/pod-file/:filename', (req, res) => {
   res.sendFile(filePath);
 });
 
+/* ================= PUBLIC BP DOCUMENT FILE ================= */
+// Same approach as POD: served through /app so it works in production where
+// only /app is proxied to the backend. Filenames are server-generated
+// (bpdoc_<ts>_<rand>.<ext>) — path traversal is blocked.
+const BP_DOC_DIR = path.join(__dirname, '..', 'uploads', 'bp-docs');
+const BP_DOC_MIME = {
+    ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+    ".gif": "image/gif", ".webp": "image/webp", ".bmp": "image/bmp",
+    ".heic": "image/heic", ".heif": "image/heif", ".pdf": "application/pdf",
+};
+
+router.get('/bp-doc-file/:filename', (req, res) => {
+    const filename = path.basename(req.params.filename); // strips any path traversal
+    const filePath = path.join(BP_DOC_DIR, filename);
+    if (!/^bpdoc_.+$/i.test(filename) || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+        return res.status(404).json({ success: false, message: 'Document file not found' });
+    }
+    res.setHeader('Content-Type', BP_DOC_MIME[path.extname(filename).toLowerCase()] || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.sendFile(filePath);
+});
+
 /* ================= PUBLIC TOWN COORDINATES ================= */
 
 router.post('/town/coordinates', async (req, res) => {
