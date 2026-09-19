@@ -61,7 +61,7 @@ const appRoutes = [
   { path: "/dev/distance-calculator", element: <DistanceCalculator />,  protected: false },
   { path: "/dev/pincode-search",      element: <PincodeSearchPage />,   protected: false },
   { path: "/dev/docket-enquiry",      element: <DocketEnquiryPage />,   protected: false },
-  { path: "/common/terms-conditions", element: <TermsAndConditions />,  protected: true },
+  { path: "/common/terms-conditions", element: <TermsAndConditions />,  protected: false },
   { path: "/docket-scan/:docketNo",   element: <DocketScanView />,      protected: false },
 ];
 
