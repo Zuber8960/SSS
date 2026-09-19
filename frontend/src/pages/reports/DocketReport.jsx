@@ -251,7 +251,8 @@ export default function DocketReport() {
       window.ReactNativeWebView.postMessage(
         JSON.stringify({
           type: 'PRINT_ON_DT',
-          docketNumbers
+          docketNumbers,
+          printQuantity:4
         })
       );
     } else {
