@@ -20,9 +20,9 @@ router.get('/:no/:loc/:date', async (req, res) => {
   try {
     const { no, loc, date } = req.params;
     const data = await HireVoucherController.getHireVoucherByKey({
-      hv_no: no,
-      hv_loc: loc,
-      hv_date: date
+      vha_no: no,
+      vha_loc: loc,
+      vha_date: date
     });
     res.json({ success: true, data });
   } catch (err) {
@@ -40,9 +40,9 @@ router.get('/by-no/:no', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Hire Voucher not found' });
     }
     const details = await HireVoucherController.getHireVoucherDetails({
-      hv_no: header.hv_no,
-      hv_loc: header.hv_loc || header.from_loc,
-      hv_date: header.hv_date
+      vha_no: header.vha_no,
+      vha_loc: header.vha_loc || header.from_loc,
+      vha_date: header.vha_date
     });
     res.json({ success: true, data: { header, details } });
   } catch (err) {
@@ -55,7 +55,7 @@ router.get('/by-no/:no', async (req, res) => {
 router.get('/next-no', async (req, res) => {
   try {
     const nextNo = await HireVoucherController.getNextHireVoucherNo();
-    res.json({ success: true, data: { hv_no: nextNo } });
+    res.json({ success: true, data: { vha_no: nextNo } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -73,7 +73,7 @@ router.post('/', async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Hire Voucher saved successfully',
-      data: { hv_no: result.hv_no }
+      data: { vha_no: result.vha_no }
     });
   } catch (err) {
     res.status(500).json({
@@ -89,7 +89,7 @@ router.put('/:no/:loc/:date', async (req, res) => {
   try {
     const { no, loc, date } = req.params;
     const { header, details } = req.body;
-    const keys = { hv_no: no, hv_loc: loc, hv_date: date };
+    const keys = { vha_no: no, vha_loc: loc, vha_date: date };
 
     // Update header
     if (header && Object.keys(header).length > 0) {
@@ -114,7 +114,7 @@ router.delete('/:no/:loc/:date', async (req, res) => {
   try {
     const { no, loc, date } = req.params;
     await HireVoucherController.deleteHireVoucher({
-      hv_no: no, hv_loc: loc, hv_date: date
+      vha_no: no, vha_loc: loc, vha_date: date
     }, trx);
     await trx.commit();
     res.json({ success: true, message: 'Hire Voucher deleted successfully' });
