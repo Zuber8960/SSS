@@ -1,6 +1,52 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const BusinessPartnerController = require('./businessPartner.controller');
+
+// ── BP document upload (stored under backend/uploads/bp-docs, served via /app/public/bp-doc-file/...) ──
+const BP_DOC_DIR = path.join(__dirname, '..', '..', 'uploads', 'bp-docs');
+fs.mkdirSync(BP_DOC_DIR, { recursive: true });
+
+const bpDocStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, BP_DOC_DIR),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname || "") || ".pdf";
+        cb(null, `bpdoc_${Date.now()}_${Math.round(Math.random() * 1e6)}${ext}`);
+    },
+});
+
+const BP_DOC_MIME = [
+    "image/jpeg", "image/png", "image/jpg", "image/gif",
+    "image/heic", "image/heif", "application/pdf",
+    "", // Android/mobile captures can send an empty mimetype
+];
+const bpDocUpload = multer({
+    storage: bpDocStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+    fileFilter: (req, file, cb) => {
+        if (BP_DOC_MIME.includes(file.mimetype)) cb(null, true);
+        else cb(new Error(`File type not supported: ${file.mimetype || "unknown"} (${file.originalname || "unnamed"})`));
+    },
+});
+
+// Upload BP document → returns { url: "/uploads/bp-docs/<filename>" }
+router.post('/documents', (req, res) => {
+    bpDocUpload.single('file')(req, res, (err) => {
+        if (err) {
+            const isSize = err.code === 'LIMIT_FILE_SIZE';
+            return res.status(isSize ? 413 : 400).json({
+                success: false,
+                message: isSize ? 'File too large (max 10MB)' : err.message,
+            });
+        }
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No document file received' });
+        }
+        res.status(201).json({ success: true, data: { url: `/uploads/bp-docs/${req.file.filename}` } });
+    });
+});
 
 router.get('/types', async (req, res) => {
     try {

@@ -1,53 +1,37 @@
-import { useEffect, useState, useRef } from "react";
-import { SaveIcon, RefreshIcon, ClearIcon, NoteAddIcon, EditIcon } from "../../components/common/icons";
+import { useState } from "react";
+import { SaveIcon, RefreshIcon, ClearIcon, NoteAddIcon, EditIcon, DeleteIcon, AddRowIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
   FormPanel,
   FormField,
+  DataTable,
 } from "../../components/common/MasterPage";
 import {
-  fetchAllLorries,
+  fetchLorryByVehicleNo,
   createLorry,
   updateLorry,
-  deleteLorry,
-  fetchLorryByVehicleNo,
 } from "../../utils/lorryMaster";
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import {
   Box,
-  Checkbox,
   FormControl,
-  FormControlLabel,
-  FormGroup,
-  FormLabel,
   IconButton,
-  Select,
-  MenuItem,
   Paper,
   Tooltip,
   Typography,
-  Chip,
   TextField,
   InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import VideocamIcon from "@mui/icons-material/Videocam";
-import BuildIcon from "@mui/icons-material/Build";
-import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
-import SpeedIcon from "@mui/icons-material/Speed";
-import CarRepairIcon from "@mui/icons-material/CarRepair";
-import AirlineSeatFlatIcon from "@mui/icons-material/AirlineSeatFlat";
-import LuggageIcon from "@mui/icons-material/Luggage";
-import EmergencyIcon from "@mui/icons-material/Emergency";
 
 const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiSelect-select": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
 
-function MuiSelect({ label, name, value, onChange, options }) { 
+function MuiSelect({ label, name, value, onChange, options, disabled = false }) {
   return (
-    <FormControl fullWidth size="small" sx={fieldSx}>
+    <FormControl fullWidth size="small" sx={fieldSx} disabled={disabled}>
       <InputLabel>{label}</InputLabel>
       <Select label={label} size="small" value={value ?? ""} onChange={(e) => onChange(name, e.target.value)} sx={{ fontSize: 13 }}>
         {options.map((opt) => (
@@ -60,296 +44,104 @@ function MuiSelect({ label, name, value, onChange, options }) {
   );
 }
 
-const emptyLorryForm = {
-  // ── Top Section ──
-  vehicle_type: "",
-  vehicle_ownership: "",
-
-  // ── Vehicle Details ──
-  vehicle_no: "",
-  branch_code: "",
-  chassis_no: "",
-  fleet_no: "",
-  owner_name: "",
-  make: "",
-  model: "",
-  engine_no: "",
-  engine_power_hp: "",
-  tax_token: "",
-  tax_from_date: "",
-  tax_exp_date: "",
-  body_type: "",
-  floor_type: "",
-  fitness_from_date: "",
-  fitness_exp_date: "",
-  regis_year: "",
-  regis_rto: "",
-  lorry_condition: "",
-  emission_stage: "",
-  tax_issue_place: "",
-  puc_no: "",
-  puc_exp_date: "",
-  fastag_provider: "",
-  fastag_id: "",
-  vehicle_assigned_to: "",
-  vehicle_category: "",
-  driver_pay_type: "",
-  gps_service_provider: "",
-  gps_device_id: "",
-  financer: "",
-  loan_no: "",
-  hp_status: "",
-  battery_capacity: "",
-  fuel_tank_capacity: "",
-  fuel_ratio: "",
-  def_tank_capacity: "",
-  fuel_type: "",
-  black_listed: "No",
-  is_active: "Active",
-  max_no_tyres: "",
-
-  // ── Weight Volume Details ──
-  length_mm: "",
-  breadth_mm: "",
-  height_mm: "",
-  volume_cbm: "",
-  laden_weight_kg: "",
-  unladen_weight_kg: "",
-  carrying_capacity_kg: "",
-  ground_clearence_mm: "",
-
-  // ── Insurance Details ──
-  insurance_company_name: "",
-  insurance_policy_no: "",
-  insurance_type: "",
-  insurance_cert_no: "",
-  insurance_amount: "",
-  insurance_from_date: "",
-  insurance_to_date: "",
-
-  // ── Permit Details ──
-  permit_no: "",
-  permit_date: "",
-  permit_type: "",
-  permit_expiry_date: "",
-  num_fitted_tyre: "",
-  num_stepney: "",
-  tyre_size: "",
-
-  // ── Equipment Details ──
-  has_first_aid: false,
-  has_fire_extinguisher: false,
-  has_speed_governor: false,
-  has_abs: false,
-  has_rear_view_camera: false,
-  has_jack: false,
-  has_tool_kit: false,
-  has_cabin: false,
-  cabin_type: "",
-
-  // ── Document Upload ──
-  doc_permit: "",
-  doc_insurance: "",
-  doc_vehicle_rc: "",
-  doc_fitness: "",
-  doc_pollution: "",
+const num = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
 };
 
-const mapLorryToForm = (row) => ({
-  // ── Top Section ──
-  vehicle_type: row.vehicle_type ?? "",
-  vehicle_ownership: row.vehicle_ownership ?? "",
+const fmt = (v) =>
+  num(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  // ── Vehicle Details ──
-  vehicle_no: row.vehicle_no ?? "",
-  branch_code: row.branch_code ?? "",
-  chassis_no: row.chassis_no ?? "",
-  fleet_no: row.fleet_no ?? "",
-  owner_name: row.owner_name ?? "",
-  make: row.make ?? "",
-  model: row.model ?? "",
-  engine_no: row.engine_no ?? "",
-  engine_power_hp: row.engine_power_hp ?? "",
-  tax_token: row.tax_token ?? "",
-  tax_from_date: row.tax_from_date ? row.tax_from_date.slice(0, 10) : "",
-  tax_exp_date: row.tax_exp_date ? row.tax_exp_date.slice(0, 10) : "",
-  body_type: row.body_type ?? "",
-  floor_type: row.floor_type ?? "",
-  fitness_from_date: row.fitness_from_date ? row.fitness_from_date.slice(0, 10) : "",
-  fitness_exp_date: row.fitness_exp_date ? row.fitness_exp_date.slice(0, 10) : "",
-  regis_year: row.regis_year ?? "",
-  regis_rto: row.regis_rto ?? "",
-  lorry_condition: row.lorry_condition ?? "",
-  emission_stage: row.emission_stage ?? "",
-  tax_issue_place: row.tax_issue_place ?? "",
-  puc_no: row.puc_no ?? "",
-  puc_exp_date: row.puc_exp_date ? row.puc_exp_date.slice(0, 10) : "",
-  fastag_provider: row.fastag_provider ?? "",
-  fastag_id: row.fastag_id ?? "",
-  vehicle_assigned_to: row.vehicle_assigned_to ?? "",
-  vehicle_category: row.vehicle_category ?? "",
-  driver_pay_type: row.driver_pay_type ?? "",
-  gps_service_provider: row.gps_service_provider ?? "",
-  gps_device_id: row.gps_device_id ?? "",
-  financer: row.financer ?? "",
-  loan_no: row.loan_no ?? "",
-  hp_status: row.hp_status ?? "",
-  battery_capacity: row.battery_capacity ?? "",
-  fuel_tank_capacity: row.fuel_tank_capacity ?? "",
-  fuel_ratio: row.fuel_ratio ?? "",
-  def_tank_capacity: row.def_tank_capacity ?? "",
-  fuel_type: row.fuel_type ?? "",
-  black_listed: row.black_listed ?? "No",
-  is_active: row.is_active ?? "Active",
-  max_no_tyres: row.max_no_tyres ?? "",
+const emptyLorryForm = {
+  // ── 1. Vehicle & Ownership ──
+  vehicle_no: "",
+  vehicle_ownership: "Own",
+  vehicle_type: "",
+  vehicle_capacity: "",
+  owner_name: "",
+  broker_name: "",
+  payment_to: "",
+  voucher_no: "",
 
-  // ── Weight Volume Details ──
-  length_mm: row.length_mm ?? "",
-  breadth_mm: row.breadth_mm ?? "",
-  height_mm: row.height_mm ?? "",
-  volume_cbm: row.volume_cbm ?? "",
-  laden_weight_kg: row.laden_weight_kg ?? "",
-  unladen_weight_kg: row.unladen_weight_kg ?? "",
-  carrying_capacity_kg: row.carrying_capacity_kg ?? "",
-  ground_clearence_mm: row.ground_clearence_mm ?? "",
+  // ── 2. Trip & Route ──
+  from_location: "",
+  to_location: "",
+  via_1: "",
+  via_2: "",
+  actual_weight: "",
+  guaranteed_weight: "",
+  rate_type: "Fixed",
+  rate: "",
 
-  // ── Insurance Details ──
-  insurance_company_name: row.insurance_company_name ?? "",
-  insurance_policy_no: row.insurance_policy_no ?? "",
-  insurance_type: row.insurance_type ?? "",
-  insurance_cert_no: row.insurance_cert_no ?? "",
-  insurance_amount: row.insurance_amount ?? "",
-  insurance_from_date: row.insurance_from_date ? row.insurance_from_date.slice(0, 10) : "",
-  insurance_to_date: row.insurance_to_date ? row.insurance_to_date.slice(0, 10) : "",
+  // ── 3. Hire Calculation ──
+  total_hire: "",
+  loading: "",
+  other_charges: "",
+  advance: "",
+  tds: "",
 
-  // ── Permit Details ──
-  permit_no: row.permit_no ?? "",
-  permit_date: row.permit_date ? row.permit_date.slice(0, 10) : "",
-  permit_type: row.permit_type ?? "",
-  permit_expiry_date: row.permit_expiry_date ? row.permit_expiry_date.slice(0, 10) : "",
-  num_fitted_tyre: row.num_fitted_tyre ?? "",
-  num_stepney: row.num_stepney ?? "",
-  tyre_size: row.tyre_size ?? "",
+  // ── 4. Trip Expense / Advance ──
+  estimated_diesel: "",
+  estimated_other_charges: "",
+  exp_loading: "",
+  exp_other_charges: "",
+  advance_diesel: "",
+  advance_cash: "",
 
-  // ── Equipment Details ──
-  has_first_aid: row.has_first_aid ?? false,
-  has_fire_extinguisher: row.has_fire_extinguisher ?? false,
-  has_speed_governor: row.has_speed_governor ?? false,
-  has_abs: row.has_abs ?? false,
-  has_rear_view_camera: row.has_rear_view_camera ?? false,
-  has_jack: row.has_jack ?? false,
-  has_tool_kit: row.has_tool_kit ?? false,
-  has_cabin: row.has_cabin ?? false,
-  cabin_type: row.cabin_type ?? "",
+  // ── 5. Loading Remarks ──
+  loading_remarks: "",
 
-  // ── Document Upload ──
-  doc_permit: row.doc_permit ?? "",
-  doc_insurance: row.doc_insurance ?? "",
-  doc_vehicle_rc: row.doc_vehicle_rc ?? "",
-  doc_fitness: row.doc_fitness ?? "",
-  doc_pollution: row.doc_pollution ?? "",
-});
+  // ── Signatures ──
+  prepared_by: "",
+  checked_by: "",
+  approved_by: "",
+  owner_driver_ack: "",
+};
+
+const emptyManifestRow = {
+  manifest_no: "",
+  manifest_date: "",
+  from_loc: "",
+  from_town: "",
+  to_loc: "",
+  to_town: "",
+  actual_wt: "",
+  no_of_cns: "",
+  no_of_pkgs: "",
+};
+
 
 export default function LorryPage() {
-
-  const [, setLorries] = useState([]);
-  const { dialog, closeAlert, showSuccess, showError, showWarning } = useAlert();
-
   const [form, setForm] = useState(emptyLorryForm);
-
-  const [isEditing, setIsEditing] = useState(false);
+  const [manifestRows, setManifestRows] = useState([]);
   const [originalLorry, setOriginalLorry] = useState(null);
-
-  const clearForm = () => {
-    setForm(emptyLorryForm);
-    setIsEditing(false);
-    setOriginalLorry(null);
-  };
-
-  const loadLorries = async () => {
-    try {
-      const data = await fetchAllLorries();
-      setLorries(data);
-    } catch (err) {
-      showError(err.message || "Failed to load lorries");
-      console.error("Load lorries error:", err);
-    }
-  };
-
-  const saveLorry = async () => {
-    if (!form.vehicle_no) {
-      showError("Vehicle Number is required");
-      return;
-    }
-
-    const payload = {
-      ...form,
-      engine_power_hp: form.engine_power_hp ? Number(form.engine_power_hp) : null,
-      battery_capacity: form.battery_capacity ? Number(form.battery_capacity) : null,
-      fuel_tank_capacity: form.fuel_tank_capacity ? Number(form.fuel_tank_capacity) : null,
-      fuel_ratio: form.fuel_ratio ? Number(form.fuel_ratio) : null,
-      def_tank_capacity: form.def_tank_capacity ? Number(form.def_tank_capacity) : null,
-      length_mm: form.length_mm ? Number(form.length_mm) : null,
-      breadth_mm: form.breadth_mm ? Number(form.breadth_mm) : null,
-      height_mm: form.height_mm ? Number(form.height_mm) : null,
-      volume_cbm: form.volume_cbm ? Number(form.volume_cbm) : null,
-      laden_weight_kg: form.laden_weight_kg ? Number(form.laden_weight_kg) : null,
-      unladen_weight_kg: form.unladen_weight_kg ? Number(form.unladen_weight_kg) : null,
-      carrying_capacity_kg: form.carrying_capacity_kg ? Number(form.carrying_capacity_kg) : null,
-      insurance_amount: form.insurance_amount ? Number(form.insurance_amount) : null,
-      num_fitted_tyre: form.num_fitted_tyre ? Number(form.num_fitted_tyre) : null,
-      num_stepney: form.num_stepney ? Number(form.num_stepney) : null,
-      max_no_tyres: form.max_no_tyres ? Number(form.max_no_tyres) : null,
-      ground_clearence_mm: form.ground_clearence_mm ? Number(form.ground_clearence_mm) : null,
-    };
-
-    try {
-      if (isEditing && originalLorry?.rec_id) {
-        await updateLorry(originalLorry.rec_id, payload);
-        setLorries((prev) =>
-          prev.map((lorry) =>
-            lorry.rec_id === originalLorry.rec_id ? { ...lorry, ...payload } : lorry
-          )
-        );
-        showSuccess("Lorry updated successfully");
-      } else {
-        const created = await createLorry(payload);
-        setLorries((prev) => [...prev, ...(Array.isArray(created) ? created : [created])]);
-        showSuccess("Lorry created successfully");
-      }
-      clearForm();
-    } catch (err) {
-      showError(err.message || "Failed to save lorry");
-      console.error("Save lorry error:", err);
-    }
-  };
-
-  // eslint-disable-next-line no-unused-vars
-  const editLorry = (row) => {
-    setForm(mapLorryToForm(row));
-    setOriginalLorry(row);
-    setIsEditing(true);
-  };
-
-  // eslint-disable-next-line no-unused-vars
-  const handleDeleteLorry = (rec_id) => {
-    showWarning("Confirm Delete", "Delete Lorry ?",
-      async () => {
-        try {
-          await deleteLorry(rec_id);
-          setLorries((prev) => prev.filter((x) => x.rec_id !== rec_id));
-          showSuccess("Lorry deleted successfully");
-        } catch (err) {
-          showError(err.message || "Failed to delete lorry");
-          console.error("Delete lorry error:", err);
-        }
-      }
-    );
-  };
+  const [isEditing, setIsEditing] = useState(false);
+  const { dialog, closeAlert, showSuccess, showError, showWarning } = useAlert();
 
   const updateField = (name, value) => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
+
+  const clearForm = () => {
+    setForm(emptyLorryForm);
+    setManifestRows([]);
+    setOriginalLorry(null);
+    setIsEditing(false);
+  };
+
+  // ── Derived: 3. Hire Calculation ──
+  const grossAmount = num(form.total_hire) + num(form.loading) + num(form.other_charges);
+  const balance = grossAmount - num(form.advance);
+  const netAdvance = num(form.advance) - num(form.tds);
+
+  // ── Derived: 4. Trip Expense / Advance ──
+  const totalTripAmount = num(form.estimated_diesel) + num(form.estimated_other_charges);
+  const expGrossAmount = num(form.exp_loading) + num(form.exp_other_charges);
+
+  // ── Derived: 7. Settlement Summary ──
+  const totalAdvance = num(form.advance_diesel) + num(form.advance_cash);
+  const totalDeductions = num(form.tds);
+  const netPayable = grossAmount - totalAdvance - totalDeductions;
 
   const handleVehicleNoKeyDown = async (e) => {
     if (e.key === "Enter" || e.key === "Tab") {
@@ -358,15 +150,20 @@ export default function LorryPage() {
       try {
         const data = await fetchLorryByVehicleNo(vno);
         if (data) {
-          setForm(mapLorryToForm(data));
+          setForm((prev) => ({
+            ...prev,
+            vehicle_no: data.vehicle_no ?? vno,
+            vehicle_ownership: data.vehicle_ownership ?? prev.vehicle_ownership,
+            vehicle_type: data.vehicle_type ?? prev.vehicle_type,
+            vehicle_capacity: data.carrying_capacity_kg ?? prev.vehicle_capacity,
+            owner_name: data.owner_name ?? prev.owner_name,
+          }));
           setOriginalLorry(data);
           setIsEditing(true);
-          showSuccess("Lorry details loaded for editing");
+          showSuccess("Lorry details loaded from Lorry Master");
         } else {
-          clearForm();
-          updateField("vehicle_no", vno);
           setIsEditing(false);
-          showWarning("Vehicle not found. Creating new entry.");
+          setOriginalLorry(null);
         }
       } catch (err) {
         showError(err.message || "Failed to fetch lorry details");
@@ -375,80 +172,80 @@ export default function LorryPage() {
     }
   };
 
-  const [, setError] = useState("");
-  const [, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadLorriesAtMount = async () => {
-      try {
-        setLoading(true);
-        setError("");
-        const data = await fetchAllLorries();
-        setLorries(data);
-      } catch (err) {
-        setError(err.message || "Failed to load lorries");
-        console.error("Error loading lorries:", err);
-      } finally {
-        setLoading(false);
-      }
+  const saveForm = async () => {
+    if (!form.vehicle_no?.trim()) {
+      showError("Vehicle Number is required");
+      return;
+    }
+    const sharedPayload = {
+      vehicle_no: form.vehicle_no,
+      vehicle_ownership: form.vehicle_ownership,
+      vehicle_type: form.vehicle_type,
+      owner_name: form.owner_name,
+      carrying_capacity_kg: form.vehicle_capacity ? Number(form.vehicle_capacity) : null,
     };
+    try {
+      if (isEditing && originalLorry?.rec_id) {
+        await updateLorry(originalLorry.rec_id, sharedPayload);
+        showSuccess("Lorry details updated successfully");
+      } else {
+        const created = await createLorry(sharedPayload);
+        const row = Array.isArray(created) ? created[0] : created;
+        setOriginalLorry(row);
+        setIsEditing(true);
+        showSuccess("Lorry details saved successfully");
+      }
+    } catch (err) {
+      showError(err.message || "Failed to save lorry details");
+      console.error("Save lorry error:", err);
+    }
+  };
 
-    loadLorriesAtMount();
-  }, []);
+  // ── Manifest rows handlers ──
+  // ── Manifest rows handlers ──
+  const addManifestRow = () => setManifestRows((prev) => [...prev, { ...emptyManifestRow }]);
 
-  // Check if any Own Vehicle Extra Details field has data
-  const hasOwnVehicleData = Boolean(
-    form.loan_no || form.hp_status || form.battery_capacity || 
-    form.fuel_tank_capacity || form.fuel_ratio || form.def_tank_capacity || 
-    form.fuel_type
-  );
+  const updateManifestRow = (idx, field, value) =>
+    setManifestRows((prev) => prev.map((r, i) => (i === idx ? { ...r, [field]: value } : r)));
+
+  const deleteManifestRow = (row) => {
+    showWarning("Confirm Delete", "Remove this manifest row?",
+      () => setManifestRows((prev) => prev.filter((r) => r !== row))
+    );
+  };
+
+  const manifestColumns = [
+    { key: "manifest_no", label: "Manifest No.", minWidth: 120, editable: true },
+    { key: "manifest_date", label: "Manifest Date", minWidth: 130, editable: true, type: "string", isDate: true },
+    { key: "from_loc", label: "Form Loc", minWidth: 110, editable: true },
+    { key: "from_town", label: "From Town", minWidth: 120, editable: true },
+    { key: "to_loc", label: "To Loc", minWidth: 110, editable: true },
+    { key: "to_town", label: "To Town", minWidth: 120, editable: true },
+    { key: "actual_wt", label: "Actual Wt.", minWidth: 110, editable: true, type: "number" },
+    { key: "no_of_cns", label: "No. of CNs", minWidth: 100, editable: true, type: "number" },
+    { key: "no_of_pkgs", label: "No. of Pkgs", minWidth: 110, editable: true, type: "number" },
+  ];
 
   const sectionStyle = {
-    margin: "24px 0 10px",
+    margin: "10px 0 6px",
     color: "#1e293b",
-    fontSize: "17px",
+    fontSize: "16px",
     fontWeight: 700,
-    padding: "8px 0",
+    padding: "6px 0",
     borderBottom: "2px solid #a855f7",
     display: "inline-block",
   };
 
-  // Equipment items config
-  const equipmentItems = [
-    { key: "has_first_aid", label: "First Aid", icon: <EmergencyIcon sx={{ fontSize: 28 }} /> },
-    { key: "has_fire_extinguisher", label: "Fire Extinguisher", icon: <LocalFireDepartmentIcon sx={{ fontSize: 28 }} /> },
-    { key: "has_speed_governor", label: "Speed Governor", icon: <SpeedIcon sx={{ fontSize: 28 }} /> },
-    { key: "has_abs", label: "ABS", icon: <CarRepairIcon sx={{ fontSize: 28 }} /> },
-    { key: "has_rear_view_camera", label: "Rear View Camera", icon: <VideocamIcon sx={{ fontSize: 28 }} /> },
-    { key: "has_jack", label: "Jack", icon: <BuildIcon sx={{ fontSize: 28 }} /> },
-    { key: "has_tool_kit", label: "Tool Kit", icon: <LuggageIcon sx={{ fontSize: 28 }} /> },
-    { key: "has_cabin", label: "Cabin", icon: <AirlineSeatFlatIcon sx={{ fontSize: 28 }} /> },
-  ];
-
-  // Document upload config
-  const docItems = [
-    { key: "doc_permit", label: "Permit" },
-    { key: "doc_insurance", label: "Insurance" },
-    { key: "doc_vehicle_rc", label: "Vehicle RC" },
-    { key: "doc_fitness", label: "Fitness" },
-    { key: "doc_pollution", label: "Pollution" },
-  ];
-
-  // Refs for hidden file inputs
-  const fileInputRefs = useRef({});
-
-  const handleFileSelect = (docKey) => (event) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      updateField(docKey, file.name);
-    }
-    // Reset input so same file can be selected again
-    event.target.value = "";
-  };
+  const summaryCardSx = (highlight = false) => ({
+    p: 2,
+    borderRadius: "12px",
+    border: highlight ? "2px solid #a855f7" : "1.5px solid #e2e8f0",
+    background: highlight ? "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)" : "#ffffff",
+  });
 
   return (
     <MainLayout>
-      <PageBody title="Lorry Master">
+      <PageBody title="Lorry">
         <div className="pageToolbar" style={{ alignItems: "center" }}>
           <Tooltip title="Create New">
             <IconButton onClick={clearForm} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
@@ -477,364 +274,152 @@ export default function LorryPage() {
             </IconButton>
           </Tooltip>
           <Tooltip title="Save">
-            <IconButton onClick={saveLorry} size="small" sx={{ color: "#16a34a", "&:hover": { background: "#dcfce7" } }}>
+            <IconButton onClick={saveForm} size="small" sx={{ color: "#16a34a", "&:hover": { background: "#dcfce7" } }}>
               <SaveIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Refresh">
+            <IconButton size="small" onClick={() => showSuccess("Data refreshed")} sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
+              <RefreshIcon />
             </IconButton>
           </Tooltip>
         </div>
 
-        {/* ═══════════════════ TOP SECTION ═══════════════════ */}
+        {/* ═══════════ 1. VEHICLE & OWNERSHIP DETAILS ═══════════ */}
+        <h3 style={sectionStyle}>1. Vehicle &amp; Ownership Details</h3>
+        <FormPanel columns={4}>
+          <TextField size="small" label="Vehicle No" fullWidth sx={fieldSx}
+            value={form.vehicle_no} onChange={(e) => updateField("vehicle_no", e.target.value)}
+            onKeyDown={handleVehicleNoKeyDown} placeholder="e.g. HR 55 AB 1234" />
+          <MuiSelect label="Vehicle Ownership" name="vehicle_ownership" value={form.vehicle_ownership}
+            onChange={updateField} options={["Own", "Market", "Vendor"]} />
+          <MuiSelect label="Vehicle Type" name="vehicle_type" value={form.vehicle_type}
+            onChange={updateField} options={["Truck / Trailer / LCV", "Truck", "Trailer", "LCV", "Tipper", "Container"]} />
+          <FormField label="Vehicle Capacity" name="vehicle_capacity" form={form} setForm={setForm} />
+          <FormField label="Owner" name="owner_name" form={form} setForm={setForm} />
+          <FormField label="Broker" name="broker_name" form={form} setForm={setForm} />
+          <MuiSelect label="Payment To" name="payment_to" value={form.payment_to}
+            onChange={updateField} options={["Owner / Broker / Vendor", "Owner", "Broker", "Vendor"]} />
+          <FormField label="Voucher No (Auto generated)" name="voucher_no" form={form} setForm={setForm} disabled />
+        </FormPanel>
+
+        {/* ═══════════ 2. TRIP & ROUTE DETAILS ═══════════ */}
+        <h3 style={sectionStyle}>2. Trip &amp; Route Details</h3>
+        <FormPanel columns={4}>
+          <FormField label="From Location" name="from_location" form={form} setForm={setForm} />
+          <FormField label="To Location" name="to_location" form={form} setForm={setForm} />
+          <FormField label="Via 1" name="via_1" form={form} setForm={setForm} />
+          <FormField label="Via 2" name="via_2" form={form} setForm={setForm} />
+          <FormField label="Actual Weight (Kg)" name="actual_weight" form={form} setForm={setForm} type="number" />
+          <FormField label="Guaranteed Weight (Kg)" name="guaranteed_weight" form={form} setForm={setForm} type="number" />
+          <MuiSelect label="Rate Type" name="rate_type" value={form.rate_type}
+            onChange={updateField} options={["Fixed", "Per Kg", "Per Ton", "Per Trip"]} />
+          <FormField label="Rate (₹)" name="rate" form={form} setForm={setForm} type="number" />
+        </FormPanel>
+
+
+        {/* ═══════════ 3. HIRE CALCULATION ═══════════ */}
+        <h3 style={sectionStyle}>3. Hire Calculation</h3>
+        <FormPanel columns={4}>
+          <FormField label="Total Hire (₹)" name="total_hire" form={form} setForm={setForm} type="number" />
+          <FormField label="Loading (₹)" name="loading" form={form} setForm={setForm} type="number" />
+          <FormField label="Other Charges (₹)" name="other_charges" form={form} setForm={setForm} type="number" />
+          <TextField size="small" label="Gross Amount (₹)" fullWidth sx={fieldSx} disabled
+            value={`₹ ${fmt(grossAmount)}`} />
+          <FormField label="Advance (₹)" name="advance" form={form} setForm={setForm} type="number" />
+          <TextField size="small" label="Balance (₹)" fullWidth sx={fieldSx} disabled
+            value={`₹ ${fmt(balance)}`} />
+          <FormField label="TDS (₹)" name="tds" form={form} setForm={setForm} type="number" />
+          <TextField size="small" label="Net Advance (₹)" fullWidth sx={fieldSx} disabled
+            value={`₹ ${fmt(netAdvance)}`} />
+        </FormPanel>
+
+        {/* ═══════════ 4. TRIP EXPENSE / ADVANCE DETAILS ═══════════ */}
+        <h3 style={sectionStyle}>4. Trip Expense / Advance Details</h3>
+        <FormPanel columns={4}>
+          <FormField label="Estimated Diesel (₹)" name="estimated_diesel" form={form} setForm={setForm} type="number" />
+          <FormField label="Estimated Other Charges (₹)" name="estimated_other_charges" form={form} setForm={setForm} type="number" />
+          <TextField size="small" label="Total Trip Amount (₹)" fullWidth sx={fieldSx} disabled
+            value={`₹ ${fmt(totalTripAmount)}`} />
+          <FormField label="Loading (₹)" name="exp_loading" form={form} setForm={setForm} type="number" />
+          <FormField label="Other Charges (₹)" name="exp_other_charges" form={form} setForm={setForm} type="number" />
+          <TextField size="small" label="Gross Amount (₹)" fullWidth sx={fieldSx} disabled
+            value={`₹ ${fmt(expGrossAmount)}`} />
+          <FormField label="Advance Diesel (₹)" name="advance_diesel" form={form} setForm={setForm} type="number" />
+          <FormField label="Advance Cash (₹)" name="advance_cash" form={form} setForm={setForm} type="number" />
+        </FormPanel>
+
+        {/* ═══════════ 5. LOADING REMARKS ═══════════ */}
+        <h3 style={sectionStyle}>5. Loading Remarks</h3>
+        <FormPanel>
+          <TextField size="small" label="Loading Remarks" fullWidth multiline rows={3} sx={fieldSx}
+            value={form.loading_remarks} onChange={(e) => updateField("loading_remarks", e.target.value)}
+            placeholder="Enter loading instructions, vehicle condition, special instructions, deductions or remarks..." />
+        </FormPanel>
+
+
+        {/* ═══════════ 6. MANIFEST / SHIPMENT DETAILS ═══════════ */}
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1, mt: "10px" }}>
+          <h3 style={{ ...sectionStyle, margin: 0 }}>6. Manifest / Shipment Details</h3>
+          <Tooltip title="Add manifest row">
+            <IconButton onClick={addManifestRow} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
+              <AddRowIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+        <DataTable
+          columns={manifestColumns}
+          rows={manifestRows}
+          getKey={(row, index) => index}
+          actions={[
+            {
+              label: "Delete",
+              icon: <DeleteIcon />,
+              onClick: deleteManifestRow,
+            },
+          ]}
+          editable
+          singleClick
+          autoHeight
+          onCellChange={(rowIndex, key, value) => updateManifestRow(rowIndex, key, value)}
+        />
+
+
+        {/* ═══════════ 7. SETTLEMENT SUMMARY ═══════════ */}
+        <h3 style={sectionStyle}>7. Settlement Summary</h3>
         <Box
           sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 3,
-            flexWrap: "wrap",
-            p: 2.5,
-            mb: 1,
-            borderRadius: "14px",
-            border: "1.5px solid #e2e8f0",
-            background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+            display: "grid",
+            gridTemplateColumns: { xs: "repeat(1, 1fr)", sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" },
+            gap: 2,
+            mb: 3,
           }}
         >
-          <FormControl component="fieldset" size="small">
-            <FormLabel sx={{ fontSize: "13px", fontWeight: 600, color: "#475569", mb: 0.5 }}>
-              Vehicle Ownership
-            </FormLabel>
-            <FormGroup row>
-              {["Market Vehicle", "Vendor Vehicle", "Own Vehicle"].map((label) => {
-                const value = label === "Market Vehicle" ? "Market" : label === "Vendor Vehicle" ? "Vendor" : "Own";
-                return (
-                  <FormControlLabel
-                    key={value}
-                    control={
-                      <Checkbox
-                        checked={form.vehicle_ownership === value}
-                        onChange={() => updateField("vehicle_ownership", form.vehicle_ownership === value ? "" : value)}
-                        size="small"
-                        sx={{ "&.Mui-checked": { color: "#a855f7" } }}
-                      />
-                    }
-                    label={<span style={{ fontSize: "13px" }}>{label}</span>}
-                  />
-                );
-              })}
-            </FormGroup>
-          </FormControl>
-
-          <Tooltip title="Refresh"><IconButton size="small" onClick={loadLorries} sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}><RefreshIcon /></IconButton></Tooltip>
+          <Paper elevation={0} sx={summaryCardSx()}>
+            <Typography sx={{ fontSize: "11px", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>Lorry Hire</Typography>
+            <Typography sx={{ fontSize: "20px", fontWeight: 700, color: "#1e293b" }}>₹ {fmt(grossAmount)}</Typography>
+          </Paper>
+          <Paper elevation={0} sx={summaryCardSx()}>
+            <Typography sx={{ fontSize: "11px", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>Total Advance</Typography>
+            <Typography sx={{ fontSize: "20px", fontWeight: 700, color: "#1e293b" }}>₹ {fmt(totalAdvance)}</Typography>
+          </Paper>
+          <Paper elevation={0} sx={summaryCardSx()}>
+            <Typography sx={{ fontSize: "11px", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>Total Deductions / TDS</Typography>
+            <Typography sx={{ fontSize: "20px", fontWeight: 700, color: "#1e293b" }}>₹ {fmt(totalDeductions)}</Typography>
+          </Paper>
+          <Paper elevation={0} sx={summaryCardSx(true)}>
+            <Typography sx={{ fontSize: "11px", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>Net Payable</Typography>
+            <Typography sx={{ fontSize: "20px", fontWeight: 700, color: "#7e22ce" }}>₹ {fmt(netPayable)}</Typography>
+          </Paper>
         </Box>
 
-        {/* ═══════════════════ VEHICLE DETAILS ═══════════════════ */}
-        <h3 style={sectionStyle}>🔹 Vehicle Details</h3>
-        <FormPanel>
-          <TextField size="small" label="Vehicle Number" fullWidth sx={fieldSx}
-            value={form.vehicle_no} onChange={(e) => updateField("vehicle_no", e.target.value)}
-            onKeyDown={handleVehicleNoKeyDown} />
-          <TextField size="small" label="Branch Code" fullWidth sx={fieldSx}
-            value={form.branch_code} onChange={(e) => updateField("branch_code", e.target.value)} />
-          <TextField size="small" label="Chassis Number" fullWidth sx={fieldSx}
-            value={form.chassis_no} onChange={(e) => updateField("chassis_no", e.target.value)} />
-          <TextField size="small" label="Fleet Number" fullWidth sx={fieldSx}
-            value={form.fleet_no} onChange={(e) => updateField("fleet_no", e.target.value)} />
-          <TextField size="small" label="Owner Name" fullWidth sx={fieldSx}
-            value={form.owner_name} onChange={(e) => updateField("owner_name", e.target.value)} />
-          <TextField size="small" label="Make" fullWidth sx={fieldSx}
-            value={form.make} onChange={(e) => updateField("make", e.target.value)} />
-          <TextField size="small" label="Model" fullWidth sx={fieldSx}
-            value={form.model} onChange={(e) => updateField("model", e.target.value)} />
-          <TextField size="small" label="Engine Number" fullWidth sx={fieldSx}
-            value={form.engine_no} onChange={(e) => updateField("engine_no", e.target.value)} />
-          <TextField size="small" label="Engine Power HP" fullWidth sx={fieldSx} type="number"
-            value={form.engine_power_hp} onChange={(e) => updateField("engine_power_hp", e.target.value)} />
-          <TextField size="small" label="Tax Token" fullWidth sx={fieldSx}
-            value={form.tax_token} onChange={(e) => updateField("tax_token", e.target.value)} />
-          <TextField size="small" label="Tax From Date" type="date" fullWidth sx={fieldSx}
-            value={form.tax_from_date} onChange={(e) => updateField("tax_from_date", e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }} />
-          <TextField size="small" label="Tax Exp. Date" type="date" fullWidth sx={fieldSx}
-            value={form.tax_exp_date} onChange={(e) => updateField("tax_exp_date", e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }} />
-          <MuiSelect label="Body Type" name="body_type" value={form.body_type} onChange={updateField}
-            options={["Open Body", "Closed Body", "Container", "Tanker", "Flat Bed", "Refrigerated", "Hydraulic"]} />
-          <MuiSelect label="Floor Type" name="floor_type" value={form.floor_type} onChange={updateField}
-            options={["Wooden", "Aluminum", "Steel", "PVC", "Rubber Mat"]} />
-          <TextField size="small" label="Fitness From Date" type="date" fullWidth sx={fieldSx}
-            value={form.fitness_from_date} onChange={(e) => updateField("fitness_from_date", e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }} />
-          <TextField size="small" label="Fitness Exp. Date" type="date" fullWidth sx={fieldSx}
-            value={form.fitness_exp_date} onChange={(e) => updateField("fitness_exp_date", e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }} />
-          <TextField size="small" label="Vehicle Registered Year" fullWidth sx={fieldSx}
-            value={form.regis_year} onChange={(e) => updateField("regis_year", e.target.value)} />
-          <TextField size="small" label="Registration RTO" fullWidth sx={fieldSx}
-            value={form.regis_rto} onChange={(e) => updateField("regis_rto", e.target.value)} />
-          <MuiSelect label="Lorry Condition" name="lorry_condition" value={form.lorry_condition} onChange={updateField}
-            options={["Excellent", "Good", "Average", "Poor"]} />
-          <MuiSelect label="Emission Stage" name="emission_stage" value={form.emission_stage} onChange={updateField}
-            options={["BS3", "BS4", "BS6", "Euro 3", "Euro 4", "Euro 5", "Euro 6"]} />
-          <TextField size="small" label="Tax Issue Place" fullWidth sx={fieldSx}
-            value={form.tax_issue_place} onChange={(e) => updateField("tax_issue_place", e.target.value)} />
-          <TextField size="small" label="PUC No" fullWidth sx={fieldSx}
-            value={form.puc_no} onChange={(e) => updateField("puc_no", e.target.value)} />
-          <TextField size="small" label="PUC Exp. Date" type="date" fullWidth sx={fieldSx}
-            value={form.puc_exp_date} onChange={(e) => updateField("puc_exp_date", e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }} />
-          <MuiSelect label="Fastag Provider" name="fastag_provider" value={form.fastag_provider} onChange={updateField}
-            options={["ICICI", "HDFC", "SBI", "Axis", "Paytm", "Airtel", "Other"]} />
-          <TextField size="small" label="Fastag ID" fullWidth sx={fieldSx}
-            value={form.fastag_id} onChange={(e) => updateField("fastag_id", e.target.value)} />
-          <TextField size="small" label="Vehicle Assigned To" fullWidth sx={fieldSx}
-            value={form.vehicle_assigned_to} onChange={(e) => updateField("vehicle_assigned_to", e.target.value)} />
-          <MuiSelect label="Vehicle Category" name="vehicle_category" value={form.vehicle_category} onChange={updateField}
-            options={["LCV", "MCV", "HCV", "Trailer", "Tractor"]} />
-          <MuiSelect label="Driver Pay Type" name="driver_pay_type" value={form.driver_pay_type} onChange={updateField}
-            options={["Fixed", "Per Trip", "Per Km", "Percentage"]} />
-          <TextField size="small" label="GPS Service Provider" fullWidth sx={fieldSx}
-            value={form.gps_service_provider} onChange={(e) => updateField("gps_service_provider", e.target.value)} />
-          <TextField size="small" label="GPS Device ID" fullWidth sx={fieldSx}
-            value={form.gps_device_id} onChange={(e) => updateField("gps_device_id", e.target.value)} />
-          <TextField size="small" label="Financer" fullWidth sx={fieldSx}
-            value={form.financer} onChange={(e) => updateField("financer", e.target.value)} />
-          <TextField size="small" label="Max No of Tyres" fullWidth sx={fieldSx} type="number"
-            value={form.max_no_tyres} onChange={(e) => updateField("max_no_tyres", e.target.value)} />
-          <MuiSelect label="Black Listed" name="black_listed" value={form.black_listed} onChange={updateField}
-            options={["No", "Yes"]} />
-          <MuiSelect label="Is Active" name="is_active" value={form.is_active} onChange={updateField}
-            options={["Active", "Inactive"]} />
+        {/* ═══════════ SIGNATURES ═══════════ */}
+        <FormPanel columns={4}>
+          <FormField label="Prepared By" name="prepared_by" form={form} setForm={setForm} />
+          <FormField label="Checked By" name="checked_by" form={form} setForm={setForm} />
+          <FormField label="Approved By" name="approved_by" form={form} setForm={setForm} />
+          <FormField label="Owner / Driver Acknowledgment" name="owner_driver_ack" form={form} setForm={setForm} />
         </FormPanel>
-
-        {/* ═══════════════════ OWN VEHICLE EXTRA DETAILS ═══════════════════ */}
-        <h3 style={sectionStyle}>🔹 Own Vehicle Extra Details</h3>
-        <FormPanel>
-          <FormField label="Loan No" name="loan_no" form={form} setForm={setForm} />
-          <FormField label="HP Status" name="hp_status" form={form} setForm={setForm} options={["Active", "Closed", "None"]} />
-          <FormField label="Battery Capacity" name="battery_capacity" form={form} setForm={setForm} type="number" />
-          <FormField label="Fuel Tank Capacity" name="fuel_tank_capacity" form={form} setForm={setForm} type="number" />
-          <FormField label="Fuel Ratio" name="fuel_ratio" form={form} setForm={setForm} type="number" />
-          <FormField label="DEF Tank Capacity" name="def_tank_capacity" form={form} setForm={setForm} type="number" />
-          <FormField label="Fuel Type" name="fuel_type" form={form} setForm={setForm} options={["Diesel", "Petrol", "CNG", "LNG", "Electric", "Hybrid"]} />
-        </FormPanel>
-
-        {/* ═══════════════════ WEIGHT VOLUME DETAILS ═══════════════════ */}
-        <h3 style={sectionStyle}>🔹 Weight Volume Details</h3>
-        <FormPanel>
-          <FormField label="Length (mm)" name="length_mm" form={form} setForm={setForm} type="number" />
-          <FormField label="Breadth (mm)" name="breadth_mm" form={form} setForm={setForm} type="number" />
-          <FormField label="Height (mm)" name="height_mm" form={form} setForm={setForm} type="number" />
-          <FormField label="Volume (CBM)" name="volume_cbm" form={form} setForm={setForm} type="number" />
-          <FormField label="Laden Weight (Kg)" name="laden_weight_kg" form={form} setForm={setForm} type="number" />
-          <FormField label="UnLaden Weight (Kg)" name="unladen_weight_kg" form={form} setForm={setForm} type="number" />
-          <FormField label="Carrying Capacity (Kg)" name="carrying_capacity_kg" form={form} setForm={setForm} type="number" />
-          <FormField label="Ground Clearance (mm)" name="ground_clearence_mm" form={form} setForm={setForm} type="number" />
-        </FormPanel>
-
-        {/* ═══════════════════ INSURANCE DETAILS ═══════════════════ */}
-        <h3 style={sectionStyle}>🔹 Insurance Details</h3>
-        <FormPanel>
-          <FormField label="Insurance Company Name" name="insurance_company_name" form={form} setForm={setForm} />
-          <FormField label="Insurance Policy No" name="insurance_policy_no" form={form} setForm={setForm} />
-          <FormField label="Insurance Type" name="insurance_type" form={form} setForm={setForm} options={["Comprehensive", "Third Party", "Own Damage", "Liability Only"]} />
-          <FormField label="Insurance Certificate No." name="insurance_cert_no" form={form} setForm={setForm} />
-          <FormField label="Insurance Amount" name="insurance_amount" form={form} setForm={setForm} type="number" />
-          <FormField label="Insurance From Date" name="insurance_from_date" form={form} setForm={setForm} type="date" />
-          <FormField label="To Date" name="insurance_to_date" form={form} setForm={setForm} type="date" />
-        </FormPanel>
-
-        {/* ═══════════════════ PERMIT DETAILS ═══════════════════ */}
-        <h3 style={sectionStyle}>🔹 Permit Details</h3>
-        <FormPanel>
-          <FormField label="Permit No" name="permit_no" form={form} setForm={setForm} />
-          <FormField label="Permit Date" name="permit_date" form={form} setForm={setForm} type="date" />
-          <FormField label="Permit Type" name="permit_type" form={form} setForm={setForm} options={["National", "State", "Local", "Temporary"]} />
-          <FormField label="Permit Expiry Date" name="permit_expiry_date" form={form} setForm={setForm} type="date" />
-          <FormField label="Number of Fitted Tyre" name="num_fitted_tyre" form={form} setForm={setForm} type="number" />
-          <FormField label="Number Of Stepney" name="num_stepney" form={form} setForm={setForm} type="number" />
-          <FormField label="Tyre Size" name="tyre_size" form={form} setForm={setForm} />
-        </FormPanel>
-
-        {/* ═══════════════════ EQUIPMENT DETAILS ═══════════════════ */}
-        <h3 style={{
-          ...sectionStyle,
-          opacity: hasOwnVehicleData ? 1 : 0.4,
-        }}>🔹 Equipment Details {!hasOwnVehicleData && <span style={{fontSize: 12, fontWeight: 400, color: '#94a3b8'}}>(Fill Own Vehicle Extra Details first)</span>}</h3>
-        <Paper
-          elevation={0}
-          sx={{
-            p: 2.5,
-            borderRadius: "14px",
-            border: "1.5px solid #e2e8f0",
-            background: "#fafafa",
-            mb: 2,
-            opacity: hasOwnVehicleData ? 1 : 0.4,
-            pointerEvents: hasOwnVehicleData ? "auto" : "none",
-          }}
-        >
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)", md: "repeat(4, 1fr)" },
-              gap: 2,
-            }}
-          >
-            {equipmentItems.map((item) => (
-              <Paper
-                key={item.key}
-                elevation={0}
-                onClick={() => updateField(item.key, !form[item.key])}
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 1,
-                  p: 2,
-                  borderRadius: "12px",
-                  cursor: "pointer",
-                  border: form[item.key] ? "2px solid #a855f7" : "2px solid #e2e8f0",
-                  background: form[item.key]
-                    ? "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)"
-                    : "#ffffff",
-                  transition: "all 0.2s ease",
-                  "&:hover": {
-                    borderColor: form[item.key] ? "#9333ea" : "#cbd5e1",
-                    transform: "translateY(-2px)",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                  },
-                }}
-              >
-                <Box
-                  sx={{
-                    color: form[item.key] ? "#a855f7" : "#94a3b8",
-                    transition: "color 0.2s",
-                  }}
-                >
-                  {item.icon}
-                </Box>
-                <Typography
-                  sx={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: form[item.key] ? "#7e22ce" : "#64748b",
-                    textAlign: "center",
-                  }}
-                >
-                  {item.label}
-                </Typography>
-                {form[item.key] && (
-                  <CheckCircleIcon sx={{ fontSize: 16, color: "#a855f7" }} />
-                )}
-              </Paper>
-            ))}
-          </Box>
-
-          {/* Cabin Type - shown when Cabin is checked */}
-          {form.has_cabin && (
-            <Box sx={{ mt: 2, maxWidth: 320 }}>
-              <FormField label="Cabin Type" name="cabin_type" form={form} setForm={setForm} options={["Day Cabin", "Sleeper Cabin", "Double Sleeper", "Crew Cabin"]} />
-            </Box>
-          )}
-        </Paper>
-
-        {/* ═══════════════════ DOCUMENT UPLOAD ═══════════════════ */}
-        <h3 style={sectionStyle}>🔹 Document Upload</h3>
-        <Paper
-          elevation={0}
-          sx={{
-            p: 2.5,
-            borderRadius: "14px",
-            border: "1.5px solid #e2e8f0",
-            background: "#fafafa",
-            mb: 2,
-          }}
-        >
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "repeat(1, 1fr)", sm: "repeat(3, 1fr)", md: "repeat(5, 1fr)" },
-              gap: 2,
-            }}
-          >
-            {docItems.map((doc) => (
-              <Paper
-                key={doc.key}
-                elevation={0}
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 1.5,
-                  p: 2.5,
-                  borderRadius: "12px",
-                  border: form[doc.key] ? "2px solid #a855f7" : "2px dashed #d1d5db",
-                  background: form[doc.key]
-                    ? "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)"
-                    : "#ffffff",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  "&:hover": {
-                    borderColor: "#a855f7",
-                    background: "#faf5ff",
-                    transform: "translateY(-2px)",
-                    boxShadow: "0 4px 12px rgba(168,85,247,0.12)",
-                  },
-                }}
-                onClick={() => {
-                  fileInputRefs.current[doc.key]?.click();
-                }}
-              >
-                <CloudUploadIcon
-                  sx={{
-                    fontSize: 36,
-                    color: form[doc.key] ? "#a855f7" : "#94a3b8",
-                  }}
-                />
-                <Typography
-                  sx={{
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: form[doc.key] ? "#7e22ce" : "#64748b",
-                    textAlign: "center",
-                  }}
-                >
-                  {doc.label}
-                </Typography>
-                {form[doc.key] ? (
-                  <Chip
-                    label="Uploaded"
-                    size="small"
-                    icon={<CheckCircleIcon sx={{ fontSize: 14 }} />}
-                    sx={{
-                      background: "#f3e8ff",
-                      color: "#7e22ce",
-                      fontWeight: 600,
-                      fontSize: "11px",
-                      "& .MuiChip-icon": { color: "#a855f7" },
-                    }}
-                  />
-                ) : (
-                  <Chip
-                    label="Upload"
-                    size="small"
-                    sx={{
-                      background: "#f1f5f9",
-                      color: "#64748b",
-                      fontWeight: 500,
-                      fontSize: "11px",
-                    }}
-                  />
-                )}
-                <input
-                  type="file"
-                  ref={(el) => { fileInputRefs.current[doc.key] = el; }}
-                  onChange={handleFileSelect(doc.key)}
-                  style={{ display: "none" }}
-                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                />
-              </Paper>
-            ))}
-          </Box>
-        </Paper>
-
       </PageBody>
       <CommonAlertDialog
         dialog={dialog}
@@ -843,3 +428,5 @@ export default function LorryPage() {
     </MainLayout>
   );
 }
+
+
