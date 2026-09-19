@@ -28,6 +28,7 @@ import { isAuthenticated } from "./utils/authService";
 import DistanceCalculator from "./pages/dev/DistanceCalculator";
 import PincodeSearchPage from "./pages/dev/PincodeSearchPage";
 import DocketEnquiryPage from "./pages/dev/DocketEnquiryPage";
+import TermsAndConditions from "./pages/TermsAndConditions";
 
 const appRoutes = [
   { path: "/",                   element: <MasterPortal />,    protected: false },
@@ -59,6 +60,7 @@ const appRoutes = [
   { path: "/dev/distance-calculator", element: <DistanceCalculator />,  protected: false },
   { path: "/dev/pincode-search",      element: <PincodeSearchPage />,   protected: false },
   { path: "/dev/docket-enquiry",      element: <DocketEnquiryPage />,   protected: false },
+  { path: "/common/terms-conditions", element: <TermsAndConditions />,  protected: true },
 ];
 
 function ProtectedRoute({ children }) {

@@ -22,7 +22,7 @@ const fmtAmt = (val) => {
   return Number.isFinite(n) ? n.toFixed(2) : "0.00";
 };
 
-const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, copyLabel, qrDataUrl }) => {
+const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, copyLabel, qrDataUrl, tcQrDataUrl }) => {
   console.log(form);
   const tenantConfig = getTenantConfig();
   const logoUrl = tenantConfig?.logo_url || "";
@@ -139,11 +139,16 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
                 </tr>
               </tbody>
             </table>
-            <div class="note-block">
-              <strong>NOTE:</strong><br/>
-              * NOT RESPONSIBLE FOR LEAKAGE OR BREAKAGE<br/>
-              * Subject To ${fmt(currentLoc.loc_state || currentLoc.loc_town || "")} Jurisdiction Only.<br/>
-              * Please Make Payment By Cheque In Favour Of ${fmt(coName)}.
+            <div class="note-block" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
+              <div style="flex: 1;">
+                <strong>NOTE:</strong><br/>
+                * NOT RESPONSIBLE FOR LEAKAGE OR BREAKAGE<br/>
+                * Subject To ${fmt(currentLoc.loc_state || currentLoc.loc_town || "")} Jurisdiction Only.<br/>
+                * Please Make Payment By Cheque In Favour Of ${fmt(coName)}.
+              </div>
+              ${tcQrDataUrl ? `<div style="text-align: center; min-width: 56px;">
+                <img src="${tcQrDataUrl}" alt="T&C QR" style="width: 50px; height: 50px; display: block;" />
+              </div>` : ""}
             </div>
           </div>
           <div class="charges-section">
@@ -304,7 +309,15 @@ export async function printDocket({ form, charges, ewbList, ewbNoDisplay, compan
     }
   }
 
-  const slipData = { form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl };
+  let tcQrDataUrl = "";
+  try {
+    const tcUrl = `${window.location.origin}/common/terms-conditions`;
+    tcQrDataUrl = await QRCode.toDataURL(tcUrl, { width: 50, margin: 1, errorCorrectionLevel: "M" });
+  } catch (e) {
+    console.error("T&C QR generation failed:", e);
+  }
+
+  const slipData = { form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl, tcQrDataUrl };
 
   // Resolve copy labels
   let copyLabels;
