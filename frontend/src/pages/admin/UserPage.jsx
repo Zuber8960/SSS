@@ -105,7 +105,8 @@ export default function UserPage() {
       form.mobile_no !== originalUser.mobile_no ||
       form.user_status !== originalUser.user_status ||
       form.location_id !== originalUser.location_id ||
-      form.division_code !== originalUser.division_code
+      form.division_code !== originalUser.division_code || 
+      (isSuperAdmin && form.is_admin !== originalUser.is_admin)
     );
   };
 
