@@ -81,7 +81,7 @@ export default function UserRolePage() {
       }
     };
     init();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const clearForm = () => setForm(emptyForm);
@@ -89,6 +89,13 @@ export default function UserRolePage() {
   const saveMapping = async () => {
     if (!form.user_id || !form.role_code) {
       showError("Please select both User and Role");
+      return;
+    }
+    // Duplicate check against the latest server data (guards against stale client state)
+
+    const duplicate = mappings.find((m) => m.user_id === form.user_id);
+    if (duplicate) {
+      showError(`Role '${duplicate.role_code}' is already assigned to user '${form.user_id}'`);
       return;
     }
     try {

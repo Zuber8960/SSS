@@ -12,7 +12,7 @@ import {
   FormPanel,
   DataTable,
 } from "../../components/common/MasterPage";
-import { FormControl, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, FormGroup } from "@mui/material";
+import { FormControl, InputLabel, Select, MenuItem, Checkbox, FormControlLabel, FormGroup, TextField } from "@mui/material";
 
 const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiSelect-select": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
 
@@ -94,6 +94,7 @@ export default function RoleMenuPage() {
   const [roles, setRoles] = useState([]);
   const [menus, setMenus] = useState([]);
   const [mappings, setMappings] = useState([]);
+  const [searchText, setSearchText] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -162,6 +163,22 @@ export default function RoleMenuPage() {
 
     try {
       setLoading(true);
+
+      // Duplicate check against the latest server data (guards against stale client state)
+      const freshMappings = await fetchAllRoleMenus();
+      const normRole = (v) => String(v ?? "").trim().toUpperCase();
+      const normMenu = (v) => String(v ?? "").trim();
+      const duplicate = freshMappings.find(
+        (m) =>
+          normRole(m.role_code) === normRole(form.roleCode) &&
+          (!form.recId || m.rec_id !== form.recId) &&
+          form.menuIds.some((menuId) => normMenu(m.menu_id) === normMenu(menuId))
+      );
+      if (duplicate) {
+        showError(`Mapping already exists for role '${form.roleCode}' with the selected menu`);
+        return;
+      }
+
       const flags = {
         view_yn: boolToYn(form.viewYn),
         add_yn: boolToYn(form.addYn),
@@ -226,6 +243,14 @@ export default function RoleMenuPage() {
   const roleOptions = roles.map((r) => ({ label: r.role_name ? `${r.role_name} (${r.role_code})` : r.role_code, value: r.role_code }));
   const menuOptions = menus.map((m) => ({ label: m.menu_name, value: m.menu_id }));
 
+  // Filter mappings by role code / role name (case-insensitive)
+  const filteredMappings = mappings.filter((row) => {
+    const q = searchText.trim().toLowerCase();
+    if (!q) return true;
+    const roleName = roles.find((r) => String(r.role_code) === String(row.roleCode))?.role_name || "";
+    return row.roleCode?.toLowerCase().includes(q) || roleName.toLowerCase().includes(q);
+  });
+
   return (
     <MainLayout>
       <PageBody title="Role Menu Mapping">
@@ -265,12 +290,19 @@ export default function RoleMenuPage() {
                 label={<span style={{ fontSize: 13 }}>{label}</span>}
               />
             ))}
+            <TextField
+              size="small"
+              placeholder="Search Role..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              sx={{ ...fieldSx, ml: 2, width: 220 }}
+            />
           </FormGroup>
         </div>
 
         <DataTable
           columns={roleColumns}
-          rows={mappings}
+          rows={filteredMappings}
           getKey={(row) => row.recId}
           actions={[
             { label: "Edit", icon: <EditIcon />, onClick: editMapping },
