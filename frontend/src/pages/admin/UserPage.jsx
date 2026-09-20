@@ -235,6 +235,7 @@ export default function UserPage() {
             { label: "Edit", icon: <EditIcon />, onClick: editUser },
             { label: "Delete", icon: <DeleteIcon />, onClick: handleDeleteUser },
           ]}
+          isHeight={420}
         />
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
       </PageBody>

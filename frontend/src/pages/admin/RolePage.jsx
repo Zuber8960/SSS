@@ -63,7 +63,7 @@ export default function RolePage() {
     fetchAllRoles()
       .then(setRoles)
       .catch((err) => showError(err.message || "Failed to load roles"));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const clearForm = () => {
@@ -149,6 +149,7 @@ export default function RolePage() {
             { label: "Edit", icon: <EditIcon />, onClick: editRole },
             { label: "Delete", icon: <DeleteIcon />, onClick: handleDelete },
           ]}
+          isHeight={420}
         />
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
       </PageBody>
