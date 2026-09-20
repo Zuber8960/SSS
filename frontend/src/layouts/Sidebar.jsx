@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { getTenantConfig } from "../utils/tenantService";
+import { useMenuAccess } from "../utils/accessControl";
 import { Link, useLocation } from "react-router-dom";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -63,7 +64,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
   const isSearchActive = searchQuery.trim().length > 0;
 
   // ── Nav config ──────────────────────────────────────────────────────────────
-  const navSections = [
+  const navConfig = [
     {
       key: "admin",
       label: "Administration",
@@ -147,6 +148,24 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
       ],
     },
   ];
+  // ────────────────────────────────────────────────────────────────────────────
+
+  // ── Role-menu based access filtering ────────────────────────────────────────
+  const { isAdmin, allowedPaths } = useMenuAccess();
+
+  // NOTE: intentionally NOT memoized — each section object carries its
+  // `open`/`onToggle` state which must stay fresh on every render, otherwise
+  // the collapsible children stop expanding.
+  const navSections =
+    isAdmin || !allowedPaths
+      ? navConfig
+      : navConfig
+          .map((section) => {
+            const allowedChildren = section.children.filter((child) => allowedPaths.has(child.path));
+            if (allowedChildren.length === 0) return null;
+            return { ...section, children: allowedChildren };
+          })
+          .filter(Boolean);
   // ────────────────────────────────────────────────────────────────────────────
 
   // Flatten all nav items with their section info for search

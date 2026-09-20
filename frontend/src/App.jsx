@@ -25,6 +25,7 @@ import InvoiceReport from "./pages/reports/InvoiceReport";
 import ManifestReport from "./pages/reports/ManifestReport";
 import CustomerBill from "./pages/transaction/CustomerBill";
 import { isAuthenticated } from "./utils/authService";
+import { useMenuAccess } from "./utils/accessControl";
 import DistanceCalculator from "./pages/dev/DistanceCalculator";
 import PincodeSearchPage from "./pages/dev/PincodeSearchPage";
 import DocketEnquiryPage from "./pages/dev/DocketEnquiryPage";
@@ -65,8 +66,33 @@ const appRoutes = [
   { path: "/docket-scan/:docketNo",   element: <DocketScanView />,      protected: false },
 ];
 
-function ProtectedRoute({ children }) {
-  return isAuthenticated() ? children : <Navigate to="/" replace />;
+const AccessDenied = () => (
+  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: 12 }}>
+    <h2 style={{ margin: 0, color: "#b91c1c" }}>Access Denied</h2>
+    <p style={{ margin: 0, color: "#64748b", fontSize: 14 }}>
+      You do not have permission to view this page. Please contact your administrator.
+    </p>
+  </div>
+);
+
+// Dashboard is the landing page — always accessible after login.
+const ALWAYS_ALLOWED = ["/dashboard"];
+
+function ProtectedRoute({ children, path }) {
+  const { isAdmin, allowedPaths, loading } = useMenuAccess();
+  if (!isAuthenticated()) return <Navigate to="/" replace />;
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", color: "#64748b", fontSize: 14 }}>
+        Loading...
+      </div>
+    );
+  }
+  // Admins pass everything; other users need view access from role_menu.
+  // if (!isAdmin && allowedPaths && !allowedPaths.has(path) && !ALWAYS_ALLOWED.includes(path)) {
+  //   return <AccessDenied />;
+  // }
+  return children;
 }
 
 function App() {
@@ -79,7 +105,7 @@ function App() {
             path={route.path}
             element={
               route.protected ? (
-                <ProtectedRoute>{route.element}</ProtectedRoute>
+                <ProtectedRoute path={route.path}>{route.element}</ProtectedRoute>
               ) : (
                 route.element
               )

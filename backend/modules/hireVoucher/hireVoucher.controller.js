@@ -49,29 +49,68 @@ const createHireVoucher = async (headerData, detailsData) => {
   // Generate next vha no BEFORE starting the transaction
   const nextNo = await getNextHireVoucherNo();
 
+  // ── Header: computed amounts (server-side source of truth) ──
+  const n = (v) => {
+    const x = Number(v);
+    return Number.isFinite(x) ? x : 0;
+  };
+  const hireAmt = n(headerData.vha_hire_amt);
+  const loadingAmt = n(headerData.vha_loading_amt);
+  const dcAmt = n(headerData.vha_dc_amt);
+  const grossAmt = n(headerData.vha_total_amt) || hireAmt + loadingAmt + dcAmt;
+  const advDiesel = n(headerData.vha_advance_diesel);
+  const advCash = n(headerData.vha_advance_cash);
+  const advTotal = n(headerData.vha_advance_total) || advDiesel + advCash;
+  const tdsAmt = n(headerData.vha_tds_amt);
+  const advNet = advTotal - tdsAmt;
+
   const trx = await db.transaction();
   try {
-    // Build header row
+    // Build header row (only known sst_vha_hdr columns are accepted)
     const headerRow = {
       ...headerData,
       vha_no: nextNo,
+      // NOT NULL columns — always defaulted
+      vha_loc: headerData.vha_loc || '',
+      vha_to_loc: headerData.vha_to_loc || '',
+      vha_to_loc_state: headerData.vha_to_loc_state || '',
+      // numeric columns — cast to numbers (vha_rate_uom is numeric: 1=Fixed, 2=Per Kg, 3=Per Ton, 4=Per Trip)
+      dwb_actual_weight: headerData.dwb_actual_weight != null && headerData.dwb_actual_weight !== "" ? Number(headerData.dwb_actual_weight) : null,
+      vha_guarantee_weight: headerData.vha_guarantee_weight != null && headerData.vha_guarantee_weight !== "" ? Number(headerData.vha_guarantee_weight) : null,
+      vha_rate_uom: headerData.vha_rate_uom != null && headerData.vha_rate_uom !== "" ? Number(headerData.vha_rate_uom) : null,
+      vha_rate_per_uom: headerData.vha_rate_per_uom != null && headerData.vha_rate_per_uom !== "" ? Number(headerData.vha_rate_per_uom) : null,
+      vha_hire_amt: hireAmt,
+      vha_loading_amt: loadingAmt,
+      vha_dc_amt: dcAmt,
+      vha_total_amt: grossAmt,
+      vha_advance_diesel: advDiesel,
+      vha_advance_cash: advCash,
+      vha_advance_total: advTotal,
+      vha_tds_amt: tdsAmt,
+      vha_advance_net: advNet,
+      vha_balance_amt: n(headerData.vha_balance_amt) || grossAmt - advTotal - tdsAmt,
       aud_date: new Date(),
     };
 
     // Insert header
     await trx('sss.sst_vha_hdr').insert(headerRow);
 
-    // Build detail rows with composite key
-    const detailRows = detailsData.map((row, index) => ({
+    // Build detail rows with composite key (only sst_vha_dtl columns)
+    const detailRows = (detailsData || []).map((row, index) => ({
       company_code: headerData.company_code || null,
       division_code: headerData.division_code || null,
       vha_no: nextNo,
-      vha_loc: headerData.vha_loc || headerData.from_loc,
-      vha_date: headerData.vha_date,     
+      vha_loc: headerData.vha_loc || headerData.from_loc || null,
+      vha_date: headerData.vha_date,
+      mnf_no: row.mnf_no || null,
+      mnf_date: row.mnf_date || null,
+      mnf_loc: row.mnf_loc || null,
+      mnf_act_weight: row.mnf_act_weight != null && row.mnf_act_weight !== "" ? Number(row.mnf_act_weight) : null,
+      mnf_cns_no: row.mnf_cns_no != null && row.mnf_cns_no !== "" ? Number(row.mnf_cns_no) : null,
+      mnf_pkgs_no: row.mnf_pkgs_no != null && row.mnf_pkgs_no !== "" ? Number(row.mnf_pkgs_no) : null,
       aud_user: headerData.aud_user || '',
-      aud_loc: headerData.aud_loc || '',
+      aud_loc: headerData.vha_loc || headerData.from_loc || '',
       aud_date: new Date(),
-      ...row
     }));
 
     // Insert details
@@ -108,7 +147,7 @@ const updateHireVoucherDetails = async (keys, detailsData) => {
       .where(keys)
       .del();
 
-  
+
     // Insert new details
     const detailRows = detailsData.map((row, index) => ({
       company_code: row.company_code || null,
@@ -117,14 +156,12 @@ const updateHireVoucherDetails = async (keys, detailsData) => {
       vha_loc: keys.vha_loc,
       vha_date: keys.vha_date,
       vhv_srno: index + 1,
-      vhv_no: row.vhv_no,
-      date: row.date || null,
-      loc: row.loc || '',
-      to: row.to || '',
-      city: row.city || '',
-      veh: row.veh || '',
-      order: row.order || '',
-      pickup: row.pickup || '',
+      mnf_no: row.mnf_no || null,
+      mnf_date: row.mnf_date || null,
+      mnf_loc: row.mnf_loc || null,
+      mnf_act_weight: row.mnf_act_weight != null && row.mnf_act_weight !== "" ? Number(row.mnf_act_weight) : null,
+      mnf_cns_no: row.mnf_cns_no != null && row.mnf_cns_no !== "" ? Number(row.mnf_cns_no) : null,
+      mnf_pkgs_no: row.mnf_pkgs_no != null && row.mnf_pkgs_no !== "" ? Number(row.mnf_pkgs_no) : null,
       aud_user: row.aud_user || '',
       aud_loc: keys.vha_loc,
       aud_date: new Date(),

@@ -1,6 +1,7 @@
 import Api from '../services/Api';
 import { getTenantToken } from './tenantService';
 import { clearLocationsCache } from './locationMaster';
+import { clearMenuAccessCache } from './accessControl';
 
 const TOKEN_KEY = 'authToken';
 
@@ -58,6 +59,7 @@ export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const logout = () => {
   localStorage.removeItem(TOKEN_KEY);
   clearTenantScopedStorage();
+  clearMenuAccessCache();
 };
 
 export const isAuthenticated = () => !!localStorage.getItem(TOKEN_KEY);
