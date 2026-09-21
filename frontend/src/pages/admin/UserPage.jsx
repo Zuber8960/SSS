@@ -40,6 +40,7 @@ const userColumns = [
   { key: "user_status", label: "Status" },
   { key: "location_id", label: "Location ID" },
   { key: "division_code", label: "Division Code" },
+  { key: "allowed_branches", label: "Allowed Branches", render: (row) => [row.loc_code_1, row.loc_code_2, row.loc_code_3, row.loc_code_4, row.loc_code_5].filter(Boolean).join(", ") || "-" },
   { key: "is_admin", label: "Admin User", render: (row) => (row.is_admin === "Y" ? "Yes" : "No") },
 ];
 
@@ -61,6 +62,7 @@ export default function UserPage() {
   const [form, setForm] = useState({
     rec_id: "", user_id: "", user_name: "", email_id: "", mobile_no: "",
     user_status: "A", is_admin: "N", password_hash: "", location_id: "", division_code: "",
+    loc_code_1: "", loc_code_2: "", loc_code_3: "", loc_code_4: "", loc_code_5: "",
   });
 
   const setField = (name, value) => setForm((prev) => ({ ...prev, [name]: value }));
@@ -105,7 +107,8 @@ export default function UserPage() {
       form.mobile_no !== originalUser.mobile_no ||
       form.user_status !== originalUser.user_status ||
       form.location_id !== originalUser.location_id ||
-      form.division_code !== originalUser.division_code || 
+      form.division_code !== originalUser.division_code ||
+      ["loc_code_1", "loc_code_2", "loc_code_3", "loc_code_4", "loc_code_5"].some((k) => form[k] !== originalUser[k]) ||
       (isSuperAdmin && form.is_admin !== originalUser.is_admin)
     );
   };
@@ -114,6 +117,7 @@ export default function UserPage() {
     setForm({
       rec_id: "", user_id: "", user_name: "", email_id: "", mobile_no: "",
       user_status: "A", is_admin: "N", password_hash: "", location_id: "", division_code: "",
+      loc_code_1: "", loc_code_2: "", loc_code_3: "", loc_code_4: "", loc_code_5: "",
     });
     setIsEditing(false);
   };
@@ -133,6 +137,11 @@ export default function UserPage() {
         user_name: form.user_name, email_id: form.email_id, mobile_no: form.mobile_no,
         user_status: form.user_status, location_id: form.location_id || null,
         division_code: form.division_code || null,
+        loc_code_1: form.loc_code_1 || null,
+        loc_code_2: form.loc_code_2 || null,
+        loc_code_3: form.loc_code_3 || null,
+        loc_code_4: form.loc_code_4 || null,
+        loc_code_5: form.loc_code_5 || null,
         ...(isSuperAdmin && { is_admin: form.is_admin }),
       };
       if (isEditing) {
@@ -159,6 +168,8 @@ export default function UserPage() {
       email_id: row.email_id || "", mobile_no: row.mobile_no || "",
       user_status: row.user_status || "A", is_admin: row.is_admin || "N",
       password_hash: "", location_id: row.location_id || "", division_code: row.division_code || "",
+      loc_code_1: row.loc_code_1 || "", loc_code_2: row.loc_code_2 || "", loc_code_3: row.loc_code_3 || "",
+      loc_code_4: row.loc_code_4 || "", loc_code_5: row.loc_code_5 || "",
     };
     setForm(formatted);
     setOriginalUser(formatted);
@@ -217,6 +228,16 @@ export default function UserPage() {
           <MuiSelect label="Division Code" name="division_code" value={form.division_code} onChange={setField}
             options={divisionOptions} />
           <MuiSelect label="Location" name="location_id" value={form.location_id} onChange={setField}
+            options={locationOptions} />
+          <MuiSelect label="Branch 1" name="loc_code_1" value={form.loc_code_1} onChange={setField}
+            options={locationOptions} />
+          <MuiSelect label="Branch 2" name="loc_code_2" value={form.loc_code_2} onChange={setField}
+            options={locationOptions} />
+          <MuiSelect label="Branch 3" name="loc_code_3" value={form.loc_code_3} onChange={setField}
+            options={locationOptions} />
+          <MuiSelect label="Branch 4" name="loc_code_4" value={form.loc_code_4} onChange={setField}
+            options={locationOptions} />
+          <MuiSelect label="Branch 5" name="loc_code_5" value={form.loc_code_5} onChange={setField}
             options={locationOptions} />
           <MuiSelect label="Admin User" name="is_admin" value={form.is_admin} onChange={setField}
             options={[{ label: "Yes", value: "Y" }, { label: "No", value: "N" }]}

@@ -59,7 +59,7 @@ router.post('/login', async (req, res) => {
         tenant_id: tenant.rec_id
       },
       secret,
-      { expiresIn: '5h' }
+      { expiresIn: '1h' }
     );
 
     return res.status(200).json({

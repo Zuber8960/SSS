@@ -154,9 +154,25 @@ export default function TenantLoginPage() {
     setLoading(true);
     try {
       const response = await loginUser(userId, password, selectedLocation, selectedDivision);
-      const selectedDiv = selectedDivision || response.user?.division_code;
-      const selectedLoc = selectedLocation || response.user?.location_id;
-      const userToStore = { ...response.user, division_code: selectedDiv, location_id: selectedLoc };
+      const user = response.user || {};
+      const selectedDiv = selectedDivision || user.division_code;
+      const selectedLoc = selectedLocation || user.location_id;
+
+      // Branch validation: admin users can log in through all branches;
+      // non-admin users can only log in through branches allowed in user
+      // master (loc_code_1..loc_code_5).
+      if (user.is_admin !== "Y") {
+        const allowedBranches = [user.loc_code_1, user.loc_code_2, user.loc_code_3, user.loc_code_4, user.loc_code_5]
+          .filter(Boolean)
+          .map((c) => String(c).trim());
+        if (allowedBranches.length > 0 && !allowedBranches.includes(String(selectedLoc ?? "").trim())) {
+          localStorage.removeItem("authToken");
+          showError(`You are not authorized to log in from branch ${selectedLoc || "(none)"}. Allowed branches: ${allowedBranches.join(", ")}`);
+          return;
+        }
+      }
+
+      const userToStore = { ...user, division_code: selectedDiv, location_id: selectedLoc };
       localStorage.setItem("current_user", JSON.stringify(userToStore));
 
       // Store company_code and division_code separately (used by manifests etc.)

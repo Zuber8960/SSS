@@ -46,7 +46,7 @@ router.get('/:recId', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { tenant_id } = req;
-    const { user_id, user_name, password_hash, email_id, mobile_no, division_code, location_id, is_admin } = req.body;
+    const { user_id, user_name, password_hash, email_id, mobile_no, division_code, location_id, is_admin,loc_code_1,loc_code_2,loc_code_3,loc_code_4,loc_code_5 } = req.body;
     if (!user_id || !user_name || !password_hash || !tenant_id) {
       return res.status(400).json({ success: false, message: 'User ID, User Name, Password, and Tenant ID are required' });
     }
@@ -54,6 +54,7 @@ router.post('/', async (req, res) => {
       user_id, user_name, password_hash, email_id, mobile_no,
       tenant_id, division_code, location_id,
       is_admin: is_admin || 'N',
+      loc_code_1, loc_code_2, loc_code_3, loc_code_4, loc_code_5,
       created_by: req.user.userId
     };
     const newUser = await UserContoller.createUser(userData);
@@ -68,12 +69,12 @@ router.put('/:recId', async (req, res) => {
   try {
     const { recId } = req.params;
     const { tenant_id } = req;
-    const { user_name, email_id, mobile_no, division_code, loc_code, is_admin, user_status } = req.body;
+    const { user_name, email_id, mobile_no, division_code, loc_code, is_admin, user_status,loc_code_1,loc_code_2,loc_code_3,loc_code_4,loc_code_5 } = req.body;
     const existingUser = await UserContoller.getUserById(recId, tenant_id);
     if (!existingUser) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    const updateData = { user_name, email_id, mobile_no, division_code, loc_code, is_admin, user_status, modified_by: req.user.userId };
+    const updateData = { user_name, email_id, mobile_no, division_code, loc_code, is_admin, user_status, loc_code_1, loc_code_2, loc_code_3, loc_code_4, loc_code_5, modified_by: req.user.userId };
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
     const updatedUser = await UserContoller.updateUser(recId, updateData);
     res.status(200).json({ success: true, message: 'User updated successfully', data: updatedUser });

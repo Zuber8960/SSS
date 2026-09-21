@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 const getAllUsers = async (tenant_id) => {
   return db('sss.ssm_user')
     .where({ record_status: 0, tenant_id })
-    .select('rec_id', 'user_id', 'user_name', 'email_id', 'mobile_no', 'tenant_id', 'is_admin', 'last_login_on', 'created_on', 'user_status','division_code', 'loc_code as location_id',);
+    .select('rec_id', 'user_id', 'user_name', 'email_id', 'mobile_no', 'tenant_id', 'is_admin', 'last_login_on', 'created_on', 'user_status','division_code', 'loc_code as location_id', 'loc_code_1', 'loc_code_2', 'loc_code_3', 'loc_code_4', 'loc_code_5',);
 };
 
 const getUserById = async (recId, tenant_id) => {
@@ -42,6 +42,11 @@ const createUser = async (userData) => {
       email_id: userData.email_id || null,
       is_admin: userData.is_admin || 'N',
       user_status: userData.user_status || 'A',
+      loc_code_1: userData.loc_code_1 || null,
+      loc_code_2: userData.loc_code_2 || null,
+      loc_code_3: userData.loc_code_3 || null,
+      loc_code_4: userData.loc_code_4 || null,
+      loc_code_5: userData.loc_code_5 || null,
       created_by: userData.created_by,
       created_on: new Date()
     })
@@ -154,8 +159,15 @@ const authenticateUser = async (userId, password, tenant_id, loc_id) => {
       passwordMatch = user.password_hash === password;      
     }
 
-    if (user.is_admin === 'N' && user.loc_code !== loc_id) {
-      return { success: false, message: 'Invalid location for this user' };
+    if (user.is_admin !== 'Y') {
+      // Non-admin users can only log in through branches allowed in user
+      // master: their primary loc_code or any of loc_code_1..loc_code_5.
+      const allowedBranches = [user.loc_code, user.loc_code_1, user.loc_code_2, user.loc_code_3, user.loc_code_4, user.loc_code_5]
+        .filter(Boolean)
+        .map((c) => String(c).trim());
+      if (allowedBranches.length > 0 && !allowedBranches.includes(String(loc_id ?? '').trim())) {
+        return { success: false, message: `Invalid location for this user. Allowed branches: ${allowedBranches.join(', ')}` };
+      }
     }
 
     if (passwordMatch) {
