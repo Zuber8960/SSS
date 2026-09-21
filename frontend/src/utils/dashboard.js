@@ -3,6 +3,9 @@ import Api from '../services/Api';
 export const fetchDashboardStats = () =>
   Api.get('/dashboard/stats').then(r => r.data.data);
 
+export const fetchDashboardOverview = () =>
+  Api.get('/dashboard/overview').then(r => r.data.data);
+
 export const fetchInTransitVehicleLocations = () =>
   Api.get('/dashboard/in-transit-vehicle-locations').then(r => r.data.data || r.data || []);
 

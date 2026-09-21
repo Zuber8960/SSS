@@ -27,6 +27,379 @@
   }
 }
 
+/* ================= Dashboard Overview (landing section) ================= */
+@keyframes ovShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.ovSectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 30px 0 14px;
+}
+.ovSectionHead__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ovSectionHead__bar {
+  width: 5px;
+  height: 22px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #a855f7, #6d28d9);
+  box-shadow: 0 2px 6px rgba(168, 85, 247, 0.35);
+}
+.ovSectionHead h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: 0.01em;
+}
+.ovSectionHead span {
+  font-size: 12px;
+  color: #9ca3af;
+  background: #f6f3fc;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.ovKpiGrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 14px;
+}
+.ovKpiCard {
+  position: relative;
+  background: #fff;
+  border: 1px solid #ece9f4;
+  border-radius: 12px;
+  padding: 16px 16px 14px;
+  box-shadow: 0 2px 10px rgba(80, 60, 140, 0.06);
+  overflow: hidden;
+  opacity: 0;
+  animation: ovFadeUp 0.5s ease forwards;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.ovKpiCard::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--ov-accent, linear-gradient(90deg, #a855f7, #7c3aed));
+}
+.ovKpiCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(80, 60, 140, 0.14);
+}
+.ovKpiCard__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.ovKpiCard__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+}
+.ovKpiCard__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ov-accent-soft, #f3e8ff);
+  color: var(--ov-accent-strong, #7c3aed);
+  font-size: 17px;
+  flex-shrink: 0;
+}
+.ovKpiCard__value {
+  font-size: 26px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.ovKpiCard__sub {
+  margin-top: 9px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ovOpsGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+.ovOpsCard {
+  background: #fff;
+  border: 1px solid #ece9f4;
+  border-radius: 12px;
+  padding: 0 16px 12px;
+  box-shadow: 0 2px 10px rgba(80, 60, 140, 0.06);
+  overflow: hidden;
+  opacity: 0;
+  animation: ovFadeUp 0.5s ease forwards;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.ovOpsCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(80, 60, 140, 0.14);
+}
+.ovOpsCard__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #111827;
+  padding: 13px 0 10px;
+  border-bottom: 1px solid #f1eef8;
+  margin: 0 -16px 4px;
+  padding-left: 16px;
+  padding-right: 16px;
+  background: var(--ov-accent-soft, #f9f7fe);
+}
+.ovOpsCard__title .ovOpsCard__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ov-accent-strong, #7c3aed);
+  font-size: 17px;
+}
+.ovOpsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dashed #f3f0fa;
+  font-size: 12.5px;
+  transition: background 0.15s ease;
+}
+.ovOpsCard:hover .ovOpsRow:hover {
+  background: #faf8ff;
+}
+.ovOpsRow:last-child {
+  border-bottom: none;
+}
+.ovOpsRow span:first-child {
+  color: #6b7280;
+}
+.ovOpsRow span:last-child {
+  font-weight: 700;
+  color: #111827;
+}
+.ovPerfGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.ovPerfCard {
+  background: #fff;
+  border: 1px solid #ece9f4;
+  border-radius: 12px;
+  padding: 14px 16px 16px;
+  box-shadow: 0 2px 10px rgba(80, 60, 140, 0.06);
+  opacity: 0;
+  animation: ovFadeUp 0.5s ease forwards;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.ovPerfCard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(80, 60, 140, 0.14);
+}
+.ovTableCard {
+  background: #fff;
+  border: 1px solid #ece9f4;
+  border-radius: 12px;
+  padding: 0 0 8px;
+  box-shadow: 0 2px 10px rgba(80, 60, 140, 0.06);
+  margin-bottom: 18px;
+  overflow: hidden;
+  opacity: 0;
+  animation: ovFadeUp 0.5s ease forwards;
+  transition: box-shadow 0.2s ease;
+}
+.ovTableCard:hover {
+  box-shadow: 0 10px 28px rgba(80, 60, 140, 0.13);
+}
+.ovTableCard__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  margin-bottom: 4px;
+  background: linear-gradient(90deg, #f9f6fe 0%, #ffffff 70%);
+  border-bottom: 1px solid #f1eef8;
+}
+.ovTableCard__head h3 {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  color: #1e1b2e;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.ovTableCard__head h3 .ovTableCard__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #a855f7, #6d28d9);
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(124, 58, 237, 0.35);
+  font-size: 16px;
+}
+.ovTableScroll {
+  overflow-x: auto;
+  padding: 4px 14px 10px;
+}
+.ovPill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ede9fe, #e0e7ff);
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.ovTable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+  font-size: 12.5px;
+}
+.ovTable th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 10px 10px;
+  border-bottom: 2px solid #ece9f4;
+  white-space: nowrap;
+  background: #fbfaff;
+}
+.ovTable td {
+  padding: 11px 10px;
+  border-bottom: 1px solid #f5f3fa;
+  color: #374151;
+  white-space: nowrap;
+}
+.ovTable tbody tr:nth-child(even) td {
+  background: #fcfbff;
+}
+.ovTable tbody tr:hover td {
+  background: #f3ecff;
+}
+.ovTable tbody tr:last-child td {
+  border-bottom: none;
+}
+.ovTable td.ovNum {
+  font-weight: 700;
+  color: #111827;
+}
+.ovAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #a855f7, #6d28d9);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  margin-right: 9px;
+  vertical-align: middle;
+  box-shadow: 0 2px 5px rgba(124, 58, 237, 0.3);
+}
+.ovPerfTable {
+  min-width: unset;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.ovPerfTable th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px;
+  border-bottom: 2px solid #ece9f4;
+  background: #fbfaff;
+}
+.ovPerfTable td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #f5f3fa;
+}
+.ovPerfTable tbody tr:last-child td {
+  border-bottom: none;
+}
+.ovPerfTable tbody tr:hover td {
+  background: #faf8ff;
+}
+.ovPerfBar {
+  height: 6px;
+  border-radius: 4px;
+  background: #f1edf9;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.ovPerfBar__fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #34d399, #059669);
+  transition: width 0.6s ease;
+}
+.ovRating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  color: #047857;
+  font-weight: 800;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #a7f3d0;
+}
+@keyframes ovFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 1200px) {
+  .ovKpiGrid { grid-template-columns: repeat(3, 1fr); }
+  .ovOpsGrid { grid-template-columns: repeat(3, 1fr); }
+  .ovPerfGrid { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .ovKpiGrid { grid-template-columns: repeat(2, 1fr); }
+  .ovOpsGrid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .ovKpiGrid { grid-template-columns: 1fr; }
+  .ovOpsGrid { grid-template-columns: 1fr; }
+}
 /* Master Page Container */
 .pageBody {
   padding: 24px;

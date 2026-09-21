@@ -1,6 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const { getDashboardStats, getInTransitVehicleLocations, getInTransitDockets } = require('./dashboard.controller');
+const { getDashboardStats, getDashboardOverview, getInTransitVehicleLocations, getInTransitDockets } = require('./dashboard.controller');
+
+router.get('/overview', async (req, res) => {
+  try {
+    const tenant_id = req.tenant_id;
+    const data = await getDashboardOverview(tenant_id);
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error('Dashboard overview error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching dashboard overview' });
+  }
+});
 
 router.get('/stats', async (req, res) => {
   try {

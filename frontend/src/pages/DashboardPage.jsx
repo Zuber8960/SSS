@@ -1,9 +1,10 @@
 import { useEffect, useState, useMemo } from "react";
 import MainLayout from "../layouts/MainLayout";
 import { PageBody, DataTable } from "../components/common/MasterPage";
-import { fetchDashboardStats, fetchInTransitDockets } from "../utils/dashboard";
+import { fetchDashboardStats, fetchInTransitDockets, fetchDashboardOverview } from "../utils/dashboard";
 import { fetchAllManifests } from "../utils/manifest";
 import GetAllDetailsPopup from "../components/common/GetAllDetailsPopup";
+import DashboardOverview from "../components/common/DashboardOverview";
 import SearchIcon from "@mui/icons-material/Search";
 import {
   Dialog, DialogTitle, DialogContent,
@@ -455,6 +456,8 @@ function InTransitVehiclesPopup({ open, onClose }) {
 
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
+  const [overview, setOverview] = useState(null);
+  const [overviewLoading, setOverviewLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [inTransitVehiclesOpen, setInTransitVehiclesOpen] = useState(false);
@@ -465,6 +468,11 @@ export default function DashboardPage() {
       .then(setStats)
       .catch(err => console.error("Dashboard stats error:", err))
       .finally(() => setLoading(false));
+
+    fetchDashboardOverview()
+      .then(setOverview)
+      .catch(err => console.error("Dashboard overview error:", err))
+      .finally(() => setOverviewLoading(false));
   }, []);
 
   const v = (key) => loading ? "…" : (stats?.[key] ?? 0);
@@ -494,7 +502,7 @@ export default function DashboardPage() {
         <PageBody title="Dashboard">
 
           {/* Search Engine Button */}
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
             <button
               type="button"
               onClick={() => setDetailsOpen(true)}
@@ -548,7 +556,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Stat Cards — 2 rows × 4 columns */}
-          {cards.map((row, ri) => (
+          {/* {cards.map((row, ri) => (
             <div key={ri} style={{
               display: "grid",
               gridTemplateColumns: "repeat(4, 1fr)",
@@ -559,14 +567,14 @@ export default function DashboardPage() {
                 <StatCard key={c.label} {...c} />
               ))}
             </div>
-          ))}
+          ))} */}
 
           {/* Charts */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 20 }}
-            className="dashboardCharts">
+          {/* <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 20 }}
+            className="dashboardCharts"> */}
 
             {/* Bar chart — dockets per day */}
-            <div style={{ background: "#fff", borderRadius: 12, padding: 24, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+            {/* <div style={{ background: "#fff", borderRadius: 12, padding: 24, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#111" }}>
                   📊 Dockets — Last 30 Days
@@ -576,10 +584,10 @@ export default function DashboardPage() {
                 </span>
               </div>
               <BarChart data={stats?.dailyCounts} />
-            </div>
+            </div> */}
 
             {/* Manifest status chart */}
-            <div style={{
+            {/* <div style={{
               background: "#fff", borderRadius: 12, padding: 24,
               boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
               display: "flex", flexDirection: "column",
@@ -596,8 +604,11 @@ export default function DashboardPage() {
                     />
                 }
               </div>
-            </div>
-          </div>
+            </div> */}
+          {/* </div> */}
+
+          {/* Executive Overview — landing section below dashboard */}
+          <DashboardOverview data={overview} loading={overviewLoading} />
 
         </PageBody>
       </div>
