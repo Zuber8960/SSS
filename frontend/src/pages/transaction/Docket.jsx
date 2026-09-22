@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { ToggleSwitch } from "../../components/common/MasterPage";
-import { IconButton, Tooltip, Menu, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
+import { IconButton, Tooltip, Menu, MenuItem, ListItemIcon, ListItemText, Box } from "@mui/material";
 import PrintIcon from "@mui/icons-material/Print";
 import { EditIcon, SaveIcon, ResetIcon, SECTION_ICONS } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
@@ -101,23 +101,15 @@ const headerFields = [
   { label: "Total Pkgs", name: "tot_pkgs", type: "number", required: true },
 
   {
-    label: "Dimension Unit", name: "dim_unit"
-    // , compact: true
-    , options: [
+    label: "Dimension Unit", name: "dim_unit", options: [
       { label: "Inches", value: "inches" },
       { label: "MM", value: "mm" },
       { label: "CM", value: "cm" },
     ]
   },
-  { label: "Length",  name: "dim_length",  type: "number"
-    // , compact: true
-   },
-  { label: "Breadth", name: "dim_breadth", type: "number"
-    // , compact: true
-   },
-  { label: "Height",  name: "dim_height",  type: "number"
-    // , compact: true
-   },
+  { label: "Length", name: "dim_length", type: "number" },
+  { label: "Breadth", name: "dim_breadth", type: "number" },
+  { label: "Height", name: "dim_height", type: "number" },
 
   { label: "Rate", name: "rate", type: "number", required: true },
   {
@@ -157,7 +149,7 @@ const headerFields = [
   { label: "Sum Insured", name: "sum_insured", type: "number" },
   { label: "Valid Upto", name: "valid_upto", type: "date" },
 
-  { label: "Goods Group",     name: "goods_grp",  required: true },
+  { label: "Goods Group", name: "goods_grp", required: true },
   { label: "Goods Sub Group", name: "goods_subgrp", required: true },
   { label: "Goods Description", name: "goods_desc", fullWidth: true, required: true },
   { label: "Remarks", name: "remark", type: "textarea" },
@@ -370,6 +362,34 @@ export default function DocketPage() {
     await printSticker({ form, company });
   };
 
+  const calculateVolumetricWeight = (length, breadth, height, unit) => {
+    if (!length || !breadth || !height || !unit) return null;
+
+    const l = parseFloat(length);
+    const b = parseFloat(breadth);
+    const h = parseFloat(height);
+
+    if (!Number.isFinite(l) || !Number.isFinite(b) || !Number.isFinite(h) || l <= 0 || b <= 0 || h <= 0) {
+      return null;
+    }
+
+    let volumeCubicFeet;
+    if (unit === "mm") {
+      const volumeCubicMm = l * b * h;
+      volumeCubicFeet = volumeCubicMm / (304.8 ** 3);
+    } else if (unit === "cm") {
+      const volumeCubicCm = l * b * h;
+      volumeCubicFeet = volumeCubicCm / (30.48 ** 3);
+    } else if (unit === "inches") {
+      const volumeCubicInches = l * b * h;
+      volumeCubicFeet = volumeCubicInches / 1728;
+    } else {
+      return null;
+    }
+
+    return volumeCubicFeet * 10;
+  };
+
   const handleWeightBlur = (field, value) => {
     let num = parseFloat(value);
     if (!Number.isFinite(num) || num < 30) num = 30;
@@ -387,6 +407,28 @@ export default function DocketPage() {
       return updated;
     });
     setDirtyFields((prev) => new Set(prev).add(field));
+  };
+
+  const handleDimensionChange = (field, value) => {
+    setForm((prev) => {
+      const updated = { ...prev, [field]: value };
+      setDirtyFields((d) => new Set(d).add(field));
+
+      const volWeight = calculateVolumetricWeight(
+        updated.dim_length,
+        updated.dim_breadth,
+        updated.dim_height,
+        updated.dim_unit
+      );
+
+      if (volWeight !== null) {
+        const chargeWeight = Math.max(volWeight, parseFloat(updated.act_wt) || 30);
+        updated.chrg_wt = Math.max(chargeWeight, 30);
+        setDirtyFields((d) => new Set(d).add("chrg_wt"));
+      }
+
+      return updated;
+    });
   };
 
   const fetchBpSuggestions = async (searchTerm, prefix) => {
@@ -1060,58 +1102,62 @@ export default function DocketPage() {
       if (isNameField) {
         const suggestions = bpSuggestions[prefix] || [];
         const isDisabled = !isFormEditMode;
+        const tooltipText = form[`${prefix}_name`] ? String(form[`${prefix}_name`]) : "";
+
         return (
-          <div
-            key={field.name}
-            style={{ position: "relative", ...(field.fullWidth ? sectionCardStyles.fullWidthField : {}) }}
-          >
-            <MuiField
-              label={field.label}
-              name={`${prefix}_name`}
-              value={form[`${prefix}_name`] || ""}
-              onChange={(_, val) => handleBpNameChange(val, prefix)}
-              onBlur={() => handleBpNameBlur(prefix)}
-              disabled={isDisabled}
-            />
-            {suggestions.length > 0 && (
-              <ul
-                style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: 0,
-                  right: 0,
-                  zIndex: 1000,
-                  background: "#fff",
-                  border: "1px solid #d0c5e0",
-                  borderRadius: 6,
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-                  listStyle: "none",
-                  margin: 0,
-                  padding: "4px 0",
-                  maxHeight: 200,
-                  overflowY: "auto",
-                }}
-              >
-                {suggestions.map((bp, idx) => (
-                  <li
-                    key={bp.rec_id || idx}
-                    onClick={() => selectBpSuggestion(bp, prefix)}
-                    onMouseDown={(e) => e.preventDefault()}
-                    style={{
-                      padding: "8px 2px",
-                      cursor: "pointer",
-                      background: idx % 2 === 0 ? "#faf9ff" : "#fff",
-                      color: "#333",
-                      fontSize: 12,
-                      borderBottom: "1px solid #f0ecf9",
-                    }}
-                  >
-                    {bp.bp_name}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <Tooltip title={tooltipText} placement="top" arrow={!!tooltipText}>
+            <div
+              key={field.name}
+              style={{ position: "relative", ...(field.fullWidth ? sectionCardStyles.fullWidthField : {}) }}
+            >
+              <MuiField
+                label={field.label}
+                name={`${prefix}_name`}
+                value={form[`${prefix}_name`] || ""}
+                onChange={(_, val) => handleBpNameChange(val, prefix)}
+                onBlur={() => handleBpNameBlur(prefix)}
+                disabled={isDisabled}
+              />
+              {suggestions.length > 0 && (
+                <ul
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    right: 0,
+                    zIndex: 1000,
+                    background: "#fff",
+                    border: "1px solid #d0c5e0",
+                    borderRadius: 6,
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                    listStyle: "none",
+                    margin: 0,
+                    padding: "4px 0",
+                    maxHeight: 200,
+                    overflowY: "auto",
+                  }}
+                >
+                  {suggestions.map((bp, idx) => (
+                    <li
+                      key={bp.rec_id || idx}
+                      onClick={() => selectBpSuggestion(bp, prefix)}
+                      onMouseDown={(e) => e.preventDefault()}
+                      style={{
+                        padding: "8px 2px",
+                        cursor: "pointer",
+                        background: idx % 2 === 0 ? "#faf9ff" : "#fff",
+                        color: "#333",
+                        fontSize: 12,
+                        borderBottom: "1px solid #f0ecf9",
+                      }}
+                    >
+                      {bp.bp_name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </Tooltip>
         );
       }
 
@@ -1129,6 +1175,22 @@ export default function DocketPage() {
       const handleChange = (name, value) => {
         let updated = { ...form, [name]: value };
         setDirtyFields((prev) => new Set(prev).add(name));
+
+        // Recalculate charge weight if dimensions or actual weight changes
+        if (["dim_length", "dim_breadth", "dim_height", "dim_unit", "act_wt"].includes(name)) {
+          const volWeight = calculateVolumetricWeight(
+            updated.dim_length,
+            updated.dim_breadth,
+            updated.dim_height,
+            updated.dim_unit
+          );
+          if (volWeight !== null) {
+            const chargeWeight = Math.max(volWeight, parseFloat(updated.act_wt) || 30);
+            updated.chrg_wt = Math.max(chargeWeight, 30);
+            setDirtyFields((prev) => new Set(prev).add("chrg_wt"));
+          }
+        }
+
         // Auto-populate goods_desc when goods_subgrp is selected
         if (name === "goods_subgrp") {
           const match = subGroupLookup.find(s => s.sub_group_code === value);
@@ -1182,36 +1244,58 @@ export default function DocketPage() {
         setForm(updated);
       };
 
+      const getTooltipText = () => {
+        const value = form[fieldProps.name];
+        if (!value) return "";
+
+        // For select fields, find and show the label
+        if (fieldProps.options) {
+          const selected = fieldProps.options.find(opt =>
+            (typeof opt === "object" ? opt.value : opt) === value
+          );
+          if (selected) {
+            return typeof selected === "object" ? selected.label : String(selected);
+          }
+        }
+
+        // For text fields, show the value
+        return String(value);
+      };
+
+      const tooltipText = getTooltipText();
+
       return (
-        <div
-          key={field.name}
-          style={isTextarea || field.fullWidth ? sectionCardStyles.fullWidthField : undefined}
-        >
-          {fieldProps.options ? (
-            <MuiSelectField
-              label={fieldProps.label}
-              name={fieldProps.name}
-              value={form[fieldProps.name]}
-              onChange={handleChange}
-              options={fieldProps.options}
-              disabled={isDisabled}
-              required={fieldProps.required}
-            />
-          ) : (
-            <MuiField
-              label={fieldProps.label}
-              name={fieldProps.name}
-              value={form[fieldProps.name]}
-              onChange={handleChange}
-              type={isTextarea ? "text" : (fieldProps.type || "text")}
-              disabled={isDisabled}
-              required={fieldProps.required}
-              {...(["act_wt", "chrg_wt"].includes(field.name) ? {
-                onBlur: () => handleWeightBlur(field.name, form[field.name]),
-              } : {})}
-            />
-          )}
-        </div>
+        <Tooltip title={tooltipText} placement="top" arrow={!!tooltipText}>
+          <div
+            key={field.name}
+            style={isTextarea || field.fullWidth ? sectionCardStyles.fullWidthField : undefined}
+          >
+            {fieldProps.options ? (
+              <MuiSelectField
+                label={fieldProps.label}
+                name={fieldProps.name}
+                value={form[fieldProps.name]}
+                onChange={handleChange}
+                options={fieldProps.options}
+                disabled={isDisabled}
+                required={fieldProps.required}
+              />
+            ) : (
+              <MuiField
+                label={fieldProps.label}
+                name={fieldProps.name}
+                value={form[fieldProps.name]}
+                onChange={handleChange}
+                type={isTextarea ? "text" : (fieldProps.type || "text")}
+                disabled={isDisabled}
+                required={fieldProps.required}
+                {...(["act_wt", "chrg_wt"].includes(field.name) ? {
+                  onBlur: () => handleWeightBlur(field.name, form[field.name]),
+                } : {})}
+              />
+            )}
+          </div>
+        </Tooltip>
       );
     };
 
