@@ -33,6 +33,7 @@ import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
 import UnarchiveIcon from "@mui/icons-material/Unarchive";
 import ListAltIcon from "@mui/icons-material/ListAlt";
 import RequestQuoteIcon from "@mui/icons-material/RequestQuote";
+import ZoneIcon from "@mui/icons-material/Map";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import Tooltip from "@mui/material/Tooltip";
@@ -103,6 +104,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/masters/location",         label: "Location Master",   icon: <LocationOnIcon /> },
         { path: "/masters/business-partner", label: "Business Partner",  icon: <HandshakeIcon /> },
         { path: "/masters/lorry",            label: "Lorry Master",      icon: <DirectionsCarIcon /> },
+        { path: "/masters/zone",             label: "Make Zone",         icon: <ZoneIcon /> },
         { path: "/transaction/add-town",     label: "Add Town",          icon: <LocationOnIcon /> },
       ],
     },
