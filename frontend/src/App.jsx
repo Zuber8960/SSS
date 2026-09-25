@@ -33,6 +33,8 @@ import PincodeSearchPage from "./pages/dev/PincodeSearchPage";
 import DocketEnquiryPage from "./pages/dev/DocketEnquiryPage";
 import TermsAndConditions from "./pages/TermsAndConditions";
 import DocketScanView from "./pages/DocketScanView";
+import MyPage from "./pages/MyPage";
+
 
 const appRoutes = [
   { path: "/",                   element: <MasterPortal />,    protected: false },
@@ -68,6 +70,8 @@ const appRoutes = [
   { path: "/dev/docket-enquiry",      element: <DocketEnquiryPage />,   protected: false },
   { path: "/common/terms-conditions", element: <TermsAndConditions />,  protected: false },
   { path: "/docket-scan/:docketNo",   element: <DocketScanView />,      protected: false },
+  { path: "/mypage",                  element: <MyPage />,             protected: false },
+
 ];
 
 const AccessDenied = () => (
