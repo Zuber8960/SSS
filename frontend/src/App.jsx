@@ -13,6 +13,7 @@ import LocationPage from "./pages/masters/LocationPage";
 import BusinessPartnerPage from "./pages/masters/BusinessPartnerPage";
 import LorryPage from "./pages/masters/LorryPage";
 import ZonePage from "./pages/masters/ZonePage";
+import ZoneTownPage from "./pages/masters/ZoneTownPage";
 import AddTown from "./pages/transaction/AddTown";
 import Docket from "./pages/transaction/Docket";
 import TripSheet from "./pages/transaction/TripSheet";
@@ -49,6 +50,7 @@ const appRoutes = [
   { path: "/masters/business-partner", element: <BusinessPartnerPage />, protected: true },
   { path: "/masters/lorry", element: <LorryPage />, protected: true },
   { path: "/masters/zone", element: <ZonePage />, protected: true },
+  { path: "/masters/zone-town", element: <ZoneTownPage />, protected: true },
   { path: "/transaction/add-town", element: <AddTown />, protected: true },
   { path: "/transaction/docket", element: <Docket />, protected: true },
   { path: "/transaction/trip-sheet", element: <TripSheet />, protected: true },

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { DataGrid, useGridApiContext, useGridApiRef } from "@mui/x-data-grid";
 import { Box, Button, FormControl, InputLabel, Select, MenuItem, IconButton, TextField, Tooltip } from "@mui/material";
 import { getDateFormat } from "../../utils/tenantService";
@@ -293,6 +293,18 @@ export function MuiSelectField({
   );
 }
 
+/*
+ * MUI DataGrid v9 expects rowSelectionModel = { type: 'include'|'exclude', ids: Set<GridRowId> }.
+ * Accept legacy inputs (array / Set) and normalise them into the v9 model shape so
+ * callers can pass either form without hitting "currentSelection.ids is not iterable".
+ */
+function toRowSelectionModel(model) {
+  if (model == null) return undefined;
+  if (Array.isArray(model)) return { type: "include", ids: new Set(model) };
+  if (model instanceof Set) return { type: "include", ids: model };
+  return model; // already a v9 model object
+}
+
 export function DataTable({
   columns,
   rows,
@@ -306,6 +318,7 @@ export function DataTable({
   checkboxSelection = false,
   disableMultipleRowSelection = false,
   onRowSelectionModelChange,
+  rowSelectionModel,
   autoHeight = false,
   isHeight,
   scroll,
@@ -317,6 +330,10 @@ export function DataTable({
   rowColors = {},
 }) {
   const apiRef = useGridApiRef();
+  // Normalise the controlled selection prop to the v9 model shape. Memoised so the
+  // object reference stays stable between renders — the grid compares the controlled
+  // prop BY REFERENCE, and a fresh object each render would reset user selections.
+  const controlledSelectionModel = useMemo(() => toRowSelectionModel(rowSelectionModel), [rowSelectionModel]);
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
     pageSize: 5,
@@ -555,6 +572,7 @@ export function DataTable({
         {...(checkboxSelection ? { checkboxSelection: true } : {})}
         {...(disableMultipleRowSelection ? { disableMultipleRowSelection: true } : {})}
         {...(onRowSelectionModelChange ? { onRowSelectionModelChange } : {})}
+        {...(rowSelectionModel !== undefined ? { rowSelectionModel: controlledSelectionModel } : {})}
         {...(onCellEditStop || (editable && onCellChange) ? {
           onCellEditStop: (params, event) => {
             const { id, field, value } = params;

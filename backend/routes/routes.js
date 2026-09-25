@@ -27,6 +27,7 @@ const cnsRoutes = require("../modules/manifest/cns.routes");
 const dashboardRoutes = require("../modules/dashboard/dashboard.routes");
 const pincodeMasterRoutes = require("../modules/pincodeMaster/pincodeMaster.routes");
 const zoneMasterRoutes = require("../modules/zoneMaster/zoneMaster.routes");
+const zoneTownRoutes = require("../modules/zoneTown/zoneTown.routes");
 const aiRoutes = require("../modules/ai/ai.routes");
 const LocationMasterController = require('../modules/locationMaster/locationMaster.controller');
 const DocketController = require('../modules/docket/docket.controller');
@@ -260,6 +261,7 @@ router.use('/cns', authMiddleware, cnsRoutes);
 router.use('/dashboard', authMiddleware, dashboardRoutes);
 router.use('/ai', authMiddleware, aiRoutes);
 router.use('/zone', authMiddleware, zoneMasterRoutes);
+router.use('/zone-town', authMiddleware, zoneTownRoutes);
 // pincodeMaster is mounted publicly above (no req.user dependency)
 
 router.get('/stateCity', authMiddleware, async (req, res) => {

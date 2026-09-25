@@ -105,6 +105,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/masters/business-partner", label: "Business Partner",  icon: <HandshakeIcon /> },
         { path: "/masters/lorry",            label: "Lorry Master",      icon: <DirectionsCarIcon /> },
         { path: "/masters/zone",             label: "Make Zone",         icon: <ZoneIcon /> },
+        { path: "/masters/zone-town",        label: "Zone Town Mapping", icon: <ZoneIcon /> },
         { path: "/transaction/add-town",     label: "Add Town",          icon: <LocationOnIcon /> },
       ],
     },
