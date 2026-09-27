@@ -1,11 +1,14 @@
+import { useState } from "react";
 import {
   ShoppingBag, PendingActions, LocalShipping, CheckCircle,
   ReceiptLong, AccountBalanceWallet, Inventory2,
   CancelScheduleSend, AssignmentTurnedIn, Receipt, Factory,
   Route, Insights, Group, AirportShuttle, TrendingUp,
 } from "@mui/icons-material";
+import ArrowOutwardIcon from "@mui/icons-material/ArrowOutward";
 import "../../styles/MasterPage.css";
 import { DataTable } from "./MasterPage";
+import ExecutiveKpiPopup from "./ExecutiveKpiPopup";
 
 /**
  * DashboardOverview — executive landing section rendered below the dashboard.
@@ -91,18 +94,12 @@ function LoadingBar({ width = "60%" }) {
   );
 }
 
-function EmptyRow({ colSpan = 15, text = "No data available" }) {
-  return (
-    <tr>
-      <td colSpan={colSpan} style={{ textAlign: "center", color: "#9ca3af", padding: "18px 0", fontSize: 13 }}>
-        {text}
-      </td>
-    </tr>
-  );
-}
-
 export default function DashboardOverview({ data, loading = false }) {
   const overview = data || {};
+  // Clicking a KPI card opens the drill-down popup with its full detail grid
+  const [activeKpi, setActiveKpi] = useState(null);
+  const openKpi = (k) => setActiveKpi(k);
+  const closeKpi = () => setActiveKpi(null);
   // While loading show skeletons; once loaded, always render cards —
   // falling back to zero-value cards when the DB has no data.
   const hasKpis = (overview.kpis || []).length > 0;
@@ -138,22 +135,34 @@ export default function DashboardOverview({ data, loading = false }) {
           return (
             <div
               key={k.label}
-              className="ovKpiCard"
+              className="ovKpiCard ovKpiCard--clickable"
+              role="button"
+              tabIndex={0}
+              aria-label={`View details for ${k.label}`}
+              onClick={() => openKpi(k)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openKpi(k); } }}
               style={{ animationDelay: `${i * 60}ms`, "--ov-accent": grad, "--ov-accent-soft": soft, "--ov-accent-strong": strong }}
             >
+              {/* soft accent glow behind the card */}
+              <span className="ovKpiCard__glow" />
+
               <div className="ovKpiCard__top">
+                <span className="ovKpiCard__icon" style={{ background: grad, color: "#fff" }}>
+                  {Icon && <Icon style={{ fontSize: 19 }} />}
+                </span>
                 <span className="ovKpiCard__label">{k.label}</span>
-                {Icon && (
-                  <span className="ovKpiCard__icon" style={{ background: soft, color: strong }}>
-                    <Icon style={{ fontSize: 17 }} />
-                  </span>
-                )}
+                <span className="ovKpiCard__arrow" style={{ color: "#fff", background: grad }}>
+                  <ArrowOutwardIcon style={{ fontSize: 14 }} />
+                </span>
               </div>
-              <div className="ovKpiCard__value">{k.value}</div>
-              <div className="ovKpiCard__sub" style={{ color: tone.color }}>
-                <span style={{ background: tone.background, padding: "3px 9px", borderRadius: 999, display: "inline-block" }}>
+
+              <div className="ovKpiCard__value" style={{ color: strong }}>{k.value}</div>
+
+              <div className="ovKpiCard__foot">
+                <span className="ovKpiCard__sub" style={{ color: tone.color, background: tone.background }}>
                   {k.sub}
                 </span>
+                <span className="ovKpiCard__cta" style={{ color: strong }}>Details</span>
               </div>
             </div>
           );
@@ -316,6 +325,15 @@ export default function DashboardOverview({ data, loading = false }) {
           />
         </div>
       </div>
+
+      {/* Drill-down popup — full detail grid for the clicked Executive KPI card.
+          `key` remounts on KPI change so search/error/loading state starts fresh. */}
+      <ExecutiveKpiPopup
+        key={activeKpi?.label || "closed"}
+        open={Boolean(activeKpi)}
+        kpi={activeKpi}
+        onClose={closeKpi}
+      />
     </div>
   );
 }

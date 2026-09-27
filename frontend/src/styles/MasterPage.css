@@ -72,16 +72,21 @@
 }
 .ovKpiCard {
   position: relative;
-  background: #fff;
+  /* Layered gradient surface: a soft accent wash over white, plus a subtle
+     diagonal sheen. Each card picks up its own tint from --ov-accent-soft. */
+  background:
+    linear-gradient(160deg, var(--ov-accent-soft, #f3e8ff) 0%, rgba(255, 255, 255, 0) 58%),
+    linear-gradient(200deg, #ffffff 0%, #fbfaff 100%);
   border: 1px solid #ece9f4;
-  border-radius: 12px;
+  border-radius: 18px;
   padding: 16px 16px 14px;
   box-shadow: 0 2px 10px rgba(80, 60, 140, 0.06);
   overflow: hidden;
   opacity: 0;
   animation: ovFadeUp 0.5s ease forwards;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
 }
+/* Accent bar along the top edge */
 .ovKpiCard::before {
   content: "";
   position: absolute;
@@ -91,44 +96,123 @@
   height: 4px;
   background: var(--ov-accent, linear-gradient(90deg, #a855f7, #7c3aed));
 }
+/* Soft radial glow that fades in on hover */
+.ovKpiCard__glow {
+  position: absolute;
+  top: -60px;
+  right: -60px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: var(--ov-accent-soft, #f3e8ff);
+  opacity: 0;
+  filter: blur(28px);
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
 .ovKpiCard:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 24px rgba(80, 60, 140, 0.14);
+  transform: translateY(-6px);
+  box-shadow: 0 16px 34px rgba(80, 60, 140, 0.18);
+  border-color: var(--ov-accent-strong, #7c3aed);
+}
+.ovKpiCard:hover .ovKpiCard__glow {
+  opacity: 0.75;
 }
 .ovKpiCard__top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 .ovKpiCard__label {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   color: #6b7280;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
 }
 .ovKpiCard__icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--ov-accent-soft, #f3e8ff);
-  color: var(--ov-accent-strong, #7c3aed);
-  font-size: 17px;
+  font-size: 19px;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+  transition: transform 0.25s ease;
+}
+.ovKpiCard:hover .ovKpiCard__icon {
+  transform: scale(1.08) rotate(-4deg);
+}
+/* Circular arrow badge revealed on hover */
+.ovKpiCard__arrow {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
   flex-shrink: 0;
 }
+.ovKpiCard:hover .ovKpiCard__arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
 .ovKpiCard__value {
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 800;
-  color: #111827;
   line-height: 1.1;
   letter-spacing: -0.02em;
+  position: relative;
+  z-index: 1;
+}
+.ovKpiCard__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  position: relative;
+  z-index: 1;
 }
 .ovKpiCard__sub {
-  margin-top: 9px;
   font-size: 11px;
   font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Clickable KPI card — opens the drill-down detail popup */
+.ovKpiCard--clickable {
+  cursor: pointer;
+  user-select: none;
+}
+.ovKpiCard--clickable:focus-visible {
+  outline: 2px solid var(--ov-accent-strong, #7c3aed);
+  outline-offset: 3px;
+}
+.ovKpiCard__cta {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translateX(-5px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  white-space: nowrap;
+}
+.ovKpiCard--clickable:hover .ovKpiCard__cta,
+.ovKpiCard--clickable:focus-visible .ovKpiCard__cta {
+  opacity: 1;
+  transform: translateX(0);
 }
 .ovOpsGrid {
   display: grid;
