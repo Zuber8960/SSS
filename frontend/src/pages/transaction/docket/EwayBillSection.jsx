@@ -37,6 +37,7 @@ export default function EwayBillSection({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scannerError, setScannerError] = useState("");
   const scannerRef = useRef(null);
+  const tabPressedRef = useRef(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -92,6 +93,7 @@ export default function EwayBillSection({
     onCellChange(rowIndex, key, value);
   };
 
+
   const handleRowUpdate = useCallback(async (newRow, oldRow) => {
     if (newRow.ewb_no === oldRow.ewb_no) {
       Object.keys(newRow).forEach((key) => {
@@ -105,6 +107,16 @@ export default function EwayBillSection({
     const ewbNo = String(newRow.ewb_no).trim();
     if (!ewbNo) return newRow;
 
+    // Only fetch data if Tab key was pressed
+    const shouldFetch = tabPressedRef.current;
+    tabPressedRef.current = false; // Always reset immediately
+
+    if (!shouldFetch) {
+      // Even if Tab wasn't pressed, update the cell value to preserve the input
+      onCellChange(newRow.id, "ewb_no", ewbNo);
+      return newRow;
+    }
+
     const isDuplicate = ewbList.some(
       (row, idx) => idx !== newRow.id && String(row.ewb_no).trim() === ewbNo
     );
@@ -114,11 +126,37 @@ export default function EwayBillSection({
     }
 
     try {
-      let ewbApi = (await fetchEwayBillFromDB([Number(ewbNo)]))?.data;
+      // Collect all EWB numbers from all rows in the grid (including current row)
+      const allEwbNumbers = [];
+      ewbList.forEach((row) => {
+        const nums = String(row.ewb_no || "")
+          .split(',')
+          .map(n => Number(n.trim()))
+          .filter(n => !isNaN(n));
+        allEwbNumbers.push(...nums);
+      });
+
+      // Also add EWB numbers from current row if they're new
+      const currentEwbNumbers = String(ewbNo)
+        .split(',')
+        .map(n => Number(n.trim()))
+        .filter(n => !isNaN(n));
+      allEwbNumbers.push(...currentEwbNumbers);
+
+      // Remove duplicates
+      const uniqueEwbNumbers = [...new Set(allEwbNumbers)];
+
+      if (uniqueEwbNumbers.length === 0) {
+        showError(`Invalid EWB number format: ${ewbNo}`);
+        return oldRow;
+      }
+
+      // Fetch all EWB numbers at once
+      let ewbApi = (await fetchEwayBillFromDB(uniqueEwbNumbers))?.data;
       const { apiCalls, docketData } = ewbApi || {};
       let records = ewbApi?.data || ewbApi || [];
       if (!records || records.length === 0) {
-        showError(`EWB number ${ewbNo} does not exist`);
+        showError(`EWB number(s) ${ewbNo} do not exist`);
         return oldRow;
       }
 
@@ -130,9 +168,19 @@ export default function EwayBillSection({
         }
       }
 
-      let r = records[0];
-      if (!apiCalls) {
-        r = records.find((r) => !r.docket_no) || records[0];
+      // Find the matching record for the current row's EWB number
+      let r = records.find((record) => {
+        const recordEwbNo = String(record.EWB_NO || record.ewb_no || "").trim();
+        return currentEwbNumbers.some(num => String(num) === recordEwbNo);
+      });
+
+      // If no exact match found, prefer a record without docket_no, otherwise take first
+      if (!r) {
+        if (!apiCalls) {
+          r = records.find((rec) => !rec.docket_no) || records[0];
+        } else {
+          r = records[0];
+        }
       }
 
       const toDate = (val) =>
@@ -221,7 +269,57 @@ export default function EwayBillSection({
         const result = onDocketPopulate(docketPayload);
         if (result === false) return oldRow;
       }
-      if (onEwbListUpdate) onEwbListUpdate(newRow.id, populated);
+      // Populate all matching rows with their corresponding data
+      if (onEwbListUpdate) {
+        // For the current row, always update with matched record
+        onEwbListUpdate(newRow.id, populated);
+
+        // Also update other rows if their EWB numbers are in the returned records
+        ewbList.forEach((row, idx) => {
+          if (idx !== newRow.id) {
+            const rowEwbNums = String(row.ewb_no || "")
+              .split(',')
+              .map(n => Number(n.trim()))
+              .filter(n => !isNaN(n));
+
+            // Find matching records for this row
+            const matchedRecord = records.find((record) => {
+              const recordEwbNo = String(record.EWB_NO || record.ewb_no || "").trim();
+              return rowEwbNums.some(num => String(num) === recordEwbNo);
+            });
+
+            if (matchedRecord) {
+              const dtl = Array.isArray(matchedRecord.dtl_rows) ? matchedRecord.dtl_rows[0] : null;
+              const rowPopulated = {
+                ...row,
+                rec_id: matchedRecord.rec_id ?? null,
+                ewb_no: matchedRecord.EWB_NO || matchedRecord.ewb_no || row.ewb_no,
+                ewb_date: toDate(matchedRecord.EWB_DATE || matchedRecord.ewb_date),
+                ewb_valid: toDate(matchedRecord.EWB_VALID_UPTO || matchedRecord.ewb_valid_upto),
+                inv_no: matchedRecord.INV_NO || matchedRecord.invoice_no || "",
+                inv_date: toDate(matchedRecord.INV_DATE || matchedRecord.invoice_date),
+                cnor_name: dtl?.FROM_CUST_NAME || matchedRecord.FROM_CUST_NAME || matchedRecord.cnor_name || "",
+                cnee_name: dtl?.TO_CUST_NAME || matchedRecord.TO_CUST_NAME || matchedRecord.cnee_name || "",
+                cnor_address: dtl?.FROM_ADDRESS || matchedRecord.FROM_ADDRESS || matchedRecord.cnor_address || "",
+                cnee_address: dtl?.TO_ADDRESS || matchedRecord.TO_ADDRESS || matchedRecord.cnee_address || "",
+                cnor_gstin: dtl?.CNOR_GSTIN || matchedRecord.CNOR_GSTIN || matchedRecord.cnor_gstin || "",
+                cnee_gstin: dtl?.CNEE_GSTIN || matchedRecord.CNEE_GSTIN || matchedRecord.cnee_gstin || "",
+                cnor_pincode: dtl?.FROM_PINCODE || matchedRecord.FROM_PINCODE || matchedRecord.cnor_pincode || "",
+                cnee_pincode: dtl?.TO_PINCODE || matchedRecord.TO_PINCODE || matchedRecord.cnee_pincode || "",
+                cnor_city: dtl?.FROM_PLACE || matchedRecord.FROM_PLACE || matchedRecord.cnor_city || "",
+                cnee_city: dtl?.TO_PLACE || matchedRecord.TO_PLACE || matchedRecord.cnee_city || "",
+                invoice_total: matchedRecord.TOTAL_INV_VALUE || matchedRecord.invoice_total || 0,
+                cgst: matchedRecord.CGST_VALUE || matchedRecord.cgst || 0,
+                sgst: matchedRecord.SGST_VALUE || matchedRecord.sgst || 0,
+                igst: matchedRecord.IGST_VALUE || matchedRecord.igst || 0,
+                cess: matchedRecord.cess || 0,
+              };
+              onEwbListUpdate(idx, rowPopulated);
+            }
+          }
+        });
+      }
+
       if (onShowForm) onShowForm();
       return populated;
     } catch (err) {
@@ -347,6 +445,11 @@ export default function EwayBillSection({
         checkboxSelection
         onCellChange={handleCellChange}
         onRowUpdate={handleRowUpdate}
+        onCellEditStop={(params, event) => {
+          if (params.field === "ewb_no" && event?.key === "Tab") {
+            tabPressedRef.current = true;
+          }
+        }}
         onRowSelectionModelChange={(model) => {
           const ids = model?.ids instanceof Set ? model.ids : new Set(Array.isArray(model) ? model : []);
           setSelectedRows(ids);

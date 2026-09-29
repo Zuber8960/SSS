@@ -46,7 +46,7 @@ router.get('/ewayfile/db', async (req, res) => {
 
 router.get('/ewayfile/db/:ewbNumbers', async (req, res) => {
   try {
-    const ewbNumbers = req.params.ewbNumbers?.split(',').map(s => s.trim()).filter(Boolean).map(Number);
+    const ewbNumbers = req.params.ewbNumbers?.split(',').map(s => s.trim()).filter(Boolean).map(Number).filter(n => n>0);
     if (!ewbNumbers?.length) {
       return res.json({ success: true, data: [] });
     }
