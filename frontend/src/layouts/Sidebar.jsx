@@ -40,6 +40,7 @@ import Tooltip from "@mui/material/Tooltip";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import SearchIcon from "@mui/icons-material/Search";
+import Inventory2Icon from "@mui/icons-material/Inventory2";
 import "./Sidebar.css";
 import logoFallback from "../images/loogo.PNG";
 
@@ -106,6 +107,8 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/masters/lorry",            label: "Lorry Master",      icon: <DirectionsCarIcon /> },
         { path: "/masters/zone",             label: "Make Zone",         icon: <ZoneIcon /> },
         { path: "/masters/zone-town",        label: "Zone Town Mapping", icon: <ZoneIcon /> },
+        { path: "/masters/item-group",       label: "Item Group Master", icon: <CategoryIcon /> },
+        { path: "/masters/item",             label: "Item Master",       icon: <Inventory2Icon /> },
         { path: "/transaction/add-town",     label: "Add Town",          icon: <LocationOnIcon /> },
       ],
     },

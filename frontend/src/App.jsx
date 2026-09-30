@@ -14,6 +14,8 @@ import BusinessPartnerPage from "./pages/masters/BusinessPartnerPage";
 import LorryPage from "./pages/masters/LorryPage";
 import ZonePage from "./pages/masters/ZonePage";
 import ZoneTownPage from "./pages/masters/ZoneTownPage";
+import ItemGroupPage from "./pages/masters/itemGroupPage";
+import ItemPage from "./pages/masters/itempage";
 import AddTown from "./pages/transaction/AddTown";
 import Docket from "./pages/transaction/Docket";
 import TripSheet from "./pages/transaction/TripSheet";
@@ -53,6 +55,8 @@ const appRoutes = [
   { path: "/masters/lorry", element: <LorryPage />, protected: true },
   { path: "/masters/zone", element: <ZonePage />, protected: true },
   { path: "/masters/zone-town", element: <ZoneTownPage />, protected: true },
+  { path: "/masters/item-group", element: <ItemGroupPage />, protected: true },
+  { path: "/masters/item", element: <ItemPage />, protected: true },
   { path: "/transaction/add-town", element: <AddTown />, protected: true },
   { path: "/transaction/docket", element: <Docket />, protected: true },
   { path: "/transaction/trip-sheet", element: <TripSheet />, protected: true },

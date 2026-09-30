@@ -28,6 +28,8 @@ const dashboardRoutes = require("../modules/dashboard/dashboard.routes");
 const pincodeMasterRoutes = require("../modules/pincodeMaster/pincodeMaster.routes");
 const zoneMasterRoutes = require("../modules/zoneMaster/zoneMaster.routes");
 const zoneTownRoutes = require("../modules/zoneTown/zoneTown.routes");
+const itemMasterRoutes = require("../modules/itemMaster/itemMaster.routes");
+const itemGroupMasterRoutes = require("../modules/itemGroupMaster/itemGroupMaster.routes");
 const aiRoutes = require("../modules/ai/ai.routes");
 const LocationMasterController = require('../modules/locationMaster/locationMaster.controller');
 const DocketController = require('../modules/docket/docket.controller');
@@ -262,6 +264,8 @@ router.use('/dashboard', authMiddleware, dashboardRoutes);
 router.use('/ai', authMiddleware, aiRoutes);
 router.use('/zone', authMiddleware, zoneMasterRoutes);
 router.use('/zone-town', authMiddleware, zoneTownRoutes);
+router.use('/itemMaster', authMiddleware, itemMasterRoutes);
+router.use('/itemGroupMaster', authMiddleware, itemGroupMasterRoutes);
 // pincodeMaster is mounted publicly above (no req.user dependency)
 
 router.get('/stateCity', authMiddleware, async (req, res) => {
