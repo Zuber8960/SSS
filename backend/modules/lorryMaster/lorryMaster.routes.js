@@ -15,6 +15,20 @@ router.get('/', async (req, res) => {
     }
 });
 
+// NOTE: must be declared BEFORE '/:recId', otherwise Express matches the
+// literal string "vehicle" as a recId and the lookup never reaches here.
+router.get('/vehicle/:vehicleId', async (req, res) => {
+    try {
+        const { vehicleId } = req.params;
+        const { tenant_id } = req;
+        const data = await LorryMasterController.getByVehicleId(vehicleId, tenant_id);
+        res.status(200).json({ success: true, data: data || null });
+    } catch (error) {
+        console.error('Lorry Master error:', error);
+        res.status(500).json({ success: false, message: 'Error retrieving lorry data' });
+    }
+});
+
 router.get('/:recId', async (req, res) => {
     try {
         const { recId } = req.params;

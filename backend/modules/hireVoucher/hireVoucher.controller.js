@@ -27,10 +27,31 @@ const getHireVoucherByNo = async (vha_no) => {
 
 /* ================= GET HIRE VOUCHER DETAILS ================= */
 
+// Blank-safe date/number coercion for the NOT NULL columns of sst_vha_dtl.
+// mnf_no / mnf_loc are varchar -> '' is fine, but mnf_date is a real DATE
+// column, and PostgreSQL rejects '' with:
+//   invalid input syntax for type date: ""
+// so an empty manifest date must fall back to a valid date value.
+const EMPTY_DATE = '1900-01-01';
+
+const toDateOr = (value, fallback = EMPTY_DATE) => {
+  if (value === null || value === undefined || String(value).trim() === '') return fallback;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? fallback : d.toISOString().slice(0, 10);
+};
+
+const toNumOrNull = (value) => {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+// NOTE: the table has no `vhv_srno` column (verified against the live schema),
+// so rows are ordered by the surrogate `rec_id` instead.
 const getHireVoucherDetails = async ({ vha_no, vha_loc, vha_date }) => {
   return db('sss.sst_vha_dtl')
     .where({ vha_no, vha_loc, vha_date })
-    .orderBy('vhv_srno');
+    .orderBy('rec_id');
 };
 
 /* ================= GENERATE NEXT HIRE VOUCHER NO ================= */
@@ -95,21 +116,23 @@ const createHireVoucher = async (headerData, detailsData) => {
     // Insert header
     await trx('sss.sst_vha_hdr').insert(headerRow);
 
-    // Build detail rows with composite key (only sst_vha_dtl columns)
-    const detailRows = (detailsData || []).map((row, index) => ({
+    // Build detail rows with composite key (only sst_vha_dtl columns).
+    // mnf_loc / mnf_no (varchar) and mnf_date (date) are NOT NULL, so blanks
+    // are coerced to '' / an epoch date rather than null.
+    const detailRows = (detailsData || []).map((row) => ({
       company_code: headerData.company_code || null,
       division_code: headerData.division_code || null,
       vha_no: nextNo,
-      vha_loc: headerData.vha_loc || headerData.from_loc || null,
+      vha_loc: headerData.vha_loc || '',
       vha_date: headerData.vha_date,
-      mnf_no: row.mnf_no || null,
-      mnf_date: row.mnf_date || null,
-      mnf_loc: row.mnf_loc || null,
-      mnf_act_weight: row.mnf_act_weight != null && row.mnf_act_weight !== "" ? Number(row.mnf_act_weight) : null,
-      mnf_cns_no: row.mnf_cns_no != null && row.mnf_cns_no !== "" ? Number(row.mnf_cns_no) : null,
-      mnf_pkgs_no: row.mnf_pkgs_no != null && row.mnf_pkgs_no !== "" ? Number(row.mnf_pkgs_no) : null,
+      mnf_no: row.mnf_no || '',
+      mnf_date: toDateOr(row.mnf_date),
+      mnf_loc: row.mnf_loc || '',
+      mnf_act_weight: toNumOrNull(row.mnf_act_weight),
+      mnf_cns_no: toNumOrNull(row.mnf_cns_no),
+      mnf_pkgs_no: toNumOrNull(row.mnf_pkgs_no),
       aud_user: headerData.aud_user || '',
-      aud_loc: headerData.vha_loc || headerData.from_loc || '',
+      aud_loc: headerData.vha_loc || '',
       aud_date: new Date(),
     }));
 
@@ -149,19 +172,20 @@ const updateHireVoucherDetails = async (keys, detailsData) => {
 
 
     // Insert new details
-    const detailRows = detailsData.map((row, index) => ({
+    // mnf_loc / mnf_no (varchar) and mnf_date (date) are NOT NULL -> coerce blanks.
+    // Row order is preserved by inserting in order (rec_id asc).
+    const detailRows = detailsData.map((row) => ({
       company_code: row.company_code || null,
       division_code: row.division_code || null,
       vha_no: keys.vha_no,
       vha_loc: keys.vha_loc,
       vha_date: keys.vha_date,
-      vhv_srno: index + 1,
-      mnf_no: row.mnf_no || null,
-      mnf_date: row.mnf_date || null,
-      mnf_loc: row.mnf_loc || null,
-      mnf_act_weight: row.mnf_act_weight != null && row.mnf_act_weight !== "" ? Number(row.mnf_act_weight) : null,
-      mnf_cns_no: row.mnf_cns_no != null && row.mnf_cns_no !== "" ? Number(row.mnf_cns_no) : null,
-      mnf_pkgs_no: row.mnf_pkgs_no != null && row.mnf_pkgs_no !== "" ? Number(row.mnf_pkgs_no) : null,
+      mnf_no: row.mnf_no || '',
+      mnf_date: toDateOr(row.mnf_date),
+      mnf_loc: row.mnf_loc || '',
+      mnf_act_weight: toNumOrNull(row.mnf_act_weight),
+      mnf_cns_no: toNumOrNull(row.mnf_cns_no),
+      mnf_pkgs_no: toNumOrNull(row.mnf_pkgs_no),
       aud_user: row.aud_user || '',
       aud_loc: keys.vha_loc,
       aud_date: new Date(),
@@ -189,8 +213,9 @@ const deleteHireVoucher = async (keys, trx = db) => {
 /* ================= GET HIRE VOUCHER BY VHV NO ================= */
 
 const getHireVoucherByVhvNo = async (vhvNo) => {
+  // record_status 0 = active. Soft-deleted vouchers must not be loaded for edit.
   const header = await db('sss.sst_vha_hdr')
-    .where({ vha_no: vhvNo })
+    .where({ vha_no: vhvNo, record_status: 0 })
     .first();
 
   if (!header) return null;
@@ -198,7 +223,7 @@ const getHireVoucherByVhvNo = async (vhvNo) => {
   const details = await db('sss.sst_vha_dtl')
     .where({
       vha_no: header.vha_no,
-      vha_loc: header.vha_loc || header.from_loc,
+      vha_loc: header.vha_loc,
       vha_date: header.vha_date
     })
 

@@ -14,6 +14,13 @@ Api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   const currentUser = JSON.parse(localStorage.getItem('current_user') || 'null');
   if (currentUser?.company_code) config.headers['x-company-code'] = currentUser.company_code;
+
+  // The instance sets a default JSON content-type. For FormData bodies the
+  // browser must supply the multipart boundary itself, so drop the default
+  // and let axios generate the correct header.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   return config;
 });
 

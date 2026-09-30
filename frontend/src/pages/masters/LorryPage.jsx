@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from "react";
-import { SaveIcon, RefreshIcon, ClearIcon, NoteAddIcon, EditIcon } from "../../components/common/icons";
+import { SaveIcon, RefreshIcon, ClearIcon, NoteAddIcon, EditIcon, DeleteIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
   FormPanel,
   FormField,
+  DataTable,
 } from "../../components/common/MasterPage";
 import {
   fetchAllLorries,
@@ -252,16 +253,21 @@ const mapLorryToForm = (row) => ({
 
 export default function LorryPage() {
 
-  const [, setLorries] = useState([]);
+  const [lorries, setLorries] = useState([]);
   const { dialog, closeAlert, showSuccess, showError, showWarning } = useAlert();
 
   const [form, setForm] = useState(emptyLorryForm);
+  // Newly picked documents, keyed by doc field name. Kept out of `form` because
+  // a File cannot be serialised into the form state used for editing.
+  const [files, setFiles] = useState({});
 
   const [isEditing, setIsEditing] = useState(false);
   const [originalLorry, setOriginalLorry] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const clearForm = () => {
     setForm(emptyLorryForm);
+    setFiles({});
     setIsEditing(false);
     setOriginalLorry(null);
   };
@@ -269,7 +275,7 @@ export default function LorryPage() {
   const loadLorries = async () => {
     try {
       const data = await fetchAllLorries();
-      setLorries(data);
+      setLorries(Array.isArray(data) ? data : []);
     } catch (err) {
       showError(err.message || "Failed to load lorries");
       console.error("Load lorries error:", err);
@@ -304,40 +310,44 @@ export default function LorryPage() {
     };
 
     try {
+      setIsSaving(true);
       if (isEditing && originalLorry?.rec_id) {
-        await updateLorry(originalLorry.rec_id, payload);
-        setLorries((prev) =>
-          prev.map((lorry) =>
-            lorry.rec_id === originalLorry.rec_id ? { ...lorry, ...payload } : lorry
-          )
-        );
+        await updateLorry(originalLorry.rec_id, payload, files);
         showSuccess("Lorry updated successfully");
       } else {
-        const created = await createLorry(payload);
-        setLorries((prev) => [...prev, ...(Array.isArray(created) ? created : [created])]);
+        await createLorry(payload, files);
         showSuccess("Lorry created successfully");
       }
+      // Reload from the server instead of patching local state: the response is
+      // the mapped DB row (rec_id, mapped column names) and local `payload`
+      // uses frontend field names, so merging them would corrupt the list.
+      await loadLorries();
       clearForm();
     } catch (err) {
       showError(err.message || "Failed to save lorry");
       console.error("Save lorry error:", err);
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // eslint-disable-next-line no-unused-vars
   const editLorry = (row) => {
     setForm(mapLorryToForm(row));
+    setFiles({});
     setOriginalLorry(row);
     setIsEditing(true);
+    showSuccess(`Loaded ${row.vehicle_no || "lorry"} for editing`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // eslint-disable-next-line no-unused-vars
-  const handleDeleteLorry = (rec_id) => {
-    showWarning("Confirm Delete", "Delete Lorry ?",
+  const handleDeleteLorry = (row) => {
+    showWarning("Confirm Delete", `Delete lorry "${row.vehicle_no || row.rec_id}"? This cannot be undone.`,
       async () => {
         try {
-          await deleteLorry(rec_id);
-          setLorries((prev) => prev.filter((x) => x.rec_id !== rec_id));
+          await deleteLorry(row.rec_id);
+          // Drop it from the grid immediately, and stop editing it if it was open.
+          setLorries((prev) => prev.filter((x) => x.rec_id !== row.rec_id));
+          if (originalLorry?.rec_id === row.rec_id) clearForm();
           showSuccess("Lorry deleted successfully");
         } catch (err) {
           showError(err.message || "Failed to delete lorry");
@@ -351,49 +361,55 @@ export default function LorryPage() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Look up an existing lorry by vehicle no so Enter/Tab (or the Edit button)
+  // can switch the form into update mode. Accepts either a key event or nothing.
   const handleVehicleNoKeyDown = async (e) => {
-    if (e.key === "Enter" || e.key === "Tab") {
-      const vno = form.vehicle_no?.trim();
-      if (!vno) return;
-      try {
-        const data = await fetchLorryByVehicleNo(vno);
-        if (data) {
-          setForm(mapLorryToForm(data));
-          setOriginalLorry(data);
-          setIsEditing(true);
-          showSuccess("Lorry details loaded for editing");
-        } else {
-          clearForm();
-          updateField("vehicle_no", vno);
-          setIsEditing(false);
-          showWarning("Vehicle not found. Creating new entry.");
-        }
-      } catch (err) {
-        showError(err.message || "Failed to fetch lorry details");
-        console.error("Fetch lorry by vehicle no error:", err);
+    if (e?.key && e.key !== "Enter" && e.key !== "Tab") return;
+    e?.preventDefault?.();
+    const vno = form.vehicle_no?.trim();
+    if (!vno) {
+      showError("Please enter a Vehicle Number first");
+      return;
+    }
+    try {
+      const data = await fetchLorryByVehicleNo(vno);
+      if (data) {
+        setForm(mapLorryToForm(data));
+        setFiles({});
+        setOriginalLorry(data);
+        setIsEditing(true);
+        showSuccess("Lorry details loaded for editing");
+      } else {
+        // Not found — keep what the user typed and start a fresh record.
+        setForm((prev) => ({ ...prev, vehicle_no: vno }));
+        setFiles({});
+        setOriginalLorry(null);
+        setIsEditing(false);
+        showWarning("Vehicle not found. Creating new entry.");
       }
+    } catch (err) {
+      showError(err.message || "Failed to fetch lorry details");
+      console.error("Fetch lorry by vehicle no error:", err);
     }
   };
 
-  const [, setError] = useState("");
-  const [, setLoading] = useState(true);
-
+  // Initial fetch of the lorry list. The async call is intentionally NOT awaited
+  // here — state is only set once the request resolves, so this does not trigger
+  // the "setState synchronously in an effect" cascading-render warning.
   useEffect(() => {
-    const loadLorriesAtMount = async () => {
-      try {
-        setLoading(true);
-        setError("");
-        const data = await fetchAllLorries();
-        setLorries(data);
-      } catch (err) {
-        setError(err.message || "Failed to load lorries");
-        console.error("Error loading lorries:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadLorriesAtMount();
+    const controller = new AbortController();
+    fetchAllLorries()
+      .then((data) => {
+        if (!controller.signal.aborted) setLorries(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          showError(err.message || "Failed to load lorries");
+          console.error("Load lorries error:", err);
+        }
+      });
+    return () => { controller.abort(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Check if any Own Vehicle Extra Details field has data
@@ -437,14 +453,39 @@ export default function LorryPage() {
   // Refs for hidden file inputs
   const fileInputRefs = useRef({});
 
+  // Hold the real File object for upload; `form[docKey]` only stores the file
+  // NAME for display, and the backend replaces the path only when a file is sent.
   const handleFileSelect = (docKey) => (event) => {
     const file = event.target.files?.[0];
     if (file) {
+      // 5 MB limit mirrors the multer config in backend/middleware/upload.js
+      if (file.size > 5 * 1024 * 1024) {
+        showError(`${file.name} is larger than 5 MB`);
+        event.target.value = "";
+        return;
+      }
+      setFiles((prev) => ({ ...prev, [docKey]: file }));
       updateField(docKey, file.name);
     }
-    // Reset input so same file can be selected again
+    // Reset input so the same file can be selected again
     event.target.value = "";
   };
+
+  // A doc tile is "filled" when a file was just picked OR the saved record
+  // already has a stored path for it.
+  const docName = (docKey) => files[docKey]?.name || form[docKey] || "";
+
+  // Columns for the Lorry list grid (read-only; editing happens in the form above)
+  const lorryListColumns = [
+    { key: "vehicle_no", label: "Vehicle No", minWidth: 130 },
+    { key: "owner_name", label: "Owner", minWidth: 150 },
+    { key: "vehicle_ownership", label: "Ownership", minWidth: 110 },
+    { key: "vehicle_type", label: "Type", minWidth: 110 },
+    { key: "make", label: "Make", minWidth: 100 },
+    { key: "model", label: "Model", minWidth: 100 },
+    { key: "carrying_capacity_kg", label: "Capacity (Kg)", minWidth: 120, type: "number" },
+    { key: "is_active", label: "Status", minWidth: 100 },
+  ];
 
   return (
     <MainLayout>
@@ -457,14 +498,7 @@ export default function LorryPage() {
           </Tooltip>
           <Tooltip title="Edit / View">
             <IconButton
-              onClick={() => {
-                const vno = form.vehicle_no?.trim();
-                if (!vno) {
-                  showError("Please enter a Vehicle Number first");
-                  return;
-                }
-                handleVehicleNoKeyDown({ key: "Enter", preventDefault: () => {} });
-              }}
+              onClick={() => handleVehicleNoKeyDown()}
               size="small"
               sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}
             >
@@ -476,10 +510,22 @@ export default function LorryPage() {
               <ClearIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Save">
-            <IconButton onClick={saveLorry} size="small" sx={{ color: "#16a34a", "&:hover": { background: "#dcfce7" } }}>
-              <SaveIcon />
+          <Tooltip title="Refresh List">
+            <IconButton onClick={loadLorries} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
+              <RefreshIcon />
             </IconButton>
+          </Tooltip>
+          <Tooltip title={isEditing ? "Update" : "Save"}>
+            <span>
+              <IconButton
+                onClick={saveLorry}
+                disabled={isSaving}
+                size="small"
+                sx={{ color: "#16a34a", "&:hover": { background: "#dcfce7" } }}
+              >
+                <SaveIcon />
+              </IconButton>
+            </span>
           </Tooltip>
         </div>
 
@@ -765,8 +811,8 @@ export default function LorryPage() {
                   gap: 1.5,
                   p: 2.5,
                   borderRadius: "12px",
-                  border: form[doc.key] ? "2px solid #a855f7" : "2px dashed #d1d5db",
-                  background: form[doc.key]
+                  border: docName(doc.key) ? "2px solid #a855f7" : "2px dashed #d1d5db",
+                  background: docName(doc.key)
                     ? "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)"
                     : "#ffffff",
                   cursor: "pointer",
@@ -785,20 +831,20 @@ export default function LorryPage() {
                 <CloudUploadIcon
                   sx={{
                     fontSize: 36,
-                    color: form[doc.key] ? "#a855f7" : "#94a3b8",
+                    color: docName(doc.key) ? "#a855f7" : "#94a3b8",
                   }}
                 />
                 <Typography
                   sx={{
                     fontSize: "13px",
                     fontWeight: 600,
-                    color: form[doc.key] ? "#7e22ce" : "#64748b",
+                    color: docName(doc.key) ? "#7e22ce" : "#64748b",
                     textAlign: "center",
                   }}
                 >
                   {doc.label}
                 </Typography>
-                {form[doc.key] ? (
+                {docName(doc.key) ? (
                   <Chip
                     label="Uploaded"
                     size="small"
@@ -834,6 +880,19 @@ export default function LorryPage() {
             ))}
           </Box>
         </Paper>
+
+        {/* ═══════════════════ LORRY LIST (Read / Edit / Delete) ═══════════════════ */}
+        <h3 style={sectionStyle}>🔹 Lorry List</h3>
+        <DataTable
+          columns={lorryListColumns}
+          rows={lorries}
+          getKey={(row) => row.rec_id}
+          actions={[
+            { label: "Edit", icon: <EditIcon />, onClick: editLorry },
+            { label: "Delete", icon: <DeleteIcon />, onClick: handleDeleteLorry },
+          ]}
+          isHeight={400}
+        />
 
       </PageBody>
       <CommonAlertDialog

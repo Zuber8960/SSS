@@ -96,8 +96,10 @@ router.put('/:no/:loc/:date', async (req, res) => {
       await HireVoucherController.updateHireVoucher(keys, header);
     }
 
-    // Update details (delete all + re-insert)
-    if (details && details.length > 0) {
+    // Update details (delete all + re-insert).
+    // Must run even for an empty array, otherwise removing every manifest row
+    // from the UI would silently leave the old rows in the database.
+    if (Array.isArray(details)) {
       await HireVoucherController.updateHireVoucherDetails(keys, details);
     }
 

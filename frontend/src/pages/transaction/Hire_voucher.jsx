@@ -100,8 +100,13 @@ const emptyManifestRow = {
 };
 
 
+// Voucher date is auto generated (creation date)
+const today = () => new Date().toISOString().slice(0, 10);
+
 export default function HireVoucherPage() {
-  const [form, setForm] = useState(emptyVoucherForm);
+  // Voucher date is auto-generated (creation date) — seed it once at mount
+  // instead of setting it from an effect.
+  const [form, setForm] = useState(() => ({ ...emptyVoucherForm, vha_date: today() }));
   const [manifestRows, setManifestRows] = useState([]);
   const [originalVoucher, setOriginalVoucher] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -118,18 +123,19 @@ export default function HireVoucherPage() {
     setIsEditing(false);
   };
 
-  // Voucher date is auto generated (creation date)
-  const today = () => new Date().toISOString().slice(0, 10);
-
-  // Load next voucher no + today's date at mount (both auto generated)
+  // Load next voucher no at mount. The form's date is seeded by the lazy
+  // initialState below, so this effect only performs the async fetch and
+  // setStates in the .then() callback (never synchronously in the effect body).
   useEffect(() => {
-    setForm((prev) => ({ ...prev, vha_date: prev.vha_date || today() }));
+    let active = true;
     fetchNextHireVoucherNo()
       .then((next) => {
+        if (!active) return;
         const nextNo = next?.vha_no ?? next?.hv_no ?? "";
         if (nextNo) setForm((prev) => (prev.vha_no ? prev : { ...prev, vha_no: nextNo }));
       })
       .catch((err) => console.error("Fetch next voucher no error:", err));
+    return () => { active = false; };
   }, []);
 
   // ── Derived (sss.sst_vha_hdr computed columns) ──
@@ -283,7 +289,7 @@ export default function HireVoucherPage() {
     }));
 
     try {
-      if (isEditing && originalVoucher) {
+      if (isEditing && originalVoucher?.vha_no) {
         const keys = {
           vha_no: originalVoucher.vha_no,
           vha_loc: originalVoucher.vha_loc,
@@ -292,10 +298,16 @@ export default function HireVoucherPage() {
         await updateHireVoucher(keys.vha_no, keys.vha_loc, keys.vha_date, header, details);
         showSuccess("Hire voucher updated successfully");
       } else {
-        await createHireVoucher(header, details);
-        setOriginalVoucher(header);
+        const res = await createHireVoucher(header, details);
+        // The server generates vha_no itself and may return a DIFFERENT number
+        // than the one shown in the form (e.g. another user saved in between).
+        // Always trust the server value, otherwise the next Update would target
+        // a voucher that does not exist.
+        const savedNo = res?.data?.vha_no ?? header.vha_no;
+        setOriginalVoucher({ ...header, vha_no: savedNo, vha_loc: header.vha_loc, vha_date: header.vha_date });
+        setForm((prev) => ({ ...prev, vha_no: savedNo }));
         setIsEditing(true);
-        showSuccess("Hire voucher saved successfully");
+        showSuccess(`Hire voucher saved successfully (No: ${savedNo})`);
       }
     } catch (err) {
       showError(err.message || "Failed to save hire voucher");
