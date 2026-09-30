@@ -123,15 +123,18 @@ export default function DeliveryUpdate() {
       const docketData = await fetchDocketByDocketNo(docketNo);
 
       if (docketData && docketData.docket_no) {
-        // Check the manifest unloading table — if the docket is already
-        // unloaded, show a message and do not load anything into the UI.
+        // Check the manifest unloading table — data can only be loaded for
+        // dockets that are present there. If the docket is not unloaded,
+        // show an error and do not load anything into the UI.
         const alreadyUnloaded = await checkDocketUnloaded(docketNo);
-        if (alreadyUnloaded) {
+        if (!alreadyUnloaded) {
           setForm({ ...emptyForm });
           setDlyNoteNo("");
           setDocketNumberInput("");
           setIsDirty(false);
-          showError(`Docket #${docketNo} is already unloaded (present in Manifest Unloading). Data cannot be loaded.`);
+          setSelectedFiles([]);
+          setUploadedPods([]);
+          showError(`Docket #${docketNo} is not unloaded (not present in Manifest Unloading). Data cannot be loaded.`);
           return;
         }
 
