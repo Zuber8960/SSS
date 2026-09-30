@@ -1,731 +1,493 @@
-import { useState, useRef } from "react";
+import { useEffect, useState } from "react";
+import { SaveIcon, RefreshIcon, ClearIcon, NoteAddIcon, EditIcon, DeleteIcon, AddRowIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
-import { IconButton, Tooltip } from "@mui/material";
-import { NoteAddIcon, SaveIcon, ResetIcon, ViewIcon, AddRowIcon, DeleteIcon } from "../../components/common/icons";
-
 import {
-  DataTable,
-  FormField,
-  FormPanel,
   PageBody,
-  PageToolbar,
+  FormPanel,
+  FormField,
+  DataTable,
 } from "../../components/common/MasterPage";
-
-import useAlert from "../../components/common/UseAlert";
-import CommonAlertDialog from "../../components/common/CommonAlertDialog";
-import useLoading from "../../components/common/UseLoading";
-import LoadingOverlay from "../../components/common/LoadingOverlay";
-import vocherimage from "../../images/loogo.PNG";
-
 import {
-  createHireVoucher,
+  fetchLorryByVehicleNo,
+} from "../../utils/lorryMaster";
+import {
+  fetchNextHireVoucherNo,
   fetchHireVoucherByVhvNo,
+  createHireVoucher,
   updateHireVoucher,
 } from "../../utils/hireVoucher";
-
 import { fetchManifestByNo } from "../../utils/manifest";
+import useAlert from "../../components/common/UseAlert";
+import CommonAlertDialog from "../../components/common/CommonAlertDialog";
+import {
+  Box,
+  FormControl,
+  IconButton,
+  Paper,
+  Tooltip,
+  Typography,
+  TextField,
+  InputLabel,
+  Select,
+  MenuItem,
+} from "@mui/material";
 
-// ------------------- IMAGE CONFIG -------------------
-const voucherImage = vocherimage;
-const bgPlaceholder = "/images/logo.png";
+const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiSelect-select": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
 
-const sectionCardStyles = {
-  sectionCard: {
-    background: "#fffefe",
-    borderRadius: 12,
-    border: "1px solid #e9e5f0",
-    boxShadow: "0 2px 12px rgba(126, 34, 206, 0.06)",
-    overflow: "hidden",
-    marginBottom: 16,
-    transition: "box-shadow 0.2s ease",
-  },
-  sectionHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    padding: "14px 20px",
-    background: "linear-gradient(135deg, #f6f3ff 0%, #f0ecf9 100%)",
-    borderBottom: "1px solid #e9e5f0",
-  },
-  sectionIcon: {
-    fontSize: 18,
-    lineHeight: 1,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: 700,
-    color: "#4a3466",
-    textTransform: "uppercase",
-    letterSpacing: 0.1,
-    margin: 0,
-  },
-  sectionFields: {
-    padding: "14px 16px",
-    display: "grid",
-    gap: 12,
-    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-  },
-  fullWidthField: {
-    gridColumn: "1 / -1",
-  },
+function MuiSelect({ label, name, value, onChange, options, disabled = false }) {
+  return (
+    <FormControl fullWidth size="small" sx={fieldSx} disabled={disabled}>
+      <InputLabel>{label}</InputLabel>
+      <Select label={label} size="small" value={value ?? ""} onChange={(e) => onChange(name, e.target.value)} sx={{ fontSize: 13 }}>
+        {options.map((opt) => (
+          <MenuItem key={typeof opt === "object" ? opt.value : opt} value={typeof opt === "object" ? opt.value : opt} sx={{ fontSize: 13 }}>
+            {typeof opt === "object" ? opt.label : opt}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  );
+}
+
+const num = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
 };
 
-// ------------------- HEADER FIELDS -------------------
-const headerFields = [
-  // Vehicle Hire Voucher
-  { label: "VHV No", name: "vhv_no" },
-  { label: "Date", name: "vhv_date", type: "date" },
-  { label: "From Loc", name: "vhv_loc" },
-  { label: "To Loc", name: "vhv_to_loc" },
-  { label: "State", name: "vhv_state" },
-  { label: "City", name: "vhv_city" },
-  { label: "Town", name: "vhv_town" },
-  { label: "Pin", name: "vhv_pin" },
-  { label: "Via1", name: "via1" },
-  { label: "Via2", name: "via2" },
-  { label: "Via3", name: "via3" },
-  { label: "Via4", name: "via4" },
-  { label: "Via5", name: "via5" },
-  { label: "Via6", name: "via6" },
-];
+const fmt = (v) =>
+  num(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// ------------------- FORM SECTIONS (card layout) -------------------
-const formSections = [
-  {
-    title: "Vehicle Hire Voucher",
-    icon: "🚛",
-    fields: ["vhv_no", "vhv_date", "vhv_loc", "vhv_to_loc", "vhv_state", "vhv_city", "vhv_town", "vhv_pin", "via1", "via2", "via3", "via4", "via5", "via6"],
-    half: false,
-    horizontal: true,
-  },
-];
+const emptyVoucherForm = {
+  // ── sss.sst_vha_hdr columns ──
+  vha_no: "",                 // Voucher No (auto generated)
+  vha_date: "",               // Voucher Date
+  vha_type: "",               // Vehicle Ownership (Own / Market / Vendor)
+  vha_sub_type: "",           // Vehicle Type
+  vehicle_regis_no: "",       // Vehicle No
+  vendor_name: "",            // Owner
+  broker_name: "",            // Broker
+  vha_adv_paid_to: "",        // Payment To
 
-// ------------------- DETAIL TABLE COLUMNS (sst_vha_dtl - Manifest Docket Data) -------------------
-const detailColumns = [
-  { key: "mnf_loc", label: "Mnf Loc" },
-  { key: "mnf_no", label: "Mnf No" },
-  { key: "mnf_date", label: "Mnf Date" },
-  { key: "mnf_act_weight", label: "Act Weight", type: "number" },
-  { key: "mnf_chrg_weight", label: "Chrg Weight", type: "number" },
-  { key: "mnf_pkgs_no", label: "Pkgs", type: "number" },
-  { key: "mnf_cns_no", label: "Cns No", type: "number" },
-];
+  vha_loc: "",                // From Location
+  vha_to_loc: "",             // To Location
+  vha_via_loc_1: "",          // Via 1
+  vha_via_loc_2: "",          // Via 2
+  dwb_actual_weight: "",      // Actual Weight (Kg)
+  vha_guarantee_weight: "",   // Guaranteed Weight (Kg)
+  vha_rate_uom: 1,            // Rate Type (numeric UOM code: 1=Fixed, 2=Per Kg, 3=Per Ton, 4=Per Trip)
+  vha_rate_per_uom: "",       // Rate (₹)
 
-// ------------------- MANIFEST DETAILS TABLE COLUMNS -------------------
-const manifestColumns = [
-  { key: "manifest_no", label: "Manifest No" },
-  { key: "manifest_date", label: "Date" },
-  { key: "from_loc", label: "From Loc" },
-  { key: "to_loc", label: "To Loc" },
-  { key: "vehicle_no", label: "Vehicle No" },
-  { key: "driver_name", label: "Driver Name" },
-];
+  vha_hire_amt: "",           // Total Hire (₹)
+  vha_loading_amt: "",        // Loading (₹)
+  vha_dc_amt: "",             // Other Charges (₹)
+  vha_advance_total: "",      // Advance (₹)
+  vha_tds_amt: "",            // TDS (₹)
 
-const emptyForm = {
-  vhv_no: "",
-  vhv_date: "",
-  vhv_loc: "",
-  vhv_to_loc: "",
-  vhv_state: "",
-  vhv_city: "",
-  vhv_town: "",
-  vhv_pin: "",
-  via1: "",
-  via2: "",
-  via3: "",
-  via4: "",
-  via5: "",
-  via6: "",
+  vha_advance_diesel: "",     // Advance Diesel (₹)
+  vha_dtn_amt: "",            // Other Charges (₹)
+  vha_advance_cash: "",       // Advance Cash (₹)
+
+  vha_remarks: "",            // Loading Remarks
 };
 
-// ------------------- DESIGN / HEADER IMAGE -------------------
-const headerDesignStyle = {
-  container: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "20px 24px",
-    background: "linear-gradient(135deg, #7e22ce 0%, #a855f7 50%, #c084fc 100%)",
-    borderRadius: 16,
-    marginBottom: 24,
-    color: "#ffffff",
-    position: "relative",
-    overflow: "hidden",
-    boxShadow: "0 4px 20px rgba(126, 34, 206, 0.3)",
-  },
-  overlay: {
-    position: "absolute",
-    top: -20,
-    right: -20,
-    width: 180,
-    height: 180,
-    borderRadius: "50%",
-    background: "rgba(255,255,255,0.08)",
-    pointerEvents: "none",
-  },
-  overlay2: {
-    position: "absolute",
-    bottom: -30,
-    left: -10,
-    width: 120,
-    height: 120,
-    borderRadius: "50%",
-    background: "rgba(255,255,255,0.05)",
-    pointerEvents: "none",
-  },
-  textContainer: {
-    zIndex: 1,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: 800,
-    margin: 0,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-  },
-  subtitle: {
-    fontSize: 14,
-    fontWeight: 400,
-    margin: "6px 0 0 0",
-    opacity: 0.9,
-  },
-  imageContainer: {
-    zIndex: 1,
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    background: "rgba(255,255,255,0.15)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 6,
-    boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-    objectFit: "contain",
-    borderRadius: 8,
-  },
+const emptyManifestRow = {
+  mnf_no: "",          // Manifest No
+  mnf_date: "",        // Manifest Date
+  mnf_loc: "",         // Manifest Loc
+  mnf_act_weight: "",  // Actual Weight
+  mnf_cns_no: "",      // No. of CNs
+  mnf_pkgs_no: "",     // No. of Pkgs
 };
 
-// ------------------- COMPONENT -------------------
+
 export default function HireVoucherPage() {
-  const { dialog, closeAlert, showSuccess, showError, showInfo } = useAlert();
-  const { isLoading, showLoading, hideLoading } = useLoading();
+  const [form, setForm] = useState(emptyVoucherForm);
+  const [manifestRows, setManifestRows] = useState([]);
+  const [originalVoucher, setOriginalVoucher] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const { dialog, closeAlert, showSuccess, showError, showWarning } = useAlert();
 
-  const [form, setForm] = useState({ ...emptyForm });
-  const [details, setDetails] = useState([]);
-  const [manifestDetails, setManifestDetails] = useState([]);
-  const [manifestCache, setManifestCache] = useState({});
-
-  // Mode: "create" | "edit"
-  const [mode, setMode] = useState("create");
-  // Toggle: when true, VHV No field is enabled for user to type
-  const [searchMode, setSearchMode] = useState(false);
-
-  // Store original composite key for updates
-  const originalKey = useRef(null);
-
-  // ------------------- DETAIL ROW HANDLERS (sst_vha_dtl) -------------------
-  const addRow = () => {
-    setDetails([
-      ...details,
-      {
-        mnf_loc: "",
-        mnf_no: "",
-        mnf_date: "",
-        mnf_act_weight: "",
-        mnf_chrg_weight: "",
-        mnf_pkgs_no: "",
-        mnf_cns_no: "",
-      },
-    ]);
+  const updateField = (name, value) => {
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const deleteRow = (row) => {
-    setDetails((prev) => prev.filter((r) => r !== row));
+  const clearForm = () => {
+    setForm({ ...emptyVoucherForm, vha_date: today() });
+    setManifestRows([]);
+    setOriginalVoucher(null);
+    setIsEditing(false);
   };
 
-  const updateRow = (index, field, value) => {
-    const updated = [...details];
-    updated[index][field] = value;
-    setDetails(updated);
-  };
+  // Voucher date is auto generated (creation date)
+  const today = () => new Date().toISOString().slice(0, 10);
 
-  const handleCellChange = (rowIndex, key, value) => {
-    updateRow(rowIndex, key, value);
-  };
+  // Load next voucher no + today's date at mount (both auto generated)
+  useEffect(() => {
+    setForm((prev) => ({ ...prev, vha_date: prev.vha_date || today() }));
+    fetchNextHireVoucherNo()
+      .then((next) => {
+        const nextNo = next?.vha_no ?? next?.hv_no ?? "";
+        if (nextNo) setForm((prev) => (prev.vha_no ? prev : { ...prev, vha_no: nextNo }));
+      })
+      .catch((err) => console.error("Fetch next voucher no error:", err));
+  }, []);
 
-  // ------------------- MANIFEST DETAILS HANDLERS -------------------
-  const addManifestRow = () => {
-    setManifestDetails([
-      ...manifestDetails,
-      {
-        manifest_no: "",
-        manifest_date: "",
-        from_loc: "",
-        to_loc: "",
-        vehicle_no: "",
-        driver_name: "",
-      },
-    ]);
-  };
+  // ── Derived (sss.sst_vha_hdr computed columns) ──
+  const grossAmount = num(form.vha_hire_amt) + num(form.vha_loading_amt) + num(form.vha_dc_amt);
+  const balance = grossAmount - num(form.vha_advance_total);
+  const netAdvance = num(form.vha_advance_total) - num(form.vha_tds_amt);
 
-  const deleteManifestRow = (row) => {
-    setManifestDetails((prev) => prev.filter((r) => r !== row));
-  };
+  const totalAdvance = num(form.vha_advance_diesel) + num(form.vha_advance_cash);
+  const totalDeductions = num(form.vha_tds_amt);
+  const netPayable = grossAmount - totalAdvance - totalDeductions;
 
-  const updateManifestRow = (index, field, value) => {
-    const updated = [...manifestDetails];
-    updated[index][field] = value;
-    setManifestDetails(updated);
-  };
-
-  // When manifest_no changes, fetch details from API and auto-fill the row
-  const fetchAndFillManifest = async (index, manifestNo) => {
-    if (!manifestNo) return;
-    try {
-      showLoading();
-      let manifestData = manifestCache[manifestNo];
-      if (!manifestData) {
-        manifestData = await fetchManifestByNo(manifestNo);
-        if (manifestData) {
-          setManifestCache((prev) => ({ ...prev, [manifestNo]: manifestData }));
+  // Autofill owner/vendor info from Vehicle Master (sss.ssm_vehicle_master)
+  const handleVehicleNoKeyDown = async (e) => {
+    if (e.key === "Enter" || e.key === "Tab") {
+      const vno = form.vehicle_regis_no?.trim();
+      if (!vno) return;
+      try {
+        const data = await fetchLorryByVehicleNo(vno);
+        if (data) {
+          setForm((prev) => ({
+            ...prev,
+            vehicle_regis_no: data.vehicle_no ?? vno,
+            vha_type: data.vehicle_ownership ?? prev.vha_type,
+            vha_sub_type: data.vehicle_type ?? prev.vha_sub_type,
+            vendor_name: data.owner_name ?? prev.vendor_name,
+          }));
+          setOriginalVoucher(data);
+          showSuccess("Owner details loaded from Lorry Master");
         }
+      } catch (err) {
+        showError(err.message || "Failed to fetch lorry details");
+        console.error("Fetch lorry by vehicle no error:", err);
       }
-      if (!manifestData || !manifestData.header) {
-        showError("Manifest not found");
+    }
+  };
+
+  // Edit / View: load hire voucher by vha_no
+  const handleEditView = async () => {
+    const vno = form.vha_no?.trim();
+    if (!vno) {
+      showError("Please enter a Voucher Number first");
+      return;
+    }
+    try {
+      const data = await fetchHireVoucherByVhvNo(vno);
+      if (!data?.header) {
+        showWarning("Voucher not found. Creating a new entry.");
+        setIsEditing(false);
+        setOriginalVoucher(null);
         return;
       }
-      const hdr = manifestData.header;
-      setManifestDetails((prev) => {
-        const upd = [...prev];
-        if (upd[index]) {
-          upd[index] = {
-            ...upd[index],
-            manifest_date: hdr.mnf_date ? hdr.mnf_date.substring(0, 10) : "",
-            from_loc: hdr.mnf_loc || "",
-            to_loc: hdr.mnf_to_loc || "",
-            vehicle_no: hdr.desp_veh_no || "",
-            driver_name: hdr.loaded_by || "",
-          };
-        }
-        return upd;
-      });
-
-        // Populate a single aggregated row from all manifest docket rows
-        const dtls = manifestData.details || [];
-        if (dtls.length > 0) {
-          const totalActWeight = dtls.reduce((sum, dtl) => sum + (parseFloat(dtl?.dwb_actual_wt) || 0), 0);
-          const totalChrgWeight = dtls.reduce((sum, dtl) => sum + (parseFloat(dtl?.dwb_charged_wt) || 0), 0);
-          const totalPkgs = dtls.reduce((sum, dtl) => sum + (parseFloat(dtl?.dwb_pkgs) || 0), 0);
-          const totalCnsNo = dtls.reduce((sum, dtl) => sum + (parseFloat(dtl?.dwb_no) || 0), 0);
-          setDetails((prev) => [
-            ...prev,
-            {
-              mnf_loc: hdr.mnf_loc || "",
-              mnf_no: hdr.mnf_no || "",
-              mnf_date: hdr.mnf_date ? hdr.mnf_date.substring(0, 10) : "",
-              mnf_act_weight: totalActWeight || "",
-              mnf_chrg_weight: totalChrgWeight || "",
-              mnf_pkgs_no: totalPkgs || "",
-              mnf_cns_no: totalCnsNo || "",
-            },
-          ]);
-        }
-    } catch (err) {
-      showError(err.message || "Failed to fetch manifest details");
-      console.error("Fetch manifest error:", err);
-    } finally {
-      hideLoading();
-    }
-  };
-
-  const handleManifestCellChange = (rowIndex, key, value) => {
-    updateManifestRow(rowIndex, key, value);
-    if (key === "manifest_no") {
-      fetchAndFillManifest(rowIndex, value);
-    }
-  };
-
-  // ------------------- MAP HELPERS -------------------
-  const mapFormToHeader = () => ({
-    vha_no: form.vhv_no,
-    vha_date: form.vhv_date || null,
-    vha_loc: form.vhv_loc,
-    vha_to_loc: form.vhv_to_loc,
-    vha_to_loc_state: form.vhv_state,
-    vha_to_loc_city: form.vhv_city,
-    vha_to_loc_town: form.vhv_town,
-    vha_to_loc_pincode: form.vhv_pin,
-    vha_via_loc_1: form.via1,
-    vha_via_loc_2: form.via2,
-    vha_via_loc_3: form.via3,
-    vha_via_loc_4: form.via4,
-    vha_via_loc_5: form.via5,
-    vha_via_loc_6: form.via6,
-  });
-
-  const mapDetailsToDb = () =>
-    details
-      .filter((row) => row.mnf_cns_no)
-      .map((row) => ({
-        mnf_loc: row.mnf_loc || "",
-        mnf_no: row.mnf_no || "",
-        mnf_date: row.mnf_date || null,
-        mnf_act_weight: parseFloat(row.mnf_act_weight) || 0,
-        mnf_chrg_weight: parseFloat(row.mnf_chrg_weight) || 0,
-        mnf_pkgs_no: parseFloat(row.mnf_pkgs_no) || 0,
-        mnf_cns_no: row.mnf_cns_no || "",
-      }));
-
-  const mapHeaderToForm = (hdr) => ({
-    vhv_no: hdr.vha_no || "",
-    vhv_date: hdr.vha_date ? hdr.vha_date.substring(0, 10) : "",
-    vhv_loc: hdr.vha_loc || "",
-    vhv_to_loc: hdr.vha_to_loc || "",
-    vhv_state: hdr.vha_to_loc_state || "",
-    vhv_city: hdr.vha_to_loc_city || "",
-    vhv_town: hdr.vha_to_loc_town || "",
-    vhv_pin: hdr.vha_to_loc_pincode || "",
-    via1: hdr.vha_via_loc_1 || "", 
-    via2: hdr.vha_via_loc_2 || "",
-    via3: hdr.vha_via_loc_3 || "",
-    via4: hdr.vha_via_loc_4 || "",
-    via5: hdr.vha_via_loc_5 || "",
-    via6: hdr.vha_via_loc_6 || "",
-  });
-
-  const mapDetailToForm = (dtl) => ({
-    mnf_loc: dtl.mnf_loc || "",
-    mnf_no: dtl.mnf_no || "",
-    mnf_date: dtl.mnf_date ? dtl.mnf_date.substring(0, 10) : "",
-    mnf_act_weight: dtl.mnf_act_weight ?? "",
-    mnf_chrg_weight: dtl.mnf_chrg_weight ?? "",
-    mnf_pkgs_no: dtl.mnf_pkgs_no ?? "",
-    mnf_cns_no: dtl.mnf_cns_no || "",
-  });
-
-  // ------------------- FETCH & LOAD BY VHV NO (for edit/view) -------------------
-  const fetchAndLoadByVhvNo = async (vhvNo) => {
-    if (!vhvNo) {
-      showError("Please enter a VHV No to search");
-      return;
-    }
-
-    try {
-      showLoading();
-      const data = await fetchHireVoucherByVhvNo(vhvNo);
-
-      if (!data || !data.header) {
-        showError("No Hire Voucher found for VHV No: " + vhvNo);
-        return false;
-      }
-
       const hdr = data.header;
-      const dtls = data.details || [];
-
-      setForm(mapHeaderToForm(hdr));
-      setDetails(dtls.map(mapDetailToForm));
-
-      // Populate manifest details from saved detail rows
-      if (dtls.length > 0) {
-        const uniqueManifests = [];
-        const seen = new Set();
-        dtls.forEach((dtl) => {
-          const mnfNo = dtl.mnf_no || "";
-          if (mnfNo && !seen.has(mnfNo)) {
-            seen.add(mnfNo);
-            uniqueManifests.push({
-              manifest_no: mnfNo,
-              manifest_date: dtl.mnf_date ? dtl.mnf_date.substring(0, 10) : "",
-              from_loc: dtl.mnf_loc || "",
-              to_loc: "",
-              vehicle_no: "",
-              driver_name: "",
-            });
-          }
-        });
-        setManifestDetails(uniqueManifests);
-      }
-
-      originalKey.current = {
-        hv_loc: hdr.vha_loc || hdr.from_loc || "",
-        hv_date: hdr.vha_date || hdr.hv_date || "",
-      };
-
-      setMode("edit");
-      setSearchMode(false);
-      showInfo("Hire Voucher loaded successfully for VHV No: " + vhvNo);
-      return true;
+      setForm((prev) => ({
+        ...prev,
+        vha_no: hdr.vha_no ?? vno,
+        vha_date: hdr.vha_date ? String(hdr.vha_date).slice(0, 10) : "",
+        vha_type: hdr.vha_type ?? "",
+        vha_sub_type: hdr.vha_sub_type ?? "",
+        vehicle_regis_no: hdr.vehicle_regis_no ?? "",
+        vendor_name: hdr.vendor_name ?? "",
+        broker_name: hdr.broker_name ?? "",
+        vha_adv_paid_to: hdr.vha_adv_paid_to ?? "",
+        vha_loc: hdr.vha_loc ?? "",
+        vha_to_loc: hdr.vha_to_loc ?? "",
+        vha_via_loc_1: hdr.vha_via_loc_1 ?? "",
+        vha_via_loc_2: hdr.vha_via_loc_2 ?? "",
+        dwb_actual_weight: hdr.dwb_actual_weight ?? "",
+        vha_guarantee_weight: hdr.vha_guarantee_weight ?? "",
+        vha_rate_uom: hdr.vha_rate_uom ?? 1,
+        vha_rate_per_uom: hdr.vha_rate_per_uom ?? "",
+        vha_hire_amt: hdr.vha_hire_amt ?? "",
+        vha_loading_amt: hdr.vha_loading_amt ?? "",
+        vha_dc_amt: hdr.vha_dc_amt ?? "",
+        vha_advance_total: hdr.vha_advance_total ?? "",
+        vha_tds_amt: hdr.vha_tds_amt ?? "",
+        vha_advance_diesel: hdr.vha_advance_diesel ?? "",
+        vha_dtn_amt: hdr.vha_dtn_amt ?? "",
+        vha_advance_cash: hdr.vha_advance_cash ?? "",
+        vha_remarks: hdr.vha_remarks ?? "",
+      }));
+      setManifestRows(
+        (Array.isArray(data.details) ? data.details : []).map((d) => ({
+          mnf_no: d.mnf_no ?? "",
+          mnf_date: d.mnf_date ? String(d.mnf_date).slice(0, 10) : "",
+          mnf_loc: d.mnf_loc ?? "",
+          mnf_act_weight: d.mnf_act_weight ?? "",
+          mnf_cns_no: d.mnf_cns_no ?? "",
+          mnf_pkgs_no: d.mnf_pkgs_no ?? "",
+        }))
+      );
+      setOriginalVoucher(hdr);
+      setIsEditing(true);
+      showSuccess("Voucher details loaded for editing");
     } catch (err) {
-      if (err.response?.status === 404) {
-        showError("No Hire Voucher found for VHV No: " + vhvNo);
-      } else {
-        showError(err.message || "Failed to fetch hire voucher by VHV No");
-        console.error("Fetch by VHV No error:", err);
-      }
-      return false;
-    } finally {
-      hideLoading();
+      showError(err.message || "Failed to fetch voucher details");
+      console.error("Fetch voucher error:", err);
     }
   };
 
-  // ------------------- BUTTON HANDLERS -------------------
-  const handleCreateNew = () => {
-    setForm({ ...emptyForm });
-    setDetails([]);
-    setManifestDetails([]);
-    setManifestCache({});
-    originalKey.current = null;
-    setMode("create");
-    setSearchMode(false);
-    showInfo("New hire voucher form ready");
-  };
-
-  const handleEditView = async () => {
-    if (!searchMode) {
-      setMode("view");
-      setSearchMode(true);
-      showInfo("Type the VHV No and press Enter or leave the field to search");
+  const saveForm = async () => {
+    if (!form.vehicle_regis_no?.trim()) {
+      showError("Vehicle Number is required");
       return;
     }
-  };
-
-  const handleVhvNoSearch = async (vhvNo) => {
-    const trimmed = (vhvNo || "").trim();
-
-    if (!trimmed) {
+    if (!form.vha_loc?.trim() || !form.vha_date) {
+      showError("From Location and Voucher Date are required");
       return;
     }
 
-    if (!searchMode) {
-      setSearchMode(true);
-    }
+    // ── Header: exact DB columns of sss.sst_vha_hdr ──
+    const header = {
+      vha_no: form.vha_no,
+      vha_date: form.vha_date || null,
+      vha_type: form.vha_type || null,
+      vha_sub_type: form.vha_sub_type || null,
+      vehicle_regis_no: form.vehicle_regis_no,
+      vendor_name: form.vendor_name || null,
+      broker_name: form.broker_name || null,
+      vha_adv_paid_to: form.vha_adv_paid_to || null,
+      vha_loc: form.vha_loc,
+      vha_to_loc: form.vha_to_loc || "",
+      vha_to_loc_state: "",           // NOT NULL column — defaulted
+      vha_via_loc_1: form.vha_via_loc_1 || null,
+      vha_via_loc_2: form.vha_via_loc_2 || null,
+      dwb_actual_weight: form.dwb_actual_weight ? Number(form.dwb_actual_weight) : null,
+      vha_guarantee_weight: form.vha_guarantee_weight ? Number(form.vha_guarantee_weight) : null,
+      vha_rate_uom: num(form.vha_rate_uom) || null,
+      vha_rate_per_uom: form.vha_rate_per_uom ? Number(form.vha_rate_per_uom) : null,
+      vha_hire_amt: num(form.vha_hire_amt),
+      vha_loading_amt: num(form.vha_loading_amt),
+      vha_dc_amt: num(form.vha_dc_amt),
+      vha_total_amt: grossAmount,
+      vha_advance_diesel: num(form.vha_advance_diesel),
+      vha_dtn_amt: num(form.vha_dtn_amt),
+      vha_advance_cash: num(form.vha_advance_cash),
+      vha_advance_total: totalAdvance || num(form.vha_advance_total),
+      vha_tds_amt: num(form.vha_tds_amt),
+      vha_advance_net: netAdvance,
+      vha_balance_amt: balance,
+      vha_remarks: form.vha_remarks || null,
+    };
 
-    await fetchAndLoadByVhvNo(trimmed);
-  };
-
-  const handleVhvNoKeyDown = async (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      await handleVhvNoSearch(form.vhv_no);
-    }
-  };
-
-  const handleVhvNoBlur = async () => {
-    await handleVhvNoSearch(form.vhv_no);
-  };
-
-  const handleClear = () => {
-    setForm({ ...emptyForm });
-    setDetails([]);
-    setManifestDetails([]);
-    setManifestCache({});
-    originalKey.current = null;
-    setMode("create");
-    setSearchMode(false);
-    showInfo("Form cleared");
-  };
-
-  const handleSave = async () => {
-    // Require at least one manifest detail row with a manifest number
-    const hasManifest = manifestDetails.some((row) => row.manifest_no && row.manifest_no.trim() !== "");
-    if (!hasManifest) {
-      showError("Please add at least one Manifest before saving");
-      return;
-    }
+    // ── Details: exact DB columns of sss.sst_vha_dtl ──
+    const details = manifestRows.map((r) => ({
+      mnf_no: r.mnf_no || null,
+      mnf_date: r.mnf_date || null,
+      mnf_loc: r.mnf_loc || null,
+      mnf_act_weight: r.mnf_act_weight ? Number(r.mnf_act_weight) : null,
+      mnf_cns_no: r.mnf_cns_no ? Number(r.mnf_cns_no) : null,
+      mnf_pkgs_no: r.mnf_pkgs_no ? Number(r.mnf_pkgs_no) : null,
+    }));
 
     try {
-      showLoading();
-
-      const header = mapFormToHeader();
-      const detailRows = mapDetailsToDb();
-
-      if (mode === "create") {
-        const response = await createHireVoucher(header, detailRows);
-        if (response.success) {
-          showSuccess("Hire Voucher saved successfully");
-
-          originalKey.current = {
-            hv_loc: header.from_loc,
-            hv_date: header.hv_date,
-          };
-          setMode("edit");
-        } else {
-          showError(response.message || "Failed to save hire voucher");
-        }
-      } else if (mode === "edit") {
-        if (!originalKey.current) {
-          showError("No hire voucher key found for update");
-          return;
-        }
-        const { hv_loc, hv_date } = originalKey.current;
-        const response = await updateHireVoucher(
-          "",
-          hv_loc,
-          hv_date,
-          header,
-          detailRows
-        );
-        if (response.success) {
-          showSuccess("Hire Voucher updated successfully");
-        } else {
-          showError(response.message || "Failed to update hire voucher");
-        }
+      if (isEditing && originalVoucher) {
+        const keys = {
+          vha_no: originalVoucher.vha_no,
+          vha_loc: originalVoucher.vha_loc,
+          vha_date: originalVoucher.vha_date ? String(originalVoucher.vha_date).slice(0, 10) : form.vha_date,
+        };
+        await updateHireVoucher(keys.vha_no, keys.vha_loc, keys.vha_date, header, details);
+        showSuccess("Hire voucher updated successfully");
+      } else {
+        await createHireVoucher(header, details);
+        setOriginalVoucher(header);
+        setIsEditing(true);
+        showSuccess("Hire voucher saved successfully");
       }
     } catch (err) {
       showError(err.message || "Failed to save hire voucher");
-      console.error("Save hire voucher error:", err);
-    } finally {
-      hideLoading();
+      console.error("Save voucher error:", err);
     }
   };
 
-  // ------------------- RENDER SECTION CARD (matching Docket.jsx pattern) -------------------
-  const fieldMap = {};
-  headerFields.forEach((f) => {
-    fieldMap[f.name] = f;
-  });
+  // ── Manifest rows handlers ──
+  // ── Manifest rows handlers ──
+  const addManifestRow = () => setManifestRows((prev) => [...prev, { ...emptyManifestRow }]);
 
-  const renderFormSection = (section) => {
-    const sectionFieldConfigs = section.fields
-      .map((name) => fieldMap[name])
-      .filter(Boolean);
+  const updateManifestRow = async (idx, field, value) => {
+    // Auto-fill: when user commits a Manifest No (Enter/Tab), fetch it from
+    // sst_mnf_hdr and fill the row; the updated row is returned so the grid
+    // and local state stay in sync. Manifest No is saved to sst_vha_dtl on Save.
+    if (field === "mnf_no" && value?.trim()) {
+      try {
+        const data = await fetchManifestByNo(value.trim());
+        const hdr = data?.header || data;
+        if (hdr) {
+          const filledRow = {
+            ...manifestRows[idx],
+            mnf_no: value,
+            mnf_date: hdr.mnf_date ? String(hdr.mnf_date).slice(0, 10) : "",
+            mnf_loc: hdr.mnf_loc ?? "",
+            mnf_act_weight: hdr.mnf_actual_wt ?? "",
+            mnf_cns_no: hdr.mnf_no_of_dwb ?? "",
+            mnf_pkgs_no: hdr.mnf_no_of_pkgs ?? "",
+          };
+          setManifestRows((prev) => prev.map((r, i) => (i === idx ? filledRow : r)));
+          showSuccess("Manifest details filled from Manifest Master");
+          return filledRow;
+        }
+        showError(`Manifest No "${value}" not found`);
+      } catch (err) {
+        showError(err.message || "Failed to fetch manifest details");
+        console.error("Fetch manifest error:", err);
+      }
+    }
+    setManifestRows((prev) => prev.map((r, i) => (i === idx ? { ...r, [field]: value } : r)));
+  };
 
-    if (sectionFieldConfigs.length === 0) return null;
-
-    // Horizontal layout: display fields in a row with wrapping
-    const horizontalStyle = {
-      padding: "14px 16px",
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 10,
-      alignItems: "flex-start",
-    };
-
-    return (
-      <div key={section.title} style={{ ...sectionCardStyles.sectionCard, gridColumn: section.half ? undefined : "1 / -1" }}>
-        <div style={sectionCardStyles.sectionHeader}>
-          <span style={sectionCardStyles.sectionIcon}>{section.icon}</span>
-          <h4 style={sectionCardStyles.sectionTitle}>{section.title}</h4>
-        </div>
-        <div style={section.horizontal ? horizontalStyle : sectionCardStyles.sectionFields}>
-          {sectionFieldConfigs.map((field) => {
-            const isTextarea = field.type === "textarea";
-            const fieldStyle = {
-              minWidth: 130,
-              flex: "0 1 auto",
-              ...(isTextarea || field.fullWidth ? { flex: "1 1 100%" } : {}),
-            };
-            return (
-              <div
-                key={field.name}
-                style={fieldStyle}
-              >
-                <FormField
-                  {...field}
-                  form={form}
-                  setForm={setForm}
-                  disabled={
-                    (field.name === "vhv_no" && mode === "create" && !searchMode)
-                  }
-                  onKeyDown={field.name === "vhv_no" ? handleVhvNoKeyDown : undefined}
-                  onBlur={field.name === "vhv_no" ? handleVhvNoBlur : undefined}
-                />
-              </div>
-            );
-          })}
-        </div>
-      </div>
+  const deleteManifestRow = (row) => {
+    showWarning("Confirm Delete", "Remove this manifest row?",
+      () => setManifestRows((prev) => prev.filter((r) => r !== row))
     );
   };
 
-  // ------------------- RENDER -------------------
+  const manifestColumns = [
+    { key: "mnf_no", label: "Manifest No.", minWidth: 120, editable: true },
+    { key: "mnf_date", label: "Manifest Date", minWidth: 130, editable: true, type: "string", isDate: true },
+    { key: "mnf_loc", label: "Form Loc", minWidth: 110, editable: true },
+    { key: "mnf_act_weight", label: "Actual Wt.", minWidth: 110, editable: true, type: "number" },
+    { key: "mnf_cns_no", label: "No. of CNs", minWidth: 100, editable: true, type: "number" },
+    { key: "mnf_pkgs_no", label: "No. of Pkgs", minWidth: 110, editable: true, type: "number" },
+  ];
+
+  const sectionStyle = {
+    margin: "10px 0 6px",
+    color: "#1e293b",
+    fontSize: "16px",
+    fontWeight: 700,
+    padding: "6px 0",
+    borderBottom: "2px solid #a855f7",
+    display: "inline-block",
+  };
+
+  const summaryCardSx = (highlight = false) => ({
+    p: 2,
+    borderRadius: "12px",
+    border: highlight ? "2px solid #a855f7" : "1.5px solid #e2e8f0",
+    background: highlight ? "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)" : "#ffffff",
+  });
+
   return (
     <MainLayout>
       <PageBody title="Hire Voucher">
-        {/* ✅ DESIGN HEADER WITH IMAGE */}
-        <div style={headerDesignStyle.container}>
-          <div style={headerDesignStyle.overlay} />
-          <div style={headerDesignStyle.overlay2} />
-          <div style={headerDesignStyle.textContainer}>
-            <h1 style={headerDesignStyle.title}>Hire Voucher</h1>
-            <p style={headerDesignStyle.subtitle}>
-              Lorry hire transaction management
-            </p>
-          </div>
-          <div style={headerDesignStyle.imageContainer}>
-            <img
-              src={voucherImage}
-              alt="Hire Voucher"
-              style={headerDesignStyle.image}
-              onError={(e) => {
-                e.target.src = bgPlaceholder;
-              }}
-            />
-          </div>
-        </div>
-
-        {/* ✅ TOOLBAR */}
         <div className="pageToolbar" style={{ alignItems: "center" }}>
-          <Tooltip title="Create New"><IconButton onClick={handleCreateNew} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}><NoteAddIcon /></IconButton></Tooltip>
-          <Tooltip title="Edit / View"><IconButton onClick={handleEditView} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}><ViewIcon /></IconButton></Tooltip>
-          <Tooltip title="Clear"><IconButton onClick={handleClear} size="small" sx={{ color: "#dc2626", "&:hover": { background: "#fee2e2" } }}><ResetIcon /></IconButton></Tooltip>
-          <Tooltip title="Save"><IconButton onClick={handleSave} size="small" sx={{ color: "#16a34a", "&:hover": { background: "#dcfce7" } }}><SaveIcon /></IconButton></Tooltip>
-
-          <span
-            style={{
-              marginLeft: "auto",
-              fontSize: 13,
-              fontWeight: 600,
-              color: mode === "create" ? "#16a34a" : "#ca8a04",
-              background: mode === "create" ? "#dcfce7" : "#fef9c3",
-              padding: "4px 12px",
-              borderRadius: 12,
-            }}
-          >
-            {mode === "create" ? "CREATE" : searchMode ? "VIEW" : "EDIT"}
-          </span>
+          <Tooltip title="Create New">
+            <IconButton onClick={clearForm} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
+              <NoteAddIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Edit / View">
+            <IconButton
+              onClick={handleEditView}
+              size="small"
+              sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}
+            >
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Clear">
+            <IconButton onClick={clearForm} size="small" sx={{ color: "#dc2626", "&:hover": { background: "#fee2e2" } }}>
+              <ClearIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Save">
+            <IconButton onClick={saveForm} size="small" sx={{ color: "#16a34a", "&:hover": { background: "#dcfce7" } }}>
+              <SaveIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Refresh">
+            <IconButton size="small" onClick={() => showSuccess("Data refreshed")} sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
         </div>
 
-        {/* ✅ HEADER FORM (Card Layout) */}
-        <div
-          style={{
-            background: "#f8f6ff",
-            borderRadius: 14,
-            border: "1px solid #e9e5f0",
-            padding: "1px",
-            boxShadow: "0 2px 12px rgba(126, 34, 206, 0.06)",
-          }}
-        >
-          {formSections.map((section) => renderFormSection(section))}
-        </div>
+        {/* ═══════════ 1. VEHICLE & OWNERSHIP DETAILS ═══════════ */}
+        <h3 style={sectionStyle}>1. Vehicle &amp; Ownership Details</h3>
+        <FormPanel columns={4}>
+          <TextField size="small" label="Vehicle No" fullWidth sx={fieldSx}
+            value={form.vehicle_regis_no} onChange={(e) => updateField("vehicle_regis_no", e.target.value)}
+            onKeyDown={handleVehicleNoKeyDown} placeholder="e.g. HR 55 AB 1234" />
+          <MuiSelect label="Vehicle Ownership" name="vha_type" value={form.vha_type}
+            onChange={updateField} options={["Own", "Market", "Vendor"]} />
+          <MuiSelect label="Vehicle Type" name="vha_sub_type" value={form.vha_sub_type}
+            onChange={updateField} options={["Truck / Trailer / LCV", "Truck", "Trailer", "LCV", "Tipper", "Container"]} />
+          <FormField label="Owner" name="vendor_name" form={form} setForm={setForm} />
+          <FormField label="Broker" name="broker_name" form={form} setForm={setForm} />
+          <MuiSelect label="Payment To" name="vha_adv_paid_to" value={form.vha_adv_paid_to}
+            onChange={updateField} options={["Owner / Broker / Vendor", "Owner", "Broker", "Vendor"]} />
+          <FormField label="Voucher No (Auto generated)" name="vha_no" form={form} setForm={setForm} disabled />
+          <FormField label="Voucher Date (Auto)" name="vha_date" form={form} setForm={setForm} type="date" disabled />
+        </FormPanel>
 
-        {/* ✅ MANIFEST DETAILS TABLE */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            flexWrap: "wrap",
-            marginTop: 24,
-            marginBottom: 12,
-          }}
-        >
-          <h3 style={{ margin: 0, color: "#4a3466" }}>Manifest Details</h3>
-          <PageToolbar
-            actions={[
-              { label: "Add Row", icon: <AddRowIcon />, onClick: addManifestRow },
-            ]}
-          />
-        </div>
+        {/* ═══════════ 2. TRIP & ROUTE DETAILS ═══════════ */}
+        <h3 style={sectionStyle}>2. Trip &amp; Route Details</h3>
+        <FormPanel columns={4}>
+          <FormField label="From Location" name="vha_loc" form={form} setForm={setForm} />
+          <FormField label="To Location" name="vha_to_loc" form={form} setForm={setForm} />
+          <FormField label="Via 1" name="vha_via_loc_1" form={form} setForm={setForm} />
+          <FormField label="Via 2" name="vha_via_loc_2" form={form} setForm={setForm} />
+          <FormField label="Actual Weight (Kg)" name="dwb_actual_weight" form={form} setForm={setForm} type="number" />
+          <FormField label="Guaranteed Weight (Kg)" name="vha_guarantee_weight" form={form} setForm={setForm} type="number" />
+          <MuiSelect label="Rate Type" name="vha_rate_uom" value={form.vha_rate_uom}
+            onChange={updateField} options={[
+              { value: 1, label: "Fixed" },
+              { value: 2, label: "Per Kg" },
+              { value: 3, label: "Per Ton" },
+              { value: 4, label: "Per Trip" },
+            ]} />
+          <FormField label="Rate (₹)" name="vha_rate_per_uom" form={form} setForm={setForm} type="number" />
+        </FormPanel>
 
+
+        {/* ═══════════ 3. HIRE CALCULATION ═══════════ */}
+        <h3 style={sectionStyle}>3. Hire Calculation</h3>
+        <FormPanel columns={4}>
+          <FormField label="Total Hire (₹)" name="vha_hire_amt" form={form} setForm={setForm} type="number" />
+          <FormField label="Loading (₹)" name="vha_loading_amt" form={form} setForm={setForm} type="number" />
+          <FormField label="Other Charges (₹)" name="vha_dc_amt" form={form} setForm={setForm} type="number" />
+          <TextField size="small" label="Gross Amount (₹)" fullWidth sx={fieldSx} disabled
+            value={`₹ ${fmt(grossAmount)}`} />
+          <FormField label="Advance (₹)" name="vha_advance_total" form={form} setForm={setForm} type="number" />
+          <TextField size="small" label="Balance (₹)" fullWidth sx={fieldSx} disabled
+            value={`₹ ${fmt(balance)}`} />
+          <FormField label="TDS (₹)" name="vha_tds_amt" form={form} setForm={setForm} type="number" />
+          <TextField size="small" label="Net Advance (₹)" fullWidth sx={fieldSx} disabled
+            value={`₹ ${fmt(netAdvance)}`} />
+        </FormPanel>
+
+        {/* ═══════════ 4. TRIP EXPENSE / ADVANCE DETAILS ═══════════ */}
+        <h3 style={sectionStyle}>4. Trip Expense / Advance Details</h3>
+        <FormPanel columns={4}>
+          <FormField label="Advance Diesel (₹)" name="vha_advance_diesel" form={form} setForm={setForm} type="number" />
+          <FormField label="Other Charges (₹)" name="vha_dtn_amt" form={form} setForm={setForm} type="number" />
+          <FormField label="Advance Cash (₹)" name="vha_advance_cash" form={form} setForm={setForm} type="number" />
+        </FormPanel>
+
+        {/* ═══════════ 5. LOADING REMARKS ═══════════ */}
+        <h3 style={sectionStyle}>5. Loading Remarks</h3>
+        <FormPanel>
+          <TextField size="small" label="Loading Remarks" fullWidth multiline rows={3} sx={fieldSx}
+            value={form.vha_remarks} onChange={(e) => updateField("vha_remarks", e.target.value)}
+            placeholder="Enter loading instructions, vehicle condition, special instructions, deductions or remarks..." />
+        </FormPanel>
+
+
+        {/* ═══════════ 6. MANIFEST / SHIPMENT DETAILS ═══════════ */}
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1, mt: "10px" }}>
+          <h3 style={{ ...sectionStyle, margin: 0 }}>6. Manifest / Shipment Details</h3>
+          <Tooltip title="Add manifest row">
+            <IconButton onClick={addManifestRow} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
+              <AddRowIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
         <DataTable
           columns={manifestColumns}
-          rows={manifestDetails}
+          rows={manifestRows}
           getKey={(row, index) => index}
           actions={[
             {
@@ -735,47 +497,54 @@ export default function HireVoucherPage() {
             },
           ]}
           editable
-          onCellChange={handleManifestCellChange}
+          singleClick
+          autoHeight
+          onCellChange={(rowIndex, key, value) => updateManifestRow(rowIndex, key, value)}
         />
 
-        {/* ✅ DETAIL TABLE (Existing Vouchers) */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            flexWrap: "wrap",
-            marginTop: 24,
-            marginBottom: 12,
+
+        {/* ═══════════ 7. SETTLEMENT SUMMARY ═══════════ */}
+        <h3 style={sectionStyle}>7. Settlement Summary</h3>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "repeat(1, 1fr)", sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" },
+            gap: 2,
+            mb: 3,
           }}
         >
-          <h3 style={{ margin: 0, color: "#4a3466" }}>Existing Vouchers</h3>
-          <PageToolbar
-            actions={[
-              { label: "Add Row", icon: <AddRowIcon />, onClick: addRow },
-            ]}
-          />
-        </div>
+          <Paper elevation={0} sx={summaryCardSx()}>
+            <Typography sx={{ fontSize: "11px", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>Lorry Hire</Typography>
+            <Typography sx={{ fontSize: "20px", fontWeight: 700, color: "#1e293b" }}>₹ {fmt(grossAmount)}</Typography>
+          </Paper>
+          <Paper elevation={0} sx={summaryCardSx()}>
+            <Typography sx={{ fontSize: "11px", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>Total Advance</Typography>
+            <Typography sx={{ fontSize: "20px", fontWeight: 700, color: "#1e293b" }}>₹ {fmt(totalAdvance)}</Typography>
+          </Paper>
+          <Paper elevation={0} sx={summaryCardSx()}>
+            <Typography sx={{ fontSize: "11px", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>Total Deductions / TDS</Typography>
+            <Typography sx={{ fontSize: "20px", fontWeight: 700, color: "#1e293b" }}>₹ {fmt(totalDeductions)}</Typography>
+          </Paper>
+          <Paper elevation={0} sx={summaryCardSx(true)}>
+            <Typography sx={{ fontSize: "11px", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>Net Payable</Typography>
+            <Typography sx={{ fontSize: "20px", fontWeight: 700, color: "#7e22ce" }}>₹ {fmt(netPayable)}</Typography>
+          </Paper>
+        </Box>
 
-        <DataTable
-          columns={detailColumns}
-          rows={details}
-          getKey={(row, index) => index}
-          actions={[
-            {
-              label: "Delete",
-              icon: <DeleteIcon />,
-              onClick: deleteRow,
-            },
-          ]}
-          editable
-          onCellChange={handleCellChange}
-        />
-
-        <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
-        <LoadingOverlay isLoading={isLoading} message="Please wait..." />
+        {/* ═══════════ SIGNATURES ═══════════ */}
+        <FormPanel columns={4}>
+          <FormField label="Prepared By" name="prepared_by" form={form} setForm={setForm} />
+          <FormField label="Checked By" name="checked_by" form={form} setForm={setForm} />
+          <FormField label="Approved By" name="approved_by" form={form} setForm={setForm} />
+          <FormField label="Owner / Driver Acknowledgment" name="owner_driver_ack" form={form} setForm={setForm} />
+        </FormPanel>
       </PageBody>
+      <CommonAlertDialog
+        dialog={dialog}
+        onClose={closeAlert}
+      />
     </MainLayout>
   );
 }
+
+
