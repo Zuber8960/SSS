@@ -83,12 +83,14 @@ const emptyForm = {
   bp_credit_days: "",
   bp_status: "1",
   bp_closed_on: "",
+  cmf_flag: "N",
 };
 
 const OTHER_FIELDS = [
   { name: "bp_credit_days",     label: "Credit Days",     type: "number" },
   { name: "bp_status",          label: "Status",          type: "select", options: [{ value: "1", label: "Active" }, { value: "0", label: "Inactive" }] },
   { name: "bp_closed_on",       label: "Closed On",       type: "date" },
+  { name: "cmf_flag",           label: "CMF Flag",        type: "select", options: [{ value: "Y", label: "Y" }, { value: "N", label: "N" }] },
 ];
 
 const DOC_TYPE_OPTIONS = ["GST Certificate", "PAN Card", "Aadhaar Card", "MSME/Udyam Certificate", "Trade License", "Other"];
@@ -298,6 +300,7 @@ export default function BusinessPartnerPage() {
     { key: "bp_bank_name", label: "Bank" },
     { key: "loc_code", label: "Location", render: (row) => { const loc = locations.find((l) => String(l.loc_code) === String(row.loc_code)); return loc ? `${loc.loc_code} - ${loc.loc_name}` : (row.loc_code ?? ""); } },
     { key: "bp_status", label: "Status", render: (row) => row.bp_status === "1" || row.bp_status === 1 ? "Active" : row.bp_status === "0" || row.bp_status === 0 ? "Inactive" : "" },
+    { key: "cmf_flag", label: "CMF Flag", render: (row) => (row.cmf_flag === "Y" || row.cmf_flag === "y" || row.cmf_flag === 1 || row.cmf_flag === "1" ? "Y" : "N") },
   ];
 
   const partnerActions = [
