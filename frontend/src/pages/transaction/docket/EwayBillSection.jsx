@@ -19,6 +19,79 @@ import { DataTable } from "../../../components/common/MasterPage";
 import { fetchEwayBillFromDB } from "../../../utils/docket";
 import { getDateFormat } from "../../../utils/tenantService";
 
+// --- EWB helpers (module scope: pure, no props/state access) ---
+
+// A single ewb_no cell may hold several numbers, e.g. "1234,5678".
+const parseEwbNumbers = (value) =>
+  String(value ?? "")
+    .split(",")
+    .map((n) => n.trim())
+    .filter(Boolean);
+
+const toDate = (val) =>
+  val
+    ? moment(val, ["DD/MM/YYYY HH:mm:ss A", "YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD"]).format("MM/DD/YYYY")
+    : "";
+
+const getRecordEwbNo = (rec) => String(rec?.EWB_NO || rec?.ewb_no || "").trim();
+
+const getRecordInvValue = (rec) => parseFloat(rec?.TOTAL_INV_VALUE ?? rec?.invoice_total) || 0;
+
+const eqText = (a, b) =>
+  (a ?? "").toString().trim().toLowerCase() === (b ?? "").toString().trim().toLowerCase();
+
+// Consignor / consignee of an EWB record, preferring the first detail line.
+const getParty = (rec) => {
+  const dtl = Array.isArray(rec?.dtl_rows) ? rec.dtl_rows[0] : null;
+  return {
+    cnor_name: dtl?.FROM_CUST_NAME || rec?.FROM_CUST_NAME || rec?.cnor_name || "",
+    cnee_name: dtl?.TO_CUST_NAME || rec?.TO_CUST_NAME || rec?.cnee_name || "",
+    cnor_city: dtl?.FROM_PLACE || rec?.FROM_PLACE || rec?.cnor_city || "",
+    cnee_city: dtl?.TO_PLACE || rec?.TO_PLACE || rec?.cnee_city || "",
+  };
+};
+
+// Build the full grid-row payload for one EWB record.
+const buildRowFromRecord = (rec, baseRow = {}, ewbNoLabel) => {
+  const dtl = Array.isArray(rec?.dtl_rows) ? rec.dtl_rows[0] : null;
+  return {
+    ...baseRow,
+    rec_id: rec?.rec_id ?? null,
+    ewb_no: ewbNoLabel || rec?.EWB_NO || rec?.ewb_no || baseRow.ewb_no || "",
+    ewb_date: toDate(rec?.EWB_DATE || rec?.ewb_date),
+    ewb_valid: toDate(rec?.EWB_VALID_UPTO || rec?.ewb_valid_upto),
+    inv_no: rec?.INV_NO || rec?.invoice_no || "",
+    inv_date: toDate(rec?.INV_DATE || rec?.invoice_date),
+    cnor_name: dtl?.FROM_CUST_NAME || rec?.FROM_CUST_NAME || rec?.cnor_name || "",
+    cnee_name: dtl?.TO_CUST_NAME || rec?.TO_CUST_NAME || rec?.cnee_name || "",
+    cnor_address: dtl?.FROM_ADDRESS || rec?.FROM_ADDRESS || rec?.cnor_address || "",
+    cnee_address: dtl?.TO_ADDRESS || rec?.TO_ADDRESS || rec?.cnee_address || "",
+    cnor_gstin: dtl?.CNOR_GSTIN || rec?.CNOR_GSTIN || rec?.cnor_gstin || "",
+    cnee_gstin: dtl?.CNEE_GSTIN || rec?.CNEE_GSTIN || rec?.cnee_gstin || "",
+    cnor_pincode: dtl?.FROM_PINCODE || rec?.FROM_PINCODE || rec?.cnor_pincode || "",
+    cnee_pincode: dtl?.TO_PINCODE || rec?.TO_PINCODE || rec?.cnee_pincode || "",
+    cnor_city: dtl?.FROM_PLACE || rec?.FROM_PLACE || rec?.cnor_city || "",
+    cnee_city: dtl?.TO_PLACE || rec?.TO_PLACE || rec?.cnee_city || "",
+    invoice_total: getRecordInvValue(rec),
+    cgst: rec?.CGST_VALUE || rec?.cgst || 0,
+    sgst: rec?.SGST_VALUE || rec?.sgst || 0,
+    igst: rec?.IGST_VALUE || rec?.igst || 0,
+    cess: rec?.cess || 0,
+    product_name: dtl?.PRODUCT_NAME || rec?.PRODUCT_NAME || rec?.product_name || "",
+    hsn_code: dtl?.ITEM_HSN_CODE || rec?.ITEM_HSN_CODE || rec?.hsn_code || "",
+    quantity: dtl?.ITEM_QTY || rec?.ITEM_QTY || rec?.quantity || 0,
+  };
+};
+
+// The grid row id is rec_id once a row is populated, but every callback expects
+// an array index - so map the id back to its position in the list.
+const resolveRowIndex = (id, list) => {
+  if (typeof id === "number" && list[id] && list[id].rec_id == null) return id;
+  const byRecId = list.findIndex((r) => r.rec_id != null && String(r.rec_id) === String(id));
+  if (byRecId >= 0) return byRecId;
+  return typeof id === "number" ? id : -1;
+};
+
 export default function EwayBillSection({
   ewbList,
   onAdd,
@@ -37,7 +110,9 @@ export default function EwayBillSection({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scannerError, setScannerError] = useState("");
   const scannerRef = useRef(null);
-  const tabPressedRef = useRef(false);
+  // Set to true when the user commits the ewb_no cell with Enter or Tab, so
+  // processRowUpdate knows it should resolve the EWB against the API.
+  const commitRef = useRef(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -95,10 +170,18 @@ export default function EwayBillSection({
 
 
   const handleRowUpdate = useCallback(async (newRow, oldRow) => {
+    // The grid row id is rec_id for populated rows, but onCellChange /
+    // onEwbListUpdate expect an array index.
+    const rowIndex = resolveRowIndex(newRow.id, ewbList);
+
+    // Only resolve against the API when the cell was committed with Enter/Tab.
+    const shouldFetch = commitRef.current;
+    commitRef.current = false; // Always reset immediately
+
     if (newRow.ewb_no === oldRow.ewb_no) {
       Object.keys(newRow).forEach((key) => {
         if (key !== "id" && newRow[key] !== oldRow[key]) {
-          onCellChange(newRow.id, key, newRow[key]);
+          onCellChange(rowIndex, key, newRow[key]);
         }
       });
       return newRow;
@@ -107,123 +190,162 @@ export default function EwayBillSection({
     const ewbNo = String(newRow.ewb_no).trim();
     if (!ewbNo) return newRow;
 
-    // Only fetch data if Tab key was pressed
-    const shouldFetch = tabPressedRef.current;
-    tabPressedRef.current = false; // Always reset immediately
-
     if (!shouldFetch) {
-      // Even if Tab wasn't pressed, update the cell value to preserve the input
-      onCellChange(newRow.id, "ewb_no", ewbNo);
+      // Not committed with Enter/Tab - just keep what the user typed
+      onCellChange(rowIndex, "ewb_no", ewbNo);
       return newRow;
     }
 
-    const isDuplicate = ewbList.some(
-      (row, idx) => idx !== newRow.id && String(row.ewb_no).trim() === ewbNo
-    );
-    if (isDuplicate) {
-      showError(`EWB number ${ewbNo} is already added`);
+    // Numbers typed in this cell (a cell may hold "1234,5678")
+    const currentEwbNumbers = parseEwbNumbers(ewbNo);
+    if (currentEwbNumbers.length === 0) {
+      showError(`Invalid EWB number format: ${ewbNo}`);
       return oldRow;
     }
 
+    // Numbers already present on the other grid rows
+    const otherRows = ewbList
+      .map((row, idx) => ({ row, idx }))
+      .filter(({ idx }) => idx !== rowIndex);
+    const otherEwbNumbers = otherRows.flatMap(({ row }) => parseEwbNumbers(row.ewb_no));
+
+    // The same EWB must not appear on two rows (nor twice in one cell)
+    const duplicate = currentEwbNumbers.find((n) => otherEwbNumbers.includes(n));
+    if (duplicate) {
+      showError(`EWB number ${duplicate} is already added`);
+      return oldRow;
+    }
+    if (new Set(currentEwbNumbers).size !== currentEwbNumbers.length) {
+      showError(`Duplicate EWB number in ${ewbNo}`);
+      return oldRow;
+    }
+
+    // Every EWB on the grid is resolved together, in one API call
+    const uniqueEwbNumbers = [...new Set([...otherEwbNumbers, ...currentEwbNumbers])];
+
     try {
-      // Collect all EWB numbers from all rows in the grid (including current row)
-      const allEwbNumbers = [];
-      ewbList.forEach((row) => {
-        const nums = String(row.ewb_no || "")
-          .split(',')
-          .map(n => Number(n.trim()))
-          .filter(n => !isNaN(n));
-        allEwbNumbers.push(...nums);
-      });
-
-      // Also add EWB numbers from current row if they're new
-      const currentEwbNumbers = String(ewbNo)
-        .split(',')
-        .map(n => Number(n.trim()))
-        .filter(n => !isNaN(n));
-      allEwbNumbers.push(...currentEwbNumbers);
-
-      // Remove duplicates
-      const uniqueEwbNumbers = [...new Set(allEwbNumbers)];
-
-      if (uniqueEwbNumbers.length === 0) {
-        showError(`Invalid EWB number format: ${ewbNo}`);
-        return oldRow;
-      }
-
-      // Fetch all EWB numbers at once
-      let ewbApi = (await fetchEwayBillFromDB(uniqueEwbNumbers))?.data;
+      const ewbApi = (await fetchEwayBillFromDB(uniqueEwbNumbers))?.data;
       const { apiCalls, docketData } = ewbApi || {};
-      let records = ewbApi?.data || ewbApi || [];
-      if (!records || records.length === 0) {
+      const records = ewbApi?.data || ewbApi || [];
+      if (!Array.isArray(records) || records.length === 0) {
         showError(`EWB number(s) ${ewbNo} do not exist`);
         return oldRow;
       }
 
-      if (records.length && !apiCalls) {
-        const docketCount = records.filter((r) => r.docket_no).length;
-        if (docketCount === records.length) {
-          showError(`EWB number ${ewbNo} is already attached to docket ${records[0].docket_no}`);
+      // Index the response by EWB number so every row can find its record
+      const recordByNo = new Map();
+      records.forEach((rec) => {
+        const no = getRecordEwbNo(rec);
+        if (no && !recordByNo.has(no)) recordByNo.set(no, rec);
+      });
+
+      // Every number on the grid must exist, and none may already be in use
+      const missing = uniqueEwbNumbers.filter((n) => !recordByNo.has(n));
+      if (missing.length) {
+        showError(`EWB number(s) ${missing.join(", ")} do not exist`);
+        return oldRow;
+      }
+
+      if (!apiCalls) {
+        const attached = uniqueEwbNumbers
+          .map((n) => recordByNo.get(n))
+          .find((rec) => rec.docket_no);
+        if (attached) {
+          showError(`EWB number ${getRecordEwbNo(attached)} is already attached to docket ${attached.docket_no}`);
           return oldRow;
         }
       }
 
-      // Find the matching record for the current row's EWB number
-      let r = records.find((record) => {
-        const recordEwbNo = String(record.EWB_NO || record.ewb_no || "").trim();
-        return currentEwbNumbers.some(num => String(num) === recordEwbNo);
+      // Build the populated row for every EWB already on the grid
+      const populatedByIndex = new Map();
+      otherRows.forEach(({ row, idx }) => {
+        const nums = parseEwbNumbers(row.ewb_no);
+        // A cell can hold several numbers: merge the data of all of them
+        const matched = nums.map((n) => recordByNo.get(n)).filter(Boolean);
+        if (!matched.length) return;
+        populatedByIndex.set(idx, {
+          ...buildRowFromRecord(matched[0], row),
+          ewb_no: nums.join(","),
+          invoice_total: matched.reduce((sum, rec) => sum + getRecordInvValue(rec), 0),
+        });
       });
 
-      // If no exact match found, prefer a record without docket_no, otherwise take first
-      if (!r) {
-        if (!apiCalls) {
-          r = records.find((rec) => !rec.docket_no) || records[0];
-        } else {
-          r = records[0];
-        }
-      }
-
-      const toDate = (val) =>
-        val ? moment(val, ["DD/MM/YYYY HH:mm:ss A", "YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD"]).format("MM/DD/YYYY") : "";
-
-      const dtl = Array.isArray(r.dtl_rows) ? r.dtl_rows[0] : null;
-
+      // The row being edited, merged over all numbers it holds
+      const currentMatches = currentEwbNumbers.map((n) => recordByNo.get(n));
+      const r = currentMatches[0];
       const populated = {
-        ...newRow,
-        rec_id: r.rec_id ?? null,
-        ewb_no: r.EWB_NO || r.ewb_no || ewbNo,
-        ewb_date: toDate(r.EWB_DATE || r.ewb_date),
-        ewb_valid: toDate(r.EWB_VALID_UPTO || r.ewb_valid_upto),
-        inv_no: r.INV_NO || r.invoice_no || "",
-        inv_date: toDate(r.INV_DATE || r.invoice_date),
-        cnor_name: dtl?.FROM_CUST_NAME || r.FROM_CUST_NAME || r.cnor_name || "",
-        cnee_name: dtl?.TO_CUST_NAME || r.TO_CUST_NAME || r.cnee_name || "",
-        cnor_address: dtl?.FROM_ADDRESS || r.FROM_ADDRESS || r.cnor_address || "",
-        cnee_address: dtl?.TO_ADDRESS || r.TO_ADDRESS || r.cnee_address || "",
-        cnor_gstin: dtl?.CNOR_GSTIN || r.CNOR_GSTIN || r.cnor_gstin || "",
-        cnee_gstin: dtl?.CNEE_GSTIN || r.CNEE_GSTIN || r.cnee_gstin || "",
-        cnor_pincode: dtl?.FROM_PINCODE || r.FROM_PINCODE || r.cnor_pincode || "",
-        cnee_pincode: dtl?.TO_PINCODE || r.TO_PINCODE || r.cnee_pincode || "",
-        cnor_city: dtl?.FROM_PLACE || r.FROM_PLACE || r.cnor_city || "",
-        cnee_city: dtl?.TO_PLACE || r.TO_PLACE || r.cnee_city || "",
-        invoice_total: r.TOTAL_INV_VALUE || r.invoice_total || 0,
-        cgst: r.CGST_VALUE || r.cgst || 0,
-        sgst: r.SGST_VALUE || r.sgst || 0,
-        igst: r.IGST_VALUE || r.igst || 0,
-        cess: r.cess || 0,
-        product_name: dtl?.PRODUCT_NAME || r.PRODUCT_NAME || r.product_name || "",
-        hsn_code: dtl?.ITEM_HSN_CODE || r.ITEM_HSN_CODE || r.hsn_code || "",
-        quantity: dtl?.ITEM_QTY || r.ITEM_QTY || r.quantity || 0,
+        ...buildRowFromRecord(r, newRow, ewbNo),
+        invoice_total: currentMatches.reduce((sum, rec) => sum + getRecordInvValue(rec), 0),
       };
+      populatedByIndex.set(rowIndex, populated);
+
+      // Cross-check consignor / consignee across every EWB on the grid
+      const reference = getParty(r);
+      const mismatches = [];
+      populatedByIndex.forEach((row) => {
+        [
+          ["Consignor Name", row.cnor_name, reference.cnor_name],
+          ["Consignor Town", row.cnor_city, reference.cnor_city],
+          ["Consignee Name", row.cnee_name, reference.cnee_name],
+          ["Consignee Town", row.cnee_city, reference.cnee_city],
+        ].forEach(([label, value, expected]) => {
+          if (value && expected && !eqText(value, expected)) {
+            mismatches.push(
+              `EWB ${parseEwbNumbers(row.ewb_no).join(", ")} - ${label}: expected "${expected}", got "${value}"`
+            );
+          }
+        });
+      });
+
+      if (mismatches.length > 0) {
+        showError(mismatches.join("\n"), "Consignor / Consignee Mismatch");
+        return oldRow;
+      }
 
       if (docketData?.bpWarnings?.length && showInfo) {
         showInfo(docketData.bpWarnings.join("\n"), "Business Partner Warning");
       }
 
+      // One invoice entry per EWB number, so the PO & Invoice grid gets a row
+      // for each e-way bill. The value of an EWB is its own invoice value.
+      // Entries are ordered by grid row so the list stays stable across edits.
+      const invoiceRows = [];
+      const seenInvNos = new Set();
+      [...populatedByIndex.keys()].sort((a, b) => a - b).forEach((idx) => {
+        const row = populatedByIndex.get(idx);
+        const nums = parseEwbNumbers(row.ewb_no);
+        if (!nums.length) return;
+        const invNo = row.inv_no || "";
+        // Several EWB numbers can share one invoice number - list it once
+        if (invNo && seenInvNos.has(invNo)) return;
+        if (invNo) seenInvNos.add(invNo);
+        invoiceRows.push({
+          po_no: "",
+          po_date: "",
+          invoice_no: invNo,
+          invoice_date: row.inv_date || "",
+          invoice_value: parseFloat(row.invoice_total) || 0,
+          ewb_no: nums.join(","),
+        });
+      });
+
       if (onDocketPopulate) {
+        // The base PO & Invoice row mirrors invoiceRows[0]; the remaining
+        // entries are passed through as extra rows.
+        const baseInv = invoiceRows[0] || {};
+        const invNo = baseInv.invoice_no ?? populated.inv_no;
+        const invDate = baseInv.invoice_date ?? populated.inv_date;
+        const invValue = baseInv.invoice_value ?? (parseFloat(populated.invoice_total) || 0);
+
         let docketPayload;
         if (docketData) {
-          docketPayload = { ...docketData, ewb_no: docketData.ewb_no || populated.ewb_no };
+          docketPayload = {
+            ...docketData,
+            ewb_no: docketData.ewb_no || populated.ewb_no,
+            invoice_no: docketData.invoice_no || invNo,
+            invoice_date: docketData.invoice_date || invDate,
+            invoice_value: docketData.invoice_value ?? invValue,
+          };
         } else if (r.docket) {
           const dk = r.docket;
           docketPayload = {
@@ -244,9 +366,9 @@ export default function EwayBillSection({
             cnee_pincode:  dk.cnee_pincode  || populated.cnee_pincode,
             cnee_city:     dk.cnee_city     || populated.cnee_city,
             cnee_state:    dk.cnee_state    || "",
-            invoice_no:    dk.docket_inv_no || populated.inv_no,
-            invoice_date:  dk.docket_inv_date ? toDate(dk.docket_inv_date) : populated.inv_date,
-            invoice_value: dk.docket_inv_value ?? populated.invoice_total,
+            invoice_no:    dk.docket_inv_no || invNo,
+            invoice_date:  dk.docket_inv_date ? toDate(dk.docket_inv_date) : invDate,
+            invoice_value: invValue,
           };
         } else {
           docketPayload = {
@@ -261,63 +383,20 @@ export default function EwayBillSection({
             cnee_gstin:    populated.cnee_gstin,
             cnee_pincode:  populated.cnee_pincode,
             cnee_city:     populated.cnee_city,
-            invoice_no:    populated.inv_no,
-            invoice_date:  populated.inv_date,
-            invoice_value: populated.invoice_total,
+            invoice_no:    invNo,
+            invoice_date:  invDate,
+            invoice_value: invValue,
           };
         }
+        // Extra invoice rows (one per additional EWB) for the PO & Invoice grid
+        docketPayload.invoiceRows = invoiceRows;
         const result = onDocketPopulate(docketPayload);
         if (result === false) return oldRow;
       }
-      // Populate all matching rows with their corresponding data
+
+      // Push the matched data into every row that has an EWB number
       if (onEwbListUpdate) {
-        // For the current row, always update with matched record
-        onEwbListUpdate(newRow.id, populated);
-
-        // Also update other rows if their EWB numbers are in the returned records
-        ewbList.forEach((row, idx) => {
-          if (idx !== newRow.id) {
-            const rowEwbNums = String(row.ewb_no || "")
-              .split(',')
-              .map(n => Number(n.trim()))
-              .filter(n => !isNaN(n));
-
-            // Find matching records for this row
-            const matchedRecord = records.find((record) => {
-              const recordEwbNo = String(record.EWB_NO || record.ewb_no || "").trim();
-              return rowEwbNums.some(num => String(num) === recordEwbNo);
-            });
-
-            if (matchedRecord) {
-              const dtl = Array.isArray(matchedRecord.dtl_rows) ? matchedRecord.dtl_rows[0] : null;
-              const rowPopulated = {
-                ...row,
-                rec_id: matchedRecord.rec_id ?? null,
-                ewb_no: matchedRecord.EWB_NO || matchedRecord.ewb_no || row.ewb_no,
-                ewb_date: toDate(matchedRecord.EWB_DATE || matchedRecord.ewb_date),
-                ewb_valid: toDate(matchedRecord.EWB_VALID_UPTO || matchedRecord.ewb_valid_upto),
-                inv_no: matchedRecord.INV_NO || matchedRecord.invoice_no || "",
-                inv_date: toDate(matchedRecord.INV_DATE || matchedRecord.invoice_date),
-                cnor_name: dtl?.FROM_CUST_NAME || matchedRecord.FROM_CUST_NAME || matchedRecord.cnor_name || "",
-                cnee_name: dtl?.TO_CUST_NAME || matchedRecord.TO_CUST_NAME || matchedRecord.cnee_name || "",
-                cnor_address: dtl?.FROM_ADDRESS || matchedRecord.FROM_ADDRESS || matchedRecord.cnor_address || "",
-                cnee_address: dtl?.TO_ADDRESS || matchedRecord.TO_ADDRESS || matchedRecord.cnee_address || "",
-                cnor_gstin: dtl?.CNOR_GSTIN || matchedRecord.CNOR_GSTIN || matchedRecord.cnor_gstin || "",
-                cnee_gstin: dtl?.CNEE_GSTIN || matchedRecord.CNEE_GSTIN || matchedRecord.cnee_gstin || "",
-                cnor_pincode: dtl?.FROM_PINCODE || matchedRecord.FROM_PINCODE || matchedRecord.cnor_pincode || "",
-                cnee_pincode: dtl?.TO_PINCODE || matchedRecord.TO_PINCODE || matchedRecord.cnee_pincode || "",
-                cnor_city: dtl?.FROM_PLACE || matchedRecord.FROM_PLACE || matchedRecord.cnor_city || "",
-                cnee_city: dtl?.TO_PLACE || matchedRecord.TO_PLACE || matchedRecord.cnee_city || "",
-                invoice_total: matchedRecord.TOTAL_INV_VALUE || matchedRecord.invoice_total || 0,
-                cgst: matchedRecord.CGST_VALUE || matchedRecord.cgst || 0,
-                sgst: matchedRecord.SGST_VALUE || matchedRecord.sgst || 0,
-                igst: matchedRecord.IGST_VALUE || matchedRecord.igst || 0,
-                cess: matchedRecord.cess || 0,
-              };
-              onEwbListUpdate(idx, rowPopulated);
-            }
-          }
-        });
+        populatedByIndex.forEach((row, idx) => onEwbListUpdate(idx, row));
       }
 
       if (onShowForm) onShowForm();
@@ -327,7 +406,7 @@ export default function EwayBillSection({
       showError(apiMsg || err.message || `Failed to fetch EWB ${ewbNo}`);
       return oldRow;
     }
-  }, [ewbList, onCellChange, onDocketPopulate, onEwbListUpdate, onShowForm, showError]);
+  }, [ewbList, onCellChange, onDocketPopulate, onEwbListUpdate, onShowForm, showError, showInfo]);
 
   const applyScannedEwb = useCallback(async (ewbNo) => {
     const targetIndex = ewbList.findIndex((row) => !String(row?.ewb_no || "").trim());
@@ -338,6 +417,8 @@ export default function EwayBillSection({
 
     if (targetIndex < 0) onAdd?.();
 
+    // A scan is an implicit Enter - resolve the EWB straight away
+    commitRef.current = true;
     const newRow = { ...baseRow, id: fallbackIndex, ewb_no: ewbNo };
     const updatedRow = await handleRowUpdate(newRow, baseRow);
     if (updatedRow && onEwbListUpdate) onEwbListUpdate(fallbackIndex, updatedRow);
@@ -446,8 +527,9 @@ export default function EwayBillSection({
         onCellChange={handleCellChange}
         onRowUpdate={handleRowUpdate}
         onCellEditStop={(params, event) => {
-          if (params.field === "ewb_no" && event?.key === "Tab") {
-            tabPressedRef.current = true;
+          // Resolve the EWB on both Enter and Tab
+          if (params.field === "ewb_no" && (event?.key === "Tab" || event?.key === "Enter")) {
+            commitRef.current = true;
           }
         }}
         onRowSelectionModelChange={(model) => {

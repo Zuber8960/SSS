@@ -22,7 +22,7 @@ export const ewb_dummy_data = [
             "toTrdName": "TOYOTA MATERIAL HANDLING INDIA PVT. LTD.",
             "toAddr1": "TOYOTA MATERIAL HANDLING INDIA PRIVATE LIMITED",
             "toAddr2": "C/o YUSEN LOGISTICS INDIA PRIVATE LIMITED, VILLAGE UNCHA MAZRA, 19/4/1-7-7,, 4/2 -1-1- 5/1 -616, 5/2",
-            "toPlace": "PATAUDI",
+            "toPlace": "Ludhiana",
             "toPincode": 122503,
             "toStateCode": 6,
             "totalValue": 27487.00,

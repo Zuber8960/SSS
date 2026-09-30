@@ -23,6 +23,14 @@ export const createCharge = (docketId, data) => Api.post(`/docket/${docketId}/ch
 export const updateCharge = (chargeId, data) => Api.put(`/docket/charges/${chargeId}`, data).then(r => r.data.data || r.data);
 export const deleteCharge = (chargeId) => Api.delete(`/docket/charges/${chargeId}`).then(r => r.data);
 
+// sst_docket_inv - one row per invoice, keyed by
+// (docket_no, docket_loc, docket_date, inv_no, inv_date)
+export const fetchDocketInvoices = (docketNo) =>
+  Api.get(`/docket/${encodeURIComponent(docketNo)}/invoices`).then(r => r.data.data || r.data || []);
+export const saveDocketInvoices = (docketNo, header, rows) =>
+  Api.post(`/docket/${encodeURIComponent(docketNo)}/invoices`, { header, rows })
+    .then(r => r.data.data || r.data || []);
+
 export const fetchEwayBillFromDB = (ewbNumbers) => Api.get(`/docket/ewayfile/db/${encodeURIComponent(ewbNumbers?.join(','))}`);
 export const saveEwayBillToDB = (ewbData) => Api.post('/docket/ewayfile/db', ewbData).then(r => r.data.data || r.data || []);
 export const updateEwayBillByRecId = (recId, data) => Api.put(`/docket/ewayfile/db/${encodeURIComponent(recId)}`, data).then(r => r.data.data || r.data);

@@ -156,6 +156,38 @@ router.post('/:docketId/charges', async (req, res) => {
   }
 });
 
+/* ================= DOCKET INVOICES ROUTES (sst_docket_inv) ================= */
+
+router.get('/:docketNo/invoices', async (req, res) => {
+  try {
+    const { docketNo } = req.params;
+    const { tenant_id } = req;
+    const data = await DocketController.getDocketInvoices(docketNo, tenant_id);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Saves the whole PO & Invoice grid: upserts on the composite key and removes
+// any invoice no longer present for the docket.
+router.post('/:docketNo/invoices', async (req, res) => {
+  const trx = await db.transaction();
+  try {
+    const { docketNo } = req.params;
+    const { tenant_id } = req;
+    const { header, rows } = req.body || {};
+    const data = await DocketController.saveDocketInvoices(
+      docketNo, header, rows, tenant_id, trx
+    );
+    await trx.commit();
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    await trx.rollback();
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 /* ================= BP FIND-OR-CREATE ================= */
 
 router.post('/bp/find-or-create', async (req, res) => {

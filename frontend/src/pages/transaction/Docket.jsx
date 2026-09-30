@@ -2,13 +2,15 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { ToggleSwitch } from "../../components/common/MasterPage";
 import { IconButton, Tooltip, Menu, MenuItem, ListItemIcon, ListItemText, Box } from "@mui/material";
 import PrintIcon from "@mui/icons-material/Print";
-import { EditIcon, SaveIcon, ResetIcon, SECTION_ICONS } from "../../components/common/icons";
+import { EditIcon, SaveIcon, ResetIcon, SECTION_ICONS, AddIcon, DeleteIcon } from "../../components/common/icons";
+import { getDateFormat } from "../../utils/tenantService";
 import MainLayout from "../../layouts/MainLayout";
 import moment from "moment";
 import {
   MuiField,
   MuiSelectField,
   PageBody,
+  DataTable,
 } from "../../components/common/MasterPage";
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
@@ -21,6 +23,8 @@ import {
   saveEwayBillToDB,
   updateEwayBillByRecId,
   findOrCreateBp,
+  saveDocketInvoices,
+  fetchDocketInvoices,
 } from "../../utils/docket";
 import { fetchAllLocations, fetchLocationTowns } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
@@ -31,6 +35,13 @@ import { fetchBpByBpName } from "../../utils/businessPartner";
 import { fetchAllMaterialGroups, fetchAllMaterialSubGroups } from "../../utils/materialGroup";
 import ChargesSection from "./docket/ChargesSection";
 import EwayBillSection from "./docket/EwayBillSection";
+
+// Normalise a form date to the YYYY-MM-DD the DB expects
+const toDbDateValue = (val) => {
+  if (!val) return null;
+  const m = moment(val, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"], true);
+  return m.isValid() ? m.format("YYYY-MM-DD") : null;
+};
 
 const headerFields = [
   { label: "Cnor Name", name: "cnor_name" },
@@ -203,6 +214,10 @@ const formSections = [
     fields: ["po_no", "po_date", "invoice_no", "invoice_date", "invoice_value"],
     half: true,
     columns: 4,
+    addable: true,
+    // Spans two grid boxes so the DataTable gets room to breathe; this also
+    // pushes the sections after it down onto the next row.
+    span: 2,
   },
   {
     title: "Insurance Details",
@@ -327,6 +342,9 @@ export default function DocketPage() {
   const { isLoading, showLoading, hideLoading, withLoading } = useLoading();
   const [dirtyFields, setDirtyFields] = useState(new Set());
   const [bpSuggestions, setBpSuggestions] = useState({});
+  // Additional PO & Invoice rows (row 0 stays bound to the persisted form fields)
+  const [extraPoInvoiceRows, setExtraPoInvoiceRows] = useState([]);
+  const poInvoiceRowIdRef = useRef(0);
   const searchTimeoutRef = useRef(null);
   const prevLocRef = useRef({ docket_loc: "", docket_to_loc: "" });
   const ewbPopulatedRef = useRef({ cnor: false, cnee: false });
@@ -687,6 +705,21 @@ export default function DocketPage() {
         }
       }
 
+      // sst_docket_inv requires inv_no and inv_date on every row
+      const invoiceRowsToSave = poInvoiceRows.filter(
+        (r) => String(r.invoice_no ?? "").trim() || String(r.invoice_value ?? "").trim() !== ""
+      );
+      for (const r of invoiceRowsToSave) {
+        if (!String(r.invoice_no ?? "").trim()) {
+          showError("Invoice No is required for every PO & Invoice row");
+          return;
+        }
+        if (!r.invoice_date) {
+          showError(`Invoice Date is required for invoice ${r.invoice_no}`);
+          return;
+        }
+      }
+
       // Map form field names → DB column names
       const formToDb = {
         docket_no:           "docket_no",
@@ -858,6 +891,26 @@ export default function DocketPage() {
         setEwbList((prev) => prev.map((r) => ({ ...r, docket_no: savedDocketNo })));
       }
 
+      // Save the PO & Invoice grid to sst_docket_inv (one row per invoice)
+      if (savedDocketNo && invoiceRowsToSave.length > 0) {
+        await saveDocketInvoices(
+          savedDocketNo,
+          {
+            docket_loc: form.docket_loc,
+            docket_date: toDbDateValue(form.docket_date),
+            user_code: currentUser?.user_code ?? currentUser?.rec_id ?? null,
+            company_code: currentUser?.company_code ?? null,
+          },
+          invoiceRowsToSave.map((r) => ({
+            inv_no: String(r.invoice_no ?? "").trim(),
+            inv_date: toDbDateValue(r.invoice_date),
+            inv_value: r.invoice_value,
+            po_no: r.po_no,
+            po_date: toDbDateValue(r.po_date),
+          }))
+        );
+      }
+
       if (isNewDocket) {
         setForm((prev) => ({ ...prev, docket_no: savedDocketNo }));
         setDocketNumberInput(savedDocketNo || "");
@@ -960,6 +1013,27 @@ export default function DocketPage() {
             prepare_date:        toDate(docketData.prepare_date),
           };
           setDirtyFields(new Set());
+          setExtraPoInvoiceRows([]);
+          setBaseEwbNo("");
+          // Load the saved invoice rows for this docket
+          try {
+            const invRows = await fetchDocketInvoices(docketData.docket_no);
+            if (invRows?.length) {
+              setExtraPoInvoiceRows(
+                invRows.map((r, i) => ({
+                  rowId: `poinv_${i + 1}`,
+                  po_no: "",
+                  po_date: "",
+                  invoice_no: r.inv_no ?? "",
+                  invoice_date: toDbDateValue(r.inv_date) ?? "",
+                  invoice_value: r.inv_value ?? "",
+                }))
+              );
+            }
+          } catch (invErr) {
+            // Non-blocking: the docket still opens if the invoice grid fails
+            console.error("Fetch docket invoices error:", invErr);
+          }
           // Update prevLocRef before setForm so the location-change effect
           // doesn't treat the loaded locations as a "change" and wipe cnor/cnee fields.
           prevLocRef.current = {
@@ -987,6 +1061,8 @@ export default function DocketPage() {
       setDocketExists(false);
       setDocketRecId(null);
       setDirtyFields(new Set());
+      setExtraPoInvoiceRows([]);
+      setBaseEwbNo("");
       ewbPopulatedRef.current = { cnor: false, cnee: false };
       setForm(emptyForm);
       setEwbNoDisplay("");
@@ -1041,6 +1117,92 @@ export default function DocketPage() {
     },
   };
 
+  // ---------------- PO & Invoice DataTable rows ----------------
+  // Row 0 is a live view of the persisted form fields (po_no, po_date,
+  // invoice_no, invoice_date, invoice_value) so saving/loading stays intact.
+  // Rows added via the Add button are UI-only until a child-table endpoint
+  // exists, so they live in local state.
+  const poInvoiceFieldNames = ["po_no", "po_date", "invoice_no", "invoice_date", "invoice_value"];
+
+  const fmtPoDate = (val) => {
+    if (!val) return "";
+    const m = moment(val, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"], true);
+    return m.isValid() ? m.format(getDateFormat()) : String(val);
+  };
+
+  const emptyPoInvoiceRow = () => ({
+    rowId: `poinv_${poInvoiceRowIdRef.current++}`,
+    po_no: "",
+    po_date: "",
+    invoice_no: "",
+    invoice_date: "",
+    invoice_value: "",
+  });
+
+  // Base row mirrors the form fields; the rest come from local state.
+  // ewb_no is kept alongside so each row shows the e-way bill it came from;
+  // it is not a persisted form field.
+  const [baseEwbNo, setBaseEwbNo] = useState("");
+  const poInvoiceRows = useMemo(() => {
+    const base = { rowId: "poinv_base", ewb_no: baseEwbNo };
+    poInvoiceFieldNames.forEach((n) => { base[n] = form[n] ?? ""; });
+    return [base, ...extraPoInvoiceRows];
+  }, [form, extraPoInvoiceRows, baseEwbNo]);
+
+  const handleAddPoInvoiceRow = () => {
+    setExtraPoInvoiceRows((prev) => [...prev, emptyPoInvoiceRow()]);
+  };
+
+  const handleRemovePoInvoiceRow = (rowId) => {
+    if (rowId === "poinv_base") {
+      // Clearing row 0 clears the persisted fields
+      setForm((prev) => {
+        const next = { ...prev };
+        poInvoiceFieldNames.forEach((n) => { next[n] = ""; });
+        return next;
+      });
+      setDirtyFields((prev) => new Set([...prev, ...poInvoiceFieldNames]));
+      return;
+    }
+    setExtraPoInvoiceRows((prev) => prev.filter((r) => r.rowId !== rowId));
+  };
+
+  // DataTable calls onCellChange(rowId, key, value)
+  const handlePoInvoiceCellChange = (rowId, name, value) => {
+    if (rowId === "poinv_base") {
+      setForm((prev) => ({ ...prev, [name]: value }));
+      setDirtyFields((prev) => new Set(prev).add(name));
+      return { ...poInvoiceRows[0], [name]: value };
+    }
+    setExtraPoInvoiceRows((prev) =>
+      prev.map((r) => (r.rowId === rowId ? { ...r, [name]: value } : r))
+    );
+    const row = extraPoInvoiceRows.find((r) => r.rowId === rowId);
+    return row ? { ...row, [name]: value } : undefined;
+  };
+
+  const poInvoiceColumns = [
+    // Read-only: shows which e-way bill an invoice row came from
+    { key: "ewb_no", label: "EWB No", minWidth: 170 },
+    { key: "po_no", label: "PO No", minWidth: 190, editable: isFormEditMode },
+    { key: "po_date", label: "PO Date", minWidth: 170, editable: isFormEditMode, isDate: true, render: (row) => fmtPoDate(row.po_date) },
+    { key: "invoice_no", label: "Invoice No", minWidth: 190, editable: isFormEditMode },
+    { key: "invoice_date", label: "Invoice Date", minWidth: 170, editable: isFormEditMode, isDate: true, render: (row) => fmtPoDate(row.invoice_date) },
+    { key: "invoice_value", label: "Invoice Value", minWidth: 170, editable: isFormEditMode, type: "number" },
+  ];
+
+  const poInvoiceActions = [
+    { label: "Delete", icon: <DeleteIcon fontSize="small" />, onClick: (row) => handleRemovePoInvoiceRow(row.rowId) },
+  ];
+
+  // Total invoice value across the base row + any added rows, so the charges
+  // grid reacts to every row. Plain reduce (no memo) - the React Compiler
+  // cannot preserve a memo over the dynamic base row, and this is cheap.
+  const totalInvoiceValue = poInvoiceRows.reduce(
+    (sum, r) => sum + (parseFloat(r.invoice_value) || 0),
+    0
+  );
+
   // Render a single form section card
   const renderFormSection = (section) => {
     const sectionFieldConfigs = section.fields
@@ -1074,6 +1236,7 @@ export default function DocketPage() {
     const isCnee = section.title === "Consignee Details";
     const prefix = isCnor ? "cnor" : "cnee";
     const isPackageDetails = section.title === "Package Details";
+    const isPoInvoice = section.title === "PO & Invoice";
 
     const renderFieldInput = (field) => {
       const isTextarea = field.type === "textarea";
@@ -1310,10 +1473,39 @@ export default function DocketPage() {
       : filteredFields;
 
     return (
-      <div key={section.title} style={{ ...sectionCardStyles.sectionCard, gridColumn: section.half ? undefined : "1 / -1" }}>
+      <div
+        key={section.title}
+        style={{
+          ...sectionCardStyles.sectionCard,
+          gridColumn: section.span
+            ? `span ${section.span}`
+            : section.half
+              ? undefined
+              : "1 / -1",
+        }}
+      >
         <div style={sectionCardStyles.sectionHeader}>
           <span style={sectionCardStyles.sectionIcon}>{section.icon}</span>
           <h4 style={sectionCardStyles.sectionTitle}>{section.title}</h4>
+          {section.addable && (
+            <Tooltip title={isFormEditMode ? "Add PO / Invoice row" : "Click Edit to add rows"}>
+              <span style={{ marginLeft: "auto", display: "inline-flex" }}>
+                <IconButton
+                  onClick={handleAddPoInvoiceRow}
+                  disabled={!isFormEditMode}
+                  size="small"
+                  sx={{
+                    background: "#7c3aed",
+                    color: "#fff",
+                    "&:hover": { background: "#6d28d9" },
+                    "&.Mui-disabled": { background: "#d8ccef", color: "#fff" },
+                  }}
+                >
+                  <AddIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+          )}
         </div>
         <div style={{
           ...sectionCardStyles.sectionFields,
@@ -1335,6 +1527,21 @@ export default function DocketPage() {
                 </div>
               )}
             </>
+          ) : isPoInvoice ? (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <DataTable
+                columns={poInvoiceColumns}
+                rows={poInvoiceRows}
+                getKey={(row) => row.rowId}
+                actions={poInvoiceActions}
+                editable={isFormEditMode}
+                singleClick={isFormEditMode}
+                // 3 visible rows: 3 * 55 (row) + 42 (header) + 2 (border),
+                // matching DataTable's own ROW_HEIGHT/HEADER_HEIGHT constants.
+                isHeight={209}
+                onCellChange={handlePoInvoiceCellChange}
+              />
+            </div>
           ) : (
             filteredFields.map((field) => renderFieldInput(field))
           )}
@@ -1462,6 +1669,27 @@ export default function DocketPage() {
         ['docket_no','docket_date','docket_loc','docket_from_town','docket_to_loc','docket_to_town','cnor_id','cnor_name','cnor_address','cnor_gstin','cnor_pincode','cnor_city','cnor_state','cnee_id','cnee_name','cnee_address','cnee_gstin','cnee_pincode','cnee_city','cnee_state','invoice_no','invoice_date','invoice_value'].forEach(k => s.add(k));
         return s;
       });
+
+      // One PO & Invoice row per e-way bill. The first entry drives the base
+      // row (which mirrors the persisted form fields, set above); the rest are
+      // added as extra rows so two EWB numbers show two invoice rows.
+      if (Array.isArray(docketData.invoiceRows) && docketData.invoiceRows.length > 0) {
+        setBaseEwbNo(docketData.invoiceRows[0].ewb_no ?? "");
+        setExtraPoInvoiceRows(
+          docketData.invoiceRows.slice(1).map((r) => ({
+            rowId: `poinv_${poInvoiceRowIdRef.current++}`,
+            po_no: r.po_no ?? "",
+            po_date: r.po_date ?? "",
+            invoice_no: r.invoice_no ?? "",
+            invoice_date: r.invoice_date ?? "",
+            invoice_value: r.invoice_value ?? "",
+            ewb_no: r.ewb_no ?? "",
+          }))
+        );
+      } else {
+        setExtraPoInvoiceRows([]);
+        setBaseEwbNo("");
+      }
     }
 
   return (
@@ -1549,6 +1777,8 @@ export default function DocketPage() {
                   setEwbNoDisplay("");
                   setIsFormEditMode(false);
                   setDirtyFields(new Set());
+                  setExtraPoInvoiceRows([]);
+                  setBaseEwbNo("");
                   prevLocRef.current = { docket_loc: "", docket_to_loc: "" };
                   ewbPopulatedRef.current = { cnor: false, cnee: false };
                 }}
@@ -1662,7 +1892,7 @@ export default function DocketPage() {
               key="charges"
               ref={chargesRef}
               docketId={form.docket_no}
-              invoiceValue={form.invoice_value}
+              invoiceValue={totalInvoiceValue}
               docketRate={form.rate}
               rateUom={form.rate_uom}
               chargeWeight={form.chrg_wt}

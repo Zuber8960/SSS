@@ -405,6 +405,110 @@ const deleteCharge = async (chargeId, trx = db, tenant_id) => {
   return query.update({ record_status: 1 });
 };
 
+/* ================= DOCKET INVOICES (sst_docket_inv) ================= */
+
+// Normalise any accepted date input to YYYY-MM-DD, or null when unusable
+const normalizeInvDate = (val) => {
+  if (!val) return null;
+  const m = moment(val, ['YYYY-MM-DD', 'MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DDTHH:mm:ss.SSSZ'], true);
+  return m.isValid() ? m.format('YYYY-MM-DD') : null;
+};
+
+const getDocketInvoices = async (docketNo, tenant_id) => {
+  const query = db('sss.sst_docket_inv').where({ docket_no: docketNo });
+  if (tenant_id) query.andWhere({ tenant_id });
+  return query.orderBy('sr_no', 'asc');
+};
+
+// sst_docket_inv has a composite PK (docket_no, docket_loc, docket_date,
+// inv_no, inv_date) and no record_status column, so this upserts on that key
+// and hard-deletes any invoice no longer present for the docket.
+const saveDocketInvoices = async (docketNo, header, rows, tenant_id, trx = db) => {
+  const docketLoc = header?.docket_loc;
+  const docketDate = normalizeInvDate(header?.docket_date);
+  if (!docketNo) throw new Error('Docket number is required to save invoices');
+  if (!docketLoc) throw new Error('Docket location is required to save invoices');
+  if (!docketDate) throw new Error('Docket date is required to save invoices');
+
+  const userCode = header?.user_code || null;
+  const list = Array.isArray(rows) ? rows : [];
+  const kept = [];
+
+  for (let i = 0; i < list.length; i++) {
+    const r = list[i] || {};
+    // inv_no and inv_date are NOT NULL in the table - skip incomplete rows
+    const invNo = String(r.inv_no || r.invoice_no || '').trim();
+    const invDate = normalizeInvDate(r.inv_date || r.invoice_date);
+    if (!invNo || !invDate) continue;
+
+    const key = {
+      docket_no: docketNo,
+      docket_loc: docketLoc,
+      docket_date: docketDate,
+      inv_no: invNo,
+      inv_date: invDate,
+    };
+    kept.push(key);
+
+    const payload = {
+      ...key,
+      sr_no: i + 1,
+      inv_value: r.inv_value === '' || r.inv_value == null ? null : parseFloat(r.inv_value) || 0,
+      tenant_id: tenant_id || r.tenant_id || null,
+      company_code: r.company_code ?? header?.company_code ?? null,
+      division_code: r.division_code ?? header?.division_code ?? null,
+      record_updated_by: userCode,
+      record_updated_on: new Date(),
+    };
+
+    const base = trx('sss.sst_docket_inv').where(key);
+    if (tenant_id) base.andWhere({ tenant_id });
+    const existing = await base.first();
+
+    if (existing) {
+      // Keep the original creator audit fields
+      await trx('sss.sst_docket_inv').where(key).update(payload);
+    } else {
+      await trx('sss.sst_docket_inv').insert({
+        ...payload,
+        record_created_by: userCode,
+        record_created_on: new Date(),
+      });
+    }
+  }
+
+  // Remove invoices that were deleted in the UI
+  const existingQ = trx('sss.sst_docket_inv').where({
+    docket_no: docketNo,
+    docket_loc: docketLoc,
+    docket_date: docketDate,
+  });
+  if (tenant_id) existingQ.andWhere({ tenant_id });
+  const current = await existingQ;
+
+  const isKept = (row) =>
+    kept.some(
+      (k) => k.inv_no === row.inv_no && k.inv_date === normalizeInvDate(row.inv_date)
+    );
+
+  for (const row of current) {
+    if (!isKept(row)) {
+      await trx('sss.sst_docket_inv')
+        .where({
+          docket_no: row.docket_no,
+          docket_loc: row.docket_loc,
+          docket_date: row.docket_date,
+          inv_no: row.inv_no,
+          inv_date: normalizeInvDate(row.inv_date),
+        })
+        .del();
+    }
+  }
+
+  return getDocketInvoices(docketNo, tenant_id);
+};
+
+
 /* ================= EWAY BILL DB OPERATIONS ================= */
 
 const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
@@ -502,9 +606,9 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
             bp_city: ewbDtl?.FROM_PLACE || null,
             bp_pincode: ewbDtl?.FROM_PINCODE ? String(ewbDtl.FROM_PINCODE) : null,
             bp_state: ewbDtl?.FROM_STATE || null,
-            record_status: 0,
+            // record_status: 0,
             tenant_id,
-            aud_date: new Date()
+            // aud_date: new Date()
           }).returning(['record_id', 'bp_name', 'bp_gstin']);
           cnorBp = inserted;
         }
@@ -957,6 +1061,8 @@ module.exports = {
   createCharge,
   updateCharge,
   deleteCharge,
+  getDocketInvoices,
+  saveDocketInvoices,
   getEwayBillFromDB,
   saveEwayBillToDB,
   updateEwayBillByRecId,
