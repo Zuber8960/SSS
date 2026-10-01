@@ -812,7 +812,7 @@ export default function DocketPage() {
         }
       });
       payload.docket_po_date  = null;
-      if (payload.docket_inv_date !== undefined) payload.docket_inv_date = toDbDateValue(payload.docket_inv_date);
+      payload.docket_inv_date = toDbDateValue(form.invoice_date);
       if (isNew) {
         if (payload.docket_act_wt  === undefined || payload.docket_act_wt  === "" || payload.docket_act_wt  === null) payload.docket_act_wt  = Math.max(parseFloat(form.act_wt) || 30, 30);
         if (payload.docket_chrg_wt === undefined || payload.docket_chrg_wt === "" || payload.docket_chrg_wt === null) payload.docket_chrg_wt = Math.max(parseFloat(form.chrg_wt) || 30, 30);
