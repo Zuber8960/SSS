@@ -811,7 +811,7 @@ export default function DocketPage() {
           payload[formToDb[formKey]] = form[formKey];
         }
       });
-      if (payload.docket_po_date  !== undefined) payload.docket_po_date  = toDbDateValue(payload.docket_po_date);
+      payload.docket_po_date  = null;
       if (payload.docket_inv_date !== undefined) payload.docket_inv_date = toDbDateValue(payload.docket_inv_date);
       if (isNew) {
         if (payload.docket_act_wt  === undefined || payload.docket_act_wt  === "" || payload.docket_act_wt  === null) payload.docket_act_wt  = Math.max(parseFloat(form.act_wt) || 30, 30);
@@ -844,8 +844,6 @@ export default function DocketPage() {
           delete payload.docket_no;
         }
         // Create new docket (POST) — backend strips rec_id: -1
-        if (!payload.docket_inv_date) payload.docket_inv_date = null;
-        if (!payload.docket_po_date) payload.docket_po_date = null;
         result = await createDocket(payload);
         savedDocketNo = result?.docket_no;
         isNewDocket = true;
@@ -1187,8 +1185,6 @@ export default function DocketPage() {
   const poInvoiceColumns = [
     // Read-only: shows which e-way bill an invoice row came from
     { key: "ewb_no", label: "EWB No", minWidth: 170 },
-    { key: "po_no", label: "PO No", minWidth: 190, editable: isFormEditMode },
-    { key: "po_date", label: "PO Date", minWidth: 170, editable: isFormEditMode, isDate: true, render: (row) => fmtPoDate(row.po_date) },
     { key: "invoice_no", label: "Invoice No", minWidth: 190, editable: isFormEditMode },
     { key: "invoice_date", label: "Invoice Date", minWidth: 170, editable: isFormEditMode, isDate: true, render: (row) => fmtPoDate(row.invoice_date) },
     { key: "invoice_value", label: "Invoice Value", minWidth: 170, editable: isFormEditMode, type: "number" },
