@@ -166,12 +166,12 @@ const getDocketById = async ({ docket_no, docket_loc, docket_date }, tenant_id) 
 
 const getDocketByRecId = async (rec_id, tenant_id, docketNo) => {
   const query = db('sss.sst_docket as d')
-    .leftJoin('sss.sst_docket_ewb as e', 'd.docket_no', 'e.docket_no')
     .leftJoin('sss.ssm_business_partner as cnor', 'd.cnor_id', 'cnor.record_id')
     .leftJoin('sss.ssm_business_partner as cnee', 'd.cnee_id', 'cnee.record_id')
     .leftJoin('sss.ssm_user as u', db.raw('CAST(d.aud_user AS INTEGER)'), 'u.rec_id')
     .select(
-      'd.*', 'e.ewb_no',
+      'd.*',
+      db.raw(`(SELECT STRING_AGG(ewb_no::text, ', ' ORDER BY ewb_no) FROM sss.sst_docket_ewb WHERE docket_no = d.docket_no) as ewb_no`),
       'cnor.record_id as cnor_id',
       'cnor.bp_name as cnor_name',
       'cnor.bp_addres as cnor_address',
@@ -199,13 +199,13 @@ const getDocketByRecId = async (rec_id, tenant_id, docketNo) => {
 
 const getDocketByNo = async (docket_no, tenant_id) => {
   const query = db('sss.sst_docket as d')
-    .leftJoin('sss.sst_docket_ewb as e', 'd.docket_no', 'e.docket_no')
     .leftJoin('sss.ssm_business_partner as cnor', 'd.cnor_id', 'cnor.record_id')
     .leftJoin('sss.ssm_business_partner as cnee', 'd.cnee_id', 'cnee.record_id')
     .leftJoin('sss.ssm_user as u', db.raw('CAST(d.aud_user AS INTEGER)'), 'u.rec_id')
     .where({ 'd.docket_no': docket_no, 'd.record_status': 0 })
     .select(
-      'd.*', 'e.ewb_no',
+      'd.*',
+      db.raw(`(SELECT STRING_AGG(ewb_no::text, ', ' ORDER BY ewb_no) FROM sss.sst_docket_ewb WHERE docket_no = d.docket_no) as ewb_no`),
       'cnor.record_id as cnor_id',
       'cnor.bp_name as cnor_name',
       'cnor.bp_addres as cnor_address',
@@ -262,6 +262,7 @@ const sanitizeDocketData = (data) => {
   }
   if ('docket_act_wt' in sanitized && sanitized.docket_act_wt === null) sanitized.docket_act_wt = 30;
   if ('docket_chrg_wt' in sanitized && sanitized.docket_chrg_wt === null) sanitized.docket_chrg_wt = 30;
+  if ('docket_po_date' in sanitized && !sanitized.docket_po_date) sanitized.docket_po_date = null;
   // Coerce FK id fields to integer or null
   for (const field of ['cnor_id', 'cnee_id']) {
     if (field in sanitized) {
@@ -454,6 +455,7 @@ const saveDocketInvoices = async (docketNo, header, rows, tenant_id, trx = db) =
       ...key,
       sr_no: i + 1,
       inv_value: r.inv_value === '' || r.inv_value == null ? null : parseFloat(r.inv_value) || 0,
+      ewb_no: r.ewb_no || null,
       tenant_id: tenant_id || r.tenant_id || null,
       company_code: r.company_code ?? header?.company_code ?? null,
       division_code: r.division_code ?? header?.division_code ?? null,

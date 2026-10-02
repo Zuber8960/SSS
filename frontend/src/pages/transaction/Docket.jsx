@@ -615,6 +615,13 @@ export default function DocketPage() {
     fetchAll();
   }, [locations]);
 
+  // Keep the EWB No display box in sync with ewbList when in EWB mode
+  useEffect(() => {
+    if (!withEWB) return;
+    const nos = ewbList.map((r) => r.ewb_no).filter(Boolean);
+    if (nos.length > 0) setEwbNoDisplay(nos.join(", "));
+  }, [ewbList, withEWB]);
+
   const moveSectionToTop = (section) => {
     setSectionOrder((prev) => [section, ...prev.filter((item) => item !== section)]);
   };
@@ -748,9 +755,6 @@ export default function DocketPage() {
         rate_uom:            "docket_rate_uom",
         po_no:               "docket_po_no",
         po_date:             "docket_po_date",
-        invoice_no:          "docket_inv_no",
-        invoice_date:        "docket_inv_date",
-        invoice_value:       "docket_inv_value",
         risk:                "docket_risk",
         insurance_company:   "docket_insurance_co",
         insurance_policy_no: "docket_insurance_no",
@@ -812,7 +816,6 @@ export default function DocketPage() {
         }
       });
       payload.docket_po_date  = null;
-      payload.docket_inv_date = toDbDateValue(form.invoice_date);
       if (isNew) {
         if (payload.docket_act_wt  === undefined || payload.docket_act_wt  === "" || payload.docket_act_wt  === null) payload.docket_act_wt  = Math.max(parseFloat(form.act_wt) || 30, 30);
         if (payload.docket_chrg_wt === undefined || payload.docket_chrg_wt === "" || payload.docket_chrg_wt === null) payload.docket_chrg_wt = Math.max(parseFloat(form.chrg_wt) || 30, 30);
@@ -906,6 +909,7 @@ export default function DocketPage() {
             inv_no: String(r.invoice_no ?? "").trim(),
             inv_date: toDbDateValue(r.invoice_date),
             inv_value: r.invoice_value,
+            ewb_no: r.ewb_no || null,
             po_no: r.po_no,
             po_date: toDbDateValue(r.po_date),
           }))
@@ -997,9 +1001,6 @@ export default function DocketPage() {
             tot_amt:             docketData.docket_tot_amt      ?? "",
             po_no:               docketData.docket_po_no        || "",
             po_date:             toDate(docketData.docket_po_date),
-            invoice_no:          docketData.docket_inv_no       || "",
-            invoice_date:        toDate(docketData.docket_inv_date),
-            invoice_value:       docketData.docket_inv_value    ?? "",
             risk:                docketData.docket_risk         || "",
             insurance_company:   docketData.docket_insurance_co || "",
             insurance_policy_no: docketData.docket_insurance_no || "",
@@ -1023,6 +1024,7 @@ export default function DocketPage() {
               setExtraPoInvoiceRows(
                 invRows.map((r, i) => ({
                   rowId: `poinv_${i + 1}`,
+                  ewb_no: r.ewb_no || "",
                   po_no: "",
                   po_date: "",
                   invoice_no: r.inv_no ?? "",
@@ -1147,6 +1149,8 @@ export default function DocketPage() {
   const poInvoiceRows = useMemo(() => {
     const base = { rowId: "poinv_base", ewb_no: baseEwbNo };
     poInvoiceFieldNames.forEach((n) => { base[n] = form[n] ?? ""; });
+    const baseIsEmpty = poInvoiceFieldNames.every((n) => !base[n]);
+    if (baseIsEmpty && extraPoInvoiceRows.length > 0) return extraPoInvoiceRows;
     return [base, ...extraPoInvoiceRows];
   }, [form, extraPoInvoiceRows, baseEwbNo]);
 
@@ -1183,8 +1187,7 @@ export default function DocketPage() {
   };
 
   const poInvoiceColumns = [
-    // Read-only: shows which e-way bill an invoice row came from
-    { key: "ewb_no", label: "EWB No", minWidth: 170 },
+    ...(ewbNoDisplay ? [{ key: "ewb_no", label: "EWB No", minWidth: 170 }] : []),
     { key: "invoice_no", label: "Invoice No", minWidth: 190, editable: isFormEditMode },
     { key: "invoice_date", label: "Invoice Date", minWidth: 170, editable: isFormEditMode, isDate: true, render: (row) => fmtPoDate(row.invoice_date) },
     { key: "invoice_value", label: "Invoice Value", minWidth: 170, editable: isFormEditMode, type: "number" },
@@ -1487,23 +1490,28 @@ export default function DocketPage() {
           <span style={sectionCardStyles.sectionIcon}>{section.icon}</span>
           <h4 style={sectionCardStyles.sectionTitle}>{section.title}</h4>
           {section.addable && (
-            <Tooltip title={isFormEditMode ? "Add PO / Invoice row" : "Click Edit to add rows"}>
-              <span style={{ marginLeft: "auto", display: "inline-flex" }}>
-                <IconButton
-                  onClick={handleAddPoInvoiceRow}
-                  disabled={!isFormEditMode}
-                  size="small"
-                  sx={{
-                    background: "#7c3aed",
-                    color: "#fff",
-                    "&:hover": { background: "#6d28d9" },
-                    "&.Mui-disabled": { background: "#d8ccef", color: "#fff" },
-                  }}
-                >
-                  <AddIcon fontSize="small" />
-                </IconButton>
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#4a3466" }}>
+                Total Invoices: {totalInvoiceValue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
-            </Tooltip>
+              <Tooltip title={isFormEditMode ? "Add PO / Invoice row" : "Click Edit to add rows"}>
+                <span style={{ display: "inline-flex" }}>
+                  <IconButton
+                    onClick={handleAddPoInvoiceRow}
+                    disabled={!isFormEditMode}
+                    size="small"
+                    sx={{
+                      background: "#7c3aed",
+                      color: "#fff",
+                      "&:hover": { background: "#6d28d9" },
+                      "&.Mui-disabled": { background: "#d8ccef", color: "#fff" },
+                    }}
+                  >
+                    <AddIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </div>
           )}
         </div>
         <div style={{
@@ -1542,7 +1550,17 @@ export default function DocketPage() {
               />
             </div>
           ) : (
-            filteredFields.map((field) => renderFieldInput(field))
+            filteredFields.map((field) => {
+              const isFullWidth = (isCnor || isCnee) && [`${prefix}_name`, `${prefix}_address`].includes(field.name);
+              if (isFullWidth) {
+                return (
+                  <div key={field.name} style={{ gridColumn: "1 / -1" }}>
+                    {renderFieldInput(field)}
+                  </div>
+                );
+              }
+              return renderFieldInput(field);
+            })
           )}
         </div>
       </div>
@@ -1572,7 +1590,6 @@ export default function DocketPage() {
 
       setIsFormEditMode(true);
       setShowForm(true);
-      if (docketData.ewb_no) setEwbNoDisplay(String(docketData.ewb_no));
       if (docketData.docket_no) setDocketNumberInput(docketData.docket_no);
       if (docketData.cnor_name) ewbPopulatedRef.current.cnor = true;
       if (docketData.cnee_name) ewbPopulatedRef.current.cnee = true;
