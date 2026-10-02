@@ -8,7 +8,7 @@ import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
-import { fetchAllDockets, fetchCharges, fetchDocketByDocketNo } from "../../utils/docket";
+import { fetchAllDockets, fetchCharges, fetchDocketByDocketNo, fetchDocketInvoices } from "../../utils/docket";
 import { fetchAllLocations } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { fetchAllUsers } from "../../utils/userAPI";
@@ -442,6 +442,8 @@ export default function DocketReport() {
         ? [{ ewb_no: d.ewb_no || d.eway_bill_no, ewb_valid: d.ewb_valid, vehicle_no: d.desp_veh_no || "" }]
         : [];
 
+      const invoiceRows = await fetchDocketInvoices(d.docket_no);
+
       await printDocketOnDT({
         form,
         charges,
@@ -449,6 +451,7 @@ export default function DocketReport() {
         ewbNoDisplay: d.ewb_no || d.eway_bill_no || "",
         company,
         locations,
+        invoiceRows: Array.isArray(invoiceRows) ? invoiceRows : [],
         copies: ["Consignor Copy", "Consignee Copy", "Lorry Copy", "File Copy"],
       });
     } catch (err) {

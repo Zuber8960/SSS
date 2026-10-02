@@ -16,7 +16,7 @@ const fmtAmt = (val) => {
   return Number.isFinite(n) ? n.toFixed(2) : "0.00";
 };
 
-const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl, copyName }) => {
+const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl, tcQrDataUrl, invoiceRows, copyName }) => {
   const coName = company?.company_name || getTenantConfig()?.tenant_name || "";
   const locAddr = [currentLoc.loc_address, currentLoc.loc_town, currentLoc.loc_state, currentLoc.loc_postal_code].filter(Boolean).join(", ");
   const locPhone = currentLoc.mobile_no || currentLoc.telephone_no || "";
@@ -101,22 +101,6 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
               <td>${fmt(form.chrg_wt)} Kg</td>
             </tr>
             <tr>
-              <td class="detail-label-3inch">Inv No</td>
-              <td>${fmt(form.invoice_no)}</td>
-              <td class="detail-label-3inch">Inv Date</td>
-              <td>${fmtDate(form.invoice_date)}</td>
-            </tr>
-            <tr>
-              <td class="detail-label-3inch">Inv Value</td>
-              <td>${fmt(form.invoice_value)}</td>
-              <td class="detail-label-3inch">E-Way Bill</td>
-              <td>${fmt(printEwbNo)}</td>
-            </tr>
-            <tr>
-              <td class="detail-label-3inch">Valid</td>
-              <td colspan="3">${fmtDate(ewb.ewb_valid)}</td>
-            </tr>
-            <tr>
               <td class="detail-label-3inch">Goods</td>
               <td colspan="3">${fmt(form.goods_desc)}</td>
             </tr>
@@ -125,6 +109,28 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
               <td colspan="3">${fmt(form.remark)}</td>
             </tr>
           </table>
+          <div style="display:flex; gap:3px; align-items:flex-start; margin-top:1px;">
+            <div style="flex:1;">
+              ${(() => {
+                const rows = Array.isArray(invoiceRows) ? invoiceRows : [];
+                return `<table class="inv-table-3inch">
+                  <thead><tr><th>Inv No</th><th>Inv Date</th><th>Inv Value</th><th>EWB No</th></tr></thead>
+                  <tbody>
+                    ${rows.map((r, i) => `<tr>
+                      <td>${fmt(r.inv_no || r.invoice_no)}</td>
+                      <td>${fmtDate(r.inv_date || r.invoice_date)}</td>
+                      <td>${fmt(r.inv_value ?? r.invoice_value)}</td>
+                      <td>${fmt(r.ewb_no || (i === 0 ? printEwbNo : ""))}</td>
+                    </tr>`).join("")}
+                  </tbody>
+                </table>`;
+              })()}
+            </div>
+            ${tcQrDataUrl ? `<div style="flex-shrink:0; text-align:center;">
+              <div style="font-size:6px; font-weight:900; margin-bottom:1px;">T &amp; C</div>
+              <img src="${tcQrDataUrl}" alt="T&C QR" style="width:40px;height:40px;display:block;" />
+            </div>` : ""}
+          </div>
         </div>
 
         <div class="freight-col-3inch">
@@ -199,7 +205,7 @@ const PRINT_CSS_3INCH = `
     page-break-after: always;
     transform: rotate(90deg);
     transform-origin: center;
-    width: fit-content;
+    width: 180mm;
     margin: 130mm auto;
     height: fit-content;
   }
@@ -234,17 +240,20 @@ const PRINT_CSS_3INCH = `
   .main-content-row-3inch { display: flex; gap: 1px; margin-bottom: 0px; align-items: flex-start; }
   .left-col-3inch { flex: 1; }
   .freight-col-3inch { flex: 0.25; margin-top: -22px;}
-  .party-row-3inch { display: flex; gap: 2px; margin-bottom: 1.5px; margin-top: 0px; }
-  .party-box-3inch { flex: 1; border: 0.5px solid #555; padding: 3px 1.5px; font-size: 5px; min-height: 40px; }
-  .party-title-3inch { font-size: 5px; font-weight: 900; background: #e8e8e8; margin: 0px; padding: 0.5px 1.5px; }
-  .party-name-3inch { font-size: 5.5px; font-weight: 900; margin-bottom: 0.3px; }
-  .party-addr-3inch { font-size: 4.5px; font-weight: 800; line-height: 1; margin-bottom: 0.3px; }
-  .party-gstin-3inch { font-size: 4.5px; font-weight: 800; }
+  .party-row-3inch { display: flex; gap: 2px; margin-bottom: 1.5px; margin-top: 0px; align-items: flex-start; }
+  .party-box-3inch { flex: 1; border: 0.5px solid #555; padding: 3px 1.5px; min-height: 40px; overflow: hidden; word-break: break-word; }
+  .party-title-3inch { font-size: 6px; font-weight: 900; background: #e8e8e8; margin: 0px; padding: 0.5px 1.5px; }
+  .party-name-3inch { font-size: 7px; font-weight: 900; margin-bottom: 0.5px; word-break: break-word; }
+  .party-addr-3inch { font-size: 6px; font-weight: 800; line-height: 1.2; margin-bottom: 0.3px; word-break: break-word; }
+  .party-gstin-3inch { font-size: 6px; font-weight: 800; word-break: break-word; }
 
   .details-table-3inch { width: 100%; border-collapse: collapse; font-size: 6px; margin-top: 0px; }
   .details-table-3inch td { border: 0.5px solid #555; padding: 0.5px 2px; font-weight: 800; }
   .detail-label-3inch { background: #e8e8e8; font-weight: 900; width: 22%; }
 
+  .inv-table-3inch { width: auto; border-collapse: collapse; font-size: 6px; }
+  .inv-table-3inch th { border: 0.5px solid #555; padding: 1px 8px; background: #e8e8e8; font-weight: 900; text-align: left; white-space: nowrap; min-width: 30px; }
+  .inv-table-3inch td { border: 0.5px solid #555; padding: 1px 8px; font-weight: 800; white-space: nowrap; min-width: 30px; }
   .charges-table-3inch { width: 100%; border-collapse: collapse; font-size: 6px; }
   .charges-table-3inch th { border: 0.5px solid #555; padding: 0.5px 2px; background: #e8e8e8; font-weight: 900; text-align: left; }
   .charges-table-3inch td { border: 0.5px solid #555; padding: 0.5px 2px; font-weight: 800; }
@@ -262,7 +271,7 @@ const PRINT_CSS_3INCH = `
   .auth-sign-3inch { font-weight: 800; }
 `;
 
-export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, company, locations, copies = ["Consignor Copy"] }) {
+export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, company, locations, copies = ["Consignor Copy"], invoiceRows }) {
   const ewb = ewbList?.[0] || {};
   const printEwbNo = ewb.ewb_no || ewbNoDisplay || "";
 
@@ -294,7 +303,15 @@ export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, co
     }
   }
 
-  const slipData = { form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl };
+  let tcQrDataUrl = "";
+  try {
+    const tcUrl = `${window.location.origin}/common/terms-conditions`;
+    tcQrDataUrl = await QRCode.toDataURL(tcUrl, { width: 50, margin: 1, errorCorrectionLevel: "M" });
+  } catch (e) {
+    console.error("T&C QR generation failed:", e);
+  }
+
+  const slipData = { form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl, tcQrDataUrl, invoiceRows: invoiceRows || [] };
 
   // Company/location details (same as used in the slip HTML) for native payloads
   const coCompany = company?.company_name || getTenantConfig()?.tenant_name || "";

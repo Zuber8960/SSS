@@ -371,6 +371,7 @@ export default function DocketPage() {
       ewbNoDisplay,
       company,
       locations,
+      invoiceRows: poInvoiceRows,
       copies: ["Consignor Copy", "Consignee Copy", "Lorry Copy", "File Copy"],
     });
   };

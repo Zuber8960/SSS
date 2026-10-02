@@ -22,7 +22,7 @@ const fmtAmt = (val) => {
   return Number.isFinite(n) ? n.toFixed(2) : "0.00";
 };
 
-const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, copyLabel, qrDataUrl, tcQrDataUrl }) => {
+const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, copyLabel, qrDataUrl, tcQrDataUrl, invoiceRows }) => {
   console.log(form);
   const tenantConfig = getTenantConfig();
   const logoUrl = tenantConfig?.logo_url || "";
@@ -118,20 +118,6 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
                   <td>${fmt(form.tot_pkgs)} - ${fmt(form.goods_desc || "")}</td>
                 </tr>
                 <tr>
-                  <td class="pkg-label">Inv No</td>
-                  <td class="pkg-label">Inv Date</td>
-                  <td class="pkg-label">Inv Value</td>
-                  <td colspan="2" class="pkg-label">Eway Bill No.</td>
-                  <td colspan="4" class="pkg-label">Expiry</td>
-                </tr>
-                <tr>
-                  <td>${fmt(form.invoice_no || ewb.inv_no)}</td>
-                  <td>${fmtDate(form.invoice_date || ewb.inv_date)}</td>
-                  <td>${fmt(form.invoice_value)}</td>
-                  <td colspan="2">${fmt(printEwbNo)}</td>
-                  <td colspan="4">${fmtDate(ewb.ewb_valid)}</td>
-                </tr>
-                <tr>
                   <td class="pkg-label" colspan="9">Remark</td>
                 </tr>
                 <tr>
@@ -139,15 +125,36 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
                 </tr>
               </tbody>
             </table>
-            <div class="note-block" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
-              <div style="flex: 1;">
-                <strong>NOTE:</strong><br/>
-                * NOT RESPONSIBLE FOR LEAKAGE OR BREAKAGE<br/>
-                * Subject To ${fmt(currentLoc.loc_state || currentLoc.loc_town || "")} Jurisdiction Only.<br/>
-                * Please Make Payment By Cheque In Favour Of ${fmt(coName)}.
+            <div style="display:flex; gap:4px; align-items:flex-start;">
+              <div style="flex:1;">
+                ${(() => {
+                  const rows = (invoiceRows && invoiceRows.length > 0)
+                    ? invoiceRows
+                    : [{ invoice_no: form.invoice_no || ewb.inv_no, invoice_date: form.invoice_date || ewb.inv_date, invoice_value: form.invoice_value, ewb_no: printEwbNo }];
+                  return `<table class="inv-table">
+                <thead>
+                  <tr>
+                    <th>Inv No</th>
+                    <th>Inv Date</th>
+                    <th>Inv Value</th>
+                    <th>EWB No</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows.map((r, i) => `
+                  <tr>
+                    <td>${fmt(r.inv_no || r.invoice_no)}</td>
+                    <td>${fmtDate(r.inv_date || r.invoice_date)}</td>
+                    <td>${fmt(r.inv_value ?? r.invoice_value)}</td>
+                    <td>${fmt(r.ewb_no || (i === 0 ? printEwbNo : ""))}</td>
+                  </tr>`).join("")}
+                </tbody>
+              </table>`;
+                })()}
               </div>
-              ${tcQrDataUrl ? `<div style="text-align: center; min-width: 56px;">
-                <img src="${tcQrDataUrl}" alt="T&C QR" style="width: 50px; height: 50px; display: block;" />
+              ${tcQrDataUrl ? `<div style="flex-shrink:0; text-align:center;">
+                <div style="font-size:7px; font-weight:900; margin-bottom:1px;">T &amp; C</div>
+                <img src="${tcQrDataUrl}" alt="T&C QR" style="width:48px;height:48px;display:block;" />
               </div>` : ""}
             </div>
           </div>
@@ -237,6 +244,11 @@ const PRINT_CSS = `
   .pkg-table td { border: 1px solid #555; padding: 1px 3px; font-weight: 800; }
   .pkg-label { background: #e8e8e8; font-weight: 900; white-space: nowrap; }
   .note-block { font-size: 7.5px; font-weight: 800; border: 1px solid #555; padding: 2px 4px; }
+  .inv-table { width: auto; border-collapse: collapse; font-size: 8px; margin-top: 2px; }
+  .inv-table th { border: 1px solid #555; padding: 1px 4px; background: #e8e8e8; font-weight: 900; text-align: left; white-space: nowrap; }
+  .inv-table td { border: 1px solid #555; padding: 1px 4px; font-weight: 800; white-space: nowrap; }
+  .tc-qr-block { text-align: center; padding-top: 3px; }
+  .tc-label { font-size: 7.5px; font-weight: 900; margin-bottom: 2px; }
   .charges-section { min-width: 115px; }
   .charges-table { width: 100%; border-collapse: collapse; font-size: 8px; }
   .charges-table th { border: 1px solid #555; padding: 1px 3px; background: #e8e8e8; font-weight: 900; }
@@ -276,7 +288,7 @@ const DEFAULT_COPIES = [
  * @param {number|string[]} props.copies     - Number of copies OR array of copy labels.
  *                                             Defaults to ["Consignor Copy","Consignee Copy","Driver Copy"]
  */
-export async function printDocket({ form, charges, ewbList, ewbNoDisplay, company, locations, copies }) {
+export async function printDocket({ form, charges, ewbList, ewbNoDisplay, company, locations, copies, invoiceRows }) {
   const ewb = ewbList?.[0] || {};
   const printEwbNo = ewb.ewb_no || ewbNoDisplay || "";
 
@@ -303,7 +315,7 @@ export async function printDocket({ form, charges, ewbList, ewbNoDisplay, compan
     console.error("T&C QR generation failed:", e);
   }
 
-  const slipData = { form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl, tcQrDataUrl };
+  const slipData = { form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl, tcQrDataUrl, invoiceRows: invoiceRows || [] };
 
   // Resolve copy labels
   let copyLabels;
