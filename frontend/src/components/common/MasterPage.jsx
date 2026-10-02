@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { DataGrid, useGridApiContext, useGridApiRef } from "@mui/x-data-grid";
 import { Box, Button, FormControl, InputLabel, Select, MenuItem, IconButton, TextField, Tooltip } from "@mui/material";
 import { getDateFormat } from "../../utils/tenantService";
@@ -334,6 +334,80 @@ export function DataTable({
   // object reference stays stable between renders — the grid compares the controlled
   // prop BY REFERENCE, and a fresh object each render would reset user selections.
   const controlledSelectionModel = useMemo(() => toRowSelectionModel(rowSelectionModel), [rowSelectionModel]);
+
+  const [columnOrder, setColumnOrder] = useState(() => columns.map((c) => c.key));
+  const dragColRef = useRef(null);
+  const dragOverColRef = useRef(null);
+  const wrapperRef = useRef(null);
+
+  // Keep columnOrder in sync when columns prop changes (e.g. conditional columns)
+  useEffect(() => {
+    setColumnOrder((prev) => {
+      const keys = columns.map((c) => c.key);
+      const existing = prev.filter((k) => keys.includes(k));
+      const added = keys.filter((k) => !prev.includes(k));
+      return [...existing, ...added];
+    });
+  }, [columns]);
+
+  // Attach drag-to-reorder to column header cells via DOM — avoids renderHeader
+  // which can conflict with MUI's internal header text/styling.
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+
+    const onDragStart = (e) => {
+      const header = e.target.closest('.MuiDataGrid-columnHeader[data-field]');
+      if (!header) return;
+      dragColRef.current = header.getAttribute('data-field');
+    };
+    const onDragOver = (e) => {
+      const header = e.target.closest('.MuiDataGrid-columnHeader[data-field]');
+      if (!header) return;
+      e.preventDefault();
+      dragOverColRef.current = header.getAttribute('data-field');
+    };
+    const onDrop = (e) => {
+      const from = dragColRef.current;
+      const to = dragOverColRef.current;
+      dragColRef.current = null;
+      dragOverColRef.current = null;
+      if (!from || !to || from === to) return;
+      setColumnOrder((prev) => {
+        const next = [...prev];
+        const fromIdx = next.indexOf(from);
+        const toIdx = next.indexOf(to);
+        if (fromIdx === -1 || toIdx === -1) return prev;
+        next.splice(fromIdx, 1);
+        next.splice(toIdx, 0, from);
+        return next;
+      });
+    };
+    const onDragEnd = () => { dragColRef.current = null; dragOverColRef.current = null; };
+
+    wrapper.addEventListener('dragstart', onDragStart);
+    wrapper.addEventListener('dragover', onDragOver);
+    wrapper.addEventListener('drop', onDrop);
+    wrapper.addEventListener('dragend', onDragEnd);
+    return () => {
+      wrapper.removeEventListener('dragstart', onDragStart);
+      wrapper.removeEventListener('dragover', onDragOver);
+      wrapper.removeEventListener('drop', onDrop);
+      wrapper.removeEventListener('dragend', onDragEnd);
+    };
+  }, []);
+
+  // Mark header cells as draggable after each render (MUI re-renders them on column change)
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    const headers = wrapper.querySelectorAll('.MuiDataGrid-columnHeader[data-field]');
+    headers.forEach((h) => {
+      h.setAttribute('draggable', 'true');
+      h.style.cursor = 'grab';
+    });
+  });
+
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
     pageSize: 5,
@@ -354,8 +428,13 @@ export function DataTable({
     page: paginationModel.page > lastPage ? lastPage : paginationModel.page,
   };
 
+  const orderedColumns = useMemo(() => {
+    const colMap = Object.fromEntries(columns.map((c) => [c.key, c]));
+    return columnOrder.map((key) => colMap[key]).filter(Boolean);
+  }, [columns, columnOrder]);
+
   const muiColumns = [
-    ...columns.map((col) => ({
+    ...orderedColumns.map((col) => ({
       field: col.key,
       headerName: col.label,
       ...(scroll?.horizontal ? { width: col.minWidth ?? 120 } : { flex: 1, minWidth: col.minWidth ?? 100 }),
@@ -496,6 +575,9 @@ export function DataTable({
     "& .MuiDataGrid-columnSeparator": {
       display: "none",
     },
+    "& .MuiDataGrid-columnHeader:hover .MuiDataGrid-columnSeparator": {
+      display: "flex",
+    },
     "& .MuiDataGrid-cell": {
       borderBottom: "1px solid #f3e8ff",
       borderRight: "1px solid #f3e8ff",
@@ -540,6 +622,7 @@ export function DataTable({
 
   return (
     <div
+      ref={wrapperRef}
       className="dataTableWrapper"
       style={{
         width: "100%",

@@ -25,7 +25,7 @@ import SelectedRowInfo from "../../components/common/SelectedRowInfo";
 import moment from "moment";
 
 const docketColumns = [
-  { key: "docket_no", label: "Docket No", minWidth: 120 },
+  { key: "docket_no", label: "Docket No", minWidth: 160 },
   { key: "docket_date", label: "Docket Date", minWidth: 110 },
   { key: "docket_loc", label: "From Location", minWidth: 120 },
   { key: "docket_pickup_town", label: "From Town", minWidth: 120 },
