@@ -12,7 +12,7 @@ import { fetchAllDockets, fetchCharges, fetchDocketByDocketNo } from "../../util
 import { fetchAllLocations } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { fetchAllUsers } from "../../utils/userAPI";
-import { RefreshIcon, PrintIcon } from "../../components/common/icons";
+import { RefreshIcon, PrintIcon, ExportIcon } from "../../components/common/icons";
 import { IconButton, Tooltip, Button, TextField, Menu, MenuItem, ListItemIcon, ListItemText, Autocomplete, FormControlLabel, Checkbox } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
@@ -56,7 +56,7 @@ const toDate = (val) => {
 };
 
 export default function DocketReport() {
-  const { dialog, closeAlert, showError } = useAlert();
+  const { dialog, closeAlert, showError, showSuccess } = useAlert();
   const { isLoading, showLoading, hideLoading } = useLoading();
 
   const branchCode = (() => {
@@ -361,6 +361,19 @@ export default function DocketReport() {
       return;
     }
     await printStickerFromRow({ row: selectedRow, company });
+  };
+
+  const exportCsv = () => {
+    if (!gridRows.length) { showError("No data to export"); return; }
+    const heads = docketColumns.map((c) => c.label);
+    const rows = gridRows.map((r) => docketColumns.map((c) => r[c.key]));
+    const csv = [heads, ...rows].map((row) => row.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `docket_report_${moment().format("YYYYMMDD_HHmmss")}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url); showSuccess("Export started");
   };
 
   const handleFilterToggle = (filterKey) => {
@@ -778,6 +791,20 @@ export default function DocketReport() {
                 <ListItemText primaryTypographyProps={{ fontSize: 13 }}>Print without Freight</ListItemText>
               </MenuItem>
             </Menu>
+            <Button
+              variant="contained"
+              startIcon={<ExportIcon />}
+              onClick={exportCsv}
+              sx={{
+                background: "linear-gradient(135deg, #1ca562, #119154)",
+                "&:hover": { background: "linear-gradient(135deg, #169d56, #0f7c4b)" },
+                textTransform: "none",
+                fontWeight: 600,
+                borderRadius: 2,
+              }}
+            >
+              Export
+            </Button>
             <Button
               variant="contained"
               startIcon={<PrintIcon />}
