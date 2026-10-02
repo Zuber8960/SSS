@@ -188,6 +188,30 @@ router.post('/:docketNo/invoices', async (req, res) => {
   }
 });
 
+/* ================= DOCKET PACKAGES ROUTES (sst_docket_pkg) ================= */
+
+router.get('/:docketNo/packages', async (req, res) => {
+  try {
+    const { docketNo } = req.params;
+    const { tenant_id } = req;
+    const data = await DocketController.getDocketPackages(docketNo, tenant_id);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.post('/:docketNo/packages', async (req, res) => {
+  try {
+    const { docketNo } = req.params;
+    const { header, rows } = req.body || {};
+    const data = await DocketController.saveDocketPackages(docketNo, header, rows);
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 /* ================= BP FIND-OR-CREATE ================= */
 
 router.post('/bp/find-or-create', async (req, res) => {

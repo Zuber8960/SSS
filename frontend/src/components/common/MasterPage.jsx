@@ -95,9 +95,11 @@ function InstantSelectEditCell({ id, field, value, colDef }) {
       autoFocus
       open={open}
     >
-      {colDef.valueOptions?.map((opt) => (
-        <MenuItem key={opt} value={opt}>{opt}</MenuItem>
-      ))}
+      {colDef.valueOptions?.map((opt) => {
+        const val = typeof opt === "object" ? opt.value : opt;
+        const lbl = typeof opt === "object" ? opt.label : opt;
+        return <MenuItem key={val} value={val}>{lbl}</MenuItem>;
+      })}
     </Select>
   );
 }

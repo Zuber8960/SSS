@@ -511,6 +511,48 @@ const saveDocketInvoices = async (docketNo, header, rows, tenant_id, trx = db) =
 };
 
 
+/* ================= DOCKET PACKAGES (sst_docket_pkg) ================= */
+
+const getDocketPackages = async (docketNo, tenant_id) => {
+  const query = db('sss.sst_docket_pkg')
+    .where({ docket_no: docketNo, record_status: 0 });
+  if (tenant_id) query.andWhere({ tenant_id });
+  return query.orderBy('rec_id', 'asc');
+};
+
+const saveDocketPackages = async (docketNo, header, rows) => {
+  if (!docketNo) throw new Error('Docket number is required to save packages');
+  const docketLoc = header?.docket_loc || null;
+  const docketDate = header?.docket_date || null;
+  const tenantId = header?.tenant_id || null;
+  const companyCode = header?.company_code || null;
+  const audUser = header?.aud_user || null;
+
+  // Delete existing rows for this docket, then bulk-insert the new set
+  await db('sss.sst_docket_pkg').where({ docket_no: docketNo }).del();
+
+  const list = Array.isArray(rows) ? rows : [];
+  if (list.length > 0) {
+    const inserts = list.map((r) => ({
+      docket_no:    docketNo,
+      docket_loc:   docketLoc,
+      docket_date:  docketDate,
+      dim_unit:     r.dim_unit     || null,
+      dim_length:   r.dim_length   != null && r.dim_length   !== '' ? parseFloat(r.dim_length)   : null,
+      dim_breadth:  r.dim_breadth  != null && r.dim_breadth  !== '' ? parseFloat(r.dim_breadth)  : null,
+      dim_height:   r.dim_height   != null && r.dim_height   !== '' ? parseFloat(r.dim_height)   : null,
+      tenant_id:    tenantId,
+      company_code: companyCode,
+      aud_date:     new Date(),
+      aud_user:     audUser,
+      record_status: 0,
+    }));
+    await db('sss.sst_docket_pkg').insert(inserts);
+  }
+
+  return getDocketPackages(docketNo, tenantId);
+};
+
 /* ================= EWAY BILL DB OPERATIONS ================= */
 
 const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
@@ -1065,6 +1107,8 @@ module.exports = {
   deleteCharge,
   getDocketInvoices,
   saveDocketInvoices,
+  getDocketPackages,
+  saveDocketPackages,
   getEwayBillFromDB,
   saveEwayBillToDB,
   updateEwayBillByRecId,
