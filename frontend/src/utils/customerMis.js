@@ -27,7 +27,7 @@ export const fetchCustomerMisSummary = (filters = {}) =>
   Api.get(`/customerMis/summary${qs(filters)}`)
     .then((r) => r.data?.data ?? { total_shipments: 0, total_amount: 0, total_charge_wt: 0, total_packages: 0, distinct_customers: 0 });
 
-/** Distinct customers for the dropdown, as { bp_id, bp_name, bp_gstin }. */
+/** Distinct customers for the dropdown, as { bp_id, bp_name, bp_grp_code, bp_gstin }. */
 export const fetchCustomerMisCustomers = (search = '') =>
   Api.get(`/customerMis/customers${qs({ search })}`).then(unwrap);
 

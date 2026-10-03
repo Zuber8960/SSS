@@ -358,20 +358,22 @@ export default function CustomerMIS() {
                 sx={{ ...filterSx, flex: "1 1 220px", minWidth: 180 }}
               />
             )}
-            {/* Customer dropdown — searchable on both name and code */}
+            {/* Customer dropdown — searchable on BP group code, name and GSTIN */}
             {activeFilters.customer && (
               <Autocomplete
                 size="small"
                 options={customers}
                 value={customer}
                 onChange={(_, val) => setCustomer(val)}
-                getOptionLabel={(opt) => (opt ? opt.bp_name || "" : "")}
+                getOptionLabel={(opt) =>
+                  (opt ? [opt.bp_grp_code, opt.bp_name].filter(Boolean).join(" - ") : "")
+                }
                 filterOptions={(opts, state) => {
                   const input = state.inputValue.toLowerCase();
                   return opts.filter(
                     (o) =>
                       String(o.bp_name ?? "").toLowerCase().includes(input) ||
-                      String(o.bp_gstin ?? "").toLowerCase().includes(input)
+                      String(o.bp_grp_code ?? "").toLowerCase().includes(input)
                   );
                 }}
                 isOptionEqualToValue={(opt, val) => opt?.bp_id === val?.bp_id}
@@ -381,29 +383,32 @@ export default function CustomerMIS() {
                 }}
                 renderOption={(props, opt) => (
                   <li {...props} key={opt.bp_id}>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: PURPLE,
-                        background: PURPLE_SOFT,
-                        border: `1px solid ${PURPLE_LINE}`,
-                        borderRadius: 4,
-                        padding: "1px 6px",
-                        minWidth: 76,
-                        textAlign: "center",
-                        flexShrink: 0,
-                        marginRight: 8,
-                      }}
-                    >
-                      {opt.bp_gstin || "—"}
-                    </span>
-                    <span style={{ fontSize: 13 }}>{opt.bp_name}</span>
+                    {opt.bp_grp_code && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: PURPLE,
+                          background: PURPLE_SOFT,
+                          border: `1px solid ${PURPLE_LINE}`,
+                          borderRadius: 4,
+                          padding: "1px 3px",
+                          minWidth: 56,
+                          textAlign: "center",
+                          flexShrink: 0,
+                          marginRight: 8,
+                        }}
+                      >
+                        {opt.bp_grp_code}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 13, marginRight: 8 }}>{opt.bp_name}</span>
+                    
                   </li>
                 )}
                 sx={{ flex: "1 1 260px", minWidth: 220 }}
                 renderInput={(params) => (
-                  <TextField {...params} placeholder="Customer (Name / Code)" sx={filterSx} />
+                  <TextField {...params} placeholder="Customer (Code / Name / GSTIN)" sx={filterSx} />
                 )}
               />
             )}

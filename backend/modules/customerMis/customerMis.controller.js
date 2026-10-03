@@ -194,6 +194,7 @@ const getCustomerMisCustomers = async ({ search } = {}, tenant_id = null) => {
     .select(
       db.raw('COALESCE(cnor.record_id, cnee.record_id) as bp_id'),
       db.raw('COALESCE(cnor.bp_name, cnee.bp_name) as bp_name'),
+      db.raw('COALESCE(cnor.bp_grp_code, cnee.bp_grp_code) as bp_grp_code'),
       db.raw('COALESCE(cnor.bp_gstin, cnee.bp_gstin) as bp_gstin'),
       db.raw('COUNT(*) as shipment_count')
     )
@@ -203,6 +204,7 @@ const getCustomerMisCustomers = async ({ search } = {}, tenant_id = null) => {
     .groupBy([
       db.raw('COALESCE(cnor.record_id, cnee.record_id)'),
       db.raw('COALESCE(cnor.bp_name, cnee.bp_name)'),
+      db.raw('COALESCE(cnor.bp_grp_code, cnee.bp_grp_code)'),
       db.raw('COALESCE(cnor.bp_gstin, cnee.bp_gstin)'),
     ])
     .orderBy(db.raw('COALESCE(cnor.bp_name, cnee.bp_name)'), 'asc');
@@ -212,6 +214,7 @@ const getCustomerMisCustomers = async ({ search } = {}, tenant_id = null) => {
     const like = `%${search}%`;
     q.andWhere((b) => b
       .whereILike(db.raw('COALESCE(cnor.bp_name, cnee.bp_name)'), like)
+      .orWhereILike(db.raw('COALESCE(cnor.bp_grp_code, cnee.bp_grp_code)'), like)
       .orWhereILike(db.raw('COALESCE(cnor.bp_gstin, cnee.bp_gstin)'), like)
     );
   }
