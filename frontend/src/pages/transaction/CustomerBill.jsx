@@ -175,7 +175,24 @@ export default function CustomerBill() {
       .catch((err) => console.error("Failed to load delivery notes:", err));
   }, []);
 
-  const customerOptions = ["Select Customer", ...partners.map((p) => p.bp_name).filter(Boolean)];
+  // Customer dropdown shows "<bp_grp_code> - <bp_name>" so users can pick by code
+  // as well as name. The option *value* stays the plain bp_name because that is what
+  // form.customer is matched against (selectedCustomer, save/print payloads).
+  // bp_grp_code is not populated for every BP row, so fall back to bp_code and
+  // then record_id for the code part; if none exist just show the name.
+  const customerOptions = useMemo(
+    () => [
+      "Select Customer",
+      ...partners
+        .filter((p) => p.bp_name)
+        .map((p) => {
+          const name = String(p.bp_name).trim();
+          const code = p.bp_grp_code ?? p.bp_code ?? p.record_id ?? "";
+          return { value: p.bp_name, label: code ? `${code} - ${name}` : name };
+        }),
+    ],
+    [partners]
+  );
   const branchOptions = [
     "Select Branch",
     ...locations.map((loc) => `${loc.loc_code} - ${loc.loc_name}`).filter(Boolean),
