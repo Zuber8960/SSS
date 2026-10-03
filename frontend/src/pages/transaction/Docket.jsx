@@ -32,6 +32,7 @@ import { fetchAllLocations, fetchLocationTowns } from "../../utils/locationMaste
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { printDocket } from "../../components/common/DocketPrint";
 import { printSticker } from "./docket/StickerPrint";
+import { printDocketOnDT } from "../reports/docketReport/DocketPrintOnDT";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import { fetchBpByBpName } from "../../utils/businessPartner";
 import { fetchAllMaterialGroups, fetchAllMaterialSubGroups } from "../../utils/materialGroup";
@@ -354,6 +355,7 @@ export default function DocketPage() {
   const ewbPopulatedRef = useRef({ cnor: false, cnee: false });
   const chargesRef = useRef(null);
   const [printAnchor, setPrintAnchor] = useState(null);
+  const [printDtAnchor, setPrintDtAnchor] = useState(null);
 
   const handlePrint = async (withFreight) => {
     if (!form.docket_no) {
@@ -383,6 +385,26 @@ export default function DocketPage() {
       return;
     }
     await printSticker({ form, company });
+  };
+
+  const handlePrintOnDT = async (withFreight) => {
+    if (!form.docket_no) {
+      showError("Please load docket details before printing.");
+      return;
+    }
+    const charges = withFreight ? (chargesRef.current?.getChargeList() ?? []) : [];
+    const pkgRows = await fetchDocketPackages(form.docket_no);
+    await printDocketOnDT({
+      form: { ...form, prepare_by: form.prepare_by || "", prepare_date: form.prepare_date },
+      charges,
+      ewbList,
+      ewbNoDisplay,
+      company,
+      locations,
+      invoiceRows: poInvoiceRows,
+      pkgRows: Array.isArray(pkgRows) ? pkgRows : [],
+      copies: ["Consignor Copy", "Consignee Copy", "Lorry Copy", "File Copy"],
+    });
   };
 
   const calculateVolumetricWeight = (length, breadth, height, unit) => {
@@ -1864,6 +1886,30 @@ export default function DocketPage() {
                 <LocalOfferIcon />
               </IconButton>
             </Tooltip>
+            <Tooltip title="Print on DT">
+              <IconButton
+                onClick={(e) => setPrintDtAnchor(e.currentTarget)}
+                size="small"
+                sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}
+              >
+                <PrintIcon />
+              </IconButton>
+            </Tooltip>
+            <Menu
+              anchorEl={printDtAnchor}
+              open={Boolean(printDtAnchor)}
+              onClose={() => setPrintDtAnchor(null)}
+              anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+            >
+              <MenuItem onClick={() => { setPrintDtAnchor(null); handlePrintOnDT(true); }}>
+                <ListItemIcon><PrintIcon fontSize="small" /></ListItemIcon>
+                <ListItemText primaryTypographyProps={{ fontSize: 13 }}>Print on DT with Freight</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { setPrintDtAnchor(null); handlePrintOnDT(false); }}>
+                <ListItemIcon><PrintIcon fontSize="small" /></ListItemIcon>
+                <ListItemText primaryTypographyProps={{ fontSize: 13 }}>Print on DT without Freight</ListItemText>
+              </MenuItem>
+            </Menu>
           </div>
         </div>
         {/* ✅ Detail Tables */}

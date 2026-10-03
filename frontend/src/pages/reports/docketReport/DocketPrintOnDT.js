@@ -16,7 +16,7 @@ const fmtAmt = (val) => {
   return Number.isFinite(n) ? n.toFixed(2) : "0.00";
 };
 
-const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl, tcQrDataUrl, invoiceRows, copyName }) => {
+const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl, tcQrDataUrl, invoiceRows, pkgRows, copyName }) => {
   const coName = company?.company_name || getTenantConfig()?.tenant_name || "";
   const locAddr = [currentLoc.loc_address, currentLoc.loc_town, currentLoc.loc_state, currentLoc.loc_postal_code].filter(Boolean).join(", ");
   const locPhone = currentLoc.mobile_no || currentLoc.telephone_no || "";
@@ -87,30 +87,49 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
             </div>
           </div>
 
-          <table class="details-table-3inch">
-            <tr>
-              <td class="detail-label-3inch">Delivery Type</td>
-              <td>${fmt(form.dly_type)}</td>
-              <td class="detail-label-3inch">Actual Wt</td>
-              <td>${fmt(form.act_wt)} Kg</td>
-            </tr>
-            <tr>
-              <td class="detail-label-3inch">Packages</td>
-              <td>${fmt(form.tot_pkgs)}</td>
-              <td class="detail-label-3inch">Charged Wt</td>
-              <td>${fmt(form.chrg_wt)} Kg</td>
-            </tr>
-            <tr>
-              <td class="detail-label-3inch">Goods</td>
-              <td colspan="3">${fmt(form.goods_desc)}</td>
-            </tr>
-            <tr>
-              <td class="detail-label-3inch">Remark</td>
-              <td colspan="3">${fmt(form.remark)}</td>
-            </tr>
-          </table>
-          <div style="display:flex; gap:3px; align-items:flex-start; margin-top:1px;">
-            <div style="flex:1;">
+          <div style="display:flex; gap:3px; align-items:flex-start;">
+            <div style="flex:1; min-width:0;"><table class="details-table-3inch">
+              <tr>
+                <td class="detail-label-3inch">Delivery Type</td>
+                <td>${fmt(form.dly_type)}</td>
+                <td class="detail-label-3inch">Actual Wt</td>
+                <td>${fmt(form.act_wt)} Kg</td>
+              </tr>
+              <tr>
+                <td class="detail-label-3inch">Packages</td>
+                <td>${fmt(form.tot_pkgs)}</td>
+                <td class="detail-label-3inch">Charged Wt</td>
+                <td>${fmt(form.chrg_wt)} Kg</td>
+              </tr>
+              ${(() => {
+                const rows = Array.isArray(pkgRows) ? pkgRows : [];
+                if (!rows.length) return "";
+                const unit = rows[0].dim_unit || "";
+                const dimStr = rows
+                  .filter(r => r.dim_length || r.dim_breadth || r.dim_height)
+                  .map(r => {
+                    const fd = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? (n % 1 === 0 ? String(Math.trunc(n)) : String(n)) : "0"; };
+                    return `${r.no_of_pkg || 1}-${fd(r.dim_length)}X${fd(r.dim_breadth)}X${fd(r.dim_height)}`;
+                  })
+                  .join(", ");
+                if (!dimStr) return "";
+                return `<tr>
+                  <td class="detail-label-3inch">DIM${unit ? " (" + unit + ")" : ""}</td>
+                  <td colspan="3">${dimStr}</td>
+                </tr>`;
+              })()}
+              <tr>
+                <td class="detail-label-3inch">Goods</td>
+                <td colspan="3">${fmt(form.goods_desc)}</td>
+              </tr>
+              <tr>
+                <td class="detail-label-3inch">Remark</td>
+                <td colspan="3">${fmt(form.remark)}</td>
+              </tr>
+            </table></div>
+          </div>
+          <div style="display:flex; gap:3px; align-items:stretch; margin-top:1px; margin-bottom:6px;">
+            <div style="flex:1; min-width:0; display:flex; gap:3px; align-items:flex-start;">
               ${(() => {
                 const rows = Array.isArray(invoiceRows) ? invoiceRows : [];
                 return `<table class="inv-table-3inch">
@@ -125,10 +144,14 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
                   </tbody>
                 </table>`;
               })()}
+              <div style="flex:1; min-width:0; border:0.5px dashed #bbb; border-radius:2px; position:relative; overflow:hidden; min-height:36px; display:flex; align-items:flex-end; justify-content:center; padding:2px 3px;">
+                <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-25deg); font-size:9px; font-weight:700; color:rgba(126,34,206,0.10); white-space:nowrap; letter-spacing:1.5px; pointer-events:none;">CargoYaan</div>
+                <div style="font-size:5px; font-weight:600; color:#999; text-align:center; position:relative; z-index:1;">Signature / Stamp</div>
+              </div>
             </div>
             ${tcQrDataUrl ? `<div style="flex-shrink:0; text-align:center;">
-              <div style="font-size:6px; font-weight:900; margin-bottom:1px;">T &amp; C</div>
-              <img src="${tcQrDataUrl}" alt="T&C QR" style="width:40px;height:40px;display:block;" />
+              <div style="font-size:6px; font-weight:600; margin-bottom:1px;">T &amp; C</div>
+              <img src="${tcQrDataUrl}" alt="T&C QR" style="width:50px;height:50px;display:block;" />
             </div>` : ""}
           </div>
         </div>
@@ -189,7 +212,7 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
 const PRINT_CSS_3INCH = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; overflow-x: hidden; }
-  body { font-family: Arial, sans-serif; font-size: 7px; font-weight: 800; background: #fff; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 7px; font-weight: 400; background: #fff; }
   @page { size: 4in 55in portrait; margin: 2mm; }
   @media print {
     body { margin: 0; }
@@ -219,59 +242,71 @@ const PRINT_CSS_3INCH = `
     margin-bottom: 65mm;
   }
 
+  /* ── Header ── */
   .top-section-3inch { display: flex; gap: 2px; margin-bottom: 1.5px; width: 100%; }
   .header-row-3inch { display: flex; justify-content: space-between; align-items: flex-start; flex: 1; padding-bottom: 2px; margin-bottom: 1px; gap: 3px; }
   .logo-col-3inch { display: flex; align-items: center; justify-content: center; min-width: 30px; }
   .co-logo-3inch { max-height: 30px; max-width: 50px; object-fit: contain; }
   .company-block-3inch { flex: 1; }
-  .company-name-3inch { font-size: 8px; font-weight: 900; letter-spacing: 0.2px; margin-bottom: 1px; }
-  .company-addr-3inch { font-size: 6px; font-weight: 800; margin-bottom: 0.5px; }
-  .company-contact-3inch { font-size: 6px; font-weight: 800; margin-bottom: 0.5px; }
+  .company-name-3inch { font-size: 9px; font-weight: 700; letter-spacing: 0.2px; margin-bottom: 1px; }
+  .company-addr-3inch { font-size: 6px; font-weight: 400; margin-bottom: 0.5px; }
+  .company-contact-3inch { font-size: 6px; font-weight: 400; margin-bottom: 0.5px; }
+
+  /* ── Docket number / QR block ── */
   .cn-block-3inch { flex: 0.25; text-align: center; align-self: flex-start; }
-  .cn-title-3inch { font-size: 7px; font-weight: 900; border: 0.5px solid #222; padding: 0.5px 2px; background: #eee; margin-bottom: 1px; }
+  .cn-title-3inch { font-size: 7px; font-weight: 600; border: 0.5px solid #222; padding: 0.5px 2px; background: #eee; margin-bottom: 1px; }
   .cn-qr-3inch { width: 50px; height: 50px; display: block; margin: 1px auto; }
-  .cn-no-3inch { font-size: 10px; font-weight: 900; letter-spacing: 0.3px; margin-bottom: 0.5px; }
-  .cn-date-3inch { font-size: 6px; font-weight: 800; }
+  .cn-no-3inch { font-size: 10px; font-weight: 700; letter-spacing: 0.3px; margin-bottom: 0.5px; }
+  .cn-date-3inch { font-size: 6px; font-weight: 400; }
 
-  .route-table-3inch { width: 80%; border-collapse: collapse; margin-bottom: 0px; font-size: 6px; }
-  .route-table-3inch th { border: 0.5px solid #555; padding: 0.5px 2px; text-align: left; background: #e8e8e8; font-weight: 900; }
-  .route-table-3inch td { border: 0.5px solid #555; padding: 0.5px 2px; text-align: left; font-weight: 800; }
+  /* ── Route table ── */
+  .route-table-3inch { width: 80%; border-collapse: collapse; margin-top: -25px; margin-bottom: 0px; font-size: 6px; }
+  .route-table-3inch th { border: 0.5px solid #555; padding: 0.5px 2px; text-align: left; background: #e8e8e8; font-weight: 600; }
+  .route-table-3inch td { border: 0.5px solid #555; padding: 0.5px 2px; text-align: left; font-weight: 400; }
 
+  /* ── Main content ── */
   .main-content-row-3inch { display: flex; gap: 1px; margin-bottom: 0px; align-items: flex-start; }
   .left-col-3inch { flex: 1; }
-  .freight-col-3inch { flex: 0.25; margin-top: -22px;}
+  .freight-col-3inch { flex: 0.25; margin-top: 8px; }
+
+  /* ── Consignor / Consignee ── */
   .party-row-3inch { display: flex; gap: 2px; margin-bottom: 1.5px; margin-top: 0px; align-items: flex-start; }
   .party-box-3inch { flex: 1; border: 0.5px solid #555; padding: 3px 1.5px; min-height: 40px; overflow: hidden; word-break: break-word; }
-  .party-title-3inch { font-size: 6px; font-weight: 900; background: #e8e8e8; margin: 0px; padding: 0.5px 1.5px; }
-  .party-name-3inch { font-size: 7px; font-weight: 900; margin-bottom: 0.5px; word-break: break-word; }
-  .party-addr-3inch { font-size: 6px; font-weight: 800; line-height: 1.2; margin-bottom: 0.3px; word-break: break-word; }
-  .party-gstin-3inch { font-size: 6px; font-weight: 800; word-break: break-word; }
+  .party-title-3inch { font-size: 6px; font-weight: 600; background: #e8e8e8; margin: 0px; padding: 0.5px 1.5px; }
+  .party-name-3inch { font-size: 7px; font-weight: 700; margin-bottom: 0.5px; word-break: break-word; }
+  .party-addr-3inch { font-size: 6px; font-weight: 400; line-height: 1.2; margin-bottom: 0.3px; word-break: break-word; }
+  .party-gstin-3inch { font-size: 6px; font-weight: 400; word-break: break-word; }
 
+  /* ── Details table ── */
   .details-table-3inch { width: 100%; border-collapse: collapse; font-size: 6px; margin-top: 0px; }
-  .details-table-3inch td { border: 0.5px solid #555; padding: 0.5px 2px; font-weight: 800; }
-  .detail-label-3inch { background: #e8e8e8; font-weight: 900; width: 22%; }
+  .details-table-3inch td { border: 0.5px solid #555; padding: 0.5px 2px; font-weight: 400; }
+  .detail-label-3inch { background: #e8e8e8; font-weight: 600; width: 22%; }
 
-  .inv-table-3inch { width: auto; border-collapse: collapse; font-size: 6px; }
-  .inv-table-3inch th { border: 0.5px solid #555; padding: 1px 8px; background: #e8e8e8; font-weight: 900; text-align: left; white-space: nowrap; min-width: 30px; }
-  .inv-table-3inch td { border: 0.5px solid #555; padding: 1px 8px; font-weight: 800; white-space: nowrap; min-width: 30px; }
+  /* ── Invoice table ── */
+  .inv-table-3inch { width: auto; border-collapse: collapse; font-size: 6px; margin-top: 0; }
+  .inv-table-3inch th { border: 0.5px solid #555; padding: 0.5px 8px; background: #e8e8e8; font-weight: 600; text-align: left; white-space: nowrap; min-width: 30px; }
+  .inv-table-3inch td { border: 0.5px solid #555; padding: 0.5px 8px; font-weight: 400; white-space: nowrap; min-width: 30px; }
+
+  /* ── Charges table ── */
   .charges-table-3inch { width: 100%; border-collapse: collapse; font-size: 6px; }
-  .charges-table-3inch th { border: 0.5px solid #555; padding: 0.5px 2px; background: #e8e8e8; font-weight: 900; text-align: left; }
-  .charges-table-3inch td { border: 0.5px solid #555; padding: 0.5px 2px; font-weight: 800; }
-  .amt-cell-3inch { font-weight: 900; }
-  .total-row-3inch { background: #f0f0f0; font-weight: 900; font-size: 6.5px; }
-  .grand-total-row-3inch { background: #7e22ce; color: white; font-weight: 900; font-size: 6.5px; }
+  .charges-table-3inch th { border: 0.5px solid #555; padding: 0.5px 2px; background: #e8e8e8; font-weight: 600; text-align: left; }
+  .charges-table-3inch td { border: 0.5px solid #555; padding: 0.5px 2px; font-weight: 400; }
+  .amt-cell-3inch { font-weight: 600; }
+  .total-row-3inch { background: #f0f0f0; font-weight: 700; font-size: 6.5px; }
+  .grand-total-row-3inch { background: #7e22ce; color: white; font-weight: 700; font-size: 6.5px; }
 
+  /* ── Footer ── */
   .footer-3inch { display: flex; flex-direction: row; justify-content: space-between; align-items: center; border-top: 0.5px solid #444; padding-top: 1px; margin-top: 1px; font-size: 6px; gap: 8px; }
-  .footer-copy-label-3inch { font-weight: 900; font-size: 7px; color: #c00; flex: 0.2; }
+  .footer-copy-label-3inch { font-weight: 700; font-size: 7px; color: #c00; flex: 0.2; }
   .footer-prepared-wrapper-3inch { display: flex; flex-direction: row; gap: 8px; flex: 0.6; }
-  .footer-prepared-3inch { display: flex; gap: 2px; font-weight: 800; }
+  .footer-prepared-3inch { display: flex; gap: 2px; font-weight: 400; }
   .footer-auth-sign-3inch { flex: 0.2; text-align: right; }
-  .prepared-label-3inch { font-weight: 900; }
-  .prepared-value-3inch { font-weight: 800; }
-  .auth-sign-3inch { font-weight: 800; }
+  .prepared-label-3inch { font-weight: 600; }
+  .prepared-value-3inch { font-weight: 400; }
+  .auth-sign-3inch { font-weight: 400; }
 `;
 
-export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, company, locations, copies = ["Consignor Copy"], invoiceRows }) {
+export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, company, locations, copies = ["Consignor Copy"], invoiceRows, pkgRows }) {
   const ewb = ewbList?.[0] || {};
   const printEwbNo = ewb.ewb_no || ewbNoDisplay || "";
 
@@ -311,7 +346,7 @@ export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, co
     console.error("T&C QR generation failed:", e);
   }
 
-  const slipData = { form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl, tcQrDataUrl, invoiceRows: invoiceRows || [] };
+  const slipData = { form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl, tcQrDataUrl, invoiceRows: invoiceRows || [], pkgRows: pkgRows || [] };
 
   // Company/location details (same as used in the slip HTML) for native payloads
   const coCompany = company?.company_name || getTenantConfig()?.tenant_name || "";

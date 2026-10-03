@@ -8,7 +8,7 @@ import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
-import { fetchAllDockets, fetchCharges, fetchDocketByDocketNo, fetchDocketInvoices } from "../../utils/docket";
+import { fetchAllDockets, fetchCharges, fetchDocketByDocketNo, fetchDocketInvoices, fetchDocketPackages } from "../../utils/docket";
 import { fetchAllLocations } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { fetchAllUsers } from "../../utils/userAPI";
@@ -68,6 +68,7 @@ export default function DocketReport() {
   const [selectedRow, setSelectedRow]   = useState(null);
   const [selectedRows, setSelectedRows] = useState([]);
   const [printAnchor, setPrintAnchor]   = useState(null);
+  const [printDtAnchor, setPrintDtAnchor] = useState(null);
   const [company, setCompany]           = useState(null);
   const [locations, setLocations]     = useState([]);
   const [users, setUsers]             = useState([]);
@@ -445,7 +446,10 @@ export default function DocketReport() {
         ? [{ ewb_no: d.ewb_no || d.eway_bill_no, ewb_valid: d.ewb_valid, vehicle_no: d.desp_veh_no || "" }]
         : [];
 
-      const invoiceRows = await fetchDocketInvoices(d.docket_no);
+      const [invoiceRows, pkgRows] = await Promise.all([
+        fetchDocketInvoices(d.docket_no),
+        fetchDocketPackages(d.docket_no),
+      ]);
 
       await printDocketOnDT({
         form,
@@ -455,6 +459,7 @@ export default function DocketReport() {
         company,
         locations,
         invoiceRows: Array.isArray(invoiceRows) ? invoiceRows : [],
+        pkgRows: Array.isArray(pkgRows) ? pkgRows : [],
         copies: ["Consignor Copy", "Consignee Copy", "Lorry Copy", "File Copy"],
       });
     } catch (err) {
@@ -813,8 +818,9 @@ export default function DocketReport() {
             </Button>
             <Button
               variant="contained"
+              endIcon={<ArrowDropDownIcon />}
               startIcon={<PrintIcon />}
-              onClick={() => handlePrintOnDtBatch()}
+              onClick={(e) => setPrintDtAnchor(e.currentTarget)}
               sx={{
                 background: "#16a34a",
                 color: "white",
@@ -826,6 +832,22 @@ export default function DocketReport() {
             >
               Print on DT
             </Button>
+            <Menu
+              anchorEl={printDtAnchor}
+              open={Boolean(printDtAnchor)}
+              onClose={() => setPrintDtAnchor(null)}
+              anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+              transformOrigin={{ vertical: "top", horizontal: "left" }}
+            >
+              <MenuItem onClick={() => { setPrintDtAnchor(null); handlePrintOnDT(true); }}>
+                <ListItemIcon><PrintIcon fontSize="small" /></ListItemIcon>
+                <ListItemText primaryTypographyProps={{ fontSize: 13 }}>Print on DT with Freight</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { setPrintDtAnchor(null); handlePrintOnDT(false); }}>
+                <ListItemIcon><PrintIcon fontSize="small" /></ListItemIcon>
+                <ListItemText primaryTypographyProps={{ fontSize: 13 }}>Print on DT without Freight</ListItemText>
+              </MenuItem>
+            </Menu>
           </div>
         </div>
 
