@@ -538,6 +538,7 @@ const saveDocketPackages = async (docketNo, header, rows) => {
       docket_loc:   docketLoc,
       docket_date:  docketDate,
       dim_unit:     r.dim_unit     || null,
+      no_of_pkg:    r.no_of_pkg  != null && r.no_of_pkg  !== '' ? parseInt(r.no_of_pkg)       : null,
       dim_length:   r.dim_length   != null && r.dim_length   !== '' ? parseFloat(r.dim_length)   : null,
       dim_breadth:  r.dim_breadth  != null && r.dim_breadth  !== '' ? parseFloat(r.dim_breadth)  : null,
       dim_height:   r.dim_height   != null && r.dim_height   !== '' ? parseFloat(r.dim_height)   : null,

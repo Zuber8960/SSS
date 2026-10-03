@@ -202,6 +202,7 @@ const formSections = [
       "no_loose",
       "no_others",
       "tot_pkgs",
+      "dim_unit",
     ],
     half: true,
     columns: 4,
@@ -347,7 +348,7 @@ export default function DocketPage() {
   // Package dimension rows (sst_docket_pkg)
   const [packageRows, setPackageRows] = useState([]);
   const pkgRowIdRef = useRef(0);
-  const emptyPkgRow = () => ({ rowId: `pkg_${++pkgRowIdRef.current}`, dim_unit: "", dim_length: "", dim_breadth: "", dim_height: "" });
+  const emptyPkgRow = () => ({ rowId: `pkg_${++pkgRowIdRef.current}`, no_of_pkg: "", dim_length: "", dim_breadth: "", dim_height: "" });
   const searchTimeoutRef = useRef(null);
   const prevLocRef = useRef({ docket_loc: "", docket_to_loc: "" });
   const ewbPopulatedRef = useRef({ cnor: false, cnee: false });
@@ -431,9 +432,9 @@ export default function DocketPage() {
     setDirtyFields((prev) => new Set(prev).add(field));
   };
 
-  const recalcChargeWeight = (rows, actWt) => {
+  const recalcChargeWeight = (rows, actWt, dimUnit) => {
     const totalVol = rows.reduce((sum, r) => {
-      const v = calculateVolumetricWeight(r.dim_length, r.dim_breadth, r.dim_height, r.dim_unit);
+      const v = calculateVolumetricWeight(r.dim_length, r.dim_breadth, r.dim_height, dimUnit);
       return sum + (v ?? 0);
     }, 0);
     return Math.max(totalVol, parseFloat(actWt) || minWeight, minWeight);
@@ -922,7 +923,8 @@ export default function DocketPage() {
             aud_user:     currentUser?.rec_id ?? null,
           },
           packageRows.map((r) => ({
-            dim_unit:    r.dim_unit    || null,
+            dim_unit:    form.dim_unit  || null,
+            no_of_pkg:   r.no_of_pkg  !== "" && r.no_of_pkg  != null ? r.no_of_pkg  : null,
             dim_length:  r.dim_length  !== "" && r.dim_length  != null ? r.dim_length  : null,
             dim_breadth: r.dim_breadth !== "" && r.dim_breadth != null ? r.dim_breadth : null,
             dim_height:  r.dim_height  !== "" && r.dim_height  != null ? r.dim_height  : null,
@@ -1057,9 +1059,10 @@ export default function DocketPage() {
           try {
             const pkgRows = await fetchDocketPackages(docketData.docket_no);
             if (pkgRows?.length) {
+              setForm((f) => ({ ...f, dim_unit: pkgRows[0].dim_unit ?? "" }));
               setPackageRows(pkgRows.map((r) => ({
-                rowId: `pkg_${++pkgRowIdRef.current}`,
-                dim_unit:    r.dim_unit    ?? "",
+                rowId:       `pkg_${++pkgRowIdRef.current}`,
+                no_of_pkg:   r.no_of_pkg   ?? "",
                 dim_length:  r.dim_length  ?? "",
                 dim_breadth: r.dim_breadth ?? "",
                 dim_height:  r.dim_height  ?? "",
@@ -1230,10 +1233,10 @@ export default function DocketPage() {
   ];
 
   const packageDimColumns = [
-    { key: "dim_unit",    label: "Unit",   maxWidth: 40, editable: isFormEditMode, options: [{ label: "— Clear —", value: "" }, { label: "Inches", value: "inches" }, { label: "MM", value: "mm" }, { label: "CM", value: "cm" }] },
-    { key: "dim_length",  label: "Length", maxWidth: 40, editable: isFormEditMode, type: "number" },
-    { key: "dim_breadth", label: "Breadth",maxWidth: 40, editable: isFormEditMode, type: "number" },
-    { key: "dim_height",  label: "Height", maxWidth: 40, editable: isFormEditMode, type: "number" },
+    { key: "no_of_pkg",   label: "No of Pkg", width: 35, minWidth: 20, editable: isFormEditMode, type: "number" },
+    { key: "dim_length",  label: "Length",    width: 30, minWidth: 20, editable: isFormEditMode, type: "number" },
+    { key: "dim_breadth", label: "Breadth",   width: 30, minWidth: 20, editable: isFormEditMode, type: "number" },
+    { key: "dim_height",  label: "Height",    width: 30, minWidth: 20, editable: isFormEditMode, type: "number" },
   ];
 
   const handleAddPkgRow = () => setPackageRows((prev) => [...prev, emptyPkgRow()]);
@@ -1241,7 +1244,7 @@ export default function DocketPage() {
   const handleRemovePkgRow = (rowId) => {
     const updated = packageRows.filter((r) => r.rowId !== rowId);
     setPackageRows(updated);
-    const newChrg = recalcChargeWeight(updated, form.act_wt);
+    const newChrg = recalcChargeWeight(updated, form.act_wt, form.dim_unit);
     setForm((f) => ({ ...f, chrg_wt: newChrg }));
     setDirtyFields((d) => new Set(d).add("chrg_wt"));
   };
@@ -1249,14 +1252,10 @@ export default function DocketPage() {
   const handlePkgCellChange = (rowId, name, value) => {
     const updated = packageRows.map((r) => {
       if (r.rowId !== rowId) return r;
-      // Clearing the unit also clears the dimension values
-      if (name === "dim_unit" && !value) {
-        return { ...r, dim_unit: "", dim_length: "", dim_breadth: "", dim_height: "" };
-      }
       return { ...r, [name]: value };
     });
     setPackageRows(updated);
-    const newChrg = recalcChargeWeight(updated, form.act_wt);
+    const newChrg = recalcChargeWeight(updated, form.act_wt, form.dim_unit);
     setForm((f) => ({ ...f, chrg_wt: newChrg }));
     setDirtyFields((d) => new Set(d).add("chrg_wt"));
     return updated.find((r) => r.rowId === rowId) ?? {};
@@ -1411,9 +1410,14 @@ export default function DocketPage() {
         let updated = { ...form, [name]: value };
         setDirtyFields((prev) => new Set(prev).add(name));
 
-        // Recalculate charge weight when actual weight changes
+        // Recalculate charge weight when actual weight or dimension unit changes
         if (name === "act_wt") {
-          const newChrg = recalcChargeWeight(packageRows, value);
+          const newChrg = recalcChargeWeight(packageRows, value, form.dim_unit);
+          updated.chrg_wt = newChrg;
+          setDirtyFields((prev) => new Set(prev).add("chrg_wt"));
+        }
+        if (name === "dim_unit") {
+          const newChrg = recalcChargeWeight(packageRows, form.act_wt, value);
           updated.chrg_wt = newChrg;
           setDirtyFields((prev) => new Set(prev).add("chrg_wt"));
         }
