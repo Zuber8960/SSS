@@ -375,6 +375,13 @@ export default function DocketPage() {
       company,
       locations,
       invoiceRows: poInvoiceRows,
+      pkgRows: packageRows.map((r) => ({
+        dim_unit:   form.dim_unit || null,
+        no_of_pkg:  r.no_of_pkg,
+        dim_length: r.dim_length,
+        dim_breadth: r.dim_breadth,
+        dim_height: r.dim_height,
+      })),
       copies: ["Consignor Copy", "Consignee Copy", "Lorry Copy", "File Copy"],
     });
   };

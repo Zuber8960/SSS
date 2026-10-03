@@ -339,7 +339,10 @@ export default function DocketReport() {
         ? [{ ewb_no: d.ewb_no || d.eway_bill_no, ewb_valid: d.ewb_valid, vehicle_no: d.desp_veh_no || "" }]
         : [];
 
-      const invoiceRows = await fetchDocketInvoices(d.docket_no);
+      const [invoiceRows, pkgRows] = await Promise.all([
+        fetchDocketInvoices(d.docket_no),
+        fetchDocketPackages(d.docket_no),
+      ]);
 
       await printDocket({
         form,
@@ -349,6 +352,7 @@ export default function DocketReport() {
         company,
         locations,
         invoiceRows: Array.isArray(invoiceRows) ? invoiceRows : [],
+        pkgRows: Array.isArray(pkgRows) ? pkgRows : [],
         copies: ["Consignor Copy", "Consignee Copy", "Lorry Copy", "File Copy"],
       });
     } catch (err) {

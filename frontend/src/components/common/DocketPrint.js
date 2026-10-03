@@ -22,7 +22,7 @@ const fmtAmt = (val) => {
   return Number.isFinite(n) ? n.toFixed(2) : "0.00";
 };
 
-const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, copyLabel, qrDataUrl, tcQrDataUrl, invoiceRows }) => {
+const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, copyLabel, qrDataUrl, tcQrDataUrl, invoiceRows, pkgRows }) => {
   console.log(form);
   const tenantConfig = getTenantConfig();
   const logoUrl = tenantConfig?.logo_url || "";
@@ -117,6 +117,23 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
                   <td class="pkg-label">PACKAGE</td>
                   <td>${fmt(form.tot_pkgs)} - ${fmt(form.goods_desc || "")}</td>
                 </tr>
+                 ${(() => {
+                  const rows = Array.isArray(pkgRows) ? pkgRows : [];
+                  if (!rows.length) return "";
+                  const unit = rows[0].dim_unit || "";
+                  const dimStr = rows
+                    .filter(r => r.dim_length || r.dim_breadth || r.dim_height)
+                    .map(r => {
+                      const fd = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? (n % 1 === 0 ? String(Math.trunc(n)) : String(n)) : "0"; };
+                      return `${r.no_of_pkg || 1}-${fd(r.dim_length)}X${fd(r.dim_breadth)}X${fd(r.dim_height)}`;
+                    })
+                    .join(", ");
+                  if (!dimStr) return "";
+                  return `<tr>
+                    <td class="pkg-label">DIM${unit ? " (" + unit + ")" : ""}</td>
+                    <td colspan="8">${dimStr}</td>
+                  </tr>`;
+                })()}
                 <tr>
                   <td class="pkg-label" colspan="9">Remark</td>
                 </tr>
@@ -288,7 +305,7 @@ const DEFAULT_COPIES = [
  * @param {number|string[]} props.copies     - Number of copies OR array of copy labels.
  *                                             Defaults to ["Consignor Copy","Consignee Copy","Driver Copy"]
  */
-export async function printDocket({ form, charges, ewbList, ewbNoDisplay, company, locations, copies, invoiceRows }) {
+export async function printDocket({ form, charges, ewbList, ewbNoDisplay, company, locations, copies, invoiceRows, pkgRows }) {
   const ewb = ewbList?.[0] || {};
   const printEwbNo = ewb.ewb_no || ewbNoDisplay || "";
 
@@ -315,7 +332,7 @@ export async function printDocket({ form, charges, ewbList, ewbNoDisplay, compan
     console.error("T&C QR generation failed:", e);
   }
 
-  const slipData = { form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl, tcQrDataUrl, invoiceRows: invoiceRows || [] };
+  const slipData = { form, charges, ewb, printEwbNo, company, currentLoc, qrDataUrl, tcQrDataUrl, invoiceRows: invoiceRows || [], pkgRows: pkgRows || [] };
 
   // Resolve copy labels
   let copyLabels;
