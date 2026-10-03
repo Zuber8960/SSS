@@ -33,6 +33,7 @@ import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
 import UnarchiveIcon from "@mui/icons-material/Unarchive";
 import ListAltIcon from "@mui/icons-material/ListAlt";
 import RequestQuoteIcon from "@mui/icons-material/RequestQuote";
+import QueryStatsIcon from "@mui/icons-material/QueryStats";
 import ZoneIcon from "@mui/icons-material/Map";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
@@ -151,6 +152,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/reports/docket-report", label: "All Docket Report", icon: <ListAltIcon /> },
         { path: "/reports/manifest-report", label: "Manifest Report", icon: <UnarchiveIcon /> },
         { path: "/reports/invoice-report", label: "Invoice Report", icon: <RequestQuoteIcon /> },
+        { path: "/reports/customer-mis", label: "Customer MIS", icon: <QueryStatsIcon /> },
       ],
     },
   ];

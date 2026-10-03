@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import MainLayout from "../../layouts/MainLayout";
 import { FormField, PageBody, DataTable } from "../../components/common/MasterPage";
 import useAlert from "../../components/common/UseAlert";
@@ -7,10 +7,10 @@ import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
 import { SaveIcon, PrintIcon, AddIcon, DeleteIcon } from "../../components/common/icons";
 import { fetchAllBusinessPartners } from "../../utils/businessPartner";
-import { fetchCharges, fetchChargeMaster, fetchDocketByDocketNo } from "../../utils/docket";
+import { fetchAllDockets, fetchCharges, fetchChargeMaster, fetchDocketByDocketNo } from "../../utils/docket";
 import { fetchDeliveryNotes } from "../../utils/deliveryNote";
 import { fetchAllLocations } from "../../utils/locationMaster";
-import { saveInvoice, updateInvoice, deleteInvoice } from "../../utils/customerBill";
+import { saveInvoice, updateInvoice, deleteInvoice, fetchAllInvoices, fetchInvoiceDetails } from "../../utils/customerBill";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { printInvoice } from "../../components/common/InvoicePrint";
 import { Button, Chip, IconButton, Tooltip } from "@mui/material";
@@ -49,6 +49,21 @@ const billingColumns = [
     render: (row) => (
       <span style={{ ...statusBadgeStyle, ...(row.pod === "YES" ? yesBadge : noBadge), minWidth: "58px", height: "22px" }}>
         {row.pod}
+      </span>
+    ),
+  },
+  {
+    key: "invoice_status",
+    label: "Billing Status",
+    minWidth: 130,
+    render: (row) => (
+      <span
+        style={{
+          ...statusBadgeStyle,
+          ...(row.invoice_status === "Billed" ? billedBadge : unbilledBadge),
+        }}
+      >
+        {row.invoice_status || "Unbilled"}
       </span>
     ),
   },
@@ -113,8 +128,12 @@ export default function CustomerBill() {
   const [deliveryNotesMap, setDeliveryNotesMap] = useState({});
   const [locations, setLocations] = useState([]);
   const [company, setCompany] = useState(null);
-  const [selectedRowId, setSelectedRowId] = useState(null);
+  const [selectedDocketNos, setSelectedDocketNos] = useState(() => new Set());
+  const [loadingDockets, setLoadingDockets] = useState(false);
+  const [docketsLoaded, setDocketsLoaded] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null); // { invoice_no, invoice_date, loc_code }
+  // Guards against a stale customer/branch fetch resolving after a newer one
+  const docketLoadToken = useRef(0);
 
   useEffect(() => {
     (async () => {
@@ -276,11 +295,149 @@ export default function CustomerBill() {
       amount: totalAmount.toFixed(2),
       pod: pod === "Received" ? "YES" : "NO",
       delivery_status: deliveryStatus,
+      invoice_status: "Unbilled",
     };
   };
 
   // Editable charge columns - user can modify these values in the grid
   const editableChargeKeys = ["loading", "unloading", "detention", "add_toll", "green_tax", "other_charges"];
+
+  // The customer record picked in the dropdown. The dropdown stores only the
+  // BP name, so we resolve the full partner row here to get its record_id.
+  // Dockets saved during this session / belonging to the invoice being edited.
+  // These stay visible in the list even though they are already billed.
+  const editingDocketNos = useRef(new Set());
+  const isDocketOnEditingInvoice = (docketNo) => editingDocketNos.current.has(String(docketNo));
+
+  const selectedCustomer = useMemo(
+    () => partners.find((p) => p.bp_name === form.customer) || null,
+    [partners, form.customer]
+  );
+
+  // record_id of the selected business partner - this is what docket rows are
+  // matched against (docket.cnor_id / docket.cnee_id)
+  const selectedCustomerId = useMemo(() => {
+    if (!selectedCustomer) return null;
+    const id = selectedCustomer.record_id ?? selectedCustomer.bp_id ?? null;
+    return id == null ? null : String(id);
+  }, [selectedCustomer]);
+
+  const selectedLocCode = useMemo(
+    () => (form.billing_branch || "").split(" - ")[0].trim(),
+    [form.billing_branch]
+  );
+
+  // A docket belongs to the customer when its cnor_id OR cnee_id equals the
+  // selected business partner's record_id.
+  // The name comparison is only a safety net for dockets whose cnor_id/cnee_id
+  // columns came back NULL, so nothing silently disappears from the list.
+  const docketBelongsToCustomer = (docket, customerId, customerName) => {
+    const cnorId = docket.cnor_id == null ? "" : String(docket.cnor_id);
+    const cneeId = docket.cnee_id == null ? "" : String(docket.cnee_id);
+    if (cnorId || cneeId) {
+      return (!!customerId && (cnorId === customerId || cneeId === customerId)) || false;
+    }
+    if (!customerName) return false;
+    const name = customerName.trim().toLowerCase();
+    return (
+      (docket.cnor_name || "").trim().toLowerCase() === name ||
+      (docket.cnee_name || "").trim().toLowerCase() === name
+    );
+  };
+
+  // Load every docket belonging to the selected customer: resolve the partner's
+  // record_id, then keep only dockets whose cnor_id or cnee_id equals it.
+  // Optionally narrowed to the selected billing branch. Dockets already attached
+  // to a saved invoice are flagged as Billed so the user never bills them twice.
+  useEffect(() => {
+    const customerName = form.customer;
+    if (!customerName || customerName === "Select Customer" || !selectedCustomerId) {
+      docketLoadToken.current++;
+      setBillingRows([]);
+      setSelectedDocketNos(new Set());
+      setDocketsLoaded(false);
+      setLoadingDockets(false);
+      return;
+    }
+
+    const token = ++docketLoadToken.current;
+    const customerId = selectedCustomerId;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoadingDockets(true);
+        const [dockets, invoices] = await Promise.all([fetchAllDockets(true), fetchAllInvoices()]);
+
+        // Collect every docket already saved on some invoice
+        const detailsLists = await Promise.all(
+          (Array.isArray(invoices) ? invoices : []).map((inv) =>
+            fetchInvoiceDetails(inv.invoice_no, inv.invoice_date, inv.loc_code).catch(() => [])
+          )
+        );
+        const billedMap = {};
+        detailsLists.flat().forEach((d) => {
+          if (d.docket_no) billedMap[d.docket_no] = true;
+        });
+
+        if (cancelled || token !== docketLoadToken.current) return;
+
+        const locCode = selectedLocCode;
+        const docketList = Array.isArray(dockets) ? dockets : [];
+
+        // Dockets already attached to a saved invoice are not billable again.
+        // Ones belonging to the invoice currently being edited stay visible so
+        // an existing invoice can be re-opened and updated.
+        const isBilledElsewhere = (docketNo) =>
+          !!billedMap[docketNo] && !isDocketOnEditingInvoice(docketNo);
+
+        const filtered = docketList.filter((d) => {
+          if (!d.docket_no) return false;
+          // cnor_id or cnee_id must equal the selected partner's record_id
+          if (!docketBelongsToCustomer(d, customerId, selectedCustomer?.bp_name)) return false;
+          // skip dockets that already have a bill
+          if (isBilledElsewhere(d.docket_no)) return false;
+          // skip dockets already present in the delivery note table
+          if (deliveryNotesMap[d.docket_no]) return false;
+          if (locCode && (d.docket_loc || "").trim() !== locCode) return false;
+          return true;
+        });
+
+        const rows = filtered.map((d) => ({
+          ...buildBillingRow(d, []),
+          id: d.docket_no,
+          invoice_status: billedMap[d.docket_no] ? "Billed" : "Unbilled",
+          _chargesLoaded: false,
+        }));
+
+        setBillingRows(rows);
+        setSelectedDocketNos(new Set());
+        setDocketsLoaded(true);
+
+        // Helpful when a customer unexpectedly shows no dockets
+        if (filtered.length === 0) {
+          console.info(
+            `[CustomerBill] No dockets for "${selectedCustomer?.bp_name}" (record_id=${customerId}). ` +
+            `Scanned ${docketList.length} dockets; sample cnor_id/cnee_id:`,
+            docketList.slice(0, 5).map((d) => ({ docket_no: d.docket_no, cnor_id: d.cnor_id, cnee_id: d.cnee_id }))
+          );
+        }
+      } catch (err) {
+        if (cancelled || token !== docketLoadToken.current) return;
+        showError(err.message || "Failed to load dockets for the selected customer");
+        console.error("Load customer dockets error:", err);
+        setBillingRows([]);
+        setDocketsLoaded(false);
+      } finally {
+        if (!cancelled && token === docketLoadToken.current) setLoadingDockets(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.customer, form.billing_branch, selectedCustomerId, partners, chargeMaster, deliveryNotesMap]);
 
   // Recalculate derived fields (taxable, GST, amount) when charge values change
   const recalculateRow = (row) => {
@@ -318,6 +475,63 @@ export default function CustomerBill() {
     };
   };
 
+  // Fold a docket's charge lines into a grid row, keeping any value the user
+  // has already typed (manual entries win over the fetched charge).
+  const applyChargesToRow = (row, charges) => {
+    const merged = { ...row };
+    (Array.isArray(charges) ? charges : []).forEach((c) => {
+      const master = chargeMaster.find((m) => m.charge_code === c.charge_code);
+      const desc = master?.charge_desc || c.charge_desc || c.charge_code;
+      const colKey = mapChargeToColumn(c.charge_code, desc);
+      if (row._edited?.[colKey]) return; // user override - keep it
+      if (colKey && colKey in merged) {
+        merged[colKey] = (parseFloat(c.charge_amt) || 0).toFixed(2);
+      } else {
+        merged.other_charges = ((parseFloat(merged.other_charges) || 0) + (parseFloat(c.charge_amt) || 0)).toFixed(2);
+      }
+    });
+    merged._chargesLoaded = true;
+    return recalculateRow(merged);
+  };
+
+  // Whenever the user ticks dockets, pull their charge breakdown so amounts,
+  // taxes and the totals row are real numbers before saving.
+  const loadChargesForSelected = async (docketNos) => {
+    const pending = docketNos.filter((no) => {
+      const row = billingRows.find((r) => String(r.id) === String(no));
+      return row && !row._chargesLoaded;
+    });
+    if (pending.length === 0) return;
+
+    const pairs = await Promise.all(
+      pending.map(async (no) => {
+        try {
+          return [no, await fetchCharges(no)];
+        } catch {
+          return [no, []];
+        }
+      })
+    );
+    const chargesByDocket = Object.fromEntries(pairs);
+
+    setBillingRows((prev) =>
+      prev.map((row) => {
+        const key = String(row.id);
+        if (!(key in chargesByDocket)) return row;
+        const charges = chargesByDocket[key];
+        return Array.isArray(charges) ? applyChargesToRow(row, charges) : { ...row, _chargesLoaded: true };
+      })
+    );
+  };
+
+  // Multi-select: ticks decide which dockets get saved on the invoice
+  const handleRowSelectionModelChange = (model) => {
+    const ids = model?.ids instanceof Set ? model.ids : new Set(Array.isArray(model) ? model : []);
+    const docketNos = new Set([...ids].map(String));
+    setSelectedDocketNos(docketNos);
+    loadChargesForSelected([...docketNos]);
+  };
+
   // Add a new empty row so the user can enter a docket number
   const handleAddRow = () => {
     const id = "new_" + Date.now() + "_" + billingRows.length;
@@ -349,6 +563,9 @@ export default function CustomerBill() {
       amount: "",
       pod: "",
       delivery_status: "",
+      invoice_status: "Unbilled",
+      _chargesLoaded: false,
+      _edited: {},
     };
     setBillingRows((prev) => [...prev, emptyRow]);
   };
@@ -356,9 +573,13 @@ export default function CustomerBill() {
   // When a docket number is entered in a row, fetch all docket data and populate the row
   const handleRowUpdate = async (newRow, oldRow) => {
     // Check if a charge field was edited - recalculate derived fields
-    const chargeFieldChanged = editableChargeKeys.some((key) => newRow[key] !== oldRow[key]);
-    if (chargeFieldChanged) {
-      const recalculated = recalculateRow(newRow);
+    const changedChargeKeys = editableChargeKeys.filter((key) => newRow[key] !== oldRow[key]);
+    if (changedChargeKeys.length > 0) {
+      // Remember the manual override so a later charge fetch does not wipe it
+      const recalculated = recalculateRow({
+        ...newRow,
+        _edited: { ...(newRow._edited || {}), ...Object.fromEntries(changedChargeKeys.map((k) => [k, true])) },
+      });
       // Update the billingRows state so the recalculated row persists in the grid
       setBillingRows((prev) =>
         prev.map((row) => (row.id === newRow.id ? { ...recalculated, id: newRow.id } : row))
@@ -400,7 +621,7 @@ export default function CustomerBill() {
           prev.map((row) => (row.id === newRow.id ? { ...builtRow, id: newRow.id } : row))
         );
 
-        return { ...builtRow, id: newRow.id };
+        return { ...builtRow, id: newRow.id, _chargesLoaded: true, _edited: {} };
       } catch (err) {
         showError(err.message || "Failed to fetch docket " + newRow.docket_no);
         console.error("Load docket error:", err);
@@ -418,7 +639,17 @@ export default function CustomerBill() {
     editable: col.key === "docket_no" || editableChargeKeys.includes(col.key),
   }));
 
-  const totals = billingRows.reduce(
+  // Stable array reference - DataTable memoises its controlled model on this,
+  // so a fresh array every render would keep resetting the user's ticks
+  const selectionIds = useMemo(() => [...selectedDocketNos], [selectedDocketNos]);
+
+  // The rows the user has ticked - these are the ones that get saved
+  const selectedRows = useMemo(
+    () => billingRows.filter((r) => selectedDocketNos.has(String(r.id)) && r.docket_no),
+    [billingRows, selectedDocketNos]
+  );
+
+  const totals = selectedRows.reduce(
     (acc, row) => ({
       freight: acc.freight + (parseFloat(row.freight) || 0),
       loading: acc.loading + (parseFloat(row.loading) || 0),
@@ -437,14 +668,15 @@ export default function CustomerBill() {
     { freight: 0, loading: 0, unloading: 0, detention: 0, add_toll: 0, green_tax: 0, other_charges: 0, discount: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, amount: 0 }
   );
 
+  // Removes the ticked dockets from the working list (nothing is sent to the server)
   const handleDeleteRow = () => {
-    if (!selectedRowId) {
-      showError("Please select a row to delete");
+    if (selectedDocketNos.size === 0) {
+      showError("Please select at least one docket row to remove");
       return;
     }
-    setBillingRows((prev) => prev.filter((row) => row.id !== selectedRowId));
-    setSelectedRowId(null);
-    showSuccess("Row deleted");
+    setBillingRows((prev) => prev.filter((row) => !selectedDocketNos.has(String(row.id))));
+    setSelectedDocketNos(new Set());
+    showSuccess("Selected docket(s) removed");
   };
 
   const handleDeleteInvoice = async () => {
@@ -458,7 +690,7 @@ export default function CustomerBill() {
       showSuccess("Invoice deleted successfully");
       setForm({ ...emptyForm });
       setBillingRows([]);
-      setSelectedRowId(null);
+      setSelectedDocketNos(new Set());
       setEditingInvoice(null);
     } catch (err) {
       showError(err.message || "Failed to delete invoice");
@@ -469,9 +701,12 @@ export default function CustomerBill() {
   };
 
   const handleClear = () => {
+    docketLoadToken.current++;
     setForm({ ...emptyForm });
     setBillingRows([]);
-    setSelectedRowId(null);
+    setSelectedDocketNos(new Set());
+    setDocketsLoaded(false);
+    setLoadingDockets(false);
     setEditingInvoice(null);
   };
 
@@ -480,7 +715,7 @@ export default function CustomerBill() {
     const selectedBranch = form.billing_branch || "";
     const selectedLocCode = selectedBranch.split(" - ")[0].trim();
     const customer = partners.find((p) => p.bp_name === form.customer);
-    const totalAmt = billingRows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+    const totalAmt = selectedRows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
 
     const header = {
       division_code: currentUser?.division_code ?? null,
@@ -495,8 +730,7 @@ export default function CustomerBill() {
       modified_by: currentUser?.user_id ?? null,
     };
 
-    const details = billingRows
-      .filter((row) => row.docket_no)
+    const details = selectedRows
       .map((row, index) => ({
         division_code: currentUser?.division_code ?? null,
         invoice_loc: selectedLocCode || null,
@@ -529,8 +763,8 @@ export default function CustomerBill() {
   };
 
   const handlePrint = () => {
-    if (billingRows.length === 0) {
-      showError("Please add at least one docket before printing");
+    if (selectedRows.length === 0) {
+      showError("Please select at least one docket before printing");
       return;
     }
     if (!form.customer || form.customer === "Select Customer") {
@@ -538,16 +772,16 @@ export default function CustomerBill() {
       return;
     }
     const selectedBranch = form.billing_branch || "";
-    const selectedLocCode = selectedBranch.split(" - ")[0].trim();
+    const locCode = selectedBranch.split(" - ")[0].trim();
     const customer = partners.find((p) => p.bp_name === form.customer);
-    const totalAmt = billingRows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+    const totalAmt = selectedRows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
 
     const invoice = {
       invoice_no: form.invoice_no || "AUTO",
       invoice_date: form.invoice_date || "",
       bp_name: form.customer === "Select Customer" ? "" : form.customer || "",
       bp_code: customer?.bp_code || "",
-      loc_code: selectedLocCode || "",
+      loc_code: locCode || "",
       loc_label: selectedBranch || "",
       invoice_type: form.billing_type === "Complimentory" ? "CM" : "C",
       total_inv_amt: totalAmt.toFixed(2),
@@ -555,7 +789,7 @@ export default function CustomerBill() {
 
     printInvoice({
       invoice,
-      details: billingRows.filter((r) => r.docket_no),
+      details: selectedRows,
       company,
       locationsMap: Object.fromEntries(locations.map((l) => [l.loc_code, l])),
     });
@@ -568,7 +802,7 @@ export default function CustomerBill() {
       showError("Please select a billing branch before saving");
       return;
     }
-    const selectedLocCode = selectedBranch.split(" - ")[0].trim();
+    const locCode = selectedBranch.split(" - ")[0].trim();
 
     // Validate customer is selected
     if (!form.customer || form.customer === "Select Customer") {
@@ -582,36 +816,35 @@ export default function CustomerBill() {
       return;
     }
 
-    // Validate there is at least one docket row
+    // The dockets are listed automatically, so the user must tick the ones to bill
     if (billingRows.length === 0) {
-      showError("Please add at least one docket before saving");
+      showError("No dockets found for the selected customer");
       return;
     }
 
-    // Validate each docket exists in sst_dly_note (delivery notes) and branch matches
-    const missingDockets = [];
-    const wrongBranchDockets = [];
+    if (selectedRows.length === 0) {
+      showError("Please select at least one docket to bill");
+      return;
+    }
 
-    billingRows.forEach((row) => {
-      if (!row.docket_no) return; // skip empty rows
-      const note = deliveryNotesMap[row.docket_no];
-      if (!note) {
-        missingDockets.push(row.docket_no);
-        return;
-      }
-      const noteBranch = (note.docket_from_loc || note.docket_loc || "").trim();
-      if (noteBranch && selectedLocCode && noteBranch !== selectedLocCode) {
-        wrongBranchDockets.push(row.docket_no);
-      }
-    });
-
-    if (missingDockets.length > 0) {
+    // Block dockets that already belong to another saved invoice
+    const alreadyBilled = selectedRows
+      .filter((row) => row.invoice_status === "Billed" && !isDocketOnEditingInvoice(row.docket_no))
+      .map((row) => row.docket_no);
+    if (alreadyBilled.length > 0) {
       showError(
-        "Cannot save. The following docket(s) are not present in the delivery note table: " +
-        missingDockets.join(", ")
+        "Cannot save. The following docket(s) are already billed on another invoice: " +
+        alreadyBilled.join(", ")
       );
       return;
     }
+
+    // Validate the docket's own booking branch matches the billing branch.
+    // (Delivery-note presence is no longer checked here - dockets that already
+    // have a delivery note are filtered out of the list when it is loaded.)
+    const wrongBranchDockets = selectedRows
+      .filter((row) => locCode && (row.origin || "").trim() !== locCode)
+      .map((row) => row.docket_no);
 
     if (wrongBranchDockets.length > 0) {
       showError(
@@ -623,11 +856,13 @@ export default function CustomerBill() {
 
     const payload = buildInvoicePayload();
 
-    // If no docket rows have been filled yet, don't save
     if (payload.details.length === 0) {
-      showError("Please enter at least one docket number before saving");
+      showError("Please select at least one docket before saving");
       return;
     }
+
+    const savedDocketNos = payload.details.map((d) => String(d.docket_no));
+    editingDocketNos.current = new Set(savedDocketNos);
 
     try {
       showLoading();
@@ -655,6 +890,13 @@ export default function CustomerBill() {
           });
         }
       }
+
+      // The saved dockets are now billed - flag them so they cannot be billed twice
+      setBillingRows((prev) =>
+        prev.map((row) =>
+          savedDocketNos.includes(String(row.id)) ? { ...row, invoice_status: "Billed" } : row
+        )
+      );
     } catch (err) {
       showError(err.message || "Failed to save invoice");
       console.error("Save invoice error:", err);
@@ -700,6 +942,20 @@ export default function CustomerBill() {
         <div style={{ marginTop: 10 }}>
           <div style={{ ...tableTitleStyle, display: "flex", alignItems: "center", gap: 8 }}>
             <span>Available Dockets for Billing</span>
+            {selectedCustomer && !docketsLoaded && !loadingDockets && (
+              <Chip
+                size="small"
+                label="Select a customer to load dockets"
+                sx={{ ml: 2, fontSize: 12, fontWeight: 600, bgcolor: "#fff8e1", color: "#b45309" }}
+              />
+            )}
+            {selectedCustomer && loadingDockets && (
+              <Chip
+                size="small"
+                label="Loading dockets..."
+                sx={{ ml: 2, fontSize: 12, fontWeight: 600, bgcolor: "#e3f2fd", color: "#0d6efd" }}
+              />
+            )}
             {billingRows.length > 0 && (
               <Chip
                 size="small"
@@ -707,8 +963,15 @@ export default function CustomerBill() {
                 sx={{ ml: 2, fontSize: 12, fontWeight: 600, bgcolor: "#e8f5e9", color: "#1b5e20" }}
               />
             )}
+            {selectedRows.length > 0 && (
+              <Chip
+                size="small"
+                label={selectedRows.length + " selected"}
+                sx={{ ml: 1, fontSize: 12, fontWeight: 700, bgcolor: "#0d6efd", color: "#fff" }}
+              />
+            )}
             <span style={{ flex: 1 }} />
-            <Tooltip title="Delete Selected Row">
+            <Tooltip title="Remove Selected Rows">
               <IconButton
                 onClick={handleDeleteRow}
                 size="small"
@@ -724,7 +987,7 @@ export default function CustomerBill() {
                 <DeleteIcon />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Add Docket">
+            <Tooltip title="Add Docket Manually">
               <IconButton
                 onClick={handleAddRow}
                 size="small"
@@ -740,21 +1003,37 @@ export default function CustomerBill() {
               </IconButton>
             </Tooltip>
           </div>
+          {selectedCustomer && docketsLoaded && billingRows.length === 0 && (
+            <div
+              style={{
+                padding: "16px 14px",
+                fontSize: 13,
+                color: "#6b7280",
+                background: "#fff",
+                border: "1px solid #dfeaf8",
+                borderTop: "none",
+              }}
+            >
+              No dockets found for {selectedCustomer.bp_name} (record_id {selectedCustomerId})
+              {selectedLocCode ? ` at branch ${selectedLocCode}` : ""}. Tick the dockets you want to bill,
+              then click Save.
+            </div>
+          )}
           <DataTable
             columns={tableColumns}
             rows={billingRows}
             getKey={(row) => row.id || row.docket_no}
             checkboxSelection
-            disableMultipleRowSelection
             // autoHeight
             scroll={{ horizontal: true, afterRows: 8 }}
             editable
             singleClick
             onRowUpdate={handleRowUpdate}
             isHeight={320}
-            onRowSelectionModelChange={(ids) => setSelectedRowId(ids[0] ?? null)}
+            rowSelectionModel={selectionIds}
+            onRowSelectionModelChange={handleRowSelectionModelChange}
           />
-          {billingRows.length > 0 && (
+          {selectedRows.length > 0 && (
             <div style={totalRowStyle}>
               <div style={{ ...totalCellStyle, justifyContent: "flex-start", paddingLeft: 14 }}>TOTAL</div>
               <div style={totalCellStyle}>{totals.freight.toFixed(2)}</div>
@@ -899,6 +1178,18 @@ const noBadge = {
   background: "#ffe7e7",
   color: "#b91c1c",
   border: "1px solid #f7b5b5",
+};
+
+const billedBadge = {
+  background: "#e3f2fd",
+  color: "#0d6efd",
+  border: "1px solid #90caf9",
+};
+
+const unbilledBadge = {
+  background: "#fff8e1",
+  color: "#b45309",
+  border: "1px solid #f7d58c",
 };
 
 const saveHeaderButtonStyle = {
