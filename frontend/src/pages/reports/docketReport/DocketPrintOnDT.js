@@ -50,10 +50,16 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
           </div>
         </div>
 
-        <div class="cn-block-3inch">
-          ${qrDataUrl ? `<img src="${qrDataUrl}" class="cn-qr-3inch" alt="QR" />` : ""}
-          <div class="cn-no-3inch">${fmt(form.docket_no)}</div>
-          <div class="cn-date-3inch">${fmtDate(form.docket_date)}</div>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
+          <div class="cn-block-3inch">
+            ${qrDataUrl ? `<img src="${qrDataUrl}" class="cn-qr-3inch" alt="QR" />` : ""}
+            <div class="cn-no-3inch">${fmt(form.docket_no)}</div>
+            <div class="cn-date-3inch">${fmtDate(form.docket_date)}</div>
+          </div>
+          ${tcQrDataUrl ? `<div style="text-align:center; align-self:flex-start; padding-top:1px;">
+            <img src="${tcQrDataUrl}" alt="T&C QR" style="width:50px;height:50px;display:block;" />
+            <div style="font-size:5px; font-weight:600; margin-top:1px;">T &amp; C</div>
+          </div>` : ""}
         </div>
       </div>
 
@@ -145,14 +151,10 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
                 </table>`;
               })()}
               <div style="flex:1; min-width:0; border:0.5px dashed #bbb; border-radius:2px; position:relative; overflow:hidden; min-height:36px; display:flex; align-items:flex-end; justify-content:center; padding:2px 3px;">
-                <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-25deg); font-size:9px; font-weight:700; color:rgba(126,34,206,0.10); white-space:nowrap; letter-spacing:1.5px; pointer-events:none;">CargoYaan</div>
+                <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-10deg); font-size:7px; font-weight:700; color:rgba(126,34,206,0.12); white-space:normal; text-align:center; width:90%; letter-spacing:0.5px; line-height:1.3; pointer-events:none;">CARGOYAAN XPRESS PRIVATE LTD</div>
                 <div style="font-size:5px; font-weight:600; color:#999; text-align:center; position:relative; z-index:1;">Signature / Stamp</div>
               </div>
             </div>
-            ${tcQrDataUrl ? `<div style="flex-shrink:0; text-align:center;">
-              <div style="font-size:6px; font-weight:600; margin-bottom:1px;">T &amp; C</div>
-              <img src="${tcQrDataUrl}" alt="T&C QR" style="width:50px;height:50px;display:block;" />
-            </div>` : ""}
           </div>
         </div>
 
@@ -318,21 +320,8 @@ export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, co
   let qrDataUrl = "";
   if (form.docket_no) {
     try {
-      const qrPayload = [
-        `DN:${form.docket_no}`,
-        `DD:${fmtDate(form.docket_date)}`,
-        `FR:${form.docket_from_town || form.docket_loc || ""}`,
-        `TO:${form.docket_to_town || form.docket_to_loc || ""}`,
-        `PKGS:${form.tot_pkgs || ""}`,
-        `AWT:${form.act_wt || ""}`,
-        `CWT:${form.chrg_wt || ""}`,
-        `CNOR:${form.cnor_name || ""}`,
-        `CNEE:${form.cnee_name || ""}`,
-        `INV:${form.invoice_no || ""}`,
-        `INVDT:${fmtDate(form.invoice_date)}`,
-        `SUP:9212312222`,
-      ].join("|");
-      qrDataUrl = await QRCode.toDataURL(qrPayload, { width: 60, margin: 1, errorCorrectionLevel: "M" });
+      const docketUrl = `${window.location.origin}/docket-scan/${encodeURIComponent(form.docket_no)}`;
+      qrDataUrl = await QRCode.toDataURL(docketUrl, { width: 200, margin: 2, errorCorrectionLevel: "M" });
     } catch (e) {
       console.error("QR generation failed:", e);
     }
@@ -341,7 +330,7 @@ export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, co
   let tcQrDataUrl = "";
   try {
     const tcUrl = `${window.location.origin}/common/terms-conditions`;
-    tcQrDataUrl = await QRCode.toDataURL(tcUrl, { width: 50, margin: 1, errorCorrectionLevel: "M" });
+    tcQrDataUrl = await QRCode.toDataURL(tcUrl, { width: 200, margin: 2, errorCorrectionLevel: "H" });
   } catch (e) {
     console.error("T&C QR generation failed:", e);
   }
