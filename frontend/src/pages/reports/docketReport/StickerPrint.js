@@ -55,25 +55,15 @@ export async function printStickerFromRow({ row, company }) {
 
   const totalPkgs = parseInt(row.docket_tot_pkgs) || 1;
 
-  // Generate QR code with all key shipment details
+  // Generate QR code - same scan URL as the "Print on DT" consignment slip,
+  // so scanning a sticker opens the Docket Scan view for this docket.
   let qrDataUrl = "";
-  const qrPayload = [
-        `DN:${row.docket_no}`,
-        `DD:${docketDate}`,
-        `FR:${fromTown}`,
-        `TO:${toTown}`,
-        `PKGS:${row.docket_tot_pkgs || ""}`,
-        `AWT:${row.docket_act_wt || ""}`,
-        `CWT:${row.docket_chrg_wt || ""}`,
-        `CNOR:${row.cnor_name || ""}`,
-        `CNEE:${row.cnee_name || ""}`,
-        `INV:${row.docket_inv_no || ""}`,
-        `INVDT:${row.docket_inv_date || ""}`,
-        `SUP:${SUPPORT_NO}`,
-  ].join("|");
-  if (row.docket_no) {
+  const qrPayload = row.docket_no
+    ? `${window.location.origin}/docket-scan/${encodeURIComponent(row.docket_no)}`
+    : "";
+  if (qrPayload) {
     try {
-      qrDataUrl = await QRCode.toDataURL(qrPayload, { width: 80, margin: 1, errorCorrectionLevel: "M" });
+      qrDataUrl = await QRCode.toDataURL(qrPayload, { width: 200, margin: 2, errorCorrectionLevel: "M" });
     } catch (e) {
       console.error("QR generation failed:", e);
     }
