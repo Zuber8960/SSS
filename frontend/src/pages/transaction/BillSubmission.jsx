@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { SaveIcon } from "../../components/common/icons";
+import { useEffect, useRef, useState } from "react";
+import { SaveIcon, ViewIcon, ClearIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
@@ -45,7 +45,14 @@ function MuiSelect({ label, value, onChange, options, disabled = false }) {
   );
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Local (not UTC) calendar date — toISOString() rolls over to the previous day
+// for users east of UTC during the evening hours.
+const today = () => {
+  const d = new Date();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mo}-${day}`;
+};
 
 const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/app\/?$/, "");
 
@@ -79,6 +86,27 @@ export default function BillSubmissionPage() {
   const [contactNo, setContactNo] = useState("");
   const { dialog, closeAlert, showSuccess, showError } = useAlert();
 
+  // Fixed-layout support: the page must fill the viewport without any
+  // page-level vertical scroll, so the grid gets whatever height is left
+  // after the toolbar and the form panel. Measured with a ResizeObserver so
+  // it stays correct on window resize / zoom changes.
+  const gridHostRef = useRef(null);
+  const [gridHeight, setGridHeight] = useState(320);
+
+  useEffect(() => {
+    const host = gridHostRef.current;
+    if (!host) return undefined;
+    const measure = () => setGridHeight(Math.max(180, host.clientHeight));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(host);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+
   const byLoc = partners.filter((p) => !locCode || p.loc_code === locCode);
   const source = byLoc.length ? byLoc : partners;
   const seenCust = new Set();
@@ -96,16 +124,28 @@ export default function BillSubmissionPage() {
   const loadBills = async (station = locCode, customer = bpCode, type = submitType, annex = annexureNo) => {
     if (!station || !customer) {
       setRows([]);
+      setSelectedIds([]);
+      return;
+    }
+    // In Annexure mode the backend filters on the annexure no., so it must be
+    // chosen before the grid can be populated. Bail out instead of silently
+    // returning the customer's entire pending-bill list.
+    if (type === "A" && !annex) {
+      setRows([]);
+      setSelectedIds([]);
       return;
     }
     const data = await fetchPendingBills({
       loc_code: station,
       bp_code: customer,
       submit_type: type,
-      annexure_no: annex,
+      annexure_no: annex || "",
     });
     const list = Array.isArray(data) ? data : [];
     setRows(list);
+    // Annexure submissions cover the whole annexure, so every returned row
+    // starts selected. The grid is controlled (rowSelectionModel), so the
+    // checkboxes render in sync with this state.
     setSelectedIds(type === "A" ? list.map((r) => r.id) : []);
   };
 
@@ -121,22 +161,26 @@ export default function BillSubmissionPage() {
     })();
   }, []);
 
-  const onStationChange = async (value) => {
+  const onStationChange = (value) => {
     setLocCode(value);
     setBpCode("");
     setAnnexureNo("");
     setAnnexures([]);
     setRows([]);
+    setSelectedIds([]);
   };
 
   const onCustomerChange = async (value) => {
     setBpCode(value);
     setAnnexureNo("");
+    setRows([]);
+    setSelectedIds([]);
     try {
       if (submitType === "A" && locCode && value) {
         const list = await fetchBillAnnexures({ loc_code: locCode, bp_code: value });
         setAnnexures(Array.isArray(list) ? list : []);
       }
+      // In Annexure mode the grid stays empty until an annexure is picked.
       await loadBills(locCode, value, submitType, "");
     } catch (err) {
       showError(err.message || "Failed to load bills");
@@ -147,6 +191,7 @@ export default function BillSubmissionPage() {
     setSubmitType(value);
     setAnnexureNo("");
     setRows([]);
+    setSelectedIds([]);
     try {
       if (value === "A" && locCode && bpCode) {
         const list = await fetchBillAnnexures({ loc_code: locCode, bp_code: bpCode });
@@ -157,6 +202,19 @@ export default function BillSubmissionPage() {
       }
     } catch (err) {
       showError(err.message || "Failed to load annexures");
+    }
+  };
+
+  // Picking an annexure changes which bills belong to the grid, so reload it.
+  const onAnnexureChange = async (value) => {
+    setAnnexureNo(value);
+    setRows([]);
+    setSelectedIds([]);
+    if (!value || !locCode || !bpCode) return;
+    try {
+      await loadBills(locCode, bpCode, submitType, value);
+    } catch (err) {
+      showError(err.message || "Failed to load bills");
     }
   };
 
@@ -207,9 +265,17 @@ export default function BillSubmissionPage() {
       showError("Please enter a valid Email ID");
       return;
     }
+    if (submitType === "A" && !annexureNo) {
+      showError("Please select Annexure first");
+      return;
+    }
     const bills = rows.filter((r) => selectedIds.includes(r.id));
     if (!bills.length) {
-      showError("Please select at least one bill");
+      showError(
+        rows.length
+          ? "Please select at least one bill"
+          : "No bills to submit. Please click Show first."
+      );
       return;
     }
     try {
@@ -229,24 +295,84 @@ export default function BillSubmissionPage() {
     }
   };
 
+  /*
+   * MUI DataGrid v9 emits an OPTIMISED selection model: ticking the header
+   * "select all" box returns { type: 'exclude', ids: Set{} } — an empty set
+   * meaning "every row EXCEPT these". Reading only `model.ids` (as this page
+   * originally did) therefore resolved that to [] and made Save report
+   * "Please select at least one bill" while every checkbox was visibly ticked.
+   *
+   * Normalise both model shapes against the current row ids:
+   *   include → ids are the selected rows
+   *   exclude → ids are the UNselected rows
+   */
   const onSelectionChange = (model) => {
-    if (Array.isArray(model)) setSelectedIds(model);
-    else if (model?.ids) setSelectedIds(Array.from(model.ids));
-    else setSelectedIds([]);
+    const allIds = rows.map((r) => r.id);
+    if (!model) {
+      setSelectedIds([]);
+      return;
+    }
+    // Legacy / defensive: a plain array of ids.
+    if (Array.isArray(model)) {
+      setSelectedIds(model);
+      return;
+    }
+    const ids = model.ids instanceof Set ? model.ids : new Set(model.ids || []);
+    if (model.type === "exclude") {
+      setSelectedIds(allIds.filter((id) => !ids.has(id)));
+    } else {
+      setSelectedIds(allIds.filter((id) => ids.has(id)));
+    }
   };
 
   return (
     <MainLayout>
       <PageBody title="Bill Submission">
-        <PageToolbar
-          actions={[
-            { label: "Show", onClick: showBills },
-            { label: "Save", icon: <SaveIcon />, onClick: save },
-            { label: "Clear", onClick: clearForm },
-          ]}
-        />
+        {/* Fixed layout: the pageBody is capped to the viewport and the grid
+            takes all remaining space, so the page never scrolls as a whole.
+            Mirrors the approach already used by manifestUnloading.jsx. */}
+        <style>{`
+          .pageBody:has(.billSubmissionFixed) {
+            height: calc(100vh - 125px);
+            min-height: 0;
+            padding-top: 12px;
+            padding-bottom: 12px;
+            box-sizing: border-box;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+          }
+          .billSubmissionFixed {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+            height: 100%;
+          }
+          .billSubmissionFixed .formPanel {
+            flex-shrink: 0;
+          }
+          .billSubmissionFixed .pageToolbar {
+            flex-shrink: 0;
+          }
+          .billSubmissionGrid {
+            flex: 1;
+            min-height: 0;
+          }
+          .billSubmissionGrid .dataTableWrapper {
+            margin-bottom: 0 !important;
+          }
+        `}</style>
+        <div className="billSubmissionFixed">
+          <PageToolbar
+            actions={[
+              { label: "Show", icon: <ViewIcon />, onClick: showBills },
+              { label: "Save", icon: <SaveIcon />, onClick: save },
+              { label: "Clear", icon: <ClearIcon />, onClick: clearForm },
+            ]}
+          />
 
-        <FormPanel>
+          <FormPanel>
           <MuiSelect
             label="Billing Station"
             value={locCode}
@@ -275,7 +401,7 @@ export default function BillSubmissionPage() {
           <MuiSelect
             label="Annexure"
             value={annexureNo}
-            onChange={setAnnexureNo}
+            onChange={onAnnexureChange}
             disabled={submitType !== "A"}
             options={[
               { value: "", label: "Select" },
@@ -317,39 +443,47 @@ export default function BillSubmissionPage() {
             value={contactNo}
             onChange={(e) => setContactNo(e.target.value)}
           />
-        </FormPanel>
+          </FormPanel>
 
-        <DataTable
-          checkboxSelection
-          columns={[
-            { key: "invoice_no", label: "Bill No." },
-            { key: "invoice_date", label: "Bill Date" },
-            { key: "loc_code", label: "Branch Code" },
-            { key: "sr_no", label: "Sr. No." },
-            { key: "docket_no", label: "CNS No." },
-            { key: "docket_date", label: "CNS Date" },
-            { key: "docket_from_loc", label: "CNS Branch" },
-            { key: "docket_to_loc", label: "Dly Station" },
-            {
-              key: "pod_url",
-              label: "POD",
-              minWidth: 180,
-              render: (row) => {
-                const href = resolvePodUrl(row.pod_url);
-                if (!href) return "—";
-                return (
-                  <a href={href} target="_blank" rel="noreferrer" style={{ color: "#6d28d9", fontSize: 12 }}>
-                    {row.pod_url}
-                  </a>
-                );
-              },
-            },
-          ]}
-          rows={rows}
-          getKey={(row) => row.id}
-          onRowSelectionModelChange={onSelectionChange}
-          isHeight={320}
-        />
+          <div className="billSubmissionGrid" ref={gridHostRef}>
+            <DataTable
+              checkboxSelection
+              scroll={{ horizontal: true }}
+              columns={[
+                { key: "invoice_no", label: "Bill No." },
+                { key: "invoice_date", label: "Bill Date" },
+                { key: "loc_code", label: "Branch Code" },
+                { key: "sr_no", label: "Sr. No." },
+                { key: "docket_no", label: "CNS No." },
+                { key: "docket_date", label: "CNS Date" },
+                { key: "docket_from_loc", label: "CNS Branch" },
+                { key: "docket_to_loc", label: "Dly Station" },
+                {
+                  key: "pod_url",
+                  label: "POD",
+                  minWidth: 180,
+                  render: (row) => {
+                    const href = resolvePodUrl(row.pod_url);
+                    if (!href) return "—";
+                    return (
+                      <a href={href} target="_blank" rel="noreferrer" style={{ color: "#6d28d9", fontSize: 12 }}>
+                        {row.pod_url}
+                      </a>
+                    );
+                  },
+                },
+              ]}
+              rows={rows}
+              getKey={(row) => row.id}
+              // Controlled selection keeps the checkboxes in sync with
+              // selectedIds, which is what Save reads. Without this the grid
+              // keeps its own internal model and the two drift apart.
+              rowSelectionModel={selectedIds}
+              onRowSelectionModelChange={onSelectionChange}
+              isHeight={gridHeight}
+            />
+          </div>
+        </div>
       </PageBody>
       <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
     </MainLayout>

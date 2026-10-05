@@ -42,6 +42,34 @@ module.exports = {
       });
     }
 
+    /*
+     * Annexure submissions cover only the bills belonging to that annexure.
+     * Without this filter the endpoint ignored `annexure_no` entirely and
+     * returned the customer's ENTIRE pending-bill list for that station.
+     */
+    if (submit_type === 'A' && annexure_no) {
+      const annexure = await db('sss.sst_bill_annexure')
+        .where({ annexure_no: String(annexure_no) })
+        .select('annexure_no', 'from_date', 'loc_code', 'customer_code')
+        .first();
+
+      if (!annexure) return [];
+
+      // An annexure is a date-range statement: it covers this customer's bills
+      // raised on/after its from_date, within the annexure's own station.
+      if (annexure.loc_code) query.andWhere('h.loc_code', annexure.loc_code);
+      if (annexure.from_date) {
+        query.andWhereRaw('h.invoice_date::date >= ?::date', [toDate(annexure.from_date)]);
+      }
+      if (annexure.customer_code) {
+        const customer = String(annexure.customer_code);
+        query.andWhere(function () {
+          this.whereRaw('h.bp_code = ?', [customer]);
+          this.orWhereRaw('h.bp_grp_code = ?', [customer]).orWhereRaw('h.bp_name = ?', [customer]);
+        });
+      }
+    }
+
     const rows = await query;
     const dockets = [...new Set(rows.map((r) => r.docket_no).filter(Boolean))];
     const podMap = {};

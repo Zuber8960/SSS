@@ -55,7 +55,6 @@ const FLEET_PATHS = [
   "/masters/item-supplier",
   "/transaction/job-card-creation",
   "/transaction/job-approval",
-  "/transaction/bill-submission",
 ];
 
 export default function Sidebar({ isMobileOpen, onToggleMobile }) {
@@ -153,6 +152,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/transaction/manifest-unloading", label: "Manifest Unloading", icon: <UnarchiveIcon /> },
         { path: "/transaction/customer-bill", label: "Customer Bill", icon: <ReceiptLongIcon /> },
         { path: "/transaction/delivery-update", label: "Delivery Update", icon: <SystemUpdateAltIcon /> },
+        { path: "/transaction/bill-submission", label: "Bill Submission", icon: <PostAddIcon /> },
       ],
     },
     {
@@ -174,7 +174,6 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/masters/item-supplier",       label: "Item Supp Master",  icon: <HandshakeIcon /> },
         { path: "/transaction/job-card-creation", label: "Job Card Creation", icon: <BuildIcon /> },
         { path: "/transaction/job-approval",      label: "Job Approval",       icon: <FactCheckIcon /> },
-        { path: "/transaction/bill-submission",   label: "Bill Submission",    icon: <PostAddIcon /> },
       ],
     },
     {

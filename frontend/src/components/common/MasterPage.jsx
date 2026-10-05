@@ -128,9 +128,22 @@ export function PageToolbar({ actions, search }) {
               color: action.color === "error" ? "#dc2626" : "#7e22ce",
               background: action.active ? (action.color === "error" ? "#fee2e2" : "#f3e8ff") : "transparent",
               "&:hover": { background: action.color === "error" ? "#fee2e2" : "#f3e8ff" },
+              // Fallback for actions declared without an icon: render the label as
+              // text so the button is never an invisible, clickable blank.
+              ...(action.icon
+                ? {}
+                : {
+                    fontSize: 13,
+                    fontWeight: 600,
+                    textTransform: "none",
+                    px: 1.5,
+                    width: "auto",
+                    minWidth: 0,
+                    lineHeight: 1,
+                  }),
             }}
           >
-            {action.icon}
+            {action.icon ?? action.label}
           </IconButton>
         </Tooltip>
       ))}
