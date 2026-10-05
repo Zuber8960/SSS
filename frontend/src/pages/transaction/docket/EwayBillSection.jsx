@@ -14,7 +14,7 @@ import {
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
 import ClearAllIcon from "@mui/icons-material/ClearAll";
 import { Html5Qrcode } from "html5-qrcode";
-import { AddIcon, DeleteIcon } from "../../../components/common/icons";
+import { AddIcon, DeleteIcon, RefreshIcon } from "../../../components/common/icons";
 import { DataTable } from "../../../components/common/MasterPage";
 import { fetchEwayBillFromDB } from "../../../utils/docket";
 import { getDateFormat } from "../../../utils/tenantService";
@@ -110,9 +110,6 @@ export default function EwayBillSection({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scannerError, setScannerError] = useState("");
   const scannerRef = useRef(null);
-  // Set to true when the user commits the ewb_no cell with Enter or Tab, so
-  // processRowUpdate knows it should resolve the EWB against the API.
-  const commitRef = useRef(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -169,38 +166,39 @@ export default function EwayBillSection({
   };
 
 
-  const handleRowUpdate = useCallback(async (newRow, oldRow) => {
-    // The grid row id is rec_id for populated rows, but onCellChange /
-    // onEwbListUpdate expect an array index.
-    const rowIndex = resolveRowIndex(newRow.id, ewbList);
+  // Called on every cell commit (blur / Enter / Tab). It only persists what the
+  // user typed - resolving the EWB against the API is done by the
+  // "Fetch EWB Details" action button, so no lookup happens on Tab/Enter.
+  const handleRowUpdate = useCallback(
+    (newRow, oldRow) => {
+      // The grid row id is rec_id for populated rows, but onCellChange expects
+      // an array index.
+      const rowIndex = resolveRowIndex(newRow.id, ewbList);
 
-    // Only resolve against the API when the cell was committed with Enter/Tab.
-    const shouldFetch = commitRef.current;
-    commitRef.current = false; // Always reset immediately
-
-    if (newRow.ewb_no === oldRow.ewb_no) {
       Object.keys(newRow).forEach((key) => {
         if (key !== "id" && newRow[key] !== oldRow[key]) {
           onCellChange(rowIndex, key, newRow[key]);
         }
       });
       return newRow;
-    }
+    },
+    [ewbList, onCellChange]
+  );
 
-    const ewbNo = String(newRow.ewb_no).trim();
-    if (!ewbNo) return newRow;
-
-    if (!shouldFetch) {
-      // Not committed with Enter/Tab - just keep what the user typed
-      onCellChange(rowIndex, "ewb_no", ewbNo);
-      return newRow;
+  // Resolve one or more EWB numbers (the cell may hold "1234,5678") against the
+  // API and push the result into the grid rows + the docket form below.
+  const fetchEwbDetails = useCallback(async (rowIndex, rawEwbNo) => {
+    const ewbNo = String(rawEwbNo).trim();
+    if (!ewbNo) {
+      showError("Please enter an EWB number");
+      return null;
     }
 
     // Numbers typed in this cell (a cell may hold "1234,5678")
     const currentEwbNumbers = parseEwbNumbers(ewbNo);
     if (currentEwbNumbers.length === 0) {
       showError(`Invalid EWB number format: ${ewbNo}`);
-      return oldRow;
+      return null;
     }
 
     // Numbers already present on the other grid rows
@@ -213,11 +211,11 @@ export default function EwayBillSection({
     const duplicate = currentEwbNumbers.find((n) => otherEwbNumbers.includes(n));
     if (duplicate) {
       showError(`EWB number ${duplicate} is already added`);
-      return oldRow;
+      return null;
     }
     if (new Set(currentEwbNumbers).size !== currentEwbNumbers.length) {
       showError(`Duplicate EWB number in ${ewbNo}`);
-      return oldRow;
+      return null;
     }
 
     // Every EWB on the grid is resolved together, in one API call
@@ -229,7 +227,7 @@ export default function EwayBillSection({
       const records = ewbApi?.data || ewbApi || [];
       if (!Array.isArray(records) || records.length === 0) {
         showError(`EWB number(s) ${ewbNo} do not exist`);
-        return oldRow;
+        return null;
       }
 
       // Index the response by EWB number so every row can find its record
@@ -243,7 +241,7 @@ export default function EwayBillSection({
       const missing = uniqueEwbNumbers.filter((n) => !recordByNo.has(n));
       if (missing.length) {
         showError(`EWB number(s) ${missing.join(", ")} do not exist`);
-        return oldRow;
+        return null;
       }
 
       if (!apiCalls) {
@@ -252,7 +250,7 @@ export default function EwayBillSection({
           .find((rec) => rec.docket_no);
         if (attached) {
           showError(`EWB number ${getRecordEwbNo(attached)} is already attached to docket ${attached.docket_no}`);
-          return oldRow;
+          return null;
         }
       }
 
@@ -274,7 +272,7 @@ export default function EwayBillSection({
       const currentMatches = currentEwbNumbers.map((n) => recordByNo.get(n));
       const r = currentMatches[0];
       const populated = {
-        ...buildRowFromRecord(r, newRow, ewbNo),
+        ...buildRowFromRecord(r, ewbList[rowIndex] || {}, ewbNo),
         invoice_total: currentMatches.reduce((sum, rec) => sum + getRecordInvValue(rec), 0),
       };
       populatedByIndex.set(rowIndex, populated);
@@ -299,7 +297,7 @@ export default function EwayBillSection({
 
       if (mismatches.length > 0) {
         showError(mismatches.join("\n"), "Consignor / Consignee Mismatch");
-        return oldRow;
+        return null;
       }
 
       if (docketData?.bpWarnings?.length && showInfo) {
@@ -391,7 +389,7 @@ export default function EwayBillSection({
         // Extra invoice rows (one per additional EWB) for the PO & Invoice grid
         docketPayload.invoiceRows = invoiceRows;
         const result = onDocketPopulate(docketPayload);
-        if (result === false) return oldRow;
+        if (result === false) return null;
       }
 
       // Push the matched data into every row that has an EWB number
@@ -404,25 +402,19 @@ export default function EwayBillSection({
     } catch (err) {
       const apiMsg = err?.response?.data?.message;
       showError(apiMsg || err.message || `Failed to fetch EWB ${ewbNo}`);
-      return oldRow;
+      return null;
     }
-  }, [ewbList, onCellChange, onDocketPopulate, onEwbListUpdate, onShowForm, showError, showInfo]);
+  }, [ewbList, onDocketPopulate, onEwbListUpdate, onShowForm, showError, showInfo]);
 
   const applyScannedEwb = useCallback(async (ewbNo) => {
     const targetIndex = ewbList.findIndex((row) => !String(row?.ewb_no || "").trim());
     const fallbackIndex = targetIndex >= 0 ? targetIndex : ewbList.length;
-    const baseRow = ewbList[fallbackIndex] || {
-      ewb_no: "", ewb_date: "", ewb_valid: "", inv_no: "", inv_date: "",
-    };
 
     if (targetIndex < 0) onAdd?.();
 
-    // A scan is an implicit Enter - resolve the EWB straight away
-    commitRef.current = true;
-    const newRow = { ...baseRow, id: fallbackIndex, ewb_no: ewbNo };
-    const updatedRow = await handleRowUpdate(newRow, baseRow);
-    if (updatedRow && onEwbListUpdate) onEwbListUpdate(fallbackIndex, updatedRow);
-  }, [ewbList, handleRowUpdate, onAdd, onEwbListUpdate]);
+    // A scan is an explicit fetch request - resolve the EWB straight away
+    await fetchEwbDetails(fallbackIndex, ewbNo);
+  }, [ewbList, fetchEwbDetails, onAdd]);
 
   // Keep a stable ref so the div-mount callback always calls the latest version
   const applyScannedEwbRef = useRef(applyScannedEwb);
@@ -454,6 +446,28 @@ export default function EwayBillSection({
       });
   }, []);
 
+  // Header action: resolve every EWB number typed on the grid against the API and
+  // fill the grid below. fetchEwbDetails already resolves all numbers present on
+  // the grid in a single API call, so one call populates every row.
+  const [isFetching, setIsFetching] = useState(false);
+
+  const handleFetchAll = useCallback(async () => {
+    if (isFetching) return;
+
+    const targetIdx = ewbList.findIndex((row) => parseEwbNumbers(row?.ewb_no).length > 0);
+    if (targetIdx < 0) {
+      showError("Please enter at least one EWB number");
+      return;
+    }
+
+    setIsFetching(true);
+    try {
+      await fetchEwbDetails(targetIdx, ewbList[targetIdx].ewb_no);
+    } finally {
+      setIsFetching(false);
+    }
+  }, [ewbList, fetchEwbDetails, isFetching, showError]);
+
   const handleDelete = () => {
     const selectedIds = Array.from(selectedRows);
     if (selectedIds.length === 0) {
@@ -475,6 +489,18 @@ export default function EwayBillSection({
       <div style={sectionHeaderStyle}>
         <h3>EWB Details</h3>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <Tooltip title="Fetch EWB Details">
+            <span>
+              <IconButton
+                onClick={handleFetchAll}
+                disabled={isFetching}
+                size="small"
+                sx={{ color: "#0f766e", "&:hover": { background: "#ccfbf1" } }}
+              >
+                <RefreshIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
           <Tooltip title="Clear All">
             <IconButton
               onClick={() =>
@@ -526,12 +552,6 @@ export default function EwayBillSection({
         checkboxSelection
         onCellChange={handleCellChange}
         onRowUpdate={handleRowUpdate}
-        onCellEditStop={(params, event) => {
-          // Resolve the EWB on both Enter and Tab
-          if (params.field === "ewb_no" && (event?.key === "Tab" || event?.key === "Enter")) {
-            commitRef.current = true;
-          }
-        }}
         onRowSelectionModelChange={(model) => {
           const ids = model?.ids instanceof Set ? model.ids : new Set(Array.isArray(model) ? model : []);
           setSelectedRows(ids);

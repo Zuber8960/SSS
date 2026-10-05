@@ -448,7 +448,7 @@ export function DataTable({
     return columnOrder.map((key) => colMap[key]).filter(Boolean);
   }, [columns, columnOrder]);
 
-  const muiColumns = [
+  const baseColumns = [
     ...orderedColumns.map((col) => ({
       field: col.key,
       headerName: col.label,
@@ -495,47 +495,54 @@ export function DataTable({
         ? { renderEditCell: (params) => <DateEditCell {...params} /> }
         : {}),
     })),
-
-    ...(actions?.length
-      ? [
-        {
-          field: "actions",
-          headerName: "Actions",
-          headerAlign: "center",
-          align: "center",
-          sortable: false,
-          flex: 1,
-          minWidth: 170,
-          color: "primary",
-          renderCell: (params) => (
-            <Box style={{
-              display: "flex",
-              gap: 5,
-              justifyContent: "center",
-              alignItems: "center",
-              height: "100%",
-              width: "100%",
-            }}>
-              {actions.map((action) => (
-                <Tooltip key={action.label} title={action.label}>
-                  <IconButton
-                    size="small"
-                    onClick={() => action.onClick(params.row)}
-                    sx={{
-                      color: action.label.toLowerCase() === "delete" ? "#dc2626" : "#7e22ce",
-                      "&:hover": { background: action.label.toLowerCase() === "delete" ? "#fee2e2" : "#f3e8ff" },
-                    }}
-                  >
-                    {action.icon}
-                  </IconButton>
-                </Tooltip>
-              ))}
-            </Box>
-          ),
-        },
-      ]
-      : []),
   ];
+
+  // The Actions column sits at the far right by default; when actionsPosition is
+  // given it is spliced in at that index instead (clamped to the column range).
+  const addActionsColumn = (cols) => {
+    if (!actions?.length) return cols;
+    const actionsColumn = {
+      field: "actions",
+      headerName: "Actions",
+      headerAlign: "center",
+      align: "center",
+      sortable: false,
+      flex: 1,
+      minWidth: 170,
+      color: "primary",
+      renderCell: (params) => (
+        <Box style={{
+          display: "flex",
+          gap: 5,
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100%",
+          width: "100%",
+        }}>
+          {actions.map((action) => (
+            <Tooltip key={action.label} title={action.label}>
+              <IconButton
+                size="small"
+                onClick={() => action.onClick(params.row)}
+                sx={{
+                  color: action.label.toLowerCase() === "delete" ? "#dc2626" : "#7e22ce",
+                  "&:hover": { background: action.label.toLowerCase() === "delete" ? "#fee2e2" : "#f3e8ff" },
+                }}
+              >
+                {action.icon}
+              </IconButton>
+            </Tooltip>
+          ))}
+        </Box>
+      ),
+    };
+
+    const next = [...cols];
+    next.push(actionsColumn);
+    return next;
+  };
+
+  const muiColumns = addActionsColumn(baseColumns);
 
   const muiRows = rows.map((row, index) => ({
     id: getKey ? getKey(row, index) : index,
