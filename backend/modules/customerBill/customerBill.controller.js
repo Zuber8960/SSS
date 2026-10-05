@@ -14,6 +14,8 @@ const normalizeNumber = (value) => {
 };
 
 const sanitizeHeader = (payload = {}) => ({
+  company_code: payload.company_code ?? null,
+  tenant_id: payload.tenant_id ?? null,
   division_code: payload.division_code ?? null,
   loc_code: payload.loc_code ?? null,
   bp_code: normalizeNumber(payload.bp_code),
@@ -91,7 +93,17 @@ async function getNextInvoiceNo() {
 async function getAllInvoices(filters = {}) {
   const query = db('sss.sst_invoice_hdr').select('*');
 
-  if (filters.company_code) query.where({ company_code: filters.company_code });
+  // Tenant scoping: legacy rows were saved with company_code/tenant_id NULL
+  // (sanitizeHeader used to drop them), so NULL rows must stay visible or the
+  // report comes back empty for older invoices.
+  if (filters.company_code) {
+    query.where((q) =>
+      q.where({ company_code: filters.company_code })
+        .orWhere({ tenant_id: filters.company_code })
+        .orWhereNull('company_code')
+        .orWhereNull('tenant_id')
+    );
+  }
   if (filters.division_code) query.andWhere({ division_code: filters.division_code });
   if (filters.loc_code) query.andWhere({ loc_code: filters.loc_code });
   if (filters.invoice_no) query.andWhere({ invoice_no: filters.invoice_no });
@@ -105,14 +117,18 @@ async function getAllInvoices(filters = {}) {
 async function getInvoiceDetail(invoiceNo, invoiceDate, invoiceLoc, company_code = null) {
   const query = db('sss.sst_invoice_dtl')
     .where({ invoice_no: invoiceNo, invoice_date: invoiceDate, invoice_loc: invoiceLoc });
-  if (company_code) query.andWhere({ company_code });
+  if (company_code) query.andWhere((q) => q.where({ company_code }).orWhereNull('company_code'));
   return query.orderBy('inv_sr_no', 'asc');
 }
 
 async function getFullInvoice(invoiceNo, invoiceDate, invoiceLoc, company_code = null) {
   const headerQuery = db('sss.sst_invoice_hdr')
     .where({ invoice_no: invoiceNo, invoice_date: invoiceDate, loc_code: invoiceLoc });
-  if (company_code) headerQuery.andWhere({ company_code });
+  if (company_code) {
+    headerQuery.andWhere((q) =>
+      q.where({ company_code }).orWhereNull('company_code').orWhereNull('tenant_id')
+    );
+  }
 
   const header = await headerQuery.first();
   if (!header) return null;
@@ -163,6 +179,7 @@ async function saveInvoice(payload = {}, company_code = null) {
     } else {
       // Insert new header with auto-generated invoice_no
       headerWithNo.company_code = company_code;
+      headerWithNo.tenant_id = company_code;
       [savedHeader] = await trx('sss.sst_invoice_hdr')
         .insert(sanitizeHeader(headerWithNo))
         .returning('*');

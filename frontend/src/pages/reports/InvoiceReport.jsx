@@ -78,7 +78,6 @@ export default function InvoiceReport() {
   const { dialog, closeAlert, showError, showSuccess } = useAlert();
   const { isLoading, showLoading, hideLoading } = useLoading();
 
-  const [invoicesRaw, setInvoicesRaw] = useState([]);
   const [allGridRows, setAllGridRows] = useState([]);
   const [partners, setPartners] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -92,11 +91,12 @@ export default function InvoiceReport() {
   const [dTo, setDTo] = useState("");
 
   useEffect(() => {
-    fetchAllInvoices().then((d) => setInvoicesRaw(Array.isArray(d) ? d : [])).catch((e) => showError(e.message || "Failed to fetch invoices"));
+    // Invoice headers are NOT fetched here — loadAllData() (below) does that and
+    // also flattens them into grid rows, so fetching them twice was wasteful and
+    // left invoicesRaw out of sync with allGridRows.
     fetchAllBusinessPartners().then((d) => setPartners(Array.isArray(d) ? d : [])).catch(() => {});
     fetchAllLocations().then((d) => setLocations(Array.isArray(d) ? d : [])).catch(() => {});
     fetchAllCompanies().then((d) => { if (Array.isArray(d) && d.length) setCompany(d[0]); }).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const pMap = useMemo(() => {
@@ -117,7 +117,6 @@ export default function InvoiceReport() {
     try {
       const headers = await fetchAllInvoices();
       const list = Array.isArray(headers) ? headers : [];
-      setInvoicesRaw(list);
 
       // Fetch details for every invoice in parallel
       const detailPromises = list.map(async (inv) => {
