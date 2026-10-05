@@ -36,7 +36,12 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
   const coPhone = co.mobile_no || "";
   const coEmail = co.email_id || "";
 
-  const totalFreight = charges.reduce((s, c) => s + (parseFloat(c.charge_amt) || 0), 0);
+  const EXCLUDED_CHARGES = ["statistical charge", "misc charge", "cover off charge"];
+  const filteredCharges = charges.filter(c => {
+    const name = (c.charge_name || c.charge_code || "").toLowerCase();
+    return !EXCLUDED_CHARGES.some(ex => name.includes(ex));
+  });
+  const totalFreight = filteredCharges.reduce((s, c) => s + (parseFloat(c.charge_amt) || 0), 0);
   const gstPct = 0;
   const gstAmt = (totalFreight * gstPct) / 100;
 
@@ -181,7 +186,7 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
                 <tr><th>Freight Details</th><th>Amount</th></tr>
               </thead>
               <tbody>
-                ${charges.map((c) => `
+                ${filteredCharges.map((c) => `
                   <tr>
                     <td>${c.charge_name || c.charge_code}</td>
                     <td class="amt-cell">${fmtAmt(c.charge_amt)}</td>
@@ -191,6 +196,22 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
                 <tr><td>GST ${gstPct} %</td><td class="amt-cell">${fmtAmt(gstAmt)}</td></tr>
                 <tr class="total-row"><td>Grand Total</td><td class="amt-cell">&#8377; ${fmtAmt(totalFreight + gstAmt)}</td></tr>
                 <tr><td colspan="2" class="company-footer">${fmt(coName)}</td></tr>
+              </tbody>
+            </table>
+            <table class="charges-table" style="margin-top:3px;">
+              <colgroup>
+                <col style="width:40%;">
+                <col style="width:60%;">
+              </colgroup>
+              <tbody>
+                <tr>
+                  <td class="pkg-label" style="white-space:nowrap;">Vehicle Type</td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td class="pkg-label" style="white-space:nowrap;">Vehicle No</td>
+                  <td></td>
+                </tr>
               </tbody>
             </table>
           </div>

@@ -25,7 +25,12 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
   const coPhone = company?.mobile_no || "";
   const coEmail = company?.email_id || "";
 
-  const totalFreight = charges.reduce((s, c) => s + (parseFloat(c.charge_amt) || 0), 0);
+  const EXCLUDED_CHARGES = ["statistical charge", "misc charge", "cover off charge"];
+  const filteredCharges = charges.filter(c => {
+    const name = (c.charge_name || c.charge_code || "").toLowerCase();
+    return !EXCLUDED_CHARGES.some(ex => name.includes(ex));
+  });
+  const totalFreight = filteredCharges.reduce((s, c) => s + (parseFloat(c.charge_amt) || 0), 0);
   const gstPct = 0;
   const gstAmt = (totalFreight * gstPct) / 100;
 
@@ -53,6 +58,7 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
           <div class="cn-block-3inch">
             ${qrDataUrl ? `<img src="${qrDataUrl}" class="cn-qr-3inch" alt="QR" />` : ""}
+            <div style="font-size:5px; font-weight:600; margin-top:1px; text-align:center;">${fmt(form.docket_no)}</div>
           </div>
           ${tcQrDataUrl ? `<div style="text-align:center; align-self:flex-start; padding-top:1px;">
             <img src="${tcQrDataUrl}" alt="T&C QR" style="width:50px;height:50px;display:block;" />
@@ -168,7 +174,7 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
               <tr><th>Freight Details</th><th style="text-align: right;">Amount</th></tr>
             </thead>
             <tbody>
-              ${charges.map((c) => `
+              ${filteredCharges.map((c) => `
                 <tr>
                   <td>${c.charge_name || c.charge_code}</td>
                   <td style="text-align: right;">₹ ${fmtAmt(c.charge_amt)}</td>
@@ -185,6 +191,18 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
               <tr class="grand-total-row-3inch">
                 <td>Grand Total</td>
                 <td style="text-align: right;">₹ ${fmtAmt(totalFreight + gstAmt)}</td>
+              </tr>
+            </tbody>
+          </table>
+          <table class="charges-table-3inch" style="margin-top:3px;">
+            <tbody>
+              <tr>
+                <td class="detail-label-3inch" style="white-space:nowrap;">Vehicle Type</td>
+                <td></td>
+              </tr>
+              <tr>
+                <td class="detail-label-3inch" style="white-space:nowrap;">Vehicle No</td>
+                <td></td>
               </tr>
             </tbody>
           </table>
