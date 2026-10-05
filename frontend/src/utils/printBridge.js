@@ -51,10 +51,10 @@ export function printStickers({ stickers, html, title = "Stickers", features = "
  * Native code should handle `PRINT_ON_DT` from `onMessage` and print each
  * entry of `slips` on the thermal printer.
  */
-export function printDocketOnDt({ slips, html, title = "Consignment", features = "width=1200,height=800" }) {
+export function printDocketOnDt({ slips, html, title = "Consignment", features = "width=1200,height=800", messageType = "PRINT_ON_DT" }) {
   const nativeWebView = window.ReactNativeWebView;
   if (nativeWebView?.postMessage) {
-    nativeWebView.postMessage(JSON.stringify({ type: "PRINT_ON_DT", slips, title }));
+    nativeWebView.postMessage(JSON.stringify({ type: messageType, slips, title }));
     return { handledByNative: true };
   }
 

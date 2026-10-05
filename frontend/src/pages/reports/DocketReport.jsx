@@ -465,6 +465,7 @@ export default function DocketReport() {
         invoiceRows: Array.isArray(invoiceRows) ? invoiceRows : [],
         pkgRows: Array.isArray(pkgRows) ? pkgRows : [],
         copies: ["Consignor Copy", "Consignee Copy", "Lorry Copy", "File Copy"],
+        withFreight,
       });
     } catch (err) {
       showError(err.message || "Failed to print docket");

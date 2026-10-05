@@ -308,7 +308,7 @@ const PRINT_CSS_3INCH = `
   .auth-sign-3inch { font-weight: 400; }
 `;
 
-export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, company, locations, copies = ["Consignor Copy"], invoiceRows, pkgRows }) {
+export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, company, locations, copies = ["Consignor Copy"], invoiceRows, pkgRows, withFreight = true }) {
   const ewb = ewbList?.[0] || {};
   const printEwbNo = ewb.ewb_no || ewbNoDisplay || "";
 
@@ -444,5 +444,6 @@ export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, co
     html,
     title: `Consignment - ${form.docket_no || ""}`,
     features: "width=1200,height=800",
+    messageType: withFreight ? "PRINT_ON_DT_WITH_FREIGHT" : "PRINT_ON_DT_WITHOUT_FREIGHT",
   });
 }

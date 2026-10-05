@@ -411,6 +411,7 @@ export default function DocketPage() {
       invoiceRows: poInvoiceRows,
       pkgRows: Array.isArray(pkgRows) ? pkgRows : [],
       copies: ["Consignor Copy", "Consignee Copy", "Lorry Copy", "File Copy"],
+      withFreight,
     });
   };
 
