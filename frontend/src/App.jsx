@@ -16,6 +16,10 @@ import ZonePage from "./pages/masters/ZonePage";
 import ZoneTownPage from "./pages/masters/ZoneTownPage";
 import ItemGroupPage from "./pages/masters/itemGroupPage";
 import ItemPage from "./pages/masters/itempage";
+import ItemSuppPage from "./pages/masters/ItemSuppPage";
+import BillSubmissionPage from "./pages/transaction/BillSubmission";
+import JobCardCreationPage from "./pages/transaction/JobCardCreation";
+import JobApprovalPage from "./pages/transaction/JobApproval";
 import AddTown from "./pages/transaction/AddTown";
 import Docket from "./pages/transaction/Docket";
 import TripSheet from "./pages/transaction/TripSheet";
@@ -38,7 +42,6 @@ import TermsAndConditions from "./pages/TermsAndConditions";
 import DocketScanView from "./pages/DocketScanView";
 import MyPage from "./pages/MyPage";
 
-
 const appRoutes = [
   { path: "/",                   element: <MasterPortal />,    protected: false },
   { path: "/:tenantSlug/login",  element: <TenantLoginPage />, protected: false },
@@ -58,6 +61,7 @@ const appRoutes = [
   { path: "/masters/zone-town", element: <ZoneTownPage />, protected: true },
   { path: "/masters/item-group", element: <ItemGroupPage />, protected: true },
   { path: "/masters/item", element: <ItemPage />, protected: true },
+  { path: "/masters/item-supplier", element: <ItemSuppPage />, protected: true },
   { path: "/transaction/add-town", element: <AddTown />, protected: true },
   { path: "/transaction/docket", element: <Docket />, protected: true },
   { path: "/transaction/trip-sheet", element: <TripSheet />, protected: true },
@@ -66,6 +70,9 @@ const appRoutes = [
   { path: "/transaction/manifest-unloading", element: <ManifestUnloading />, protected: true },
   { path: "/reports/docket-enquiry", element: <DocketEnquiry />, protected: true },
   { path: "/transaction/customer-bill", element: <CustomerBill />, protected: true },
+  { path: "/transaction/bill-submission", element: <BillSubmissionPage />, protected: true },
+  { path: "/transaction/job-card-creation", element: <JobCardCreationPage />, protected: true },
+  { path: "/transaction/job-approval", element: <JobApprovalPage />, protected: true },
   { path: "/transaction/delivery-update", element: <DeliveryUpdate />, protected: true },
   { path: "/reports/docket-report", element: <DocketReport />, protected: true },
   { path: "/reports/invoice-report", element: <InvoiceReport />, protected: true },
@@ -77,7 +84,6 @@ const appRoutes = [
   { path: "/common/terms-conditions", element: <TermsAndConditions />,  protected: false },
   { path: "/docket-scan/:docketNo",   element: <DocketScanView />,      protected: false },
   { path: "/mypage",                  element: <MyPage />,             protected: false },
-
 ];
 
 const AccessDenied = () => (

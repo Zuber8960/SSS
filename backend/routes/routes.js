@@ -31,6 +31,10 @@ const zoneMasterRoutes = require("../modules/zoneMaster/zoneMaster.routes");
 const zoneTownRoutes = require("../modules/zoneTown/zoneTown.routes");
 const itemMasterRoutes = require("../modules/itemMaster/itemMaster.routes");
 const itemGroupMasterRoutes = require("../modules/itemGroupMaster/itemGroupMaster.routes");
+const itemSuppMasterRoutes = require("../modules/itemSuppMaster/itemSuppMaster.routes");
+const billSubmissionRoutes = require("../modules/billSubmission/billSubmission.routes");
+const jobCardRoutes = require("../modules/jobCard/jobCard.routes");
+const jobApprovalRoutes = require("../modules/jobApproval/jobApproval.routes");
 const aiRoutes = require("../modules/ai/ai.routes");
 const LocationMasterController = require('../modules/locationMaster/locationMaster.controller');
 const DocketController = require('../modules/docket/docket.controller');
@@ -268,6 +272,10 @@ router.use('/zone', authMiddleware, zoneMasterRoutes);
 router.use('/zone-town', authMiddleware, zoneTownRoutes);
 router.use('/itemMaster', authMiddleware, itemMasterRoutes);
 router.use('/itemGroupMaster', authMiddleware, itemGroupMasterRoutes);
+router.use('/itemSuppMaster', authMiddleware, itemSuppMasterRoutes);
+router.use('/billSubmission', authMiddleware, billSubmissionRoutes);
+router.use('/jobCard', authMiddleware, jobCardRoutes);
+router.use('/jobApproval', authMiddleware, jobApprovalRoutes);
 // pincodeMaster is mounted publicly above (no req.user dependency)
 
 router.get('/stateCity', authMiddleware, async (req, res) => {

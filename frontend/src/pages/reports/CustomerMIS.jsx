@@ -100,9 +100,11 @@ const StatusBadge = ({ raw }) => {
 
 const columns = [
   { key: "docket_no", label: "LR No", minWidth: 150 },
+  { key: "docket_no_series", label: "Docket No. Series", minWidth: 140 },
   { key: "docket_date", label: "LR Date", minWidth: 100 },
   { key: "bp_name", label: "Customer Name", minWidth: 240 },
   { key: "bp_gstin", label: "Customer GSTIN", minWidth: 150 },
+  { key: "bp_address", label: "Address", minWidth: 260 },
   { key: "docket_inv_no", label: "Invoice No", minWidth: 150 },
   { key: "from_place", label: "From", minWidth: 130 },
   { key: "to_place", label: "To", minWidth: 140 },
@@ -119,8 +121,10 @@ const columns = [
   { key: "docket_pay_type", label: "Pay Type", minWidth: 100 },
   { key: "delivery_status", label: "Delivery Status", minWidth: 130, render: (r) => <StatusBadge raw={r.delivery_status} /> },
   { key: "actual_delivery_date", label: "Actual Delivery", minWidth: 120 },
+  { key: "delivery_update_date", label: "Delivery Update", minWidth: 130 },
   { key: "delay_days", label: "Delay (Days)", minWidth: 100 },
   { key: "ewb_no", label: "EWB No", minWidth: 200 },
+  { key: "ewb_date_expiry", label: "EWB Date Ex.", minWidth: 120 },
   { key: "delivery_remarks", label: "Delivery Remarks", minWidth: 160 },
   { key: "docket_remark", label: "Remark", minWidth: 150 },
 ];
@@ -204,13 +208,15 @@ export default function CustomerMIS() {
       .catch((err) => console.error("Failed to load MIS date range:", err));
   }, []);
 
-  // Format the two date columns for display.
+  // Format the date columns for display.
   const mappedRows = useMemo(
     () =>
       allRows.map((r) => ({
         ...r,
         docket_date: fmtDate(r.docket_date),
         actual_delivery_date: fmtDate(r.actual_delivery_date),
+        delivery_update_date: fmtDate(r.delivery_update_date),
+        ewb_date_expiry: fmtDate(r.ewb_date_expiry),
       })),
     [allRows]
   );

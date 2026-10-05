@@ -17,10 +17,12 @@ const db = require('../../config/db');
 // which Postgres rejects with a syntax error near "select".
 const LATEST_DELIVERY_NOTE = db.raw(`(
   SELECT dn.docket_no,
+         dn.dly_note_no,
          dn.delivery_status,
          dn.dly_date      AS actual_delivery_date,
          dn.delivery_remarks,
-         dn.pod_url
+         dn.pod_url,
+         COALESCE(dn.record_updated_on, dn.record_created_on) AS delivery_updated_on
     FROM sss.sst_dly_note dn
    WHERE dn.record_id = (
          SELECT MAX(d2.record_id)
@@ -69,6 +71,14 @@ function buildMisQuery(filters = {}, tenant_id = null) {
       db.raw('COALESCE(cnor.bp_name, cnee.bp_name) as bp_name'),
       db.raw('COALESCE(cnor.bp_gstin, cnee.bp_gstin) as bp_gstin'),
       db.raw('COALESCE(cnor.loc_code, cnee.loc_code) as bp_loc_code'),
+      // Customer address (consignor first, consignee as fallback).
+      db.raw(`TRIM(COALESCE(cnor.bp_addres, cnee.bp_addres, '')
+                   || CASE WHEN COALESCE(cnor.bp_city, cnee.bp_city) IS NULL THEN ''
+                           ELSE ', ' || COALESCE(cnor.bp_city, cnee.bp_city) END
+                   || CASE WHEN COALESCE(cnor.bp_state, cnee.bp_state) IS NULL THEN ''
+                           ELSE ', ' || COALESCE(cnor.bp_state, cnee.bp_state) END
+                   || CASE WHEN COALESCE(cnor.bp_pincode, cnee.bp_pincode) IS NULL THEN ''
+                           ELSE ' - ' || COALESCE(cnor.bp_pincode, cnee.bp_pincode) END) as bp_address`),
       'bpt.rec_name as bp_type_name',
       // Scalar subqueries (not joins) so a duplicate loc_code can't fan out rows.
       db.raw(`(SELECT fl.loc_name FROM sss.ssm_location fl
@@ -79,10 +89,24 @@ function buildMisQuery(filters = {}, tenant_id = null) {
       'dn.actual_delivery_date',
       'dn.delivery_remarks',
       'dn.pod_url',
+      'dn.dly_note_no',
+      'dn.delivery_updated_on',
+      // Docket-number series = everything before the trailing counter digits
+      // (docket numbers are built as <docket_loc>CN<000001>).
+      db.raw(`COALESCE(
+                NULLIF(regexp_replace(d.docket_no, '[0-9]+$', ''), ''),
+                NULLIF(regexp_replace(d.docket_no, '[0-9]', '', 'g'), ''),
+                d.docket_no) as docket_no_series`),
       db.raw(
         `(SELECT STRING_AGG(ewb_no::text, ', ' ORDER BY ewb_no)
            FROM sss.sst_docket_ewb e
           WHERE e.docket_no = d.docket_no) as ewb_no`
+      ),
+      // Earliest E-Way Bill expiry across the docket's e-way bills.
+      db.raw(
+        `(SELECT MIN(e.ewb_valid_upto)
+           FROM sss.sst_docket_ewb e
+          WHERE e.docket_no = d.docket_no) as ewb_date_expiry`
       )
     );
 
@@ -100,6 +124,8 @@ function buildMisQuery(filters = {}, tenant_id = null) {
       .orWhereILike('d.docket_pickup_town', like)
       .orWhereILike('d.docket_dly_town', like)
       .orWhereILike('d.docket_inv_no', like)
+      .orWhereILike('cnor.bp_addres', like)
+      .orWhereILike('cnee.bp_addres', like)
     );
   }
   return q;
@@ -119,12 +145,14 @@ function mapMisRow(r) {
   return {
     rec_id: r.rec_id,
     docket_no: r.docket_no,
+    docket_no_series: r.docket_no_series || "",
     docket_date: r.docket_date,
     docket_inv_no: r.docket_inv_no,
     docket_inv_date: r.docket_inv_date,
     bp_id: r.bp_id,
     bp_name: r.bp_name,
     bp_gstin: r.bp_gstin,
+    bp_address: r.bp_address || "",
     bp_type_name: r.bp_type_name,
     bp_loc_code: r.bp_loc_code,
     from_place: r.from_place || r.docket_loc || "",
@@ -144,8 +172,11 @@ function mapMisRow(r) {
     delivery_status: r.delivery_status,
     actual_delivery_date: r.actual_delivery_date,
     delivery_remarks: r.delivery_remarks,
+    delivery_update_date: r.delivery_updated_on || null,
+    dly_note_no: r.dly_note_no || "",
     pod_url: r.pod_url,
     ewb_no: r.ewb_no,
+    ewb_date_expiry: r.ewb_date_expiry,
     delay_days: delayDays,
   };
 }

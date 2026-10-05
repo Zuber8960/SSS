@@ -35,6 +35,9 @@ import ListAltIcon from "@mui/icons-material/ListAlt";
 import RequestQuoteIcon from "@mui/icons-material/RequestQuote";
 import QueryStatsIcon from "@mui/icons-material/QueryStats";
 import ZoneIcon from "@mui/icons-material/Map";
+import BuildIcon from "@mui/icons-material/Build";
+import PostAddIcon from "@mui/icons-material/PostAdd";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import Tooltip from "@mui/material/Tooltip";
@@ -45,6 +48,16 @@ import Inventory2Icon from "@mui/icons-material/Inventory2";
 import "./Sidebar.css";
 import logoFallback from "../images/loogo.PNG";
 
+// Pages grouped under the "Fleet" sidebar section.
+const FLEET_PATHS = [
+  "/masters/item-group",
+  "/masters/item",
+  "/masters/item-supplier",
+  "/transaction/job-card-creation",
+  "/transaction/job-approval",
+  "/transaction/bill-submission",
+];
+
 export default function Sidebar({ isMobileOpen, onToggleMobile }) {
   const { pathname } = useLocation();
   const tenantConfig = getTenantConfig();
@@ -53,16 +66,22 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
   const logoSrc = tenantConfig?.logo_url || logoFallback;
   const tenantName = tenantConfig?.tenant_name || "SSS-ERP";
   const [openAdmin, setOpenAdmin] = useState(() => pathname.startsWith("/admin"));
-  const [openMasters, setOpenMasters] = useState(() => pathname.startsWith("/masters"));
-  const [openTransaction, setOpenTransaction] = useState(() => pathname.startsWith("/transaction"));
+  const isFleetPath = FLEET_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const [openMasters, setOpenMasters] = useState(() => pathname.startsWith("/masters") && !isFleetPath);
+  const [openTransaction, setOpenTransaction] = useState(() => pathname.startsWith("/transaction") && !isFleetPath);
   const [openReports, setOpenReports] = useState(() => pathname.startsWith("/reports"));
+  const [openFleet, setOpenFleet] = useState(() => isFleetPath);
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem("sidebarCollapsed") === "true"
   );
   const [searchQuery, setSearchQuery] = useState("");
 
   const isActive = (path) => pathname === path;
-  const isSectionActive = (prefix) => pathname.startsWith(prefix);
+  // A section is "active" when the current path belongs to one of its children.
+  // This keeps the highlight exclusive, since sections such as Fleet and
+  // Master Modules share route roots (/masters, /transaction).
+  const isSectionActive = (section) =>
+    section.children.some((child) => pathname === child.path || pathname.startsWith(`${child.path}/`));
   const textVisible = !collapsed;
   const isSearchActive = searchQuery.trim().length > 0;
 
@@ -79,6 +98,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         setOpenMasters(false);
         setOpenTransaction(false);
         setOpenReports(false);
+        setOpenFleet(false);
       },
       children: [
         { path: "/admin/users",     label: "User Master",        icon: <GroupIcon /> },
@@ -99,6 +119,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         setOpenAdmin(false);
         setOpenTransaction(false);
         setOpenReports(false);
+        setOpenFleet(false);
       },
       children: [
         { path: "/masters/company",          label: "Company Master",    icon: <ApartmentIcon /> },
@@ -108,8 +129,6 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/masters/lorry",            label: "Lorry Master",      icon: <DirectionsCarIcon /> },
         { path: "/masters/zone",             label: "Make Zone",         icon: <ZoneIcon /> },
         { path: "/masters/zone-town",        label: "Zone Town Mapping", icon: <ZoneIcon /> },
-        { path: "/masters/item-group",       label: "Item Group Master", icon: <CategoryIcon /> },
-        { path: "/masters/item",             label: "Item Master",       icon: <Inventory2Icon /> },
         { path: "/transaction/add-town",     label: "Add Town",          icon: <LocationOnIcon /> },
       ],
     },
@@ -124,6 +143,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         setOpenAdmin(false);
         setOpenMasters(false);
         setOpenReports(false);
+        setOpenFleet(false);
       },
       children: [
         { path: "/transaction/docket",           label: "Docket",          icon: <DescriptionIcon /> },
@@ -133,6 +153,28 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/transaction/manifest-unloading", label: "Manifest Unloading", icon: <UnarchiveIcon /> },
         { path: "/transaction/customer-bill", label: "Customer Bill", icon: <ReceiptLongIcon /> },
         { path: "/transaction/delivery-update", label: "Delivery Update", icon: <SystemUpdateAltIcon /> },
+      ],
+    },
+    {
+      key: "fleet",
+      label: "Fleet",
+      icon: <LocalShippingIcon />,
+      prefix: "/fleet",
+      open: openFleet,
+      onToggle: () => {
+        setOpenFleet((p) => !p);
+        setOpenAdmin(false);
+        setOpenMasters(false);
+        setOpenTransaction(false);
+        setOpenReports(false);
+      },
+      children: [
+        { path: "/masters/item-group",          label: "Item Group Master", icon: <CategoryIcon /> },
+        { path: "/masters/item",                label: "Item Master",       icon: <Inventory2Icon /> },
+        { path: "/masters/item-supplier",       label: "Item Supp Master",  icon: <HandshakeIcon /> },
+        { path: "/transaction/job-card-creation", label: "Job Card Creation", icon: <BuildIcon /> },
+        { path: "/transaction/job-approval",      label: "Job Approval",       icon: <FactCheckIcon /> },
+        { path: "/transaction/bill-submission",   label: "Bill Submission",    icon: <PostAddIcon /> },
       ],
     },
     {
@@ -146,6 +188,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         setOpenAdmin(false);
         setOpenMasters(false);
         setOpenTransaction(false);
+        setOpenFleet(false);
       },
       children: [
         { path: "/reports/docket-enquiry", label: "Docket Enquiry", icon: <FindInPageIcon /> },
@@ -340,7 +383,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
                     <ListItem disablePadding>
                       <ListItemButton
                         onClick={section.onToggle}
-                        className={`sidebarItem sidebarCollapseButton${isSectionActive(section.prefix) ? " sidebarItemActive" : ""}`}
+                        className={`sidebarItem sidebarCollapseButton${isSectionActive(section) ? " sidebarItemActive" : ""}`}
                       >
                         <ListItemIcon className="sidebarIcon">
                           {section.icon}
