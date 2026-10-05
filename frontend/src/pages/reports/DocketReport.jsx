@@ -464,7 +464,7 @@ export default function DocketReport() {
         locations,
         invoiceRows: Array.isArray(invoiceRows) ? invoiceRows : [],
         pkgRows: Array.isArray(pkgRows) ? pkgRows : [],
-        copies: ["Consignor Copy", "Consignee Copy", "Lorry Copy", "File Copy"],
+        copies: ["Consignor Copy", "Lorry Copy"],
         withFreight,
       });
     } catch (err) {
