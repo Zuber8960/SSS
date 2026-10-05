@@ -170,9 +170,9 @@ const manifestBaseColumns = [
   { key: "mnf_to_loc", label: "To Location" },
   { key: "mnf_from_town", label: "From Town" },
   { key: "mnf_to_town", label: "To Town" },
-  { key: "desp_veh_no", label: "Vehicle No" },
-  { key: "loaded_by", label: "Driver Name" },
-  { key: "mnf_type", label: "Manifest Type" },
+  // { key: "desp_veh_no", label: "Vehicle No" },
+  // { key: "loaded_by", label: "Driver Name" },
+  // { key: "mnf_type", label: "Manifest Type" },
   { key: "mnf_no_of_pkgs", label: "Packages" },
   { key: "mnf_actual_wt", label: "Weight" },
 ];
