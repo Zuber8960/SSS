@@ -53,8 +53,6 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
           <div class="cn-block-3inch">
             ${qrDataUrl ? `<img src="${qrDataUrl}" class="cn-qr-3inch" alt="QR" />` : ""}
-            <div class="cn-no-3inch">${fmt(form.docket_no)}</div>
-            <div class="cn-date-3inch">${fmtDate(form.docket_date)}</div>
           </div>
           ${tcQrDataUrl ? `<div style="text-align:center; align-self:flex-start; padding-top:1px;">
             <img src="${tcQrDataUrl}" alt="T&C QR" style="width:50px;height:50px;display:block;" />
@@ -65,9 +63,11 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
 
       <table class="route-table-3inch">
         <tr>
-          <th>ORIGIN</th><th>DESTINATION</th><th>MODE</th><th>TYPE</th><th>BILLED</th>
+          <th>DOCKET NO</th><th>DATE</th><th>ORIGIN</th><th>DESTINATION</th><th>MODE</th><th>TYPE</th><th>BILLED</th>
         </tr>
         <tr>
+          <td>${fmt(form.docket_no)}</td>
+          <td>${fmtDate(form.docket_date)}</td>
           <td>${fmt(form.docket_from_town || form.docket_loc)}</td>
           <td>${fmt(form.docket_to_town || form.docket_to_loc)}</td>
           <td>${fmt(form.transit_type)}</td>
