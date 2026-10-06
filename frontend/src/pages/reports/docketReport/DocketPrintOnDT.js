@@ -457,8 +457,28 @@ export async function printDocketOnDT({ form, charges, ewbList, ewbNoDisplay, co
 </body>
 </html>`;
 
+  const nativeDocket = {
+    company: coCompany,
+    companyAddress: coLocAddr,
+    origin: form.docket_from_town || form.docket_loc || "",
+    destination: form.docket_to_town || form.docket_to_loc || "",
+    consignorName: form.cnor_name || "",
+    consigneeName: form.cnee_name || "",
+    consignmentNo: form.docket_no || "",
+    consignmentDate: fmtDate(form.docket_date),
+    freightItems: charges.map((c) => ({
+      name: c.charge_name || c.charge_code || "",
+      amount: fmtAmt(c.charge_amt),
+    })),
+    totalFreight: fmtAmt(totalFreight),
+    gstPct,
+    gstAmt: fmtAmt(gstAmt),
+    grandTotal: fmtAmt(totalFreight + gstAmt),
+  };
+
   printDocketOnDt({
     slips,
+    dockets: [nativeDocket],
     html,
     title: `Consignment - ${form.docket_no || ""}`,
     features: "width=1200,height=800",
