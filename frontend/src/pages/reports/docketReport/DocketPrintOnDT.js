@@ -198,11 +198,11 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
             <tbody>
               <tr>
                 <td class="detail-label-3inch" style="white-space:nowrap;">Vehicle Type</td>
-                <td></td>
+                <td>${fmt(form.load_type === "FTL" ? form.veh_type : "")}</td>
               </tr>
               <tr>
                 <td class="detail-label-3inch" style="white-space:nowrap;">Vehicle No</td>
-                <td></td>
+                <td>${fmt(form.load_type === "FTL" ? form.veh_no : "")}</td>
               </tr>
             </tbody>
           </table>

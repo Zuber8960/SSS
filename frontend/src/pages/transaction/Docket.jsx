@@ -83,6 +83,18 @@ const headerFields = [
       { label: "SUNDRY", value: "SUNDRY" },
     ]
   },
+  // Vehicle details are only relevant (and only shown) for FTL load type
+  {
+    label: "Vehicle Type", name: "veh_type", options: [
+      { label: "Truck / Trailer / LCV", value: "Truck / Trailer / LCV" },
+      { label: "Truck", value: "Truck" },
+      { label: "Trailer", value: "Trailer" },
+      { label: "LCV", value: "LCV" },
+      { label: "Tipper", value: "Tipper" },
+      { label: "Container", value: "Container" },
+    ]
+  },
+  { label: "Vehicle No", name: "veh_no" },
   {
     label: "Pay Type", name: "pay_type", required: true, options: [
       { label: "TBB", value: "TBB" },
@@ -175,7 +187,7 @@ const formSections = [
     title: "Docket Information",
     icon: SECTION_ICONS.docketInfo,
     fields: ["docket_no", "docket_date", "docket_loc", "docket_from_town", "docket_to_loc", "docket_to_town",
-      "transit_type", "load_type", "pay_type", "pay_loc", "dly_type", "cc"],
+      "transit_type", "load_type", "veh_type", "veh_no", "pay_type", "pay_loc", "dly_type", "cc"],
   },
   {
     title: "Consignor Details",
@@ -280,6 +292,8 @@ const emptyForm = {
   cnee_mob: "",
   transit_type: "",
   load_type: "",
+  veh_type: "",
+  veh_no: "",
   pay_type: "",
   pay_loc: "",
   dly_type: "",
@@ -765,6 +779,8 @@ export default function DocketPage() {
         docket_to_town:      "docket_dly_town",
         transit_type:        "docket_transit_type",
         load_type:           "docket_load_type",
+        veh_type:            "docket_veh_type",
+        veh_no:              "docket_veh_no",
         pay_type:            "docket_pay_type",
         pay_loc:             "docket_pay_loc",
         dly_type:            "docket_dly_type",
@@ -1027,6 +1043,8 @@ export default function DocketPage() {
             cnee_mob:            docketData.cnee_mob            ?? "",
             transit_type:        docketData.docket_transit_type || "",
             load_type:           docketData.docket_load_type    || "",
+            veh_type:            docketData.docket_veh_type     || "",
+            veh_no:              docketData.docket_veh_no       || "",
             pay_type:            docketData.docket_pay_type     || "",
             pay_loc:             docketData.docket_pay_loc      || "",
             dly_type:            docketData.docket_dly_type     || "",
@@ -1320,6 +1338,9 @@ export default function DocketPage() {
       "valid_upto",
     ];
 
+    // Vehicle details only apply when Load Type is FTL
+    const vehicleFields = ["veh_type", "veh_no"];
+
     const filteredFields =
       section.title === "Insurance Details"
         ? sectionFieldConfigs.filter((f) => {
@@ -1328,7 +1349,12 @@ export default function DocketPage() {
           }
           return true;
         })
-        : sectionFieldConfigs;
+        : sectionFieldConfigs.filter((f) => {
+          if (vehicleFields.includes(f.name)) {
+            return form.load_type === "FTL";
+          }
+          return true;
+        });
 
     if (filteredFields.length === 0) return null;
 
@@ -1439,6 +1465,22 @@ export default function DocketPage() {
       const handleChange = (name, value) => {
         let updated = { ...form, [name]: value };
         setDirtyFields((prev) => new Set(prev).add(name));
+
+        // Vehicle No is displayed uppercase like elsewhere in the app
+        if (name === "veh_no") {
+          updated = { ...updated, veh_no: String(value ?? "").toUpperCase() };
+        }
+
+        // Vehicle details only apply to FTL — clear them when load type changes
+        if (name === "load_type" && value !== "FTL") {
+          updated = { ...updated, veh_type: "", veh_no: "" };
+          setDirtyFields((prev) => {
+            const s = new Set(prev);
+            s.add("veh_type");
+            s.add("veh_no");
+            return s;
+          });
+        }
 
         // Recalculate charge weight when actual weight or dimension unit changes
         if (name === "act_wt") {
