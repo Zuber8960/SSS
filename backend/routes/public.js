@@ -58,6 +58,16 @@ router.get('/deliveryNote/docket/:docketNo', async (req, res) => {
   }
 });
 
+router.get('/docket/:docketNo/invoices', async (req, res) => {
+  try {
+    const { docketNo } = req.params;
+    const data = await DocketController.getDocketInvoices(docketNo);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 /* ================= PUBLIC VEHICLE TRACKING ================= */
 
 router.get('/manifest/tracking/:vehicleNo', async (req, res) => {
