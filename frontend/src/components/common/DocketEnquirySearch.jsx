@@ -1,3 +1,4 @@
+import moment from "moment";
 import { useState, useRef } from "react";
 import {
   DataTable,
@@ -23,6 +24,7 @@ const docketFields = [
   { label: "To Town", name: "to_town", span: 1 },
   { label: "Docket No", name: "docket_no", span: 1 },
   { label: "Docket Date", name: "docket_date", type: "date", span: 1 },
+  { label: "Delivery Date", name: "delivery_date", type: "date", span: 1 },
   { label: "Consignor", name: "consignor", span: 2 },
   { label: "Consignee", name: "consignee", span: 2 },
   { label: "Total Packages", name: "total_pkgs", type: "number", span: 1 },
@@ -32,7 +34,7 @@ const docketFields = [
 ];
 
 const emptyForm = {
-  docket_no: "", docket_date: "", from_loc: "", from_town: "",
+  docket_no: "", docket_date: "", delivery_date: "", from_loc: "", from_town: "",
   to_loc: "", to_town: "", consignor: "", consignee: "",
   total_pkgs: "", actual_wt: "", charged_wt: "", eway_bill_no: "", remarks: "",
 };
@@ -47,11 +49,28 @@ const STATUS_META = {
 
 function computeCurrentStatus(note, manifestList) {
   const ds = (note?.delivery_status || "").toLowerCase();
-  if (ds === "delivered" || (ds && ds !== "pending" && note?.delivery_date)) return "Delivered";
+  // delivery_date comes from sss.sst_dly_note table (col: dly_date) via delivery note
+  if (ds === "delivered" || (ds && ds !== "pending" && note?.dly_date)) return "Delivered";
   if (ds.includes("out for delivery")) return "Out for Delivery";
   const arr = Array.isArray(manifestList) ? manifestList : [];
   if (arr.length > 0 && arr.every((m) => !!m.mnf_arrival_time)) return "Arrived at Destination";
   return "In Transit";
+}
+
+/**
+ * Format a backend date value as the IST calendar date (YYYY-MM-DD).
+ * sss.sst_dly_note.dly_date arrives in two shapes — both are the SAME instant:
+ *   - ISO-8601 UTC:          "2026-10-04T18:30:00.000Z"
+ *   - IST wall-clock string: "Mon Oct 05 2026 00:00:00 GMT+0530 (India Standard Time)"
+ *     (moment.utc() misparses the latter — it drops the +0530 zone — so parse
+ *      through Date(), which honours the zone, then render with a fixed +05:30
+ *      offset so the result never depends on the browser's timezone.)
+ */
+function toIstDate(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return moment(d).utcOffset(330).format("YYYY-MM-DD"); // 330 min = +05:30 IST
 }
 
 function StatusChip({ status, size = "md" }) {
@@ -286,6 +305,11 @@ export default function DocketEnquirySearch({ showForm = true }) {
         setDeliveryNote(noteData || null);
         setManifests(manifestList);
         setCurrentStatus(computeCurrentStatus(noteData, manifestList));
+        // Populate delivery_date from the sss.sst_dly_note table (col: dly_date) via delivery note
+        // Backend sends either ISO-8601 UTC or an IST string — toIstDate() normalises both to IST
+        if (noteData?.dly_date) {
+          setForm((prev) => ({ ...prev, delivery_date: toIstDate(noteData.dly_date) }));
+        }
         showInfo(`Docket #${docketNo} loaded successfully`);
       } else {
         handleClear();
@@ -377,9 +401,9 @@ export default function DocketEnquirySearch({ showForm = true }) {
           ) : (
             <StatusChip status={currentStatus} size="lg" />
           )}
-          {currentStatus === "Delivered" && deliveryNote?.delivery_date && (
+          {currentStatus === "Delivered" && deliveryNote?.dly_date && (
             <span style={{ fontSize: 13, color: "#15803d", fontWeight: 600 }}>
-              Delivered on {deliveryNote.delivery_date.substring(0, 10)}
+              Delivered on {toIstDate(deliveryNote.dly_date) || deliveryNote.dly_date}
               {deliveryNote.received_by ? ` • Received by: ${deliveryNote.received_by}` : ""}
             </span>
           )}
