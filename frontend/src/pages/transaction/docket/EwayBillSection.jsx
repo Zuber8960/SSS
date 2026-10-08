@@ -325,22 +325,51 @@ export default function EwayBillSection({
         showInfo(docketData.bpWarnings.join("\n"), "Business Partner Warning");
       }
 
-      // One invoice entry per EWB number, so the PO & Invoice grid gets a row
-      // for each e-way bill — even when two EWBs share one invoice number.
+      // One invoice entry per unique invoice (inv_no + inv_date). Two EWBs
+      // sharing one invoice must NOT create two duplicate PO & Invoice rows —
+      // sst_docket_inv is keyed by (inv_no, inv_date) so a duplicate would
+      // overwrite / fail on save. EWB numbers are merged comma-separated and
+      // the value is kept once (max, not summed — same invoice = same value).
       // Entries are ordered by grid row so the list stays stable across edits.
       const invoiceRows = [];
+      const seenInvKey = new Map();
       [...populatedByIndex.keys()].sort((a, b) => a - b).forEach((idx) => {
         const row = populatedByIndex.get(idx);
         parseEwbNumbers(row.ewb_no).forEach((n) => {
           const rec = recordByNo.get(n);
-          invoiceRows.push({
-            po_no: "",
-            po_date: "",
-            invoice_no: rec ? (rec.INV_NO || rec.invoice_no || "") : (row.inv_no || ""),
-            invoice_date: rec ? toDate(rec.INV_DATE || rec.invoice_date) : (row.inv_date || ""),
-            invoice_value: rec ? getRecordInvValue(rec) : (parseFloat(row.invoice_total) || 0),
-            ewb_no: n,
-          });
+          const invNo = rec ? (rec.INV_NO || rec.invoice_no || "") : (row.inv_no || "");
+          const invDate = rec ? toDate(rec.INV_DATE || rec.invoice_date) : (row.inv_date || "");
+          const invVal = rec ? getRecordInvValue(rec) : (parseFloat(row.invoice_total) || 0);
+          const key = `${String(invNo).trim().toLowerCase()}|${String(invDate).trim()}`;
+          // Blank invoice no → keep per-EWB (cannot dedupe without a key)
+          if (!String(invNo).trim()) {
+            invoiceRows.push({
+              po_no: "",
+              po_date: "",
+              invoice_no: invNo,
+              invoice_date: invDate,
+              invoice_value: invVal,
+              ewb_no: n,
+            });
+            return;
+          }
+          if (seenInvKey.has(key)) {
+            const existing = seenInvKey.get(key);
+            const ewbs = new Set([...parseEwbNumbers(existing.ewb_no), n].filter(Boolean));
+            existing.ewb_no = [...ewbs].join(",");
+            existing.invoice_value = Math.max(parseFloat(existing.invoice_value) || 0, invVal || 0);
+          } else {
+            const entry = {
+              po_no: "",
+              po_date: "",
+              invoice_no: invNo,
+              invoice_date: invDate,
+              invoice_value: invVal,
+              ewb_no: n,
+            };
+            seenInvKey.set(key, entry);
+            invoiceRows.push(entry);
+          }
         });
       });
 
