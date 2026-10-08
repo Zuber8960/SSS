@@ -21,11 +21,6 @@ const combinedColumns = [
   { key: "bp_name", label: "Customer", minWidth: 140 },
   { key: "loc_label", label: "Branch", minWidth: 100 },
   { key: "invoice_type", label: "Type", minWidth: 90 },
-  { key: "inv_sr_no", label: "Sr", minWidth: 50 },
-  { key: "docket_no", label: "Docket No", minWidth: 110 },
-  { key: "docket_date", label: "Docket Date", minWidth: 100 },
-  { key: "docket_from_loc", label: "Origin", minWidth: 90 },
-  { key: "docket_to_loc", label: "Destination", minWidth: 100 },
   { key: "docket_chrwt", label: "Chg Wt", minWidth: 80 },
   { key: "freight", label: "Freight", minWidth: 90 },
   { key: "loading", label: "Loading", minWidth: 85 },
@@ -39,21 +34,6 @@ const combinedColumns = [
   { key: "sgst", label: "SGST", minWidth: 80 },
   { key: "igst", label: "IGST", minWidth: 80 },
   { key: "total_amt", label: "Total", minWidth: 100 },
-  { key: "delivery_status", label: "Delivery", minWidth: 100 },
-  {
-    key: "pod_flag", label: "POD", minWidth: 70,
-    render: (r) => (
-      <span style={{
-        display: "inline-flex", alignItems: "center", justifyContent: "center",
-        minWidth: "48px", height: "22px", borderRadius: "4px", fontSize: 11, fontWeight: 700, padding: "0 8px",
-        ...(r.pod_flag === "Y"
-          ? { background: "#e8f5e9", color: "#1b5e20", border: "1px solid #a5d6a7" }
-          : { background: "#ffe7e7", color: "#b91c1c", border: "1px solid #f7b5b5" }),
-      }}>
-        {r.pod_flag === "Y" ? "YES" : "NO"}
-      </span>
-    ),
-  },
   { key: "total_inv_amt", label: "Inv Amount", minWidth: 100 },
   { key: "created_by", label: "Created By", minWidth: 90 },
 ];
@@ -131,7 +111,8 @@ export default function InvoiceReport() {
       });
       const results = await Promise.all(detailPromises);
 
-      // Flatten: one row per docket detail line, with header info repeated
+      // Group: ONE row per invoice, summing all docket lines
+      const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
       const rows = [];
       results.forEach(({ inv, details }) => {
         const p = pMap[inv.bp_code] || {};
@@ -140,58 +121,37 @@ export default function InvoiceReport() {
         const bpName = inv.bp_name || p.bp_name || "";
         const locLabel = loc.loc_name ? `${loc.loc_code} - ${loc.loc_name}` : inv.loc_code || "";
         const typeLabel = inv.invoice_type === "CM" ? "Complimentary" : inv.invoice_type === "C" ? "Regular" : inv.invoice_type || "";
-        const invAmt = fmtAmt(inv.total_inv_amt);
 
-        if (!details.length) {
-          // Invoice with no details - show header row only
-          rows.push({
-            id: inv.invoice_no + "_" + (inv.invoice_date || "") + "_hdr_" + rows.length,
-            invoice_no: inv.invoice_no || "",
-            invoice_date: invDate,
-            bp_name: bpName,
-            loc_code: inv.loc_code || "",
-            loc_label: locLabel,
-            invoice_type: typeLabel,
-            inv_sr_no: "",
-            docket_no: "",
-            docket_date: "",
-            docket_from_loc: "",
-            docket_to_loc: "",
-            docket_chrwt: "",
-            freight: "", loading: "", unloading: "", detention: "", additional_toll: "", green_tax: "", other_charges: "",
-            taxable_amt: "", cgst: "", sgst: "", igst: "", total_amt: "",
-            delivery_status: "", pod_flag: "N",
-            total_inv_amt: invAmt,
-            created_by: inv.created_by || "",
-          });
-        } else {
-          details.forEach((d, i) => {
-            rows.push({
-              ...d,
-              id: inv.invoice_no + "_" + (inv.invoice_date || "") + "_" + (d.docket_no || i) + "_" + rows.length,
-              invoice_no: inv.invoice_no || "",
-              invoice_date: invDate,
-              bp_name: bpName,
-              loc_code: inv.loc_code || "",
-              loc_label: locLabel,
-              invoice_type: typeLabel,
-              inv_sr_no: d.inv_sr_no ?? i + 1,
-              docket_no: d.docket_no || "",
-              docket_date: toDate(d.docket_date),
-              docket_from_loc: d.docket_from_loc || "",
-              docket_to_loc: d.docket_to_loc || "",
-              docket_chrwt: fmtNum(d.docket_chrwt),
-              freight: fmtAmt(d.freight), loading: fmtAmt(d.loading), unloading: fmtAmt(d.unloading),
-              detention: fmtAmt(d.detention), additional_toll: fmtAmt(d.additional_toll), green_tax: fmtAmt(d.green_tax), other_charges: fmtAmt(d.other_charges),
-              taxable_amt: fmtAmt(d.taxable_amt), cgst: fmtAmt(d.cgst), sgst: fmtAmt(d.sgst), igst: fmtAmt(d.igst),
-              total_amt: fmtAmt(d.total_amt),
-              delivery_status: d.delivery_status || "Pending",
-              pod_flag: d.pod_flag || "N",
-              total_inv_amt: invAmt,
-              created_by: inv.created_by || "",
-            });
-          });
-        }
+        const lines = Array.isArray(details) ? details : [];
+        const sum = {
+          docket_chrwt: 0, freight: 0, loading: 0, unloading: 0, detention: 0,
+          additional_toll: 0, green_tax: 0, other_charges: 0,
+          taxable_amt: 0, cgst: 0, sgst: 0, igst: 0, total_amt: 0,
+        };
+        lines.forEach((d) => {
+          Object.keys(sum).forEach((k) => { sum[k] += num(d[k]); });
+        });
+        const docketNos = lines.map((d) => d.docket_no).filter(Boolean).join(", ");
+
+        rows.push({
+          id: `${inv.invoice_no}_${inv.invoice_date || ""}_${inv.loc_code || ""}`,
+          invoice_no: inv.invoice_no || "",
+          invoice_date: invDate,
+          bp_name: bpName,
+          bp_code: inv.bp_code || "",
+          loc_code: inv.loc_code || "",
+          loc_label: locLabel,
+          invoice_type: typeLabel,
+          docket_count: lines.length,
+          docket_nos: docketNos,
+          docket_chrwt: String(sum.docket_chrwt),
+          freight: fmtAmt(sum.freight), loading: fmtAmt(sum.loading), unloading: fmtAmt(sum.unloading),
+          detention: fmtAmt(sum.detention), additional_toll: fmtAmt(sum.additional_toll), green_tax: fmtAmt(sum.green_tax), other_charges: fmtAmt(sum.other_charges),
+          taxable_amt: fmtAmt(sum.taxable_amt), cgst: fmtAmt(sum.cgst), sgst: fmtAmt(sum.sgst), igst: fmtAmt(sum.igst),
+          total_amt: fmtAmt(sum.total_amt),
+          total_inv_amt: fmtAmt(inv.total_inv_amt ?? sum.total_amt),
+          created_by: inv.created_by || "",
+        });
       });
       setAllGridRows(rows);
       if (showLoadingSpinner) showSuccess("Data refreshed");
@@ -226,7 +186,7 @@ export default function InvoiceReport() {
           if (dt && rd.isAfter(dt, "day")) return false;
         }
       }
-      if (q && !["invoice_no","bp_name","loc_label","loc_code","invoice_type","docket_no","docket_from_loc","docket_to_loc","delivery_status","created_by"]
+      if (q && !["invoice_no","bp_name","loc_label","loc_code","invoice_type","docket_nos","created_by"]
         .some((k) => String(row[k] ?? "").toLowerCase().includes(q))) return false;
       return true;
     });
