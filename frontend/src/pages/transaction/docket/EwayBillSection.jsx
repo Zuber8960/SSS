@@ -54,7 +54,22 @@ const toDate = (val) =>
 
 const getRecordEwbNo = (rec) => String(rec?.EWB_NO || rec?.ewb_no || "").trim();
 
-const getRecordInvValue = (rec) => parseFloat(rec?.TOTAL_INV_VALUE ?? rec?.invoice_total) || 0;
+const getRecordInvValue = (rec) => {
+  const dtl0 = Array.isArray(rec?.dtl_rows) ? rec.dtl_rows[0] : null;
+  return parseFloat(rec?.TOTAL_INV_VALUE ?? rec?.invoice_total ?? rec?.INV_VALUE ?? dtl0?.INV_VALUE ?? dtl0?.invoice_total) || 0;
+};
+
+// Invoice identity of an EWB record — header first, then first detail line
+// (sst_ewb_hdr often carries no INV_NO; the invoice lives in sst_ewb_dtl).
+const getRecordInvNo = (rec) => {
+  const dtl0 = Array.isArray(rec?.dtl_rows) ? rec.dtl_rows[0] : null;
+  return rec?.INV_NO || rec?.invoice_no || rec?.inv_no || dtl0?.INV_NO || dtl0?.invoice_no || dtl0?.inv_no || "";
+};
+
+const getRecordInvDateRaw = (rec) => {
+  const dtl0 = Array.isArray(rec?.dtl_rows) ? rec.dtl_rows[0] : null;
+  return rec?.INV_DATE || rec?.invoice_date || rec?.inv_date || dtl0?.INV_DATE || dtl0?.invoice_date || dtl0?.inv_date || "";
+};
 
 const eqText = (a, b) =>
   (a ?? "").toString().trim().toLowerCase() === (b ?? "").toString().trim().toLowerCase();
@@ -79,8 +94,8 @@ const buildRowFromRecord = (rec, baseRow = {}, ewbNoLabel) => {
     ewb_no: ewbNoLabel || rec?.EWB_NO || rec?.ewb_no || baseRow.ewb_no || "",
     ewb_date: toDate(rec?.EWB_DATE || rec?.ewb_date),
     ewb_valid: toDate(rec?.EWB_VALID_UPTO || rec?.ewb_valid_upto),
-    inv_no: rec?.INV_NO || rec?.invoice_no || "",
-    inv_date: toDate(rec?.INV_DATE || rec?.invoice_date),
+    inv_no: getRecordInvNo(rec),
+    inv_date: toDate(getRecordInvDateRaw(rec)),
     cnor_name: dtl?.FROM_CUST_NAME || rec?.FROM_CUST_NAME || rec?.cnor_name || "",
     cnee_name: dtl?.TO_CUST_NAME || rec?.TO_CUST_NAME || rec?.cnee_name || "",
     cnor_address: dtl?.FROM_ADDRESS || rec?.FROM_ADDRESS || rec?.cnor_address || "",
@@ -337,8 +352,8 @@ export default function EwayBillSection({
         const row = populatedByIndex.get(idx);
         parseEwbNumbers(row.ewb_no).forEach((n) => {
           const rec = recordByNo.get(n);
-          const invNo = rec ? (rec.INV_NO || rec.invoice_no || "") : (row.inv_no || "");
-          const invDate = rec ? toDate(rec.INV_DATE || rec.invoice_date) : (row.inv_date || "");
+          const invNo = rec ? getRecordInvNo(rec) : (row.inv_no || "");
+          const invDate = rec ? toDate(getRecordInvDateRaw(rec)) : (row.inv_date || "");
           const invVal = rec ? getRecordInvValue(rec) : (parseFloat(row.invoice_total) || 0);
           const key = `${String(invNo).trim().toLowerCase()}|${String(invDate).trim()}`;
           // Blank invoice no → keep per-EWB (cannot dedupe without a key)
