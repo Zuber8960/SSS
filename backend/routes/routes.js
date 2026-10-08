@@ -35,6 +35,7 @@ const itemSuppMasterRoutes = require("../modules/itemSuppMaster/itemSuppMaster.r
 const billSubmissionRoutes = require("../modules/billSubmission/billSubmission.routes");
 const jobCardRoutes = require("../modules/jobCard/jobCard.routes");
 const jobApprovalRoutes = require("../modules/jobApproval/jobApproval.routes");
+const vehicleTypeRoutes = require("../modules/vehicleType/vehicleType.routes");
 const aiRoutes = require("../modules/ai/ai.routes");
 const LocationMasterController = require('../modules/locationMaster/locationMaster.controller');
 const DocketController = require('../modules/docket/docket.controller');
@@ -276,6 +277,7 @@ router.use('/itemSuppMaster', authMiddleware, itemSuppMasterRoutes);
 router.use('/billSubmission', authMiddleware, billSubmissionRoutes);
 router.use('/jobCard', authMiddleware, jobCardRoutes);
 router.use('/jobApproval', authMiddleware, jobApprovalRoutes);
+router.use('/vehicleType', authMiddleware, vehicleTypeRoutes);
 // pincodeMaster is mounted publicly above (no req.user dependency)
 
 router.get('/stateCity', authMiddleware, async (req, res) => {

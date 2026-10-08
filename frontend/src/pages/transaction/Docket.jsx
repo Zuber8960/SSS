@@ -36,6 +36,7 @@ import { printDocketOnDT } from "../reports/docketReport/DocketPrintOnDT";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import { fetchBpByBpName } from "../../utils/businessPartner";
 import { fetchAllMaterialGroups, fetchAllMaterialSubGroups } from "../../utils/materialGroup";
+import { fetchVehicleTypeOptions } from "../../utils/vehicleType";
 import ChargesSection from "./docket/ChargesSection";
 import EwayBillSection from "./docket/EwayBillSection";
 
@@ -338,6 +339,7 @@ export default function DocketPage() {
   const [townOptions, setTownOptions] = useState({ from: [], to: [], byLoc: {} });
   const [materialGroups, setMaterialGroups] = useState([]);
   const [allSubGroups, setAllSubGroups] = useState([]);
+  const [vehicleTypeOptions, setVehicleTypeOptions] = useState([]);
   const [company, setCompany] = useState(null);
 
 
@@ -628,6 +630,9 @@ export default function DocketPage() {
     fetchAllLocations()
       .then((data) => setLocations(data))
       .catch((err) => console.error("Failed to load locations:", err));
+    fetchVehicleTypeOptions()
+      .then((data) => setVehicleTypeOptions(Array.isArray(data) ? data : []))
+      .catch((err) => console.error("Failed to load vehicle types:", err));
     fetchAllMaterialGroups()
       .then((data) => setMaterialGroups(data))
       .catch((err) => console.error("Failed to load material groups:", err));
@@ -1388,6 +1393,14 @@ export default function DocketPage() {
           ? allSubGroups.filter(s => s.material_group_code === form.goods_grp)
           : allSubGroups;
         fieldProps = { ...fieldProps, options: filtered.map(s => ({ label: s.subgroup_desc, value: s.sub_group_code })) };
+      }
+      // Vehicle Type (veh_type) column: options come from GET /vehicleType/types
+      // (sss.ssm_vehicle_type); fall back to the static list until the API loads.
+      if (field.name === "veh_type" && vehicleTypeOptions.length) {
+        fieldProps = {
+          ...fieldProps,
+          options: vehicleTypeOptions.map((t) => ({ label: String(t), value: String(t) })),
+        };
       }
       const subGroupLookup = allSubGroups;
       const isNameField = (isCnor || isCnee) && field.name === `${prefix}_name`;
