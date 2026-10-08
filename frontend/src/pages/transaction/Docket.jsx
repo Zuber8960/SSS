@@ -522,7 +522,9 @@ export default function DocketPage() {
   };
 
   const applyBpToForm = (bp, prefix) => {
-    setForm((prev) => ({
+    setForm((prev) => {
+      const mob = String(bp.bp_mobile1 ?? bp.bp_mobile2 ?? "").trim();
+      return {
       ...prev,
       [`${prefix}_id`]:      bp.record_id   ?? prev[`${prefix}_id`],
       [`${prefix}_name`]:    bp.bp_name     || prev[`${prefix}_name`],
@@ -531,8 +533,9 @@ export default function DocketPage() {
       [`${prefix}_state`]:   bp.bp_state    || prev[`${prefix}_state`],
       [`${prefix}_pincode`]: bp.bp_pincode  || prev[`${prefix}_pincode`],
       [`${prefix}_gstin`]:   bp.bp_gstin    || prev[`${prefix}_gstin`],
-      [`${prefix}_mob`]:     bp.bp_mobile1  || prev[`${prefix}_mob`],
-    }));
+      [`${prefix}_mob`]:     mob || prev[`${prefix}_mob`] || "",
+    };
+    });
     setDirtyFields((prev) => {
       const s = new Set(prev);
       [`${prefix}_id`, `${prefix}_name`, `${prefix}_address`, `${prefix}_city`, `${prefix}_state`, `${prefix}_pincode`, `${prefix}_gstin`, `${prefix}_mob`].forEach((k) => s.add(k));
@@ -1833,6 +1836,7 @@ export default function DocketPage() {
         updates.cnor_pincode = docketData.cnor_pincode || "";
         updates.cnor_city    = docketData.cnor_city    ? docketData.cnor_city.toUpperCase() : "";
         updates.cnor_state   = docketData.cnor_state   || "";
+        updates.cnor_mob     = docketData.cnor_mob || docketData.cnor_mobile || prev.cnor_mob || "";
         if (cnorLoc) {
           updates.docket_loc       = cnorLoc.loc_code;
           updates.docket_from_town = cnorTown || docketData.cnor_city;
@@ -1844,6 +1848,7 @@ export default function DocketPage() {
         updates.cnee_pincode = docketData.cnee_pincode || "";
         updates.cnee_city    = docketData.cnee_city    ? docketData.cnee_city.toUpperCase() : "";
         updates.cnee_state   = docketData.cnee_state   || "";
+        updates.cnee_mob     = docketData.cnee_mob || docketData.cnee_mobile || prev.cnee_mob || "";
         if (cneeLoc) {
           updates.docket_to_loc  = cneeLoc.loc_code;
           updates.docket_to_town = cneeTown || docketData.cnee_city;
@@ -1855,7 +1860,7 @@ export default function DocketPage() {
       });
       setDirtyFields((prev) => {
         const s = new Set(prev);
-        ['docket_no','docket_date','docket_loc','docket_from_town','docket_to_loc','docket_to_town','cnor_id','cnor_name','cnor_address','cnor_gstin','cnor_pincode','cnor_city','cnor_state','cnee_id','cnee_name','cnee_address','cnee_gstin','cnee_pincode','cnee_city','cnee_state','invoice_no','invoice_date','invoice_value'].forEach(k => s.add(k));
+        ['docket_no','docket_date','docket_loc','docket_from_town','docket_to_loc','docket_to_town','cnor_id','cnor_name','cnor_address','cnor_gstin','cnor_pincode','cnor_city','cnor_state','cnor_mob','cnee_id','cnee_name','cnee_address','cnee_gstin','cnee_pincode','cnee_city','cnee_state','cnee_mob','invoice_no','invoice_date','invoice_value'].forEach(k => s.add(k));
         return s;
       });
 

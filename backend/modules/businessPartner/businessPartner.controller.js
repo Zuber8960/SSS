@@ -68,10 +68,19 @@ module.exports = {
 
     async getBusinessPartnerByBpName(bpName, locCode, tenant_id) {
         const query = db('sss.ssm_business_partner')
-            .select('record_id', 'bp_name', 'bp_addres', 'bp_city', 'bp_state', 'bp_pincode', 'bp_gstin', 'bp_mobile1')
+            .select('record_id', 'bp_name', 'bp_addres', 'bp_city', 'bp_state', 'bp_pincode', 'bp_gstin', 'bp_mobile1', 'bp_mobile2')
             .whereRaw('LOWER(bp_name) LIKE LOWER(?)', [`%${bpName}%`])
             .where({ tenant_id });
         if (locCode) query.whereRaw('loc_code ILIKE ?', [locCode]);
-        return query;
+        let rows = await query;
+        // Fallback: BP ka loc_code docket location se alag / null ho tab bhi
+        // suggestion mile taaki mobile (bp_mobile1) auto-fill ho sake
+        if ((!rows || rows.length === 0) && locCode) {
+            rows = await db('sss.ssm_business_partner')
+                .select('record_id', 'bp_name', 'bp_addres', 'bp_city', 'bp_state', 'bp_pincode', 'bp_gstin', 'bp_mobile1', 'bp_mobile2')
+                .whereRaw('LOWER(bp_name) LIKE LOWER(?)', [`%${bpName}%`])
+                .where({ tenant_id });
+        }
+        return rows;
     },
 };

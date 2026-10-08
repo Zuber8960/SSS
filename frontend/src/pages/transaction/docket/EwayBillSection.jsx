@@ -17,7 +17,26 @@ import { Html5Qrcode } from "html5-qrcode";
 import { AddIcon, DeleteIcon, RefreshIcon } from "../../../components/common/icons";
 import { DataTable } from "../../../components/common/MasterPage";
 import { fetchEwayBillFromDB } from "../../../utils/docket";
+import { fetchBpByBpName } from "../../../utils/businessPartner";
 import { getDateFormat } from "../../../utils/tenantService";
+
+// Mobile (bp_mobile1 || bp_mobile2) for a BP name; fuzzy on first 2 words
+// so "ABC TRADERS PVT LTD" still matches BP "ABC TRADERS". "" on miss.
+const fetchBpMobile = async (bpName, locCode) => {
+  const clean = String(bpName ?? "").trim().replace(/\s+/g, " ");
+  if (!clean) return "";
+  const q = clean.split(" ").slice(0, 2).join(" ");
+  for (const loc of [locCode || null, null]) {
+    try {
+      const rows = await fetchBpByBpName(q, loc);
+      const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
+      const mob = String(list[0]?.bp_mobile1 || list[0]?.bp_mobile2 || "").trim();
+      if (mob) return mob;
+    } catch { /* try next */ }
+    if (!locCode) break;
+  }
+  return "";
+};
 
 // --- EWB helpers (module scope: pure, no props/state access) ---
 
@@ -72,6 +91,8 @@ const buildRowFromRecord = (rec, baseRow = {}, ewbNoLabel) => {
     cnee_pincode: dtl?.TO_PINCODE || rec?.TO_PINCODE || rec?.cnee_pincode || "",
     cnor_city: dtl?.FROM_PLACE || rec?.FROM_PLACE || rec?.cnor_city || "",
     cnee_city: dtl?.TO_PLACE || rec?.TO_PLACE || rec?.cnee_city || "",
+    cnor_mob: rec?.cnor_mob || rec?.cnor_mobile || baseRow.cnor_mob || "",
+    cnee_mob: rec?.cnee_mob || rec?.cnee_mobile || baseRow.cnee_mob || "",
     invoice_total: getRecordInvValue(rec),
     cgst: rec?.CGST_VALUE || rec?.cgst || 0,
     sgst: rec?.SGST_VALUE || rec?.sgst || 0,
@@ -305,29 +326,36 @@ export default function EwayBillSection({
       }
 
       // One invoice entry per EWB number, so the PO & Invoice grid gets a row
-      // for each e-way bill. The value of an EWB is its own invoice value.
+      // for each e-way bill — even when two EWBs share one invoice number.
       // Entries are ordered by grid row so the list stays stable across edits.
       const invoiceRows = [];
-      const seenInvNos = new Set();
       [...populatedByIndex.keys()].sort((a, b) => a - b).forEach((idx) => {
         const row = populatedByIndex.get(idx);
-        const nums = parseEwbNumbers(row.ewb_no);
-        if (!nums.length) return;
-        const invNo = row.inv_no || "";
-        // Several EWB numbers can share one invoice number - list it once
-        if (invNo && seenInvNos.has(invNo)) return;
-        if (invNo) seenInvNos.add(invNo);
-        invoiceRows.push({
-          po_no: "",
-          po_date: "",
-          invoice_no: invNo,
-          invoice_date: row.inv_date || "",
-          invoice_value: parseFloat(row.invoice_total) || 0,
-          ewb_no: nums.join(","),
+        parseEwbNumbers(row.ewb_no).forEach((n) => {
+          const rec = recordByNo.get(n);
+          invoiceRows.push({
+            po_no: "",
+            po_date: "",
+            invoice_no: rec ? (rec.INV_NO || rec.invoice_no || "") : (row.inv_no || ""),
+            invoice_date: rec ? toDate(rec.INV_DATE || rec.invoice_date) : (row.inv_date || ""),
+            invoice_value: rec ? getRecordInvValue(rec) : (parseFloat(row.invoice_total) || 0),
+            ewb_no: n,
+          });
         });
       });
 
       if (onDocketPopulate) {
+        // EWB data has no mobile — fill from BP master (fuzzy name match,
+        // with/without loc, so "ABC PVT LTD" still matches BP "ABC").
+        const locCode = r?.docket?.docket_loc || ewbList?.[0]?.locCode || null;
+        if (!populated.cnor_mob) {
+          populated.cnor_mob = await fetchBpMobile(populated.cnor_name, locCode);
+          populatedByIndex.set(rowIndex, populated);
+        }
+        if (!populated.cnee_mob) {
+          populated.cnee_mob = await fetchBpMobile(populated.cnee_name, r?.docket?.docket_to_loc || null);
+          populatedByIndex.set(rowIndex, populated);
+        }
         // The base PO & Invoice row mirrors invoiceRows[0]; the remaining
         // entries are passed through as extra rows.
         const baseInv = invoiceRows[0] || {};
@@ -340,6 +368,9 @@ export default function EwayBillSection({
           docketPayload = {
             ...docketData,
             ewb_no: docketData.ewb_no || populated.ewb_no,
+            // docketData from saved-EWB has no mobile — keep looked-up value
+            cnor_mob: docketData.cnor_mob || docketData.cnor_mobile || populated.cnor_mob || "",
+            cnee_mob: docketData.cnee_mob || docketData.cnee_mobile || populated.cnee_mob || "",
             invoice_no: docketData.invoice_no || invNo,
             invoice_date: docketData.invoice_date || invDate,
             invoice_value: docketData.invoice_value ?? invValue,
@@ -357,6 +388,7 @@ export default function EwayBillSection({
             cnor_pincode:  dk.cnor_pincode  || populated.cnor_pincode,
             cnor_city:     dk.cnor_city     || populated.cnor_city,
             cnor_state:    dk.cnor_state    || "",
+            cnor_mob:      dk.cnor_mob      || populated.cnor_mob || "",
             cnee_id:       dk.cnee_id       ?? null,
             cnee_name:     dk.cnee_name     || populated.cnee_name,
             cnee_address:  dk.cnee_address  || populated.cnee_address,
@@ -364,6 +396,7 @@ export default function EwayBillSection({
             cnee_pincode:  dk.cnee_pincode  || populated.cnee_pincode,
             cnee_city:     dk.cnee_city     || populated.cnee_city,
             cnee_state:    dk.cnee_state    || "",
+            cnee_mob:      dk.cnee_mob      || populated.cnee_mob || "",
             invoice_no:    dk.docket_inv_no || invNo,
             invoice_date:  dk.docket_inv_date ? toDate(dk.docket_inv_date) : invDate,
             invoice_value: invValue,
@@ -376,11 +409,13 @@ export default function EwayBillSection({
             cnor_gstin:    populated.cnor_gstin,
             cnor_pincode:  populated.cnor_pincode,
             cnor_city:     populated.cnor_city,
+            cnor_mob:      populated.cnor_mob || "",
             cnee_name:     populated.cnee_name,
             cnee_address:  populated.cnee_address,
             cnee_gstin:    populated.cnee_gstin,
             cnee_pincode:  populated.cnee_pincode,
             cnee_city:     populated.cnee_city,
+            cnee_mob:      populated.cnee_mob || "",
             invoice_no:    invNo,
             invoice_date:  invDate,
             invoice_value: invValue,
