@@ -1881,9 +1881,24 @@ export default function DocketPage() {
       // row (which mirrors the persisted form fields, set above); the rest are
       // added as extra rows so two EWB numbers show two invoice rows.
       if (Array.isArray(docketData.invoiceRows) && docketData.invoiceRows.length > 0) {
-        setBaseEwbNo(docketData.invoiceRows[0].ewb_no ?? "");
+        const uniq = [];
+        const seen = new Set();
+        for (const r of docketData.invoiceRows) {
+          const k = `${String(r.invoice_no ?? "").trim().toLowerCase()}|${String(r.invoice_date ?? "").trim()}`;
+          if (String(r.invoice_no ?? "").trim() && seen.has(k)) {
+            const prev = uniq.find((u) => `${String(u.invoice_no ?? "").trim().toLowerCase()}|${String(u.invoice_date ?? "").trim()}` === k);
+            if (prev) {
+              const ewbs = new Set([...String(prev.ewb_no ?? "").split(","), String(r.ewb_no ?? "").split(",")].flat().map((s) => s.trim()).filter(Boolean));
+              prev.ewb_no = [...ewbs].join(",");
+            }
+            continue;
+          }
+          seen.add(k);
+          uniq.push(r);
+        }
+        setBaseEwbNo(uniq[0].ewb_no ?? "");
         setExtraPoInvoiceRows(
-          docketData.invoiceRows.slice(1).map((r) => ({
+          uniq.slice(1).map((r) => ({
             rowId: `poinv_${poInvoiceRowIdRef.current++}`,
             po_no: r.po_no ?? "",
             po_date: r.po_date ?? "",
