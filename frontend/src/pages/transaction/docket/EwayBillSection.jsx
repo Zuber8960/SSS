@@ -415,9 +415,13 @@ export default function EwayBillSection({
             // docketData from saved-EWB has no mobile — keep looked-up value
             cnor_mob: docketData.cnor_mob || docketData.cnor_mobile || populated.cnor_mob || "",
             cnee_mob: docketData.cnee_mob || docketData.cnee_mobile || populated.cnee_mob || "",
-            invoice_no: docketData.invoice_no || invNo,
-            invoice_date: docketData.invoice_date || invDate,
-            invoice_value: docketData.invoice_value ?? invValue,
+            // Base invoice MUST be invoiceRows[0] (grid order). docketData's
+            // invoice is the backend's arbitrary first-with-dtl row — using it
+            // here while extras come from slice(1) of invoiceRows duplicates
+            // one invoice and loses the other when the orders disagree.
+            invoice_no: invNo || docketData.invoice_no,
+            invoice_date: invDate || docketData.invoice_date,
+            invoice_value: invValue ?? docketData.invoice_value,
           };
         } else if (r.docket) {
           const dk = r.docket;
