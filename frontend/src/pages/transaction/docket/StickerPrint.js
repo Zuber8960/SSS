@@ -1,6 +1,6 @@
-import moment from "moment";
 import QRCode from "qrcode";
 import { getTenantConfig } from "../../../utils/tenantService";
+import { toIstMoment } from "../../../utils/date";
 import { STICKER_PRINT_CSS, buildStickerHtml } from "../../../components/common/stickerUtils";
 import { printStickers } from "../../../utils/printBridge";
 
@@ -60,7 +60,7 @@ export async function printSticker({ form, company }) {
   const level1 = company?.company_name || tenantConfig?.tenant_name || "";
 
   const docketDate = docket_date
-    ? moment(docket_date).format("DD-MMM-YY").toUpperCase()
+    ? (toIstMoment(docket_date)?.format("DD-MMM-YY").toUpperCase() || "")
     : "";
 
   const fromTown = (docket_from_town || "").toUpperCase();

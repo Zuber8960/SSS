@@ -1087,6 +1087,52 @@ const findOrCreateBp = async ({ bp_name, bp_gstin, bp_addres, bp_city, bp_pincod
   return null;
 };
 
+/* ================= CUSTOMER RATE (sss.get_cust_rate) ================= */
+
+// sss.get_cust_rate(ccode, loccode, styp, floc, ftown, tloc, ttown, cwt, vtyp, cnsdt)
+// e.g. sss.get_cust_rate('1054','GGRN','LTL','GGRN','GURGAON','LDHA','AMRITSAR',100,NULL,'01-OCT-2026')
+// returns '://FREIGHT//PERKG//12.00//500.00://HANDLING//PERKG//3.00//500.00'
+const getCustomerRate = async ({ ccode, cnorId, loccode, styp, floc, ftown, tloc, ttown, cwt, vtyp, cnsdt }) => {
+  const customerCode = ccode || cnorId || null;
+  const weight = cwt === '' || cwt === undefined || cwt === null ? null : Number(cwt);
+  const vehicleType = !vtyp ? null : vtyp;
+  // DB function expects DD-MON-YYYY (e.g. 01-OCT-2026); frontend sends YYYY-MM-DD
+  let rateDate = cnsdt;
+  const m = moment(cnsdt, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD-MM-YYYY', 'DD-MMM-YYYY'], true);
+  if (m.isValid()) rateDate = m.format('DD-MMM-YYYY').toUpperCase();
+
+  const result = await db.raw(
+    'SELECT sss.get_cust_rate(?, ?, ?, ?, ?, ?, ?, ?, ?, ?) AS rate_str',
+    [customerCode, loccode, styp, floc, ftown, tloc, ttown, weight, vehicleType, rateDate]
+  );
+  const rows = result?.rows ?? result?.[0] ?? result;
+  const raw = Array.isArray(rows) ? rows[0]?.rate_str : rows?.rate_str;
+  const rateStr = raw == null ? '' : String(raw).trim();
+
+  if (!rateStr || /^:?RNA:?$/i.test(rateStr)) {
+    return { raw: rateStr, rna: true, charges: [] };
+  }
+
+  const charges = rateStr
+    .split('://')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((chunk) => {
+      const parts = chunk.split('//').map((p) => (p ?? '').trim());
+      const [rate_type, uom, rate, min_rate] = parts;
+      if (!rate_type) return null;
+      return {
+        rate_type,
+        uom: uom || '',
+        rate: rate === '' ? '' : rate,
+        min_rate: min_rate === '' ? '' : min_rate,
+      };
+    })
+    .filter(Boolean);
+
+  return { raw: rateStr, rna: charges.length === 0, charges };
+};
+
 module.exports = {
   getAllDockets,
   getDocketById,
@@ -1114,4 +1160,5 @@ module.exports = {
   saveEwayBillToDB,
   updateEwayBillByRecId,
   findOrCreateBp,
+  getCustomerRate,
 };

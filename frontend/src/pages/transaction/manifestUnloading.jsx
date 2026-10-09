@@ -17,6 +17,7 @@ import LoadingOverlay from "../../components/common/LoadingOverlay";
 
 import { fetchManifestByNo, fetchManifestsByLocation } from "../../utils/manifest";
 import { fetchDocketByDocketNo } from "../../utils/docket";
+import { toIstDate, toIstDisplay } from "../../utils/date";
 
 // ------------------- DOCKET COLUMNS (original) -------------------
 const statusOptions = ["OK", "Short", "Excess", "Damage", "Leakage", "Missing", "Returned", "Hold"];
@@ -127,7 +128,7 @@ export default function ManifestUnloading() {
             sr: i + 1,
             manifest_no: m.mnf_no || m.manifest_no || "",
             manifest_type: manifestTypeLabels[(m.mnf_type || m.manifest_type || "").toLowerCase()] || m.mnf_type || m.manifest_type || "",
-            manifest_date: (m.mnf_date || m.manifest_date || "").substring(0, 10),
+            manifest_date: toIstDate(m.mnf_date || m.manifest_date || ""),
             origin_branch: m.mnf_loc || m.origin_branch || "",
             dest_branch: m.mnf_to_loc || m.dest_branch || "",
             vehicle_no: m.desp_veh_no || m.vehicle_no || "",
@@ -177,7 +178,7 @@ export default function ManifestUnloading() {
   // ------------------- MAP HELPERS -------------------
   const mapHeaderToForm = (hdr) => ({
     manifest_no: hdr.mnf_no || hdr.manifest_no || "",
-    manifest_date: (hdr.mnf_date || hdr.manifest_date || "").substring(0, 10),
+    manifest_date: toIstDate(hdr.mnf_date || hdr.manifest_date || ""),
     origin_branch: hdr.mnf_loc || "",
     dest_branch: hdr.mnf_to_loc || "",
     vehicle_no: hdr.desp_veh_no || "",
@@ -201,7 +202,7 @@ export default function ManifestUnloading() {
       id: docket.rec_id || docket.id || index + 1,
       sr: index + 1,
       docket_no: docket.dwb_no || docket.docket_no || "",
-      booking_date: new Date(docket.dwb_date || docket.docket_date).toLocaleDateString(),
+      booking_date: toIstDisplay(docket.dwb_date || docket.docket_date),
       consignor: docket.consignor || docket.from_party || docket.dwb_loc || "",
       consignee: docket.consignee || docket.to_party || "",
       destination: docket.docket_to_loc || "",

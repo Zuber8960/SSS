@@ -3,13 +3,7 @@ import { useParams } from "react-router-dom";
 import { fetchPublicDocketByDocketNo } from "../utils/docket";
 import useAlert from "../components/common/UseAlert";
 import CommonAlertDialog from "../components/common/CommonAlertDialog";
-import moment from "moment";
-
-const fmtDate = (val) => {
-  if (!val) return "";
-  const m = moment(val);
-  return m.isValid() ? m.format("DD-MM-YYYY") : val;
-};
+import { toIstDisplay as fmtDate } from "../utils/date";
 
 const fmtAmt = (val) => {
   const n = parseFloat(val);

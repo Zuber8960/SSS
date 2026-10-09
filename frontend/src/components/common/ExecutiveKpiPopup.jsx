@@ -19,7 +19,7 @@ import { fetchAllDockets } from "../../utils/docket";
 import { fetchAllInvoices } from "../../utils/customerBill";
 import { fetchInTransitDockets } from "../../utils/dashboard";
 import { fetchDeliveryNotes } from "../../utils/deliveryNote";
-import moment from "moment";
+import { toIstDisplay as toDate } from "../../utils/date";
 
 /**
  * ExecutiveKpiPopup — drill-down popup opened when an Executive Overview KPI
@@ -37,11 +37,7 @@ import moment from "moment";
  * Each source is fetched lazily on first open and cached afterwards.
  */
 
-const toDate = (v) => {
-  if (!v) return "";
-  const m = moment(v);
-  return m.isValid() ? m.format("DD-MM-YYYY") : v;
-};
+// Date display uses shared IST helper (utils/date.js) — see import above.
 
 const statusPill = (text, bg, fg, bd) => (
   <span style={{

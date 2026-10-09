@@ -18,6 +18,7 @@ import {
 } from "../../utils/businessPartner";
 import { fetchAllDivisionsApi } from "../../utils/divisionMaster";
 import { fetchAllLocations } from "../../utils/locationMaster";
+import { toIstDate } from "../../utils/date";
 import { fetchStatesAndCities } from "../../utils/stateCity";
 import useAlert from "../../components/common/UseAlert";
 import { compressImageFile } from "../../utils/deliveryNote";
@@ -102,7 +103,7 @@ const mapRowToForm = (row) => {
   Object.keys(f).forEach((k) => {
     if (row[k] == null) return;
     if (DATE_FORM_FIELDS.includes(k)) {
-      f[k] = String(row[k]).substring(0, 10);
+      f[k] = toIstDate(row[k]);
     } else {
       f[k] = String(row[k]);
     }

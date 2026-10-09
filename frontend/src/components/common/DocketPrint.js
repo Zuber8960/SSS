@@ -1,21 +1,13 @@
-import moment from "moment";
 import QRCode from "qrcode";
 import { getTenantConfig } from "../../utils/tenantService";
+import { toIstDisplay } from "../../utils/date";
 import { openPrintDocument } from "../../utils/printBridge";
 
 const fmt = (val) => val || "";
 
-const fmtDate = (val) => {
-  if (!val) return "";
-  const m = moment(val);
-  return m.isValid() ? m.format("DD-MM-YYYY") : val;
-};
+const fmtDate = (val) => toIstDisplay(val);
 
-const fmtDateOnly = (val) => {
-  if (!val) return "";
-  const m = moment(val);
-  return m.isValid() ? m.format("DD-MM-YYYY") : val;
-};
+const fmtDateOnly = (val) => toIstDisplay(val);
 
 const fmtAmt = (val) => {
   const n = parseFloat(val);

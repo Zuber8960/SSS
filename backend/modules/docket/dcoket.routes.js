@@ -271,6 +271,28 @@ router.put('/rec/:recId', async (req, res) => {
   }
 });
 
+/* ================= CUSTOMER RATE (sss.get_cust_rate) ================= */
+
+// Must stay above the parametric GET /:no route below, otherwise
+// '/cust-rate' would be matched as a docket number.
+router.get('/cust-rate', async (req, res) => {
+  try {
+    const { ccode, cnor_id, loccode, styp, floc, ftown, tloc, ttown, cwt, vtyp, cnsdt } = req.query;
+    if (!loccode || !styp || !floc || !ftown || !tloc || !ttown || cwt === undefined || cwt === '' || !cnsdt) {
+      return res.status(400).json({
+        success: false,
+        message: 'loccode, styp, floc, ftown, tloc, ttown, cwt and cnsdt are required',
+      });
+    }
+    const data = await DocketController.getCustomerRate({
+      ccode, cnorId: cnor_id, loccode, styp, floc, ftown, tloc, ttown, cwt, vtyp, cnsdt,
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+  }
+});
+
 /* ================= GET BY SINGLE DOCKET NUMBER ================= */
 
 router.get('/:no', async (req, res) => {

@@ -1,5 +1,5 @@
-import moment from "moment";
 import { getTenantConfig } from "../../utils/tenantService";
+import { toIstDisplay as toDate } from "../../utils/date";
 import { openPrintDocument } from "../../utils/printBridge";
 
 const fmtAmt = (v) => {
@@ -7,11 +7,7 @@ const fmtAmt = (v) => {
   return Number.isFinite(n) ? n.toFixed(2) : "0.00";
 };
 
-const toDate = (v) => {
-  if (!v) return "";
-  const m = moment(v);
-  return m.isValid() ? m.format("DD-MM-YYYY") : v;
-};
+// Date display uses shared IST helper (utils/date.js) — see import above.
 
 /**
  * Prints an invoice using the given header + detail rows.

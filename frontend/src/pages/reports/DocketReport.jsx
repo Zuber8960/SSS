@@ -9,6 +9,7 @@ import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
 import { fetchAllDockets, fetchCharges, fetchDocketByDocketNo, fetchDocketInvoices, fetchDocketPackages } from "../../utils/docket";
+import { toIstDisplay as toDate } from "../../utils/date";
 import { fetchAllLocations } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { fetchAllUsers } from "../../utils/userAPI";
@@ -22,7 +23,7 @@ import { printDocketOnDT } from "./docketReport/DocketPrintOnDT";
 import { printDocketsOnDt } from "../../utils/printBridge";
 import { printStickerFromRow } from "./docketReport/StickerPrint";
 import SelectedRowInfo from "../../components/common/SelectedRowInfo";
-import moment from "moment";
+import { toIstMoment } from "../../utils/date";
 
 const docketColumns = [
   { key: "docket_no", label: "Docket No", minWidth: 160 },
@@ -49,11 +50,7 @@ const docketColumns = [
   { key: "docket_remark", label: "Remarks", minWidth: 150 },
 ];
 
-const toDate = (val) => {
-  if (!val) return "";
-  const m = moment(val);
-  return m.isValid() ? m.format("DD-MM-YYYY") : val;
-};
+// Date display uses shared IST helper (utils/date.js) — see import above.
 
 export default function DocketReport() {
   const { dialog, closeAlert, showError, showSuccess } = useAlert();
@@ -186,24 +183,24 @@ export default function DocketReport() {
     const q = searchText.toLowerCase().trim();
     const ft = fromTown.toLowerCase();
     const tt = toTown.toLowerCase();
-    const df = dateFrom ? moment(dateFrom, "YYYY-MM-DD") : null;
-    const dt = dateTo   ? moment(dateTo,   "YYYY-MM-DD") : null;
+    const df = dateFrom ? toIstMoment(dateFrom) : null;
+    const dt = dateTo   ? toIstMoment(dateTo) : null;
     return mappedDockets.filter((row) => {
       if (ft && !String(row.docket_pickup_town ?? "").toLowerCase().includes(ft)) return false;
       if (tt && !String(row.docket_dly_town ?? "").toLowerCase().includes(tt)) return false;
       if (df || dt) {
-        const rd = moment(row.docket_date, "DD-MM-YYYY");
-        if (rd.isValid()) {
+        const rd = toIstMoment(row.docket_date);
+        if (rd) {
           if (df && rd.isBefore(df, "day")) return false;
           if (dt && rd.isAfter(dt, "day"))  return false;
         }
       }
       if (audUser && !String(row.aud_user ?? "").toLowerCase().includes(audUser.toLowerCase())) return false;
       if (audDateFrom || audDateTo) {
-        const ad = row.aud_date ? moment(row.aud_date, "DD-MM-YYYY") : null;
-        if (ad && ad.isValid()) {
-          const adf = audDateFrom ? moment(audDateFrom, "YYYY-MM-DD") : null;
-          const adt = audDateTo ? moment(audDateTo, "YYYY-MM-DD") : null;
+        const ad = row.aud_date ? toIstMoment(row.aud_date) : null;
+        if (ad) {
+          const adf = audDateFrom ? toIstMoment(audDateFrom) : null;
+          const adt = audDateTo ? toIstMoment(audDateTo) : null;
           if (adf && ad.isBefore(adf, "day")) return false;
           if (adt && ad.isAfter(adt, "day")) return false;
         }
@@ -381,7 +378,7 @@ export default function DocketReport() {
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `docket_report_${moment().format("YYYYMMDD_HHmmss")}.csv`;
+    a.href = url; a.download = `docket_report_${new Date().toISOString().slice(0,19).replace(/[-:T]/g,"")}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url); showSuccess("Export started");
   };

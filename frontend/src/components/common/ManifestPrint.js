@@ -1,13 +1,5 @@
 import { getTenantConfig } from "../../utils/tenantService";
-import { openPrintDocument } from "../../utils/printBridge";
-
-const toDate = (v) => {
-  if (!v) return "";
-  const d = new Date(v);
-  if (isNaN(d)) return v;
-  const mo = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  return `${String(d.getDate()).padStart(2,"0")}-${mo[d.getMonth()]}-${d.getFullYear()}`;
-};
+import { toIstDisplay as toDate } from "../../utils/date";
 
 const manifestTypeLabels = { lp: "Local Pickup", lh: "Long Haul", ld: "Local Delivery" };
 

@@ -11,9 +11,9 @@ import { fetchAllLocations } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { RefreshIcon, PrintIcon, ExportIcon, CloseIcon } from "../../components/common/icons";
 import { printInvoice } from "../../components/common/InvoicePrint";
+import { toIstDisplay as toDate, toIstMoment } from "../../utils/date";
 import { IconButton, Tooltip, Button, TextField, Autocomplete, Menu, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import moment from "moment";
 
 const combinedColumns = [
   { key: "invoice_no", label: "Invoice No", minWidth: 110 },
@@ -38,11 +38,7 @@ const combinedColumns = [
   { key: "created_by", label: "Created By", minWidth: 90 },
 ];
 
-const toDate = (v) => {
-  if (!v) return "";
-  const m = moment(v);
-  return m.isValid() ? m.format("DD-MM-YYYY") : v;
-};
+// Date display uses shared IST helper (utils/date.js) — see import above.
 
 const fmtAmt = (v) => {
   const n = parseFloat(v);
@@ -101,8 +97,8 @@ export default function InvoiceReport() {
       // Fetch details for every invoice in parallel
       const detailPromises = list.map(async (inv) => {
         try {
-          const m = moment(inv.invoice_date);
-          const apiDate = m.isValid() ? m.format("YYYY-MM-DD") : inv.invoice_date;
+          const m = toIstMoment(inv.invoice_date);
+          const apiDate = m ? m.format("YYYY-MM-DD") : inv.invoice_date;
           const res = await fetchInvoiceDetails(inv.invoice_no, apiDate, inv.loc_code);
           return { inv, details: Array.isArray(res) ? res : [] };
         } catch {
@@ -174,14 +170,14 @@ export default function InvoiceReport() {
     const q = searchText.toLowerCase().trim();
     const fc = fCust.toLowerCase();
     const fb = fBranch.toLowerCase();
-    const df = dFrom ? moment(dFrom, "YYYY-MM-DD") : null;
-    const dt = dTo ? moment(dTo, "YYYY-MM-DD") : null;
+    const df = dFrom ? toIstMoment(dFrom) : null;
+    const dt = dTo ? toIstMoment(dTo) : null;
     return allGridRows.filter((row) => {
       if (fc && !String(row.bp_name ?? "").toLowerCase().includes(fc)) return false;
       if (fb && !String(row.loc_label ?? row.loc_code ?? "").toLowerCase().includes(fb)) return false;
       if (df || dt) {
-        const rd = moment(row.invoice_date, "DD-MM-YYYY");
-        if (rd.isValid()) {
+        const rd = toIstMoment(row.invoice_date);
+        if (rd) {
           if (df && rd.isBefore(df, "day")) return false;
           if (dt && rd.isAfter(dt, "day")) return false;
         }
@@ -214,7 +210,7 @@ export default function InvoiceReport() {
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `invoice_report_${moment().format("YYYYMMDD_HHmmss")}.csv`;
+    a.href = url; a.download = `invoice_report_${new Date().toISOString().slice(0,19).replace(/[-:T]/g,"")}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url); showSuccess("Export started");
   };
@@ -224,8 +220,8 @@ export default function InvoiceReport() {
     try {
       showLoading();
       const inv = selectedRow;
-      const m = moment(inv.invoice_date, "DD-MM-YYYY");
-      const apiDate = m.isValid() ? m.format("YYYY-MM-DD") : inv.invoice_date;
+      const m = toIstMoment(inv.invoice_date);
+      const apiDate = m ? m.format("YYYY-MM-DD") : inv.invoice_date;
       const res = await fetchInvoiceDetails(inv.invoice_no, apiDate, inv.loc_code);
       printInvoice({
         invoice: {
