@@ -146,6 +146,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
       },
       children: [
         { path: "/transaction/docket",           label: "Docket",          icon: <DescriptionIcon /> },
+        { path: "/transaction/docket-pre-alloc", label: "Docket Pre Allocation", icon: <PostAddIcon /> },
         { path: "/transaction/trip-sheet",       label: "Trip Sheet",      icon: <AccountTreeSharp /> },
         { path: "/transaction/manifest-entry",   label: "Manifest Entry",  icon: <AccessTime /> },
         { path: "/transaction/hire-voucher",     label: "Hire Voucher",    icon: <ReceiptLongIcon /> },

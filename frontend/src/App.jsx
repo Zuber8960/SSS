@@ -27,6 +27,7 @@ import ManifestEntry from "./pages/transaction/ManifestEntry";
 import HireVoucherPage from "./pages/transaction/Hire_voucher";
 import ManifestUnloading from "./pages/transaction/manifestUnloading";
 import DocketEnquiry from "./pages/transaction/DocketEnquiry";
+import DocketPreAlloc from "./pages/transaction/DocketPreAlloc";
 import DeliveryUpdate from "./pages/reports/DeliveryUpdate";
 import DocketReport from "./pages/reports/DocketReport";
 import InvoiceReport from "./pages/reports/InvoiceReport";
@@ -64,6 +65,7 @@ const appRoutes = [
   { path: "/masters/item-supplier", element: <ItemSuppPage />, protected: true },
   { path: "/transaction/add-town", element: <AddTown />, protected: true },
   { path: "/transaction/docket", element: <Docket />, protected: true },
+  { path: "/transaction/docket-pre-alloc", element: <DocketPreAlloc />, protected: true },
   { path: "/transaction/trip-sheet", element: <TripSheet />, protected: true },
   { path: "/transaction/manifest-entry", element: <ManifestEntry />, protected: true },
   { path: "/transaction/hire-voucher", element: <HireVoucherPage />, protected: true },
