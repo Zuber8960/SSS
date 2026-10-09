@@ -39,10 +39,6 @@ export const saveDocketPackages = (docketNo, header, rows) =>
     .then(r => r.data.data || r.data || []);
 
 export const fetchEwayBillFromDB = (ewbNumbers) => Api.get(`/docket/ewayfile/db/${encodeURIComponent(ewbNumbers?.join(','))}`);
-
-// Calls DB function sss.get_cust_rate(...) via GET /docket/cust-rate
-export const fetchCustRate = (params) =>
-  Api.get('/docket/cust-rate', { params }).then(r => r.data.data ?? r.data);
 export const saveEwayBillToDB = (ewbData) => Api.post('/docket/ewayfile/db', ewbData).then(r => r.data.data || r.data || []);
 export const updateEwayBillByRecId = (recId, data) => Api.put(`/docket/ewayfile/db/${encodeURIComponent(recId)}`, data).then(r => r.data.data || r.data);
 export const fetchAllEwayBillsFromDB = () => Api.get('/docket/ewayfile/db').then(r => r.data.data || r.data || []);

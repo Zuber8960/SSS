@@ -26,7 +26,7 @@ import {
 import TuneIcon from "@mui/icons-material/Tune";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
-import { toIstDisplay as fmtDate } from "../../utils/date";
+import moment from "moment";
 
 const PURPLE = "#7e22ce";
 const PURPLE_SOFT = "#f3e8ff";
@@ -55,7 +55,12 @@ const autocompleteSlots = {
   paper: { sx: autocompletePaper },
 };
 
-// ISO date / DB value → DD-MM-YYYY for display, matching the other reports (shared IST helper — see import).
+// ISO date / DB value → DD-MM-YYYY for display, matching the other reports.
+const fmtDate = (v) => {
+  if (!v) return "";
+  const m = moment(v);
+  return m.isValid() ? m.format("DD-MM-YYYY") : String(v);
+};
 
 // Turn the delivery status text into a readable badge.
 const statusStyle = (raw) => {
@@ -283,7 +288,7 @@ export default function CustomerMIS() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `customer_mis_${new Date().toISOString().slice(0,19).replace(/[-:T]/g,"")}.csv`;
+    a.download = `customer_mis_${moment().format("YYYYMMDD_HHmmss")}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

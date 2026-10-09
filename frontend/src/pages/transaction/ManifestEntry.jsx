@@ -47,7 +47,6 @@ import {
   validateLongHaul,
   validateLocalDelivery,
 } from "../../utils/cnsValidation";
-import { toIstDate } from "../../utils/date";
 
 // ✅ Detail Table Columns (Dockets inside Manifest)
 // Only docket_no is editable; all other columns are read-only (auto-filled from API)
@@ -303,7 +302,7 @@ export default function ManifestPage() {
           to_loc: docketData.docket_to_loc || "",
           packages: docketData.docket_tot_pkgs ?? "",
           weight: docketData.docket_act_wt ?? "",
-          docket_date: toIstDate(docketData.docket_date),
+          docket_date: docketData.docket_date ? docketData.docket_date.substring(0, 10) : "",
         };
         setDetails((prev) => {
           const upd = [...prev];
@@ -411,9 +410,9 @@ export default function ManifestPage() {
         // Match from location
         if ((d.docket_loc || "").toLowerCase() !== form.from_loc.toLowerCase()) return false;
 
-        // Match date <= manifest date (compare IST calendar days)
+        // Match date <= manifest date
         if (d.docket_date) {
-          const docketDate = new Date(toIstDate(d.docket_date));
+          const docketDate = new Date(d.docket_date.substring(0, 10));
           if (docketDate > manifestDate) return false;
         }
 
@@ -426,7 +425,7 @@ export default function ManifestPage() {
       // Map to display format
       const mapped = filtered.map((d) => ({
         docket_no: d.docket_no || "",
-        docket_date: toIstDate(d.docket_date),
+        docket_date: d.docket_date ? d.docket_date.substring(0, 10) : "",
         docket_loc: d.docket_loc || "",
         docket_pickup_town: d.docket_pickup_town || d.docket_from_town || "",
         docket_to_loc: d.docket_to_loc || "",
@@ -534,7 +533,7 @@ export default function ManifestPage() {
   // ✅ Map DB header to form fields
   const mapHeaderToForm = (hdr) => ({
     manifest_no: hdr.mnf_no || "",
-    manifest_date: toIstDate(hdr.mnf_date),
+    manifest_date: hdr.mnf_date ? hdr.mnf_date.substring(0, 10) : "",
     from_loc: hdr.mnf_loc || "",
     from_town: hdr.mnf_from_town || "",
     to_loc: hdr.mnf_to_loc || "",
@@ -552,7 +551,7 @@ export default function ManifestPage() {
   // ✅ Map DB detail to form detail rows
   const mapDetailToForm = (dtl) => ({
     docket_no: dtl.dwb_no || "",
-    docket_date: toIstDate(dtl.dwb_date),
+    docket_date: dtl.dwb_date ? dtl.dwb_date.substring(0, 10) : "",
     from_loc: dtl.dwb_loc || "",
     to_loc: dtl.dwb_to_loc || "",
     packages: dtl.dwb_pkgs ?? "",

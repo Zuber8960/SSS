@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { toIstDisplay } from "../../utils/date";
+import moment from "moment";
 import { DeleteIcon, EditIcon, NoteAddIcon, ExportIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import {
@@ -28,7 +28,7 @@ import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiSelect-select": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
 
 /* record_created_on / record_updated_on are DATE columns → render tenant-style dates */
-const formatDate = (value) => toIstDisplay(value) || "—";
+const formatDate = (value) => (value ? moment(value).format("DD/MM/YYYY") : "—");
 
 /* ── Standard labels (red asterisk = required, like the reference design) ── */
 function RequiredLabel({ children }) {

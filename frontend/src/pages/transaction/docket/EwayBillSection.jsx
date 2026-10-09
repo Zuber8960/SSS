@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toIstMoment, toIstDate } from "../../../utils/date";
+import moment from "moment";
 import {
   Button,
   Dialog,
@@ -47,7 +47,10 @@ const parseEwbNumbers = (value) =>
     .map((n) => n.trim())
     .filter(Boolean);
 
-const toDate = (val) => toIstDate(val);
+const toDate = (val) =>
+  val
+    ? moment(val, ["DD/MM/YYYY HH:mm:ss A", "YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD"]).format("MM/DD/YYYY")
+    : "";
 
 const getRecordEwbNo = (rec) => String(rec?.EWB_NO || rec?.ewb_no || "").trim();
 
@@ -149,8 +152,8 @@ export default function EwayBillSection({
   const dateFormat = getDateFormat();
   const fmtDate = (val) => {
     if (!val) return "";
-    const m = toIstMoment(val);
-    return m ? m.format(dateFormat) : val;
+    const m = moment(val, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"], true);
+    return m.isValid() ? m.format(dateFormat) : val;
   };
 
   const ewbColumns = [

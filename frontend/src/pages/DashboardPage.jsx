@@ -11,7 +11,7 @@ import {
   TextField, IconButton, Box, Chip, CircularProgress, InputAdornment,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { toIstDisplay as toDate } from "../utils/date";
+import moment from "moment";
 import "../styles/MasterPage.css";
 
 const COLORS = {
@@ -172,7 +172,11 @@ function ManifestStatusChart({ completed, inTransit }) {
   );
 }
 
-// Date display uses shared IST helper (utils/date.js) — see import above.
+const toDate = (v) => {
+  if (!v) return "";
+  const m = moment(v);
+  return m.isValid() ? m.format("DD-MM-YYYY") : v;
+};
 
 
 const inTransitDocketColumns = [

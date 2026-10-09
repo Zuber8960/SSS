@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { ToggleSwitch } from "../../components/common/MasterPage";
-import { IconButton, Tooltip, Menu, MenuItem, ListItemIcon, ListItemText, Box, Button } from "@mui/material";
+import { IconButton, Tooltip, Menu, MenuItem, ListItemIcon, ListItemText, Box } from "@mui/material";
 import PrintIcon from "@mui/icons-material/Print";
 import { EditIcon, SaveIcon, ResetIcon, SECTION_ICONS, AddIcon, DeleteIcon } from "../../components/common/icons";
 import { getDateFormat, getTenantConfig } from "../../utils/tenantService";
 import MainLayout from "../../layouts/MainLayout";
-import { toIstDate, toIstMoment } from "../../utils/date";
+import moment from "moment";
 import {
   MuiField,
   MuiSelectField,
@@ -27,7 +27,6 @@ import {
   fetchDocketInvoices,
   fetchDocketPackages,
   saveDocketPackages,
-  fetchCustRate,
 } from "../../utils/docket";
 import { fetchAllLocations, fetchLocationTowns } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
@@ -35,15 +34,18 @@ import { printDocket } from "../../components/common/DocketPrint";
 import { printSticker } from "./docket/StickerPrint";
 import { printDocketOnDT } from "../reports/docketReport/DocketPrintOnDT";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
-import CalculateIcon from "@mui/icons-material/Calculate";
 import { fetchBpByBpName } from "../../utils/businessPartner";
 import { fetchAllMaterialGroups, fetchAllMaterialSubGroups } from "../../utils/materialGroup";
 import { fetchVehicleTypeOptions } from "../../utils/vehicleType";
 import ChargesSection from "./docket/ChargesSection";
 import EwayBillSection from "./docket/EwayBillSection";
 
-// Normalise a form date to the YYYY-MM-DD the DB expects (IST calendar day)
-const toDbDateValue = (val) => toIstDate(val) || null;
+// Normalise a form date to the YYYY-MM-DD the DB expects
+const toDbDateValue = (val) => {
+  if (!val) return null;
+  const m = moment(val, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"], true);
+  return m.isValid() ? m.format("YYYY-MM-DD") : null;
+};
 
 const headerFields = [
   { label: "Cnor Name", name: "cnor_name" },
@@ -82,9 +84,7 @@ const headerFields = [
       { label: "SUNDRY", value: "SUNDRY" },
     ]
   },
-  // Vehicle details are only relevant (and only shown) for FTL load type.
-  // Options are loaded from GET /vehicleType/types (sss.ssm_vehicle_type);
-  // a static fallback keeps the dropdown usable if the API is unreachable.
+  // Vehicle details are only relevant (and only shown) for FTL load type
   {
     label: "Vehicle Type", name: "veh_type", options: [
       { label: "Truck / Trailer / LCV", value: "Truck / Trailer / LCV" },
@@ -625,7 +625,7 @@ export default function DocketPage() {
     return opts;
   }, [form.docket_loc, form.docket_to_loc]);
 
-  // Load locations, material groups, vehicle types, and company on mount
+  // Load locations, material groups, and company on mount
   useEffect(() => {
     fetchAllLocations()
       .then((data) => setLocations(data))
@@ -908,7 +908,11 @@ export default function DocketPage() {
 
       // Save EWB list if withEWB is on and there are rows
       if (withEWB && ewbList.length > 0 && savedDocketNo) {
-        const toDbDate = (val) => toIstDate(val) || null;
+        const toDbDate = (val) => {
+          if (!val) return null;
+          const m = moment(val, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"], true);
+          return m.isValid() ? m.format("YYYY-MM-DD") : null;
+        };
         const normalized = ewbList
           .filter((r) => r.ewb_no)
           .map((row) => ({
@@ -999,7 +1003,11 @@ export default function DocketPage() {
     }
   });
 
-  const toDate = (val) => toIstDate(val);
+  const toDate = (val) => {
+    if (!val) return "";
+    const m = moment(val);
+    return m.isValid() ? m.format("YYYY-MM-DD") : "";
+  };
 
   const handleEditView = async () => {
     console.log(getTenantConfig());
@@ -1012,7 +1020,11 @@ export default function DocketPage() {
       try {
         const docketData = await fetchDocketByDocketNo(docketNo);
         if (docketData) {
-          const toDate = (val) => toIstDate(val);
+          const toDate = (val) => {
+            if (!val) return "";
+            const m = moment(val);
+            return m.isValid() ? m.format("YYYY-MM-DD") : "";
+          };
           const mapped = {
             docket_no:           docketData.docket_no           || "",
             docket_date:         toDate(docketData.docket_date),
@@ -1208,8 +1220,8 @@ export default function DocketPage() {
 
   const fmtPoDate = (val) => {
     if (!val) return "";
-    const m = toIstMoment(val);
-    return m ? m.format(getDateFormat()) : String(val);
+    const m = moment(val, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"], true);
+    return m.isValid() ? m.format(getDateFormat()) : String(val);
   };
 
   const emptyPoInvoiceRow = () => ({
@@ -1316,72 +1328,6 @@ export default function DocketPage() {
     (sum, r) => sum + (parseFloat(r.invoice_value) || 0),
     0
   );
-
-  // Fetch contracted customer rate from DB function sss.get_cust_rate(...)
-  // e.g. sss.get_cust_rate('1054','GGRN','LTL','GGRN','GURGAON','LDHA','AMRITSAR',100,NULL,'01-OCT-2026')
-  // which returns '://FREIGHT//PERKG//12.00//500.00://HANDLING//PERKG//3.00//500.00'
-  const RATE_UOM_MAP = {
-    PERKG: "Per KG",
-    FIXED: "Fixed",
-    PERTRIP: "Per Trip",
-    PERUNIT: "Per Unit",
-    PERTONNE: "Per Tonne",
-  };
-
-  const handleGetCustRate = () => withLoading(async () => {
-    try {
-      if (!form.cnor_id)       { showError("Select Consignor (customer) first"); return; }
-      if (!form.docket_loc)    { showError("From Location is required"); return; }
-      if (!form.docket_from_town) { showError("From Town is required"); return; }
-      if (!form.docket_to_loc) { showError("To Location is required"); return; }
-      if (!form.docket_to_town){ showError("To Town is required"); return; }
-      if (!form.load_type)     { showError("Load Type is required"); return; }
-      if (!form.chrg_wt)       { showError("Charge Weight is required"); return; }
-      if (!form.docket_date)   { showError("Docket Date is required"); return; }
-
-      const result = await fetchCustRate({
-        cnor_id: form.cnor_id,
-        loccode: form.docket_loc,
-        styp: form.load_type,
-        floc: form.docket_loc,
-        ftown: form.docket_from_town,
-        tloc: form.docket_to_loc,
-        ttown: form.docket_to_town,
-        cwt: form.chrg_wt,
-        vtyp: form.veh_type || "",
-        cnsdt: toIstDate(form.docket_date),
-      });
-
-      const charges = result?.charges || [];
-      if (result?.rna || charges.length === 0) {
-        showInfo("No contracted rate found for this customer / route / date.", "Customer Rate");
-        return;
-      }
-
-      // Fill the Rate / Rate UOM fields from the FREIGHT charge (fallback: first charge)
-      const freight = charges.find((c) => String(c.rate_type || "").toUpperCase() === "FREIGHT") || charges[0];
-      const rateNum = parseFloat(freight.rate);
-      const mappedUom = RATE_UOM_MAP[String(freight.uom || "").toUpperCase().replace(/\s+/g, "")];
-      setForm((prev) => ({
-        ...prev,
-        rate: Number.isFinite(rateNum) ? rateNum : prev.rate,
-        rate_uom: mappedUom || prev.rate_uom,
-      }));
-      setDirtyFields((prev) => {
-        const s = new Set(prev);
-        s.add("rate");
-        s.add("rate_uom");
-        return s;
-      });
-
-      const lines = charges.map((c) =>
-        `${c.rate_type}: ₹${c.rate} (${c.uom})${c.min_rate ? `, Min ₹${c.min_rate}` : ""}`
-      );
-      showInfo(lines.join("\n"), "Customer Rate Applied");
-    } catch (err) {
-      showError(err.message || "Failed to fetch customer rate");
-    }
-  });
 
   // Render a single form section card
   const renderFormSection = (section) => {
@@ -1742,35 +1688,6 @@ export default function DocketPage() {
               </Tooltip>
             </div>
           )}
-          {section.title === "Rate & Charges" && (
-            <div style={{ marginLeft: "auto" }}>
-              <Tooltip title={isFormEditMode ? "Fetch customer rate via sss.get_cust_rate()" : "Click Edit to fetch rate"}>
-                <span style={{ display: "inline-flex" }}>
-                  <Button
-                    onClick={handleGetCustRate}
-                    disabled={!isFormEditMode}
-                    size="small"
-                    variant="contained"
-                    startIcon={<CalculateIcon fontSize="small" />}
-                    sx={{
-                      background: "#7c3aed",
-                      color: "#fff",
-                      textTransform: "none",
-                      fontWeight: 600,
-                      fontSize: 12,
-                      padding: "4px 12px",
-                      borderRadius: "6px",
-                      boxShadow: "none",
-                      "&:hover": { background: "#6d28d9", boxShadow: "none" },
-                      "&.Mui-disabled": { background: "#d8ccef", color: "#fff" },
-                    }}
-                  >
-                    Get Rate
-                  </Button>
-                </span>
-              </Tooltip>
-            </div>
-          )}
         </div>
         <div style={{
           ...sectionCardStyles.sectionFields,
@@ -1922,7 +1839,8 @@ export default function DocketPage() {
           updates.docket_no = docketData.docket_no;
         }
         if (docketData.docket_date) {
-          updates.docket_date = toIstDate(docketData.docket_date) || docketData.docket_date;
+          const m = moment(docketData.docket_date, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DDTHH:mm:ssZ", "YYYY-MM-DD", "DD/MM/YYYY"], true);
+          updates.docket_date = m.isValid() ? m.format("YYYY-MM-DD") : docketData.docket_date;
         }
         updates.cnor_id      = docketData.cnor_id      ?? prev.cnor_id;
         updates.cnor_name    = docketData.cnor_name    || "";
@@ -1959,11 +1877,9 @@ export default function DocketPage() {
         return s;
       });
 
-      // One PO & Invoice row per unique invoice (inv_no + inv_date). The first
-      // entry drives the base row (which mirrors the persisted form fields,
-      // set above); the rest are added as extra rows. Two EWBs sharing one
-      // invoice collapse to a single row — dedupe defensively here too so a
-      // stale/other-system payload can never render duplicates.
+      // One PO & Invoice row per e-way bill. The first entry drives the base
+      // row (which mirrors the persisted form fields, set above); the rest are
+      // added as extra rows so two EWB numbers show two invoice rows.
       if (Array.isArray(docketData.invoiceRows) && docketData.invoiceRows.length > 0) {
         const uniq = [];
         const seen = new Set();

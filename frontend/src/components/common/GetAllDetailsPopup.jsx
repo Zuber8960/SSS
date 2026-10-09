@@ -12,7 +12,13 @@ import { fetchAllManifests } from "../../utils/manifest";
 import { fetchAllInvoices } from "../../utils/customerBill";
 import { fetchAllBusinessPartners } from "../../utils/businessPartner";
 import PincodeSearch from "./PincodeSearch";
-import { toIstDisplay as toDate } from "../../utils/date";
+import moment from "moment";
+
+const toDate = (v) => {
+  if (!v) return "";
+  const m = moment(v);
+  return m.isValid() ? m.format("DD-MM-YYYY") : v;
+};
 
 const fmtNum = (v) => {
   const n = parseFloat(v);

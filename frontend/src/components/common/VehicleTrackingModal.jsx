@@ -17,7 +17,6 @@ import {
   Alert,
 } from '@mui/material';
 import { fetchVehicleTrackingData, fetchTownCoordinates } from '../../utils/manifest';
-import { toIstDisplay } from '../../utils/date';
 import RouteMap from './RouteMap';
 
 function VehicleTrackingModal({ open, vehicleNo, onClose }) {
@@ -140,7 +139,7 @@ function VehicleTrackingModal({ open, vehicleNo, onClose }) {
                   <FormField label="Vehicle No" value={data.desp_veh_no} />
                   <FormField label="Vehicle Type" value={data.vehicle_type} />
                   <FormField label="Dispatch No" value={data.desp_doc_no} />
-                  <FormField label="Dispatch Date" value={data.desp_doc_date ? (toIstDisplay(data.desp_doc_date) || '-') : '-'} />
+                  <FormField label="Dispatch Date" value={data.desp_doc_date ? new Date(data.desp_doc_date).toLocaleDateString() : '-'} />
                   <FormField label="From Location" value={data.from_loc} />
                   <FormField label="From Town" value={data.from_town} />
                   <FormField label="To Location" value={data.to_loc} />

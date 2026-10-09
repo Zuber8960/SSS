@@ -11,7 +11,7 @@ import { printManifest } from "../../components/common/ManifestPrint";
 import { RefreshIcon, PrintIcon, ExportIcon, CloseIcon } from "../../components/common/icons";
 import { IconButton, Tooltip, Button, TextField, Autocomplete, Menu, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import { toIstDisplay as toDate, toIstMoment } from "../../utils/date";
+import moment from "moment";
 
 const manifestColumns = [
   { key: "mnf_no", label: "Manifest No", minWidth: 110 },
@@ -44,7 +44,11 @@ const manifestColumns = [
   },
 ];
 
-// Date display uses shared IST helper (utils/date.js) — see import above.
+const toDate = (v) => {
+  if (!v) return "";
+  const m = moment(v);
+  return m.isValid() ? m.format("DD-MM-YYYY") : v;
+};
 
 const fmtNum = (v) => {
   const n = parseFloat(v);
@@ -101,8 +105,8 @@ export default function ManifestReport() {
     const ff = fFromLoc.toLowerCase();
     const ft = fToLoc.toLowerCase();
     const fty = fType.toLowerCase();
-    const df = dFrom ? toIstMoment(dFrom) : null;
-    const dt = dTo ? toIstMoment(dTo) : null;
+    const df = dFrom ? moment(dFrom, "YYYY-MM-DD") : null;
+    const dt = dTo ? moment(dTo, "YYYY-MM-DD") : null;
 
     return manifestRaw
       .map((m) => ({
@@ -122,8 +126,8 @@ export default function ManifestReport() {
         if (ft && !String(row.to_label ?? "").toLowerCase().includes(ft)) return false;
         if (fty && !String(row.mnf_type_label ?? "").toLowerCase().includes(fty)) return false;
         if (df || dt) {
-          const rd = toIstMoment(row.mnf_date);
-          if (rd) {
+          const rd = moment(row.mnf_date, "DD-MM-YYYY");
+          if (rd.isValid()) {
             if (df && rd.isBefore(df, "day")) return false;
             if (dt && rd.isAfter(dt, "day")) return false;
           }
@@ -156,7 +160,7 @@ export default function ManifestReport() {
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `manifest_report_${new Date().toISOString().slice(0,19).replace(/[-:T]/g,"")}.csv`;
+    a.href = url; a.download = `manifest_report_${moment().format("YYYYMMDD_HHmmss")}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url); showSuccess("Export started");
   };

@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import moment from "moment";
 import MainLayout from "../../layouts/MainLayout";
 import {
   MuiField,
@@ -102,7 +103,11 @@ export default function DeliveryUpdate() {
     return extTypeMap[ext] || "";
   };
 
-  // DB → <input type="date"> (shared IST helper — see import above)
+  const toDate = (val) => {
+    if (!val) return "";
+    const m = moment(val);
+    return m.isValid() ? m.format("YYYY-MM-DD") : "";
+  };
 
   const handleSetForm = (updatedForm) => {
     setForm(updatedForm);

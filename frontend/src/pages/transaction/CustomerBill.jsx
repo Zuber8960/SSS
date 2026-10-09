@@ -13,10 +13,9 @@ import { fetchAllLocations } from "../../utils/locationMaster";
 import { saveInvoice, updateInvoice, deleteInvoice, fetchAllInvoices, fetchInvoiceDetails } from "../../utils/customerBill";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { printInvoice } from "../../components/common/InvoicePrint";
-import { toIstDisplay as toDate } from "../../utils/date";
 import { Button, Chip, IconButton, Tooltip } from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
-import { toIstDate } from "../../utils/date";
+import moment from "moment";
 
 const billingColumns = [
   { key: "docket_no", label: "Docket", minWidth: 110 },
@@ -113,7 +112,11 @@ const CHARGE_MAP = [
   { key: "discount", keywords: ["DISC", "DISCOUNT"] },
 ];
 
-// Date display uses shared IST helper (utils/date.js) — see import above.
+const toDate = (val) => {
+  if (!val) return "";
+  const m = moment(val);
+  return m.isValid() ? m.format("DD-MM-YYYY") : val;
+};
 
 export default function CustomerBill() {
   const { dialog, closeAlert, showError, showSuccess } = useAlert();
@@ -753,7 +756,7 @@ export default function CustomerBill() {
         docket_no: row.docket_no || null,
         docket_from_loc: row.origin || null,
         docket_to_loc: row.destination || null,
-        docket_date: row.docket_date ? toIstDate(row.docket_date) || null : null,
+        docket_date: row.docket_date ? moment(row.docket_date, "DD-MM-YYYY").format("YYYY-MM-DD") : null,
         docket_chrwt: parseFloat(row.charge_wt) || 0,
         freight: parseFloat(row.freight) || 0,
         loading: parseFloat(row.loading) || 0,

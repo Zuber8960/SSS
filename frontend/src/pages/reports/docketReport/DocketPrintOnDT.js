@@ -1,11 +1,15 @@
+import moment from "moment";
 import QRCode from "qrcode";
 import { getTenantConfig } from "../../../utils/tenantService";
-import { toIstDisplay as fmtDate } from "../../../utils/date";
 import { printDocketOnDt } from "../../../utils/printBridge";
 
 const fmt = (val) => val || "";
 
-// Date display uses shared IST helper (utils/date.js) — see import above.
+const fmtDate = (val) => {
+  if (!val) return "";
+  const m = moment(val);
+  return m.isValid() ? m.format("DD-MM-YYYY") : val;
+};
 
 const fmtAmt = (val) => {
   const n = parseFloat(val);

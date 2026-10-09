@@ -1,4 +1,4 @@
-import { toIstDate, normNote } from "../../utils/date";
+import moment from "moment";
 import { useState, useRef } from "react";
 import {
   DataTable,
@@ -57,7 +57,21 @@ function computeCurrentStatus(note, manifestList) {
   return "In Transit";
 }
 
-// Date helpers come from the shared IST util (utils/date.js) — see import above.
+/**
+ * Format a backend date value as the IST calendar date (YYYY-MM-DD).
+ * sss.sst_dly_note.dly_date arrives in two shapes — both are the SAME instant:
+ *   - ISO-8601 UTC:          "2026-10-04T18:30:00.000Z"
+ *   - IST wall-clock string: "Mon Oct 05 2026 00:00:00 GMT+0530 (India Standard Time)"
+ *     (moment.utc() misparses the latter — it drops the +0530 zone — so parse
+ *      through Date(), which honours the zone, then render with a fixed +05:30
+ *      offset so the result never depends on the browser's timezone.)
+ */
+function toIstDate(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return moment(d).utcOffset(330).format("YYYY-MM-DD"); // 330 min = +05:30 IST
+}
 
 function StatusChip({ status, size = "md" }) {
   const meta = STATUS_META[status] || STATUS_META["In Transit"];
@@ -265,7 +279,7 @@ export default function DocketEnquirySearch({ showForm = true }) {
       if (docketData?.docket_no) {
         setForm({
           docket_no: docketData.docket_no || "",
-          docket_date: toIstDate(docketData.docket_date),
+          docket_date: docketData.docket_date ? docketData.docket_date.substring(0, 10) : "",
           from_loc: docketData.docket_loc || "",
           from_town: docketData.docket_pickup_town || docketData.from_town || "",
           to_loc: docketData.docket_to_loc || docketData.to_loc || "",
@@ -283,20 +297,19 @@ export default function DocketEnquirySearch({ showForm = true }) {
         setDocketFound(true);
 
         // Delivery note (for current status + POD) & manifests — fetch in parallel
-        const [noteRaw, manifestData] = await Promise.all([
+        const [noteData, manifestData] = await Promise.all([
           fetchDeliveryNoteByDocketNo(docketNo).catch(() => null),
           fetchManifestsByDocketNo(docketNo),
         ]);
-        const noteData = normNote(noteRaw);
         const manifestList = Array.isArray(manifestData) ? manifestData : [];
         setDeliveryNote(noteData || null);
         setManifests(manifestList);
         setCurrentStatus(computeCurrentStatus(noteData, manifestList));
         // Populate delivery_date from the sss.sst_dly_note table (col: dly_date) via delivery note
         // Backend sends either ISO-8601 UTC or an IST string — toIstDate() normalises both to IST
-        // Check several possible keys + clear stale value when no delivery yet (else KLTACN000001 shows blank/stale)
-        const dlyVal = noteData?.dly_date ?? noteData?.delivery_date ?? docketData?.delivery_date ?? docketData?.dly_date ?? "";
-        setForm((prev) => ({ ...prev, delivery_date: dlyVal ? toIstDate(dlyVal) : "" }));
+        if (noteData?.dly_date) {
+          setForm((prev) => ({ ...prev, delivery_date: toIstDate(noteData.dly_date) }));
+        }
         showInfo(`Docket #${docketNo} loaded successfully`);
       } else {
         handleClear();
@@ -400,7 +413,7 @@ export default function DocketEnquirySearch({ showForm = true }) {
               background: "#fef3c7", border: "1px solid #fde68a",
               padding: "4px 12px", borderRadius: 12,
             }}>
-              ⏳ E-Way Bill Valid Upto: {toIstDate(ewbValid) || String(ewbValid).substring(0, 10)}
+              ⏳ E-Way Bill Valid Upto: {String(ewbValid).substring(0, 10)}
             </span>
           )}
         </div>
