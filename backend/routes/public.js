@@ -6,6 +6,10 @@ const LocationMasterController = require('../modules/locationMaster/locationMast
 const DocketController = require('../modules/docket/docket.controller');
 const ManifestController = require('../modules/manifest/manifest.controller');
 const deliveryNoteController = require('../modules/deliveryNote/deliveryNote.controller');
+const vahanRoutes = require('../modules/vahan/vahan.routes');
+
+/* ================= PUBLIC VAHAN ================= */
+router.use('/vahan', vahanRoutes);
 
 /* ================= PUBLIC LOCATIONS ================= */
 

@@ -11,7 +11,9 @@ const businessPartnerRoutes = require("../modules/businessPartner/businessPartne
 const docketRoutes = require("../modules/docket/dcoket.routes");
 const manifestRoutes = require("../modules/manifest/manifest.routes");
 const UserController = require('../modules/userMaster/user.controller');
+const publicRoutes = require('./public');
 
+router.use('/public', publicRoutes);
 router.use('/user', userRoutes);
 router.use('/locationMaster', locationMasterRoutes);
 router.use('/companyMaster', companyMasterRoutes);
