@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import moment from "moment";
 import MainLayout from "../../layouts/MainLayout";
 import {
   MuiField,
@@ -20,7 +21,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import { fetchDocketByDocketNo } from "../../utils/docket";
 import { checkDocketUnloaded } from "../../utils/manifest";
 import { saveDeliveryNote, updateDeliveryNote, fetchDeliveryNoteByDocketNo, uploadPodFile } from "../../utils/deliveryNote";
-import { toIstDate as toDate } from "../../utils/date";
 
 const emptyForm = {
   docket_no: "",
@@ -100,7 +100,11 @@ export default function DeliveryUpdate() {
     return extTypeMap[ext] || "";
   };
 
-  // DB → <input type="date"> (shared IST helper — see import above)
+  const toDate = (val) => {
+    if (!val) return "";
+    const m = moment(val);
+    return m.isValid() ? m.format("YYYY-MM-DD") : "";
+  };
 
   const handleSetForm = (updatedForm) => {
     setForm(updatedForm);
