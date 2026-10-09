@@ -20,7 +20,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import { fetchDocketByDocketNo } from "../../utils/docket";
 import { checkDocketUnloaded } from "../../utils/manifest";
 import { saveDeliveryNote, updateDeliveryNote, fetchDeliveryNoteByDocketNo, uploadPodFile } from "../../utils/deliveryNote";
-import { toIstDate as toDate } from "../../utils/date";
+import { toIstDate as toDate, normNote } from "../../utils/date";
 
 const emptyForm = {
   docket_no: "",
@@ -65,6 +65,8 @@ export default function DeliveryUpdate() {
   const [form, setForm] = useState({ ...emptyForm });
   const [dlyNoteNo, setDlyNoteNo] = useState("");
   const [isDirty, setIsDirty] = useState(false);
+  // True when the docket already has a delivery note → view-only mode
+  const [isReadOnly, setIsReadOnly] = useState(false);
 
   // ── POD Upload State ──
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -107,6 +109,28 @@ export default function DeliveryUpdate() {
     setIsDirty(true);
   };
 
+  // Clear all search / form / POD state — used when a search is rejected
+  const resetFormState = () => {
+    setForm({ ...emptyForm });
+    setDlyNoteNo("");
+    setDocketNumberInput("");
+    setIsDirty(false);
+    setIsReadOnly(false);
+    setSelectedFiles([]);
+    setUploadedPods([]);
+  };
+
+  // Only the user logged in with the docket's destination (branch/location)
+  // is allowed to load & update the docket.
+  //   userDest   = location selected at login (current_user.location_id / loc_code)
+  //   docketDest = docket's destination location code (docket_to_loc)
+  const isDestinationMismatch = (docketToLoc) => {
+    const currentUser = JSON.parse(localStorage.getItem("current_user") || "null");
+    const userDest = String(currentUser?.location_id || localStorage.getItem("loc_code") || "").trim().toLowerCase();
+    const docketDest = String(docketToLoc || "").trim().toLowerCase();
+    return !userDest || userDest !== docketDest;
+  };
+
   const handleSearch = async () => {
     const docketNo = docketNumberInput.trim();
     if (!docketNo) {
@@ -119,24 +143,51 @@ export default function DeliveryUpdate() {
       const docketData = await fetchDocketByDocketNo(docketNo);
 
       if (docketData && docketData.docket_no) {
+        // Destination check — only the user logged in with the docket's
+        // destination (branch/location) is allowed to load & update it.
+        if (isDestinationMismatch(docketData.docket_to_loc)) {
+          resetFormState();
+          showError("Destination does not match");
+          return;
+        }
+
         // Check the manifest unloading table — data can only be loaded for
         // dockets that are present there. If the docket is not unloaded,
         // show an error and do not load anything into the UI.
         const alreadyUnloaded = await checkDocketUnloaded(docketNo);
         if (!alreadyUnloaded) {
-          setForm({ ...emptyForm });
-          setDlyNoteNo("");
-          setDocketNumberInput("");
-          setIsDirty(false);
-          setSelectedFiles([]);
-          setUploadedPods([]);
+          resetFormState();
           showError(`Docket #${docketNo} is not unloaded (not present in Manifest Unloading). Data cannot be loaded.`);
           return;
         }
 
-        const savedNote = await fetchDeliveryNoteByDocketNo(docketNo).catch(() => null);
+        // Docket already has a delivery note → it was already updated.
+        // Load it in READ-ONLY mode: the user can view it, but editing,
+        // saving and POD upload stay disabled.
+        const savedNote = normNote(await fetchDeliveryNoteByDocketNo(docketNo).catch(() => null));
+        const alreadyUpdated = !!savedNote?.dly_note_no;
 
         setDlyNoteNo(savedNote?.dly_note_no || "");
+        setIsReadOnly(alreadyUpdated);
+        setSelectedFiles([]);
+        // Show the already-saved POD as a view-only entry (no delete) when present
+        setUploadedPods(
+          alreadyUpdated && savedNote?.pod_url
+            ? [
+                {
+                  id: "saved-pod",
+                  name: decodeURIComponent(String(savedNote.pod_url).split("/").pop() || "POD"),
+                  type: String(savedNote.pod_url).toLowerCase().split("?")[0].endsWith(".pdf")
+                    ? "application/pdf"
+                    : "image/jpeg",
+                  size: 0,
+                  uploadedAt: "",
+                  url: savedNote.pod_url,
+                  docket_no: docketNo,
+                },
+              ]
+            : []
+        );
 
         setForm({
           docket_no:           docketData.docket_no               || "",
@@ -156,7 +207,11 @@ export default function DeliveryUpdate() {
           received_by:         savedNote?.received_by || docketData.received_by || "",
         });
         setIsDirty(false);
-        showSuccess(`Docket #${docketNo} loaded successfully`);
+        if (alreadyUpdated) {
+          showInfo(`Docket #${docketNo} is already updated — showing in read-only mode`);
+        } else {
+          showSuccess(`Docket #${docketNo} loaded successfully`);
+        }
       } else {
         showError(`Docket #${docketNo} not found`);
       }
@@ -171,6 +226,19 @@ export default function DeliveryUpdate() {
   const handleSave = async (podsOverride) => {
     if (!docketNumberInput.trim()) {
       showError("Please enter a Docket Number");
+      return;
+    }
+
+    // Already-updated dockets are opened read-only — never persist changes.
+    if (isReadOnly) {
+      showError(`Docket #${form.docket_no || docketNumberInput.trim()} is already updated`);
+      return;
+    }
+
+    // Destination check — re-verified here so the actual update action is
+    // also gated, not just the search/load step.
+    if (isDestinationMismatch(form.to_loc)) {
+      showError("Destination does not match");
       return;
     }
 
@@ -243,6 +311,9 @@ export default function DeliveryUpdate() {
     setDlyNoteNo("");
     setForm({ ...emptyForm });
     setIsDirty(false);
+    setIsReadOnly(false);
+    setSelectedFiles([]);
+    setUploadedPods([]);
     showInfo("Form cleared");
   };
 
@@ -272,6 +343,10 @@ export default function DeliveryUpdate() {
   };
 
   const handleUploadPods = async () => {
+    if (isReadOnly) {
+      showError(`Docket #${form.docket_no || docketNumberInput.trim()} is already updated`);
+      return;
+    }
     if (selectedFiles.length === 0) {
       showError("Please select at least one file to upload");
       return;
@@ -359,6 +434,7 @@ export default function DeliveryUpdate() {
             <Tooltip title="Save">
               <IconButton
                 onClick={handleSave}
+                disabled={isReadOnly}
                 size="small"
                 sx={{ color: "#16a34a", "&:hover": { background: "#dcfce7" } }}
               >
@@ -382,6 +458,27 @@ export default function DeliveryUpdate() {
           )}
         </div>
 
+        {/* Read-only notice for dockets that were already updated */}
+        {isReadOnly && (
+          <Box
+            sx={{
+              mt: 2,
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              padding: "8px 14px",
+              borderRadius: 1.5,
+              background: "#fef3c7",
+              border: "1px solid #fcd34d",
+              color: "#92400e",
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            ⚠ Docket #{form.docket_no || docketNumberInput} is already updated — showing in read-only mode.
+          </Box>
+        )}
+
         {/* Delivery Update Form */}
         <FormPanel>
           {formFields.map((field) => {
@@ -392,6 +489,7 @@ export default function DeliveryUpdate() {
                     {...field}
                     form={form}
                     setForm={handleSetForm}
+                    disabled={isReadOnly}
                   />
                 </div>
               );
@@ -402,6 +500,7 @@ export default function DeliveryUpdate() {
                 {...field}
                 form={form}
                 setForm={handleSetForm}
+                disabled={isReadOnly}
               />
             );
           })}
@@ -424,7 +523,8 @@ export default function DeliveryUpdate() {
             )}
           </div>
 
-          {/* File Selection Area */}
+          {/* File Selection Area (hidden in read-only mode) */}
+          {!isReadOnly && (
           <Box
             sx={{
               border: "2px dashed #cbd5e1",
@@ -454,6 +554,7 @@ export default function DeliveryUpdate() {
               Supports: JPG, PNG, GIF, PDF (Max 5MB each). Camera photos are auto-compressed.
             </p>
           </Box>
+          )}
 
           {/* Selected Files Preview */}
           {selectedFiles.length > 0 && (
@@ -551,22 +652,28 @@ export default function DeliveryUpdate() {
                         {pod.name}
                       </p>
                       <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-                        <span>{formatFileSize(pod.size)}</span>
-                        <span>•</span>
+                        {pod.size ? <span>{formatFileSize(pod.size)}</span> : null}
+                        {pod.size ? <span>•</span> : null}
                         <span>Docket: {pod.docket_no}</span>
-                        <span>•</span>
-                        <span>{new Date(pod.uploadedAt).toLocaleString()}</span>
+                        {pod.uploadedAt ? (
+                          <>
+                            <span>•</span>
+                            <span>{new Date(pod.uploadedAt).toLocaleString()}</span>
+                          </>
+                        ) : null}
                       </div>
                     </div>
-                    <Tooltip title="Delete POD">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeletePod(pod.id)}
-                        sx={{ color: "#94a3b8", "&:hover": { color: "#dc2626", background: "#fee2e2" } }}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Tooltip>
+                    {!isReadOnly && (
+                      <Tooltip title="Delete POD">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeletePod(pod.id)}
+                          sx={{ color: "#94a3b8", "&:hover": { color: "#dc2626", background: "#fee2e2" } }}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                   </Box>
                 ))}
               </div>
