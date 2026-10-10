@@ -1,4 +1,5 @@
 const axios = require('axios');
+const db = require('../../config/db');
 
 const ULIP_BASE_URL = process.env.ULIP_BASE_URL || 'https://www.ulip.dpiit.gov.in';
 const ULIP_USERNAME = process.env.ULIP_USERNAME;
@@ -68,8 +69,79 @@ async function callVahan(endpoint, body) {
     }
 }
 
+// Maps camelCase VAHAN/04 JSON fields → snake_case DB columns and upserts
+async function upsertVahanRecord(vehicleData) {
+    const v = vehicleData;
+    const row = {
+        rc_regn_no:             v.rcRegnNo,
+        rc_regn_dt:             v.rcRegnDt,
+        rc_regn_upto:           v.rcRegnUpto,
+        rc_purchase_dt:         v.rcPurchaseDt,
+        rc_owner_sr:            v.rcOwnerSr,
+        rc_owner_name:          v.rcOwnerName,
+        state_cd:               v.stateCd,
+        rto_cd:                 v.rtoCd,
+        rc_registered_at:       v.rcRegisteredAt,
+        rc_present_address:     v.rcPresentAddress,
+        rc_permanent_address:   v.rcPermanentAddress,
+        rc_vch_catg:            v.rcVchCatg,
+        rc_vch_catg_desc:       v.rcVchCatgDesc,
+        rc_vh_class:            v.rcVhClass,
+        rc_vh_class_desc:       v.rcVhClassDesc,
+        rc_vh_type:             v.rcVhType,
+        rc_chasi_no:            v.rcChasiNo,
+        rc_eng_no:              v.rcEngNo,
+        rc_maker_desc:          v.rcMakerDesc,
+        rc_maker_model:         v.rcMakerModel,
+        rc_maker_cd:            v.rcMakerCd,
+        rc_model_cd:            v.rcModelCd,
+        rc_body_type_desc:      v.rcBodyTypeDesc,
+        rc_fuel_desc:           v.rcFuelDesc,
+        rc_fuel_cd:             v.rcFuelCd,
+        rc_color:               v.rcColor,
+        rc_norms_desc:          v.rcNormsDesc,
+        rc_norms_cd:            v.rcNormsCd,
+        rc_fit_upto:            v.rcFitUpto,
+        rc_tax_upto:            v.rcTaxUpto,
+        rc_tax_mode:            v.rcTaxMode,
+        rc_passenger_tax:       v.rcPassengerTax,
+        rc_goods_tax:           v.rcGoodsTax,
+        rc_financer:            v.rcFinancer,
+        rc_insurance_comp:      v.rcInsuranceComp,
+        rc_insurance_policy_no: v.rcInsurancePolicyNo,
+        rc_insurance_upto:      v.rcInsuranceUpto,
+        rc_manu_month_yr:       v.rcManuMonthYr,
+        rc_unld_wt:             v.rcUnldWt,
+        rc_gvw:                 v.rcGvw,
+        rc_no_cyl:              v.rcNoCyl,
+        rc_cubic_cap:           v.rcCubicCap,
+        rc_seat_cap:            v.rcSeatCap,
+        rc_sleeper_cap:         v.rcSleeperCap,
+        rc_stand_cap:           v.rcStandCap,
+        rc_wheelbase:           v.rcWheelbase,
+        rc_sale_amt:            v.rcSaleAmt,
+        rc_own_catg_desc:       v.rcOwnCatgDesc,
+        rc_owner_cd_desc:       v.rcOwnerCdDesc,
+        rc_pucc_upto:           v.rcPuccUpto,
+        rc_pucc_no:             v.rcPuccNo,
+        rc_blacklist_status:    v.rcBlacklistStatus,
+        rc_noc_details:         v.rcNocDetails,
+        rc_noc_dt:              v.rcNocDt,
+        rc_status:              v.rcStatus,
+        rc_status_as_on:        v.rcStatusAsOn,
+        rc_owner_history:       v.rcOwnerHistory ? JSON.stringify(v.rcOwnerHistory) : null,
+        raw_response:           JSON.stringify(v),
+        updated_at:             new Date(),
+    };
+
+    await db('sss.sst_vahan_rc_details')
+        .insert(row)
+        .onConflict('rc_regn_no')
+        .merge();
+}
+
 // GET /vahan/vehicle?vehicleNumber=UP91L0001
-// Uses VAHAN/04 — returns JSON vehicle data by registration number
+// Uses VAHAN/04 — returns JSON vehicle data by registration number, saves to DB
 async function getVehicleByNumber(req, res) {
     try {
         const { vehicleNumber } = req.query;
@@ -78,6 +150,15 @@ async function getVehicleByNumber(req, res) {
         }
 
         const data = await callVahan('04', { vehiclenumber: vehicleNumber.toUpperCase().trim() });
+
+        // Save/update the record in DB (fire-and-forget, don't block the response)
+        const vehicleData = data?.response?.[0]?.response;
+        if (vehicleData && vehicleData.rcRegnNo) {
+            upsertVahanRecord(vehicleData).catch(err =>
+                console.error('[VAHAN] DB upsert failed:', err.message)
+            );
+        }
+
         return res.json({ success: true, data });
     } catch (err) {
         return _handleError(res, err);
