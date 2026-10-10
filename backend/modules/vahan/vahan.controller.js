@@ -12,19 +12,32 @@ async function getUlipToken() {
         return _tokenCache.token;
     }
 
-    const res = await axios.post(
-        `${ULIP_BASE_URL}/ulip/v1.0.0/user/login`,
-        { username: ULIP_USERNAME, password: ULIP_PASSWORD },
-        { headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, timeout: 15000 }
-    );
+    let res;
+    try {
+        res = await axios.post(
+            `${ULIP_BASE_URL}/ulip/v1.0.0/user/login`,
+            { username: ULIP_USERNAME, password: ULIP_PASSWORD },
+            { headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, timeout: 15000 }
+        );
+    } catch (err) {
+        console.error('[VAHAN] ULIP login failed:', err.response?.status, JSON.stringify(err.response?.data));
+        throw new Error(`ULIP login failed (${err.response?.status ?? err.message})`);
+    }
 
-    // ULIP returns the token inside different keys depending on version
+    // ULIP returns the JWT in the Authorization response header as "Bearer <token>"
+    // Fall back to common body fields for forward-compatibility
+    const authHeader = res.headers?.authorization || res.headers?.Authorization || '';
     const token =
+        (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null) ||
         res.data?.token ||
-        res.data?.data?.token ||
-        res.data?.authToken;
+        res.data?.authToken ||
+        res.data?.data?.token;
 
-    if (!token) throw new Error('ULIP login succeeded but no token found in response');
+    if (!token) {
+        console.error('[VAHAN] Login response headers:', JSON.stringify(res.headers));
+        console.error('[VAHAN] Login response body:', JSON.stringify(res.data));
+        throw new Error('ULIP login succeeded but token not found in response header or body');
+    }
 
     _tokenCache = { token, expiresAt: Date.now() + 28 * 60 * 1000 };
     return token;
@@ -32,19 +45,28 @@ async function getUlipToken() {
 
 async function callVahan(endpoint, body) {
     const token = await getUlipToken();
-    const res = await axios.post(
-        `${ULIP_BASE_URL}/ulip/v1.0.0/VAHAN/${endpoint}`,
-        body,
-        {
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-            },
-            timeout: 30000,
+    try {
+        const res = await axios.post(
+            `${ULIP_BASE_URL}/ulip/v1.0.0/VAHAN/${endpoint}`,
+            body,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                },
+                timeout: 30000,
+            }
+        );
+        return res.data;
+    } catch (err) {
+        console.error(`[VAHAN] VAHAN/${endpoint} failed:`, err.response?.status, JSON.stringify(err.response?.data));
+        // If token was rejected (401/403/412), clear cache so next call re-authenticates
+        if ([401, 403, 412].includes(err.response?.status)) {
+            _tokenCache = { token: null, expiresAt: 0 };
         }
-    );
-    return res.data;
+        throw err;
+    }
 }
 
 // GET /vahan/vehicle?vehicleNumber=UP91L0001
