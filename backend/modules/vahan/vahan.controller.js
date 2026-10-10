@@ -24,19 +24,18 @@ async function getUlipToken() {
         throw new Error(`ULIP login failed (${err.response?.status ?? err.message})`);
     }
 
-    // ULIP returns the JWT in the Authorization response header as "Bearer <token>"
-    // Fall back to common body fields for forward-compatibility
-    const authHeader = res.headers?.authorization || res.headers?.Authorization || '';
+    // Mirror the exact extraction order from the working PowerShell script:
+    //   loginJson.token  →  loginJson.response.token  →  loginJson.response.id
+    const d = res.data;
     const token =
-        (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null) ||
-        res.data?.token ||
-        res.data?.authToken ||
-        res.data?.data?.token;
+        d?.token ||
+        d?.response?.token ||
+        d?.response?.id ||
+        d?.authToken;
 
     if (!token) {
-        console.error('[VAHAN] Login response headers:', JSON.stringify(res.headers));
-        console.error('[VAHAN] Login response body:', JSON.stringify(res.data));
-        throw new Error('ULIP login succeeded but token not found in response header or body');
+        console.error('[VAHAN] Login response body:', JSON.stringify(d));
+        throw new Error('ULIP login succeeded but token not found in response body');
     }
 
     _tokenCache = { token, expiresAt: Date.now() + 28 * 60 * 1000 };
@@ -117,6 +116,22 @@ async function getVehicleByEngine(req, res) {
     }
 }
 
+// GET /vahan/fastag?vehicleNumber=RJ32GC2320
+// Uses FASTAG/01 — returns FASTag details by vehicle registration number
+async function getVehicleByFastag(req, res) {
+    try {
+        const { vehicleNumber } = req.query;
+        if (!vehicleNumber) {
+            return res.status(400).json({ success: false, message: 'vehicleNumber query param is required' });
+        }
+
+        const data = await callVahan('FASTAG/01', { vehiclenumber: vehicleNumber.toUpperCase().trim() });
+        return res.json({ success: true, data });
+    } catch (err) {
+        return _handleError(res, err);
+    }
+}
+
 function _handleError(res, err) {
     const status = err.response?.status || 500;
     const upstream = err.response?.data;
@@ -127,4 +142,4 @@ function _handleError(res, err) {
     return res.status(500).json({ success: false, message: err.message });
 }
 
-module.exports = { getVehicleByNumber, getVehicleByChassis, getVehicleByEngine };
+module.exports = { getVehicleByNumber, getVehicleByChassis, getVehicleByEngine, getVehicleByFastag };
