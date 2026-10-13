@@ -56,7 +56,7 @@ const detailColumns = [
   // { key: "to_loc", label: "To", editable: false },
   // { key: "packages", label: "Packages", editable: false },
   // { key: "weight", label: "Weight", editable: false },
-  { key: "docket_no", label: "Docket No", minWidth: 120 },
+  { key: "docket_no", label: "Docket No", minWidth: 150 },
   { key: "docket_date", label: "Docket Date", minWidth: 110 },
   { key: "docket_loc", label: "From Location", minWidth: 120 },
   { key: "docket_pickup_town", label: "From Town", minWidth: 120 },
