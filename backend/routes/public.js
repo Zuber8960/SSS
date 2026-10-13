@@ -36,6 +36,19 @@ router.get('/docket/:docketNo', async (req, res) => {
   }
 });
 
+/* ================= DOCKET PACKAGES ROUTES (sst_docket_pkg) ================= */
+
+router.get('/:docketNo/packages', async (req, res) => {
+  try {
+    const { docketNo } = req.params;
+    const data = await DocketController.getDocketPackages(docketNo);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+
 /* ================= PUBLIC MANIFEST BY DOCKET ================= */
 
 router.get('/manifest/by-docket/:docketNo', async (req, res) => {
