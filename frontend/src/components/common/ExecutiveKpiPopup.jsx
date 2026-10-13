@@ -20,6 +20,7 @@ import { fetchAllInvoices } from "../../utils/customerBill";
 import { fetchInTransitDockets } from "../../utils/dashboard";
 import { fetchDeliveryNotes } from "../../utils/deliveryNote";
 import moment from "moment";
+import { getDateFormat } from "../../utils/tenantService";
 
 /**
  * ExecutiveKpiPopup — drill-down popup opened when an Executive Overview KPI
@@ -40,7 +41,7 @@ import moment from "moment";
 const toDate = (v) => {
   if (!v) return "";
   const m = moment(v);
-  return m.isValid() ? m.format("DD-MM-YYYY") : v;
+  return m.isValid() ? m.format(getDateFormat()) : v;
 };
 
 const statusPill = (text, bg, fg, bd) => (

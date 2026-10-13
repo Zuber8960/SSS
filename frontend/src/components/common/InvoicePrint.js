@@ -1,5 +1,5 @@
 import moment from "moment";
-import { getTenantConfig } from "../../utils/tenantService";
+import { getTenantConfig, getDateFormat } from "../../utils/tenantService";
 import { openPrintDocument } from "../../utils/printBridge";
 
 const fmtAmt = (v) => {
@@ -10,7 +10,7 @@ const fmtAmt = (v) => {
 const toDate = (v) => {
   if (!v) return "";
   const m = moment(v);
-  return m.isValid() ? m.format("DD-MM-YYYY") : v;
+  return m.isValid() ? m.format(getDateFormat()) : v;
 };
 
 /**

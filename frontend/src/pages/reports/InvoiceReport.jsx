@@ -14,6 +14,7 @@ import { printInvoice } from "../../components/common/InvoicePrint";
 import { IconButton, Tooltip, Button, TextField, Autocomplete, Menu, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import moment from "moment";
+import { getDateFormat } from "../../utils/tenantService";
 
 const combinedColumns = [
   { key: "invoice_no", label: "Invoice No", minWidth: 110 },
@@ -41,7 +42,7 @@ const combinedColumns = [
 const toDate = (v) => {
   if (!v) return "";
   const m = moment(v);
-  return m.isValid() ? m.format("DD-MM-YYYY") : v;
+  return m.isValid() ? m.format(getDateFormat()) : v;
 };
 
 const fmtAmt = (v) => {
@@ -180,7 +181,7 @@ export default function InvoiceReport() {
       if (fc && !String(row.bp_name ?? "").toLowerCase().includes(fc)) return false;
       if (fb && !String(row.loc_label ?? row.loc_code ?? "").toLowerCase().includes(fb)) return false;
       if (df || dt) {
-        const rd = moment(row.invoice_date, "DD-MM-YYYY");
+        const rd = moment(row.invoice_date, getDateFormat());
         if (rd.isValid()) {
           if (df && rd.isBefore(df, "day")) return false;
           if (dt && rd.isAfter(dt, "day")) return false;
@@ -224,7 +225,7 @@ export default function InvoiceReport() {
     try {
       showLoading();
       const inv = selectedRow;
-      const m = moment(inv.invoice_date, "DD-MM-YYYY");
+      const m = moment(inv.invoice_date, getDateFormat());
       const apiDate = m.isValid() ? m.format("YYYY-MM-DD") : inv.invoice_date;
       const res = await fetchInvoiceDetails(inv.invoice_no, apiDate, inv.loc_code);
       printInvoice({

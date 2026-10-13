@@ -23,6 +23,7 @@ import { printDocketsOnDt } from "../../utils/printBridge";
 import { printStickerFromRow } from "./docketReport/StickerPrint";
 import SelectedRowInfo from "../../components/common/SelectedRowInfo";
 import moment from "moment";
+import { getDateFormat } from "../../utils/tenantService";
 
 const docketColumns = [
   { key: "docket_no", label: "Docket No", minWidth: 160 },
@@ -52,7 +53,7 @@ const docketColumns = [
 const toDate = (val) => {
   if (!val) return "";
   const m = moment(val);
-  return m.isValid() ? m.format("DD-MM-YYYY") : val;
+  return m.isValid() ? m.format(getDateFormat()) : val;
 };
 
 export default function DocketReport() {
@@ -192,7 +193,7 @@ export default function DocketReport() {
       if (ft && !String(row.docket_pickup_town ?? "").toLowerCase().includes(ft)) return false;
       if (tt && !String(row.docket_dly_town ?? "").toLowerCase().includes(tt)) return false;
       if (df || dt) {
-        const rd = moment(row.docket_date, "DD-MM-YYYY");
+        const rd = moment(row.docket_date, getDateFormat());
         if (rd.isValid()) {
           if (df && rd.isBefore(df, "day")) return false;
           if (dt && rd.isAfter(dt, "day"))  return false;
@@ -200,7 +201,7 @@ export default function DocketReport() {
       }
       if (audUser && !String(row.aud_user ?? "").toLowerCase().includes(audUser.toLowerCase())) return false;
       if (audDateFrom || audDateTo) {
-        const ad = row.aud_date ? moment(row.aud_date, "DD-MM-YYYY") : null;
+        const ad = row.aud_date ? moment(row.aud_date, getDateFormat()) : null;
         if (ad && ad.isValid()) {
           const adf = audDateFrom ? moment(audDateFrom, "YYYY-MM-DD") : null;
           const adt = audDateTo ? moment(audDateTo, "YYYY-MM-DD") : null;

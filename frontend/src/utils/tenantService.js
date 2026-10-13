@@ -32,8 +32,11 @@ export const getTenantConfig = () => {
   }
 };
 
+const oracleToMoment = (fmt) =>
+  fmt.replace(/\bMONTH\b/g, "MMMM").replace(/\bMON\b/g, "MMM");
+
 export const getDateFormat = () =>
-  getTenantConfig()?.dateFormate || "DD/MM/YYYY";
+  oracleToMoment(getTenantConfig()?.dateFormate || "DD-MON-YY");
 
 export const clearTenantConfig = () => {
   localStorage.removeItem(TENANT_KEY);

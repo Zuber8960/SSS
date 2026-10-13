@@ -1,37 +1,22 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { DataGrid, useGridApiContext, useGridApiRef } from "@mui/x-data-grid";
 import { Box, Button, FormControl, InputLabel, Select, MenuItem, IconButton, TextField, Tooltip } from "@mui/material";
+import moment from "moment";
 import { getDateFormat } from "../../utils/tenantService";
 
 function DateEditCell(props) {
   const { id, field, value } = props;
   const apiRef = useGridApiContext();
-  // Normalise to YYYY-MM-DD for the input[type=date]
+  // Normalise any display format to YYYY-MM-DD for input[type=date]
   const toInputFmt = (v) => {
     if (!v) return "";
-    // try MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD
-    const fmts = ["MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM-DD"];
-    for (const f of fmts) {
-      const m = new Date(
-        f === "MM/DD/YYYY" ? v : f === "DD/MM/YYYY"
-          ? v.split("/").reverse().join("-") : v
-      );
-      if (!isNaN(m)) {
-        const y = m.getFullYear();
-        const mo = String(m.getMonth() + 1).padStart(2, "0");
-        const d = String(m.getDate()).padStart(2, "0");
-        return `${y}-${mo}-${d}`;
-      }
-    }
-    return v;
+    const m = moment(v, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", getDateFormat(), "DD/MM/YYYY", "MM/DD/YYYY"], true);
+    return m.isValid() ? m.format("YYYY-MM-DD") : "";
   };
   const handleChange = (e) => {
     const raw = e.target.value; // YYYY-MM-DD from input[type=date]
     if (!raw) return;
-    const [y, mo, d] = raw.split("-");
-    const fmt = getDateFormat();
-    const formatted = fmt
-      .replace("YYYY", y).replace("MM", mo).replace("DD", d);
+    const formatted = moment(raw, "YYYY-MM-DD").format(getDateFormat());
     apiRef.current.setEditCellValue({ id, field, value: formatted });
     apiRef.current.stopCellEditMode({ id, field });
   };
@@ -252,6 +237,33 @@ export function MuiField({
   onKeyDown,
   slotProps,
 }) {
+  const [editingDate, setEditingDate] = useState(false);
+  const isDateField = type === "date";
+
+  const fmtDisplay = (v) => {
+    if (!v) return "";
+    const m = moment(v, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD"], true);
+    return m.isValid() ? m.format(getDateFormat()) : v;
+  };
+
+  // disabled or not actively editing → show formatted text
+  const showPicker = isDateField && !disabled && editingDate;
+  const displayType = showPicker ? "date" : (isDateField ? "text" : type);
+  const displayValue = isDateField && !showPicker
+    ? fmtDisplay(value)
+    : (value ?? "");
+
+  const handleChange = (e) => {
+    onChange(name, e.target.value);
+    // after picking a date, return to formatted display
+    if (showPicker) setEditingDate(false);
+  };
+
+  const handleBlur = (e) => {
+    if (isDateField) setEditingDate(false);
+    if (onBlur) onBlur(e);
+  };
+
   return (
     <TextField
       label={label}
@@ -259,14 +271,15 @@ export function MuiField({
       fullWidth={fullWidth}
       disabled={disabled}
       required={required}
-      type={type}
-      value={value ?? ""}
-      onChange={e => onChange(name, e.target.value)}
-      onBlur={onBlur}
+      type={displayType}
+      value={displayValue}
+      onChange={handleChange}
+      onFocus={isDateField && !disabled ? () => setEditingDate(true) : undefined}
+      onBlur={handleBlur}
       onKeyDown={onKeyDown}
       sx={{ ...muiFieldSx, ...sx }}
       slotProps={{
-        inputLabel: type === "date" ? { shrink: true } : undefined,
+        inputLabel: isDateField ? { shrink: true } : undefined,
         ...slotProps,
       }}
     />

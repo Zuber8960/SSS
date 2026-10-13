@@ -16,6 +16,7 @@ import { printInvoice } from "../../components/common/InvoicePrint";
 import { Button, Chip, IconButton, Tooltip } from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
 import moment from "moment";
+import { getDateFormat } from "../../utils/tenantService";
 
 const billingColumns = [
   { key: "docket_no", label: "Docket", minWidth: 110 },
@@ -115,7 +116,7 @@ const CHARGE_MAP = [
 const toDate = (val) => {
   if (!val) return "";
   const m = moment(val);
-  return m.isValid() ? m.format("DD-MM-YYYY") : val;
+  return m.isValid() ? m.format(getDateFormat()) : val;
 };
 
 export default function CustomerBill() {
@@ -756,7 +757,7 @@ export default function CustomerBill() {
         docket_no: row.docket_no || null,
         docket_from_loc: row.origin || null,
         docket_to_loc: row.destination || null,
-        docket_date: row.docket_date ? moment(row.docket_date, "DD-MM-YYYY").format("YYYY-MM-DD") : null,
+        docket_date: row.docket_date ? moment(row.docket_date, getDateFormat()).format("YYYY-MM-DD") : null,
         docket_chrwt: parseFloat(row.charge_wt) || 0,
         freight: parseFloat(row.freight) || 0,
         loading: parseFloat(row.loading) || 0,

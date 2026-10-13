@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import moment from "moment";
+import { getDateFormat } from "../utils/tenantService";
 import "../styles/MasterPage.css";
 
 const COLORS = {
@@ -175,7 +176,7 @@ function ManifestStatusChart({ completed, inTransit }) {
 const toDate = (v) => {
   if (!v) return "";
   const m = moment(v);
-  return m.isValid() ? m.format("DD-MM-YYYY") : v;
+  return m.isValid() ? m.format(getDateFormat()) : v;
 };
 
 

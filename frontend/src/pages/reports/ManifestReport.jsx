@@ -12,6 +12,7 @@ import { RefreshIcon, PrintIcon, ExportIcon, CloseIcon } from "../../components/
 import { IconButton, Tooltip, Button, TextField, Autocomplete, Menu, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import moment from "moment";
+import { getDateFormat } from "../../utils/tenantService";
 
 const manifestColumns = [
   { key: "mnf_no", label: "Manifest No", minWidth: 110 },
@@ -47,7 +48,7 @@ const manifestColumns = [
 const toDate = (v) => {
   if (!v) return "";
   const m = moment(v);
-  return m.isValid() ? m.format("DD-MM-YYYY") : v;
+  return m.isValid() ? m.format(getDateFormat()) : v;
 };
 
 const fmtNum = (v) => {
@@ -126,7 +127,7 @@ export default function ManifestReport() {
         if (ft && !String(row.to_label ?? "").toLowerCase().includes(ft)) return false;
         if (fty && !String(row.mnf_type_label ?? "").toLowerCase().includes(fty)) return false;
         if (df || dt) {
-          const rd = moment(row.mnf_date, "DD-MM-YYYY");
+          const rd = moment(row.mnf_date, getDateFormat());
           if (rd.isValid()) {
             if (df && rd.isBefore(df, "day")) return false;
             if (dt && rd.isAfter(dt, "day")) return false;

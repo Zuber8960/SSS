@@ -27,6 +27,7 @@ import TuneIcon from "@mui/icons-material/Tune";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import moment from "moment";
+import { getDateFormat } from "../../utils/tenantService";
 
 const PURPLE = "#7e22ce";
 const PURPLE_SOFT = "#f3e8ff";
@@ -59,7 +60,7 @@ const autocompleteSlots = {
 const fmtDate = (v) => {
   if (!v) return "";
   const m = moment(v);
-  return m.isValid() ? m.format("DD-MM-YYYY") : String(v);
+  return m.isValid() ? m.format(getDateFormat()) : String(v);
 };
 
 // Turn the delivery status text into a readable badge.

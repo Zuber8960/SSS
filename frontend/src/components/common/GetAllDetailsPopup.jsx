@@ -13,11 +13,12 @@ import { fetchAllInvoices } from "../../utils/customerBill";
 import { fetchAllBusinessPartners } from "../../utils/businessPartner";
 import PincodeSearch from "./PincodeSearch";
 import moment from "moment";
+import { getDateFormat } from "../../utils/tenantService";
 
 const toDate = (v) => {
   if (!v) return "";
   const m = moment(v);
-  return m.isValid() ? m.format("DD-MM-YYYY") : v;
+  return m.isValid() ? m.format(getDateFormat()) : v;
 };
 
 const fmtNum = (v) => {

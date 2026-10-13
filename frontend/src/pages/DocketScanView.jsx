@@ -4,11 +4,12 @@ import { fetchPublicDocketByDocketNo } from "../utils/docket";
 import useAlert from "../components/common/UseAlert";
 import CommonAlertDialog from "../components/common/CommonAlertDialog";
 import moment from "moment";
+import { getDateFormat } from "../utils/tenantService";
 
 const fmtDate = (val) => {
   if (!val) return "";
   const m = moment(val);
-  return m.isValid() ? m.format("DD-MM-YYYY") : val;
+  return m.isValid() ? m.format(getDateFormat()) : val;
 };
 
 const fmtAmt = (val) => {
