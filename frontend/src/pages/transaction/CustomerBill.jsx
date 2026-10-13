@@ -19,15 +19,15 @@ import moment from "moment";
 import { getDateFormat } from "../../utils/tenantService";
 
 const billingColumns = [
-  { key: "docket_no", label: "Docket", minWidth: 110 },
+  { key: "docket_no", label: "Docket", minWidth: 150, frozen: true },
   { key: "docket_date", label: "Date", minWidth: 110 },
   { key: "origin", label: "Origin", minWidth: 90 },
   { key: "destination", label: "Destination", minWidth: 110 },
   { key: "consignee", label: "Consignee", minWidth: 120 },
-  { key: "booking_branch", label: "Booking Branch", minWidth: 120 },
-  { key: "delivery_branch", label: "Delivery Branch", minWidth: 130 },
-  { key: "pay_type", label: "Payment", minWidth: 100 },
-  { key: "packages", label: "Packages", minWidth: 80 },
+  // { key: "booking_branch", label: "Booking Branch", minWidth: 120 },
+  // { key: "delivery_branch", label: "Delivery Branch", minWidth: 130 },
+  // { key: "pay_type", label: "Payment", minWidth: 100 },
+  // { key: "packages", label: "Packages", minWidth: 80 },
   { key: "actual_wt", label: "Actual Wt", minWidth: 90 },
   { key: "charge_wt", label: "Charge Wt", minWidth: 90 },
   { key: "freight", label: "Freight", minWidth: 100 },

@@ -321,6 +321,10 @@ export function MuiSelectField({
   );
 }
 
+// MUI's row-selection (checkbox) column field. Not re-exported by @mui/x-data-grid,
+// but stable across v6+ (GRID_CHECKBOX_SELECTION_FIELD in the package source).
+const SELECTION_COLUMN_FIELD = "__check__";
+
 /*
  * MUI DataGrid v9 expects rowSelectionModel = { type: 'include'|'exclude', ids: Set<GridRowId> }.
  * Accept legacy inputs (array / Set) and normalise them into the v9 model shape so
@@ -460,6 +464,55 @@ export function DataTable({
     const colMap = Object.fromEntries(columns.map((c) => [c.key, c]));
     return columnOrder.map((key) => colMap[key]).filter(Boolean);
   }, [columns, columnOrder]);
+
+  // Frozen (pinned) columns — common, opt-in per column:
+  //   { key: "docket_no", label: "Docket", frozen: true }   // or frozen: "left" | "right"
+  // A frozen column stays fixed while the table scrolls horizontally.
+  // Like Excel's freeze panes, freezing a column also freezes everything to its left
+  // (including the row-selection checkbox column), which keeps the grid's requirement
+  // that pinned columns lead the visible column order.
+  const frozenModel = useMemo(() => {
+    const empty = { left: [], right: [] };
+    // Pinning only matters when the table scrolls horizontally.
+    if (!scroll?.horizontal) return empty;
+    const isFrozenLeft = (c) => c.frozen === true || c.frozen === "left";
+    const isFrozenRight = (c) => c.frozen === "right";
+    if (!columns.some((c) => isFrozenLeft(c) || isFrozenRight(c))) return empty;
+
+    // Same visible order the grid sees: selection column first, then the
+    // (draggable) column order, then the actions column appended at the far right.
+    const visibleOrder = [
+      ...(checkboxSelection ? [SELECTION_COLUMN_FIELD] : []),
+      ...columnOrder.filter((key) => columns.some((c) => c.key === key)),
+      ...(actions?.length ? ["actions"] : []),
+    ];
+    let lastFrozenLeft = -1;
+    let firstFrozenRight = -1;
+    visibleOrder.forEach((key, index) => {
+      if (columns.some((c) => c.key === key && isFrozenLeft(c))) lastFrozenLeft = index;
+      if (firstFrozenRight === -1 && columns.some((c) => c.key === key && isFrozenRight(c))) {
+        firstFrozenRight = index;
+      }
+    });
+    return {
+      left: lastFrozenLeft === -1 ? [] : visibleOrder.slice(0, lastFrozenLeft + 1),
+      right: firstFrozenRight === -1 ? [] : visibleOrder.slice(firstFrozenRight),
+    };
+  }, [columns, columnOrder, actions, checkboxSelection, scroll]);
+
+  // Push the frozen model into the grid state. `state.pinnedColumns` is what MUI's
+  // column-pinning machinery reads (cells, headers, virtualization offsets), and the
+  // community DataGrid never sets it on its own — so this is the single place that
+  // turns the `frozen` column flag into actual pinned rendering.
+  useEffect(() => {
+    const current = apiRef.current.state?.pinnedColumns;
+    if (!current) return;
+    const same =
+      JSON.stringify(current.left ?? []) === JSON.stringify(frozenModel.left) &&
+      JSON.stringify(current.right ?? []) === JSON.stringify(frozenModel.right);
+    if (same) return;
+    apiRef.current.setState((state) => ({ ...state, pinnedColumns: frozenModel }));
+  }, [apiRef, frozenModel]);
 
   const baseColumns = [
     ...orderedColumns.map((col) => ({
