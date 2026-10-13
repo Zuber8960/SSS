@@ -43,7 +43,7 @@ import EwayBillSection from "./docket/EwayBillSection";
 // Normalise a form date to the YYYY-MM-DD the DB expects
 const toDbDateValue = (val) => {
   if (!val) return null;
-  const m = moment(val, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"], true);
+  const m = moment(val, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", getDateFormat(), "DD/MM/YYYY", "MM/DD/YYYY"], true);
   return m.isValid() ? m.format("YYYY-MM-DD") : null;
 };
 
@@ -910,7 +910,7 @@ export default function DocketPage() {
       if (withEWB && ewbList.length > 0 && savedDocketNo) {
         const toDbDate = (val) => {
           if (!val) return null;
-          const m = moment(val, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"], true);
+          const m = moment(val, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", getDateFormat(), "DD/MM/YYYY", "MM/DD/YYYY"], true);
           return m.isValid() ? m.format("YYYY-MM-DD") : null;
         };
         const normalized = ewbList
