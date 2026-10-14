@@ -1099,6 +1099,7 @@ export default function DocketPage() {
                 invRows.map((r, i) => ({
                   rowId: `poinv_${i + 1}`,
                   ewb_no: r.ewb_no || "",
+                  ewb_valid: r.ewb_valid || "",
                   po_no: "",
                   po_date: "",
                   invoice_no: r.inv_no ?? "",
@@ -1282,6 +1283,7 @@ export default function DocketPage() {
     { key: "invoice_no", label: "Invoice No", minWidth: 190, editable: isFormEditMode },
     { key: "invoice_date", label: "Invoice Date", minWidth: 170, editable: isFormEditMode, isDate: true, render: (row) => fmtPoDate(row.invoice_date) },
     { key: "invoice_value", label: "Invoice Value", minWidth: 170, editable: isFormEditMode, type: "number" },
+    { key: "ewb_valid", label: "EWB Expiry", minWidth: 150, isDate: true, render: (row) => fmtPoDate(row.ewb_valid) },
   ];
 
   const poInvoiceActions = [
@@ -1906,6 +1908,7 @@ export default function DocketPage() {
             invoice_date: r.invoice_date ?? "",
             invoice_value: r.invoice_value ?? "",
             ewb_no: r.ewb_no ?? "",
+            ewb_valid: r.ewb_valid ?? "",
           }))
         );
       } else {

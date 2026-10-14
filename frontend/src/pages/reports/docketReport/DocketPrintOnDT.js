@@ -145,13 +145,14 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, qr
               ${(() => {
                 const rows = Array.isArray(invoiceRows) ? invoiceRows : [];
                 return `<table class="inv-table-3inch">
-                  <thead><tr><th>Inv No</th><th>Inv Date</th><th>Inv Value</th><th>EWB No</th></tr></thead>
+                  <thead><tr><th>Inv No</th><th>Inv Date</th><th>Inv Value</th><th>EWB No</th><th>EWB Expiry</th></tr></thead>
                   <tbody>
                     ${rows.map((r, i) => `<tr>
                       <td>${fmt(r.inv_no || r.invoice_no)}</td>
                       <td>${fmtDate(r.inv_date || r.invoice_date)}</td>
                       <td>${fmt(r.inv_value ?? r.invoice_value)}</td>
                       <td>${fmt(r.ewb_no || (i === 0 ? printEwbNo : ""))}</td>
+                      <td>${fmtDate(r.ewb_expiry || r.ewb_valid || "")}</td>
                     </tr>`).join("")}
                   </tbody>
                 </table>`;

@@ -416,9 +416,12 @@ const normalizeInvDate = (val) => {
 };
 
 const getDocketInvoices = async (docketNo, tenant_id) => {
-  const query = db('sss.sst_docket_inv').where({ docket_no: docketNo });
-  if (tenant_id) query.andWhere({ tenant_id });
-  return query.orderBy('sr_no', 'asc');
+  const query = db('sss.sst_docket_inv as inv')
+    .leftJoin('sss.sst_ewb_hdr as ewb', db.raw('ewb."EWB_NO"::text'), db.raw('inv.ewb_no::text'))
+    .where({ 'inv.docket_no': docketNo })
+    .select('inv.*', db.raw('ewb."EWB_VALID_UPTO" as ewb_valid'));
+  if (tenant_id) query.andWhere({ 'inv.tenant_id': tenant_id });
+  return query.orderBy('inv.sr_no', 'asc');
 };
 
 // sst_docket_inv has a composite PK (docket_no, docket_loc, docket_date,

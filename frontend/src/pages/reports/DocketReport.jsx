@@ -47,6 +47,7 @@ const docketColumns = [
   { key: "delivery_status", label: "Delivery Status", minWidth: 130 },
   { key: "aud_user_name", label: "Created By", minWidth: 130 },
   { key: "aud_date", label: "Created Date", minWidth: 130 },
+  { key: "ewb_valid", label: "EWB Expiry", minWidth: 120 },
   { key: "docket_remark", label: "Remarks", minWidth: 150 },
 ];
 
@@ -152,6 +153,7 @@ export default function DocketReport() {
       docket_pickup_town: d.docket_pickup_town || d.docket_from_town || "",
       docket_dly_town:    d.docket_dly_town || d.docket_to_town || "",
       delivery_status:    d.delivery_status || "Pending",
+      ewb_valid:          toDate(d.ewb_valid),
       aud_user_name:      userMap[d.aud_user] || d.aud_user || "",
       aud_date:           toDate(d.aud_date),
     };
@@ -451,6 +453,7 @@ export default function DocketReport() {
         charges = Array.isArray(result) ? result : [];
       }
 
+      console.log(d);
       const ewbList = d.ewb_no || d.eway_bill_no
         ? [{ ewb_no: d.ewb_no || d.eway_bill_no, ewb_valid: d.ewb_valid, vehicle_no: d.desp_veh_no || "" }]
         : [];

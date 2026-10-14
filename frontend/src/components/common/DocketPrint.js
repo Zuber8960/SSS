@@ -160,6 +160,7 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
                     <th>Inv Date</th>
                     <th>Inv Value</th>
                     <th>EWB No</th>
+                    <th>EWB Expiry</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -169,6 +170,7 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
                     <td>${fmtDate(r.inv_date || r.invoice_date)}</td>
                     <td>${fmt(r.inv_value ?? r.invoice_value)}</td>
                     <td>${fmt(r.ewb_no || (i === 0 ? printEwbNo : ""))}</td>
+                    <td>${fmtDate(r.ewb_expiry || r.ewb_valid || "")}</td>
                   </tr>`).join("")}
                 </tbody>
               </table>`;
