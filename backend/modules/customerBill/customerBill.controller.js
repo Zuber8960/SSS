@@ -36,6 +36,7 @@ const sanitizeHeader = (payload = {}) => ({
   inv_sub_date: normalizeDate(payload.inv_sub_date),
   cancel_flag: payload.cancel_flag ?? null,
   total_inv_amt: normalizeNumber(payload.total_inv_amt),
+  bill_doc_url: payload.bill_doc_url ?? null,
   created_by: payload.created_by ?? null,
   created_on: payload.created_on ?? new Date(),
   modified_by: payload.modified_by ?? null,
@@ -263,6 +264,15 @@ async function updateInvoice(invoiceNo, invoiceDate, invoiceLoc, payload = {}, c
   }
 }
 
+async function updateBillDocUrl(invoiceNo, invoiceDate, invoiceLoc, url) {
+  const keys = { invoice_no: invoiceNo, invoice_date: invoiceDate, loc_code: invoiceLoc };
+  const [updated] = await db('sss.sst_invoice_hdr')
+    .where(keys)
+    .update({ bill_doc_url: url, modified_on: new Date() })
+    .returning('*');
+  return updated || null;
+}
+
 async function deleteInvoice(invoiceNo, invoiceDate, invoiceLoc) {
   const keys = { invoice_no: invoiceNo, invoice_date: invoiceDate, loc_code: invoiceLoc };
   const trx = await db.transaction();
@@ -287,4 +297,5 @@ module.exports = {
   saveInvoice,
   updateInvoice,
   deleteInvoice,
+  updateBillDocUrl,
 };

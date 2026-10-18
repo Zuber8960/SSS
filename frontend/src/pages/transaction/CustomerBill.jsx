@@ -10,13 +10,26 @@ import { fetchAllBusinessPartners } from "../../utils/businessPartner";
 import { fetchAllDockets, fetchCharges, fetchChargeMaster, fetchDocketByDocketNo } from "../../utils/docket";
 import { fetchDeliveryNotes } from "../../utils/deliveryNote";
 import { fetchAllLocations } from "../../utils/locationMaster";
-import { saveInvoice, updateInvoice, deleteInvoice, fetchAllInvoices, fetchInvoiceDetails } from "../../utils/customerBill";
+import { saveInvoice, updateInvoice, deleteInvoice, fetchAllInvoices, fetchInvoiceDetails, uploadBillDocument } from "../../utils/customerBill";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { printInvoice } from "../../components/common/InvoicePrint";
 import { Button, Chip, IconButton, Tooltip } from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
 import moment from "moment";
 import { getDateFormat } from "../../utils/tenantService";
+
+const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/app\/?$/, "");
+
+const buildBillDocUrl = (url) => {
+  if (!url) return null;
+  const m = String(url).match(/\/uploads\/bill-docs\/([^/?#]+)/i);
+  if (m) return `${API_BASE}/app/public/bill-doc-file/${m[1]}`;
+  if (/^\/?uploads\/bill-docs\//i.test(url))
+    return `${API_BASE}/app/public/bill-doc-file/${url.replace(/^\/?uploads\/bill-docs\//i, "")}`;
+  return `${API_BASE}/app/public/bill-doc-file/${String(url).replace(/^\/+/, "")}`;
+};
 
 const billingColumns = [
   { key: "docket_no", label: "Docket", minWidth: 150, frozen: true },
@@ -133,6 +146,8 @@ export default function CustomerBill() {
   const [loadingDockets, setLoadingDockets] = useState(false);
   const [docketsLoaded, setDocketsLoaded] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null); // { invoice_no, invoice_date, loc_code }
+  const [billDocUrl, setBillDocUrl] = useState(null);
+  const billDocInputRef = useRef(null);
   // Guards against a stale customer/branch fetch resolving after a newer one
   const docketLoadToken = useRef(0);
 
@@ -726,6 +741,34 @@ export default function CustomerBill() {
     setDocketsLoaded(false);
     setLoadingDockets(false);
     setEditingInvoice(null);
+    setBillDocUrl(null);
+  };
+
+  const handleBillDocUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!e.target) return;
+    e.target.value = "";
+    if (!file) return;
+    if (!editingInvoice) {
+      showError("Please save the invoice before uploading a document");
+      return;
+    }
+    try {
+      showLoading();
+      const result = await uploadBillDocument(
+        file,
+        editingInvoice.invoice_no,
+        editingInvoice.invoice_date,
+        editingInvoice.loc_code
+      );
+      setBillDocUrl(result?.url || null);
+      showSuccess("Bill document uploaded successfully");
+    } catch (err) {
+      showError(err.message || "Failed to upload bill document");
+      console.error("Bill doc upload error:", err);
+    } finally {
+      hideLoading();
+    }
   };
 
   const buildInvoicePayload = () => {
@@ -906,6 +949,7 @@ export default function CustomerBill() {
             invoice_date: result.header.invoice_date,
             loc_code: result.header.loc_code,
           });
+          if (result.header.bill_doc_url) setBillDocUrl(result.header.bill_doc_url);
         }
       }
 
@@ -933,6 +977,26 @@ export default function CustomerBill() {
           <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint} sx={printHeaderButtonStyle}>
             Print
           </Button>
+          <Tooltip title={editingInvoice ? "Upload bill document (PDF/image)" : "Save invoice first to upload a document"}>
+            <span>
+              <Button
+                variant="contained"
+                startIcon={<UploadFileIcon />}
+                onClick={() => billDocInputRef.current?.click()}
+                disabled={!editingInvoice}
+                sx={uploadHeaderButtonStyle}
+              >
+                Upload Bill
+              </Button>
+            </span>
+          </Tooltip>
+          <input
+            ref={billDocInputRef}
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,.gif,.heic,.heif"
+            style={{ display: "none" }}
+            onChange={handleBillDocUpload}
+          />
           <Button variant="contained" startIcon={<DeleteIcon />} onClick={handleDeleteInvoice} sx={deleteHeaderButtonStyle}>
             Delete
           </Button>
@@ -1081,6 +1145,19 @@ export default function CustomerBill() {
               setForm={handleSetForm}
             />
           </div>
+          {billDocUrl && (
+            <div style={billDocLinkStyle}>
+              <AttachFileIcon sx={{ fontSize: 16, mr: 0.5, color: "#0d6efd" }} />
+              <a
+                href={buildBillDocUrl(billDocUrl)}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: "#0d6efd", fontWeight: 600, fontSize: 13, textDecoration: "none" }}
+              >
+                View Bill Document
+              </a>
+            </div>
+          )}
         </div>
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
@@ -1252,4 +1329,26 @@ const deleteHeaderButtonStyle = {
   padding: "8px 16px",
   boxShadow: "none",
   "&:hover": { background: "linear-gradient(135deg, #c81e1e, #991b1b)" },
+};
+
+const uploadHeaderButtonStyle = {
+  background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
+  borderRadius: "6px",
+  fontWeight: 700,
+  textTransform: "none",
+  boxShadow: "none",
+  minWidth: "140px",
+  padding: "8px 16px",
+  "&:hover": { background: "linear-gradient(135deg, #6d28d9, #5b21b6)" },
+  "&.Mui-disabled": { background: "#d1d5db", color: "#9ca3af" },
+};
+
+const billDocLinkStyle = {
+  display: "flex",
+  alignItems: "center",
+  background: "#f0f7ff",
+  border: "1px solid #bfdbfe",
+  borderRadius: 6,
+  padding: "6px 12px",
+  whiteSpace: "nowrap",
 };

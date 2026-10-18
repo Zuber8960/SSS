@@ -21,3 +21,12 @@ export const updateInvoice = (invoiceNo, invoiceDate, invoiceLoc, payload) =>
 export const deleteInvoice = (invoiceNo, invoiceDate, invoiceLoc) =>
   Api.delete(`/customerBill/${encodeURIComponent(invoiceNo)}/${encodeURIComponent(invoiceDate)}/${encodeURIComponent(invoiceLoc)}`)
     .then((r) => r.data);
+
+export const uploadBillDocument = (file, invoiceNo, invoiceDate, invoiceLoc) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const params = new URLSearchParams({ invoice_no: invoiceNo, invoice_date: invoiceDate, invoice_loc: invoiceLoc });
+  return Api.post(`/customerBill/bill-doc?${params}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then((r) => r.data.data || r.data);
+};
