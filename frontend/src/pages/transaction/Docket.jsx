@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { ToggleSwitch } from "../../components/common/MasterPage";
-import { IconButton, Tooltip, Menu, MenuItem, ListItemIcon, ListItemText, Box } from "@mui/material";
+import { IconButton, Tooltip, Menu, MenuItem, ListItemIcon, ListItemText, Box, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
 import PrintIcon from "@mui/icons-material/Print";
 import { EditIcon, SaveIcon, ResetIcon, SECTION_ICONS, AddIcon, DeleteIcon } from "../../components/common/icons";
 import { getDateFormat, getTenantConfig } from "../../utils/tenantService";
@@ -372,6 +372,7 @@ export default function DocketPage() {
   const chargesRef = useRef(null);
   const [printAnchor, setPrintAnchor] = useState(null);
   const [printDtAnchor, setPrintDtAnchor] = useState(null);
+  const [showRateDialog, setShowRateDialog] = useState(false);
 
   const handlePrint = async (withFreight) => {
     if (!form.docket_no) {
@@ -1331,6 +1332,11 @@ export default function DocketPage() {
     0
   );
 
+  const handleRateChange = (name, value) => {
+    setForm((prev) => ({ ...prev, [name]: value }));
+    setDirtyFields((prev) => new Set(prev).add(name));
+  };
+
   // Render a single form section card
   const renderFormSection = (section) => {
     const sectionFieldConfigs = section.fields
@@ -1629,6 +1635,44 @@ export default function DocketPage() {
     const packageBottomFields = isPackageDetails
       ? filteredFields.filter((field) => !["act_wt", "chrg_wt"].includes(field.name) && !field.compact)
       : filteredFields;
+
+    if (section.title === "Rate & Charges") {
+      const rateLabel = form.rate !== "" && form.rate !== null && form.rate !== undefined
+        ? `FRT: ₹${form.rate}${form.rate_uom ? ` / ${form.rate_uom}` : ""}`
+        : "Set FRT Rate";
+      return (
+        <div
+          key={section.title}
+          style={{ ...sectionCardStyles.sectionCard, gridColumn: section.half ? undefined : "1 / -1" }}
+        >
+          <div style={sectionCardStyles.sectionHeader}>
+            <span style={sectionCardStyles.sectionIcon}>{section.icon}</span>
+            <h4 style={sectionCardStyles.sectionTitle}>{section.title}</h4>
+          </div>
+          <div style={{ padding: "12px 16px" }}>
+            <button
+              onClick={() => { if (isFormEditMode) setShowRateDialog(true); }}
+              style={{
+                width: "100%",
+                padding: "10px 16px",
+                border: `2px ${form.rate ? "solid" : "dashed"} #7c3aed`,
+                borderRadius: 8,
+                background: form.rate ? "#f3e8ff" : "transparent",
+                color: "#4a3466",
+                cursor: isFormEditMode ? "pointer" : "default",
+                fontWeight: 700,
+                fontSize: 13,
+                textAlign: "center",
+                opacity: isFormEditMode ? 1 : 0.75,
+                transition: "background 0.15s",
+              }}
+            >
+              {rateLabel}
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div
@@ -2161,6 +2205,43 @@ export default function DocketPage() {
             />
           </div>
 
+        <Dialog open={showRateDialog} onClose={() => setShowRateDialog(false)} maxWidth="xs" fullWidth>
+          <DialogTitle sx={{ fontSize: 14, fontWeight: 700, color: "#4a3466", pb: 1 }}>
+            Set Freight Rate
+          </DialogTitle>
+          <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "12px !important" }}>
+            <MuiField
+              label="Rate"
+              name="rate"
+              value={form.rate}
+              onChange={handleRateChange}
+              type="number"
+            />
+            <MuiSelectField
+              label="Rate UOM"
+              name="rate_uom"
+              value={form.rate_uom}
+              onChange={handleRateChange}
+              options={[
+                { label: "Fixed", value: "Fixed" },
+                { label: "Per Trip", value: "Per Trip" },
+                { label: "Per KG", value: "Per KG" },
+                { label: "Per Unit", value: "Per Unit" },
+                { label: "Per Tonne", value: "Per Tonne" },
+              ]}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setShowRateDialog(false)}
+              variant="contained"
+              size="small"
+              sx={{ background: "#7c3aed", "&:hover": { background: "#6d28d9" } }}
+            >
+              Done
+            </Button>
+          </DialogActions>
+        </Dialog>
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
         <LoadingOverlay isLoading={isLoading} message="Please wait..." />
       </PageBody>
