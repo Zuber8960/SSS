@@ -12,6 +12,7 @@ import DivisionPage from "./pages/masters/DivisionPage";
 import LocationPage from "./pages/masters/LocationPage";
 import BusinessPartnerPage from "./pages/masters/BusinessPartnerPage";
 import LorryPage from "./pages/masters/LorryPage";
+import LorryOwnerVehiclePage from "./pages/masters/LorryOwnerVehiclePage";
 import ZonePage from "./pages/masters/ZonePage";
 import ZoneTownPage from "./pages/masters/ZoneTownPage";
 import ItemGroupPage from "./pages/fleet/itemGroupPage";
@@ -58,6 +59,7 @@ const appRoutes = [
   { path: "/masters/location", element: <LocationPage />, protected: true },
   { path: "/masters/business-partner", element: <BusinessPartnerPage />, protected: true },
   { path: "/masters/lorry", element: <LorryPage />, protected: true },
+  { path: "/masters/lorry-owner-vehicle", element: <LorryOwnerVehiclePage />, protected: true },
   { path: "/masters/zone", element: <ZonePage />, protected: true },
   { path: "/masters/zone-town", element: <ZoneTownPage />, protected: true },
   { path: "/masters/item-group", element: <ItemGroupPage />, protected: true },

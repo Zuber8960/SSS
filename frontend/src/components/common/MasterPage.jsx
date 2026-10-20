@@ -1,22 +1,17 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { DataGrid, useGridApiContext, useGridApiRef } from "@mui/x-data-grid";
 import { Box, Button, FormControl, InputLabel, Select, MenuItem, IconButton, TextField, Tooltip } from "@mui/material";
-import moment from "moment";
-import { getDateFormat } from "../../utils/tenantService";
+import { formatDateDisplay, formatDateIso } from "../../utils/tenantService";
 
 function DateEditCell(props) {
   const { id, field, value } = props;
   const apiRef = useGridApiContext();
   // Normalise any display format to YYYY-MM-DD for input[type=date]
-  const toInputFmt = (v) => {
-    if (!v) return "";
-    const m = moment(v, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", getDateFormat(), "DD/MM/YYYY", "MM/DD/YYYY"], true);
-    return m.isValid() ? m.format("YYYY-MM-DD") : "";
-  };
+  const toInputFmt = (v) => formatDateIso(v);
   const handleChange = (e) => {
     const raw = e.target.value; // YYYY-MM-DD from input[type=date]
     if (!raw) return;
-    const formatted = moment(raw, "YYYY-MM-DD").format(getDateFormat());
+    const formatted = formatDateDisplay(raw);
     apiRef.current.setEditCellValue({ id, field, value: formatted });
     apiRef.current.stopCellEditMode({ id, field });
   };
@@ -240,17 +235,13 @@ export function MuiField({
   const [editingDate, setEditingDate] = useState(false);
   const isDateField = type === "date";
 
-  const fmtDisplay = (v) => {
-    if (!v) return "";
-    const m = moment(v, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD"], true);
-    return m.isValid() ? m.format(getDateFormat()) : v;
-  };
+  const fmtDisplay = (v) => (v ? formatDateDisplay(v) || v : "");
 
   // disabled or not actively editing → show formatted text
   const showPicker = isDateField && !disabled && editingDate;
   const displayType = showPicker ? "date" : (isDateField ? "text" : type);
-  const displayValue = isDateField && !showPicker
-    ? fmtDisplay(value)
+  const displayValue = isDateField
+    ? (showPicker ? formatDateIso(value) : fmtDisplay(value))
     : (value ?? "");
 
   const handleChange = (e) => {

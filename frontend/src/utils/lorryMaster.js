@@ -14,6 +14,7 @@ const toFormData = (lorryData, files = {}) => {
   const fd = new FormData();
   Object.entries(lorryData || {}).forEach(([key, value]) => {
     if (DOC_FIELDS.includes(key)) return;          // handled below
+    if (key === 'company_code' || key === 'division_code' || key === 'tenant_id') return;
     if (value === null || value === undefined) return;
     if (typeof value === 'boolean') { fd.append(key, value ? 'Y' : 'N'); return; }
     if (value instanceof Date) { fd.append(key, value.toISOString().slice(0, 10)); return; }

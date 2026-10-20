@@ -96,6 +96,28 @@ router.get('/manifest/tracking/:vehicleNo', async (req, res) => {
   }
 });
 
+/* ================= PUBLIC LORRY DOCUMENT FILE ================= */
+const LORRY_DOC_DIR = path.join(__dirname, '..', 'uploads', 'lorry');
+const LORRY_DOC_MIME = {
+  ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+  ".gif": "image/gif", ".webp": "image/webp", ".bmp": "image/bmp",
+  ".pdf": "application/pdf",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+router.get('/lorry-file/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filePath = path.join(LORRY_DOC_DIR, filename);
+  if (!/^lorry-.+$/i.test(filename) || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return res.status(404).json({ success: false, message: 'Lorry document not found' });
+  }
+  res.setHeader('Content-Type', LORRY_DOC_MIME[path.extname(filename).toLowerCase()] || 'application/octet-stream');
+  res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  res.sendFile(filePath);
+});
+
 /* ================= PUBLIC POD FILE ================= */
 // Serves POD files through the /app API path so they work in production where
 // only /app is proxied to the backend (static /uploads is NOT reachable there).
@@ -140,28 +162,6 @@ router.get('/bp-doc-file/:filename', (req, res) => {
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.sendFile(filePath);
-});
-
-/* ================= PUBLIC BILL DOCUMENT FILE ================= */
-// Serves bill documents through /app so they work in production where
-// only /app is proxied to the backend.
-const BILL_DOC_DIR = path.join(__dirname, '..', 'uploads', 'bill-docs');
-const BILL_DOC_MIME = {
-  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-  '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp',
-  '.heic': 'image/heic', '.heif': 'image/heif', '.pdf': 'application/pdf',
-};
-
-router.get('/bill-doc-file/:filename', (req, res) => {
-  const filename = path.basename(req.params.filename);
-  const filePath = path.join(BILL_DOC_DIR, filename);
-  if (!/^billdoc_.+$/i.test(filename) || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
-    return res.status(404).json({ success: false, message: 'Bill document file not found' });
-  }
-  res.setHeader('Content-Type', BILL_DOC_MIME[path.extname(filename).toLowerCase()] || 'application/octet-stream');
-  res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-  res.sendFile(filePath);
 });
 
 /* ================= PUBLIC TOWN COORDINATES ================= */

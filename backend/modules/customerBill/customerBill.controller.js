@@ -20,7 +20,7 @@ const sanitizeHeader = (payload = {}) => ({
   loc_code: payload.loc_code ?? null,
   bp_code: normalizeNumber(payload.bp_code),
   bp_name: payload.bp_name ?? null,
-  invoice_type: payload.invoice_type ?? 'C',
+  invoice_type: payload.invoice_type ?? 'R',
   invoice_no: normalizeNumber(payload.invoice_no),
   invoice_date: normalizeDate(payload.invoice_date),
   write_off_flag: payload.write_off_flag ?? null,
@@ -36,7 +36,6 @@ const sanitizeHeader = (payload = {}) => ({
   inv_sub_date: normalizeDate(payload.inv_sub_date),
   cancel_flag: payload.cancel_flag ?? null,
   total_inv_amt: normalizeNumber(payload.total_inv_amt),
-  bill_doc_url: payload.bill_doc_url ?? null,
   created_by: payload.created_by ?? null,
   created_on: payload.created_on ?? new Date(),
   modified_by: payload.modified_by ?? null,
@@ -49,6 +48,7 @@ const sanitizeDetail = (payload = {}) => ({
   invoice_loc: payload.invoice_loc ?? payload.loc_code ?? null,
   invoice_no: normalizeNumber(payload.invoice_no),
   invoice_date: normalizeDate(payload.invoice_date),
+  invoice_type: payload.invoice_type ?? payload.billing_type ?? null,
   inv_sr_no: normalizeNumber(payload.inv_sr_no),
   docket_no: payload.docket_no ?? null,
   docket_from_loc: payload.docket_from_loc ?? payload.origin ?? null,
@@ -113,6 +113,18 @@ async function getAllInvoices(filters = {}) {
   if (filters.to_date) query.andWhere('invoice_date', '<=', filters.to_date);
 
   return query.orderBy('invoice_date', 'desc').orderBy('invoice_no', 'desc');
+}
+
+async function getBilledDocketNos(company_code = null) {
+  const query = db('sss.sst_invoice_dtl')
+    .distinct('docket_no')
+    .whereNotNull('docket_no')
+    .whereRaw("TRIM(docket_no::text) <> ''");
+  if (company_code) {
+    query.andWhere((q) => q.where({ company_code }).orWhereNull('company_code'));
+  }
+  const rows = await query;
+  return (rows || []).map((r) => String(r.docket_no).trim()).filter(Boolean);
 }
 
 async function getInvoiceDetail(invoiceNo, invoiceDate, invoiceLoc, company_code = null) {
@@ -198,10 +210,12 @@ async function saveInvoice(payload = {}, company_code = null) {
     // Insert details
     if (Array.isArray(details) && details.length > 0) {
       if (company_code) details.forEach(d => d.company_code = company_code);
+      const invoiceType = savedHeader.invoice_type ?? headerWithNo.invoice_type ?? 'R';
       const detailRows = details.map((d, index) =>
         sanitizeDetail({
           ...d,
           ...detailKeys,
+          invoice_type: invoiceType,
           inv_sr_no: d.inv_sr_no || index + 1,
         })
       );
@@ -246,10 +260,12 @@ async function updateInvoice(invoiceNo, invoiceDate, invoiceLoc, payload = {}, c
     await trx('sss.sst_invoice_dtl').where(detailKeys).del();
 
     if (Array.isArray(details) && details.length > 0) {
+      const invoiceType = updatedHeader.invoice_type ?? header.invoice_type ?? existing.invoice_type ?? 'R';
       const detailRows = details.map((d, index) =>
         sanitizeDetail({
           ...d,
           ...detailKeys,
+          invoice_type: invoiceType,
           inv_sr_no: d.inv_sr_no || index + 1,
         })
       );
@@ -262,15 +278,6 @@ async function updateInvoice(invoiceNo, invoiceDate, invoiceLoc, payload = {}, c
     await trx.rollback();
     throw error;
   }
-}
-
-async function updateBillDocUrl(invoiceNo, invoiceDate, invoiceLoc, url) {
-  const keys = { invoice_no: invoiceNo, invoice_date: invoiceDate, loc_code: invoiceLoc };
-  const [updated] = await db('sss.sst_invoice_hdr')
-    .where(keys)
-    .update({ bill_doc_url: url, modified_on: new Date() })
-    .returning('*');
-  return updated || null;
 }
 
 async function deleteInvoice(invoiceNo, invoiceDate, invoiceLoc) {
@@ -292,10 +299,10 @@ async function deleteInvoice(invoiceNo, invoiceDate, invoiceLoc) {
 
 module.exports = {
   getAllInvoices,
+  getBilledDocketNos,
   getInvoiceDetail,
   getFullInvoice,
   saveInvoice,
   updateInvoice,
   deleteInvoice,
-  updateBillDocUrl,
 };

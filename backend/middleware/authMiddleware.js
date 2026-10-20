@@ -28,11 +28,18 @@ const authMiddleware = (req, res, next) => {
 
     // Attach user data to request object
     req.user = decoded;
-    // req.company_code = decoded.company_code ?? req.headers['x-company-code'] ?? null;
     req.tenant_id = decoded.tenant_id ?? req.headers['x-tenant-id'] ?? null;
-    req.divisionId = decoded.divisionId || '0';
+    req.company_code = decoded.company_code
+      ?? req.headers['x-company-code']
+      ?? decoded.tenant_id
+      ?? null;
+    req.division_code = decoded.division_code
+      ?? decoded.divisionId
+      ?? req.headers['x-division-code']
+      ?? null;
+    req.divisionId = decoded.divisionId || req.division_code || '0';
     req.locId  = decoded.locId || '000';
-    req.loc_code = decoded.loc_code || 'GGRN';
+    req.loc_code = decoded.loc_code || decoded.locCode || 'GGRN';
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {

@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Base upload directory
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
+const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
 const LORRY_DIR = path.join(UPLOAD_DIR, 'lorry');
 
 // Ensure directories exist

@@ -21,6 +21,7 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import HandshakeIcon from "@mui/icons-material/Handshake";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
+import LinkIcon from "@mui/icons-material/Link";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import DescriptionIcon from "@mui/icons-material/Description";
@@ -126,6 +127,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/masters/location",         label: "Location Master",   icon: <LocationOnIcon /> },
         { path: "/masters/business-partner", label: "Business Partner",  icon: <HandshakeIcon /> },
         { path: "/masters/lorry",            label: "Lorry Master",      icon: <DirectionsCarIcon /> },
+        { path: "/masters/lorry-owner-vehicle", label: "Lorry Owner Vehicle", icon: <LinkIcon /> },
         { path: "/masters/zone",             label: "Make Zone",         icon: <ZoneIcon /> },
         { path: "/masters/zone-town",        label: "Zone Town Mapping", icon: <ZoneIcon /> },
         { path: "/transaction/add-town",     label: "Add Town",          icon: <LocationOnIcon /> },

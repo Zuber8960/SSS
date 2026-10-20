@@ -23,3 +23,11 @@ export const deleteHireVoucher = (hvNo, hvLoc, hvDate) =>
 
 export const fetchVendorByLorryNo = (lorryNo) =>
   Api.get(`/hireVoucher/vendor/${encodeURIComponent(lorryNo)}`).then(r => r.data.data || r.data);
+
+export const fetchUncoveredManifests = (vehicleNo, vhaNo, fromLoc) =>
+  Api.get(`/hireVoucher/uncovered-manifests/${encodeURIComponent(vehicleNo)}`, {
+    params: {
+      ...(vhaNo ? { vha_no: vhaNo } : {}),
+      ...(fromLoc ? { from_loc: fromLoc } : {}),
+    },
+  }).then((r) => r.data.data || []);

@@ -4,6 +4,22 @@ const db = require('../../config/db');
 const ULIP_BASE_URL = process.env.ULIP_BASE_URL || 'https://www.ulip.dpiit.gov.in';
 const ULIP_USERNAME = process.env.ULIP_USERNAME;
 const ULIP_PASSWORD = process.env.ULIP_PASSWORD;
+// Local only: ULIP login is IP-whitelisted to the live server. Point this at that
+// server's public Vahan route. Do not set ULIP_PROXY_URL on the live server.
+const ULIP_PROXY_URL = (process.env.ULIP_PROXY_URL || '').replace(/\/$/, '');
+
+function shouldProxy(req) {
+    return Boolean(ULIP_PROXY_URL) && req.headers['x-vahan-proxy'] !== '1';
+}
+
+async function proxyVahan(req, res, path, params) {
+    const proxied = await axios.get(`${ULIP_PROXY_URL}${path}`, {
+        params,
+        timeout: 45000,
+        headers: { 'X-Vahan-Proxy': '1', Accept: 'application/json' },
+    });
+    return res.status(proxied.status).json(proxied.data);
+}
 
 // In-memory token cache — token expires in 30 min, we refresh at 28 min
 let _tokenCache = { token: null, expiresAt: 0 };
@@ -134,29 +150,36 @@ async function upsertVahanRecord(vehicleData) {
         updated_at:             new Date(),
     };
 
-    await db('sss.sst_vahan_rc_details')
-        .insert(row)
-        .onConflict('rc_regn_no')
-        .merge();
+    const regn = row.rc_regn_no;
+    if (!regn) return;
+
+    await db.transaction(async (trx) => {
+        await trx('sss.sst_vahan_rc_details').where('rc_regn_no', regn).del();
+        await trx('sss.sst_vahan_rc_details').insert(row);
+    });
 }
 
 // GET /vahan/vehicle?vehicleNumber=UP91L0001
 // Uses VAHAN/04 — returns JSON vehicle data by registration number, saves to DB
 async function getVehicleByNumber(req, res) {
     try {
-        const { vehicleNumber } = req.query;
+        const vehicleNumber = String(req.query.vehicleNumber || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
         if (!vehicleNumber) {
             return res.status(400).json({ success: false, message: 'vehicleNumber query param is required' });
         }
+        if (shouldProxy(req)) {
+            return await proxyVahan(req, res, '/vehicle', { vehicleNumber });
+        }
 
-        const data = await callVahan('04', { vehiclenumber: vehicleNumber.toUpperCase().trim() });
+        const data = await callVahan('04', { vehiclenumber: vehicleNumber });
 
-        // Save/update the record in DB (fire-and-forget, don't block the response)
         const vehicleData = data?.response?.[0]?.response;
         if (vehicleData && vehicleData.rcRegnNo) {
-            upsertVahanRecord(vehicleData).catch(err =>
-                console.error('[VAHAN] DB upsert failed:', err.message)
-            );
+            try {
+                await upsertVahanRecord(vehicleData);
+            } catch (err) {
+                console.error('[VAHAN] DB replace failed:', err.message);
+            }
         }
 
         return res.json({ success: true, data });
@@ -172,6 +195,9 @@ async function getVehicleByChassis(req, res) {
         const { chassisNumber } = req.query;
         if (!chassisNumber) {
             return res.status(400).json({ success: false, message: 'chassisNumber query param is required' });
+        }
+        if (shouldProxy(req)) {
+            return await proxyVahan(req, res, '/chassis', { chassisNumber });
         }
 
         const data = await callVahan('05', { chasisnumber: chassisNumber.trim() });
@@ -189,6 +215,9 @@ async function getVehicleByEngine(req, res) {
         if (!engineNumber) {
             return res.status(400).json({ success: false, message: 'engineNumber query param is required' });
         }
+        if (shouldProxy(req)) {
+            return await proxyVahan(req, res, '/engine', { engineNumber });
+        }
 
         const data = await callVahan('06', { enginenumber: engineNumber.trim() });
         return res.json({ success: true, data });
@@ -205,6 +234,9 @@ async function getVehicleByFastag(req, res) {
         if (!vehicleNumber) {
             return res.status(400).json({ success: false, message: 'vehicleNumber query param is required' });
         }
+        if (shouldProxy(req)) {
+            return await proxyVahan(req, res, '/fastag', { vehicleNumber });
+        }
 
         const data = await callVahan('FASTAG/01', { vehiclenumber: vehicleNumber.toUpperCase().trim() });
         return res.json({ success: true, data });
@@ -215,10 +247,11 @@ async function getVehicleByFastag(req, res) {
 
 function _handleError(res, err) {
     const status = err.response?.status || 500;
+    const mapped = [401, 403, 412].includes(status) ? 502 : status;
     const upstream = err.response?.data;
 
     if (upstream) {
-        return res.status(status).json({ success: false, message: err.message, upstream });
+        return res.status(mapped).json({ success: false, message: err.message, upstream });
     }
     return res.status(500).json({ success: false, message: err.message });
 }

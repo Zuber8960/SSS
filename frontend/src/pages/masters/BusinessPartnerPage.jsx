@@ -33,6 +33,7 @@ const BASIC_FIELDS = [
   { name: "bp_pan_name",        label: "PAN Name",        type: "text" },
   { name: "bp_name",            label: "BP Name",         type: "text" },
   { name: "bp_type",            label: "BP Type",         type: "select",  options: "bpTypeOptions" },
+  { name: "bp_supplier_type",   label: "Supplier Type",   type: "select",  options: ["Lorry Owner", "Lorry Broker", "Spare Parts", "IT Hardware", "IT Software", "Office Equipment", "Fuel"] },
   { name: "bp_company_type",    label: "Company Type",    type: "select",  options: ["Private Ltd", "Public Ltd", "Partnership", "Proprietorship", "LLP"] },
   { name: "bp_deals_with",      label: "Deals With",      type: "select",  options: ["Service", "Item", "Both"] },
   { name: "bp_addres",          label: "Address",         type: "text" },
@@ -61,6 +62,7 @@ const emptyForm = {
   bp_pan_name: "",
   bp_name: "",
   bp_type: "",
+  bp_supplier_type: "",
   bp_company_type: "",
   bp_deals_with: "",
   bp_addres: "",
@@ -181,13 +183,27 @@ export default function BusinessPartnerPage() {
 
   const isValidDate = (val) => !val || /^\d{4}-\d{2}-\d{2}$/.test(val);
 
+  const isCustomerType = (typeId) => {
+    const selectedType = bpTypes.find((t) => String(t.rec_id) === String(typeId));
+    return selectedType?.rec_name?.toLowerCase().includes("customer");
+  };
+  const isCustomer = isCustomerType(form.bp_type);
+
   const setField = (name, value) => {
-    setForm((prev) => ({ ...prev, [name]: value }));
-    setDirtyFields((prev) => new Set(prev).add(name));
+    setForm((prev) => {
+      const next = { ...prev, [name]: value };
+      if (name === "bp_type" && isCustomerType(value)) {
+        next.bp_supplier_type = "";
+      }
+      return next;
+    });
+    setDirtyFields((prev) => {
+      const next = new Set(prev).add(name);
+      if (name === "bp_type" && isCustomerType(value)) next.add("bp_supplier_type");
+      return next;
+    });
     if (name === "bp_type") {
-      const selectedType = bpTypes.find((t) => String(t.rec_id) === String(value));
-      const isCustomer = selectedType?.rec_name?.toLowerCase().includes("customer");
-      setShowBankDetails(!isCustomer);
+      setShowBankDetails(!isCustomerType(value));
     }
   };
 
@@ -205,8 +221,13 @@ export default function BusinessPartnerPage() {
   const buildPayload = (onlyDirty) => {
     const payload = {};
     const keys = onlyDirty ? Array.from(dirtyFields) : Object.keys(form);
+    const customer = isCustomerType(form.bp_type);
     for (const k of keys) {
       if (k === "record_id" || k === "company_code") continue;
+      if (k === "bp_supplier_type" && customer) {
+        payload[k] = null;
+        continue;
+      }
       const val = form[k];
       if (DATE_FIELDS.includes(k)) {
         payload[k] = val && val !== "" ? val : null;
@@ -262,9 +283,7 @@ export default function BusinessPartnerPage() {
     setIsEditing(true);
     setStateInput(mapped.bp_state || "");
     setCityInput(mapped.bp_city || "");
-    const selectedType = bpTypes.find((t) => String(t.rec_id) === String(mapped.bp_type));
-    const isCustomer = selectedType?.rec_name?.toLowerCase().includes("customer");
-    setShowBankDetails(!isCustomer);
+    setShowBankDetails(!isCustomerType(mapped.bp_type));
     setShowForm(true);
   };
 
@@ -294,6 +313,7 @@ export default function BusinessPartnerPage() {
   const partnerColumns = [
     { key: "bp_name", label: "BP Name" },
     { key: "bp_type_name", label: "BP Type" },
+    { key: "bp_supplier_type", label: "Supplier Type" },
     { key: "bp_pan_no", label: "PAN No" },
     { key: "bp_mobile1", label: "Mobile No 1" },
     { key: "bp_mobile2", label: "Mobile No 2" },
@@ -345,6 +365,7 @@ export default function BusinessPartnerPage() {
 
   // Generic field renderer — driven by field config objects
   const renderField = (f) => {
+    if (f.name === "bp_supplier_type" && isCustomer) return null;
     const disabled = f.disabledWhenNew ? !isEditing : false;
 
     switch (f.type) {

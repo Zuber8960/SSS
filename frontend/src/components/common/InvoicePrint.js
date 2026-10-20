@@ -155,7 +155,7 @@ export function printInvoice({ invoice, details, company, locationsMap }) {
       <h4>BILLING BRANCH</h4>
       <strong>${invoice.loc_label || invoice.loc_code || invoice.billing_branch || ""}</strong><br/>
       ${branchAddr ? branchAddr + "<br/>" : ""}
-      Type: ${invoice.invoice_type || invoice.billing_type || "Regular"}
+      Type: ${({ R: "Regular", C: "Regular", D: "Debit Note", DN: "Debit Note", CM: "Complimentary" })[invoice.invoice_type] || invoice.billing_type || invoice.invoice_type || "Regular"}
     </div>
   </div>
 
@@ -164,7 +164,7 @@ export function printInvoice({ invoice, details, company, locationsMap }) {
     <thead>
       <tr>
         <th>Sr</th><th>Docket No</th><th>Date</th><th>Origin</th><th>Dest</th><th>Wt</th>
-        <th>Freight</th><th>Ldg</th><th>Uld</th><th>Det</th><th>Toll</th><th>Green Tax</th><th>Other</th>
+        <th>Freight</th><th>Handling</th><th>Fuel Surcharge</th><th>Factory Charge</th><th>ODA Charge</th><th>FOV</th><th>Stationery</th>
         <th>Taxable</th><th>CGST</th><th>SGST</th><th>IGST</th><th>Total</th>
       </tr>
     </thead>

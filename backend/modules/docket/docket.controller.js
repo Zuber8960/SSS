@@ -376,6 +376,22 @@ const getChargesByDocketId = async (docketNo, tenant_id) => {
   return query;
 };
 
+const getChargesByDocketNos = async (docketNos = [], tenant_id) => {
+  const nos = (Array.isArray(docketNos) ? docketNos : [])
+    .map((n) => String(n || "").trim())
+    .filter(Boolean);
+  if (nos.length === 0) return [];
+  const query = db('sss.sst_docket_charges as dc')
+    .leftJoin('sss.ssm_charge_master as cm', 'dc.charge_code', 'cm.charge_code')
+    .whereIn('dc.docket_no', nos)
+    .andWhere({ 'dc.record_status': 0 })
+    .select('dc.*', 'cm.charge_desc as charge_name')
+    .orderBy('dc.docket_no')
+    .orderBy('dc.charge_code');
+  if (tenant_id) query.andWhere({ 'dc.tenant_id': tenant_id });
+  return query;
+};
+
 const createCharge = async (docketNo, chargeData, trx = db) => {
   return trx('sss.sst_docket_charges')
     .insert({
@@ -1106,6 +1122,7 @@ module.exports = {
   getListEwayDetails,
   getChargeMaster,
   getChargesByDocketId,
+  getChargesByDocketNos,
   createCharge,
   updateCharge,
   deleteCharge,

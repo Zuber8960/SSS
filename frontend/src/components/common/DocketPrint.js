@@ -75,7 +75,7 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
           <thead>
             <tr>
               <th>ORIGIN</th><th>DESTINATION</th><th>DISPATCH MODE</th>
-              <th>BILLING STATION</th><th>Vehicle No.</th><th>Truck Size</th><th>C/N DATE</th>
+              <th>BILLING STATION</th><th>Truck No.</th><th>Truck Size</th><th>C/N DATE</th>
             </tr>
           </thead>
           <tbody>
@@ -84,7 +84,7 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
               <td>${fmt(form.docket_to_town || form.docket_to_loc)}</td>
               <td>${fmt(form.transit_type)}</td>
               <td>${fmt(form.pay_loc)}</td>
-              <td>${fmt(form.veh_no)}</td>
+              <td>${fmt(ewb.vehicle_no)}</td>
               <td>${fmt(form.load_type)}</td>
               <td>${fmtDate(form.docket_date)}</td>
             </tr>

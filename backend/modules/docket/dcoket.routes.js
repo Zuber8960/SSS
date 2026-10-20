@@ -99,6 +99,18 @@ router.get('/charge-master', async (req, res) => {
   }
 });
 
+router.get('/charges-bulk', async (req, res) => {
+  try {
+    const { tenant_id } = req;
+    const raw = req.query.docket_nos || req.query.docketNos || "";
+    const docketNos = String(raw).split(",").map((s) => s.trim()).filter(Boolean);
+    const data = await DocketController.getChargesByDocketNos(docketNos, tenant_id);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.get('/charges/:chargeId', async (req, res) => {
   try {
     const { chargeId } = req.params;

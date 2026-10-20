@@ -7,107 +7,59 @@ import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
 import { SaveIcon, PrintIcon, AddIcon, DeleteIcon } from "../../components/common/icons";
 import { fetchAllBusinessPartners } from "../../utils/businessPartner";
-import { fetchAllDockets, fetchCharges, fetchChargeMaster, fetchDocketByDocketNo } from "../../utils/docket";
-import { fetchDeliveryNotes } from "../../utils/deliveryNote";
+import { fetchAllDockets, fetchCharges, fetchChargesBulk, fetchChargeMaster, fetchDocketByDocketNo } from "../../utils/docket";
+import { fetchDeliveryNotes, fetchDeliveryNoteByDocketNo } from "../../utils/deliveryNote";
 import { fetchAllLocations } from "../../utils/locationMaster";
-import { saveInvoice, updateInvoice, deleteInvoice, fetchAllInvoices, fetchInvoiceDetails, uploadBillDocument } from "../../utils/customerBill";
+import { saveInvoice, updateInvoice, deleteInvoice, fetchBilledDocketNos } from "../../utils/customerBill";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { printInvoice } from "../../components/common/InvoicePrint";
-import { Button, Chip, IconButton, Tooltip } from "@mui/material";
+import { Autocomplete, Button, Chip, IconButton, TextField, Tooltip } from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
-import UploadFileIcon from "@mui/icons-material/UploadFile";
-import AttachFileIcon from "@mui/icons-material/AttachFile";
 import moment from "moment";
 import { getDateFormat } from "../../utils/tenantService";
 
-const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/app\/?$/, "");
-
-const buildBillDocUrl = (url) => {
-  if (!url) return null;
-  const m = String(url).match(/\/uploads\/bill-docs\/([^/?#]+)/i);
-  if (m) return `${API_BASE}/app/public/bill-doc-file/${m[1]}`;
-  if (/^\/?uploads\/bill-docs\//i.test(url))
-    return `${API_BASE}/app/public/bill-doc-file/${url.replace(/^\/?uploads\/bill-docs\//i, "")}`;
-  return `${API_BASE}/app/public/bill-doc-file/${String(url).replace(/^\/+/, "")}`;
-};
-
 const billingColumns = [
-  { key: "docket_no", label: "Docket", minWidth: 150, frozen: true },
-  { key: "docket_date", label: "Date", minWidth: 110 },
-  { key: "origin", label: "Origin", minWidth: 90 },
-  { key: "destination", label: "Destination", minWidth: 110 },
-  { key: "consignee", label: "Consignee", minWidth: 120 },
-  // { key: "booking_branch", label: "Booking Branch", minWidth: 120 },
-  // { key: "delivery_branch", label: "Delivery Branch", minWidth: 130 },
-  // { key: "pay_type", label: "Payment", minWidth: 100 },
-  // { key: "packages", label: "Packages", minWidth: 80 },
-  { key: "actual_wt", label: "Actual Wt", minWidth: 90 },
-  { key: "charge_wt", label: "Charge Wt", minWidth: 90 },
-  { key: "freight", label: "Freight", minWidth: 100 },
-  { key: "loading", label: "Loading", minWidth: 90 },
-  { key: "unloading", label: "Unloading", minWidth: 100 },
-  { key: "detention", label: "Detention", minWidth: 95 },
-  { key: "add_toll", label: "Add Toll", minWidth: 95 },
-  { key: "green_tax", label: "Green Tax", minWidth: 95 },
-  { key: "other_charges", label: "Other Charges", minWidth: 120 },
-  { key: "discount", label: "Discount", minWidth: 90 },
-  { key: "taxable", label: "Taxable", minWidth: 100 },
-  { key: "cgst", label: "CGST", minWidth: 90 },
-  { key: "sgst", label: "SGST", minWidth: 90 },
-  { key: "igst", label: "IGST", minWidth: 90 },
-  { key: "amount", label: "Amount", minWidth: 110 },
+  { key: "docket_no", label: "Docket", minWidth: 100 },
+  { key: "docket_date", label: "Date", minWidth: 70 },
+  { key: "origin", label: "Origin", minWidth: 110 },
+  { key: "destination", label: "Dest", minWidth: 110 },
+  { key: "consignee", label: "Consignee", minWidth: 150 },
+  { key: "actual_wt", label: "Act Wt", minWidth: 60 },
+  { key: "charge_wt", label: "Chg Wt", minWidth: 60 },
+  { key: "freight", label: "Freight", minWidth: 64 },
+  { key: "loading", label: "Handling", minWidth: 68 },
+  { key: "unloading", label: "Fuel Surcharge", minWidth: 88 },
+  { key: "detention", label: "Factory Charge", minWidth: 88 },
+  { key: "add_toll", label: "ODA Charge", minWidth: 78 },
+  { key: "green_tax", label: "FOV", minWidth: 52 },
+  { key: "other_charges", label: "Stationery", minWidth: 76 },
+  { key: "taxable", label: "Taxable", minWidth: 62 },
+  { key: "cgst", label: "CGST", minWidth: 50 },
+  { key: "sgst", label: "SGST", minWidth: 50 },
+  { key: "igst", label: "IGST", minWidth: 50 },
+  { key: "amount", label: "Amount", minWidth: 66 },
   {
     key: "pod",
     label: "POD",
-    minWidth: 90,
+    minWidth: 56,
     render: (row) => (
-      <span style={{ ...statusBadgeStyle, ...(row.pod === "YES" ? yesBadge : noBadge), minWidth: "58px", height: "22px" }}>
+      <span style={{ ...statusBadgeStyle, ...(row.pod === "YES" ? yesBadge : noBadge) }}>
         {row.pod}
-      </span>
-    ),
-  },
-  {
-    key: "invoice_status",
-    label: "Billing Status",
-    minWidth: 130,
-    render: (row) => (
-      <span
-        style={{
-          ...statusBadgeStyle,
-          ...(row.invoice_status === "Billed" ? billedBadge : unbilledBadge),
-        }}
-      >
-        {row.invoice_status || "Unbilled"}
-      </span>
-    ),
-  },
-  {
-    key: "delivery_status",
-    label: "Delivery",
-    minWidth: 110,
-    render: (row) => (
-      <span
-        style={{
-          ...statusBadgeStyle,
-          ...(row.delivery_status === "Delivered" ? deliveredBadge : pendingBadge),
-        }}
-      >
-        {row.delivery_status}
       </span>
     ),
   },
 ];
 
 const invoiceFields = [
-  { label: "Customer", name: "customer", type: "select", options: ["Select Customer"] },
   { label: "Invoice No", name: "invoice_no", disabled: true },
   { label: "Invoice Date", name: "invoice_date", type: "date" },
+  { label: "Billing Type", name: "billing_type", type: "select", options: ["Regular", "Debit Note"], required: true },
   { label: "Billing Branch", name: "billing_branch", type: "select", options: ["Select Branch"], required: true },
-  { label: "Billing Type", name: "billing_type", type: "select", options: [" Regular", "Complimentory"] },
+  { label: "Customer", name: "customer", type: "select", options: ["Select Customer"] },
 ];
 
 const emptyForm = {
-  customer: "Select Customer",
+  customer: "",
   invoice_no: "AUTO",
   invoice_date: "",
   billing_branch: "Select Branch",
@@ -115,22 +67,68 @@ const emptyForm = {
   invoice_remarks: "",
 };
 
-const CHARGE_MAP = [
-  { key: "freight", keywords: ["FRT", "FREIGHT", "DK01"] },
-  { key: "loading", keywords: ["LOAD", "LOADING"] },
-  { key: "unloading", keywords: ["UNLOAD", "UNLOADING", "ULD"] },
-  { key: "detention", keywords: ["DET", "DETENTION"] },
-  { key: "add_toll", keywords: ["TOLL"] },
-  { key: "green_tax", keywords: ["GREEN", "GRN", "ENV"] },
-  { key: "other_charges", keywords: ["OTH", "OTHER"] },
-  { key: "discount", keywords: ["DISC", "DISCOUNT"] },
+const customerFieldSx = {
+  "& .MuiInputBase-input": { fontSize: 11, fontWeight: 700 },
+  "& .MuiInputLabel-root": { fontSize: 11, fontWeight: 700 },
+};
+
+const billPageFontCss = `
+.customer-bill-page .MuiInputBase-input,
+.customer-bill-page .MuiInputLabel-root,
+.customer-bill-page .MuiSelect-select,
+.customer-bill-page .MuiDataGrid-cell,
+.customer-bill-page .MuiDataGrid-cell *,
+.customer-bill-page .MuiDataGrid-columnHeaderTitle,
+.customer-bill-page .MuiTablePagination-root,
+.customer-bill-page .MuiTablePagination-selectLabel,
+.customer-bill-page .MuiTablePagination-displayedRows {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+}
+.customer-bill-page .MuiDataGrid-cell {
+  padding: 2px 4px !important;
+}
+.customer-bill-page .MuiDataGrid-columnHeader {
+  padding: 0 4px !important;
+}
+`;
+
+// Map ssm_charge_master.charge_desc onto billing columns (order: specific names first).
+const MASTER_DESC_RULES = [
+  { key: "green_tax", tests: ["FREIGHT ON VALUE", "FOV"] },
+  { key: "unloading", tests: ["FUEL SURCHARGE", "FSC"] },
+  { key: "detention", tests: ["FACTORY CHARGE", "FACTORY"] },
+  { key: "loading", tests: ["HANDLING CHARGE", "HANDLING"] },
+  { key: "add_toll", tests: ["ODA CHARGE", "ODA"] },
+  { key: "other_charges", tests: ["STATIONERY", "STATIONARY"] },
+  { key: "freight", tests: ["FREIGHT", "FRT"] },
 ];
+
+const columnFromMasterDesc = (desc) => {
+  const d = String(desc || "").toUpperCase();
+  if (!d) return null;
+  for (const rule of MASTER_DESC_RULES) {
+    if (rule.tests.some((t) => d.includes(t))) return rule.key;
+  }
+  return null;
+};
 
 const toDate = (val) => {
   if (!val) return "";
   const m = moment(val);
   return m.isValid() ? m.format(getDateFormat()) : val;
 };
+
+const locCodeOf = (val) => String(val || "").split(" - ")[0].split(">")[0].trim().toUpperCase();
+
+const locTownLabel = (loc, town) => {
+  const l = String(loc || "").trim();
+  const t = String(town || "").trim();
+  if (l && t) return `${l} > ${t}`;
+  return l || t || "";
+};
+
+const isDeliveredStatus = (status) => String(status || "").trim().toLowerCase() === "delivered";
 
 export default function CustomerBill() {
   const { dialog, closeAlert, showError, showSuccess } = useAlert();
@@ -140,14 +138,13 @@ export default function CustomerBill() {
   const [billingRows, setBillingRows] = useState([]);
   const [chargeMaster, setChargeMaster] = useState([]);
   const [deliveryNotesMap, setDeliveryNotesMap] = useState({});
+  const [deliveredDocketNos, setDeliveredDocketNos] = useState(() => new Set());
   const [locations, setLocations] = useState([]);
   const [company, setCompany] = useState(null);
   const [selectedDocketNos, setSelectedDocketNos] = useState(() => new Set());
   const [loadingDockets, setLoadingDockets] = useState(false);
   const [docketsLoaded, setDocketsLoaded] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null); // { invoice_no, invoice_date, loc_code }
-  const [billDocUrl, setBillDocUrl] = useState(null);
-  const billDocInputRef = useRef(null);
   // Guards against a stale customer/branch fetch resolving after a newer one
   const docketLoadToken = useRef(0);
 
@@ -183,37 +180,59 @@ export default function CustomerBill() {
     fetchDeliveryNotes()
       .then((notes) => {
         const map = {};
+        const delivered = new Set();
         (Array.isArray(notes) ? notes : []).forEach((n) => {
-          if (n.docket_no) map[n.docket_no] = n;
+          if (!n.docket_no) return;
+          map[n.docket_no] = n;
+          if (isDeliveredStatus(n.delivery_status)) delivered.add(String(n.docket_no));
         });
         setDeliveryNotesMap(map);
+        setDeliveredDocketNos(delivered);
       })
       .catch((err) => console.error("Failed to load delivery notes:", err));
   }, []);
 
-  // Customer dropdown shows "<bp_grp_code> - <bp_name>" so users can pick by code
-  // as well as name. The option *value* stays the plain bp_name because that is what
-  // form.customer is matched against (selectedCustomer, save/print payloads).
-  // bp_grp_code is not populated for every BP row, so fall back to bp_code and
-  // then record_id for the code part; if none exist just show the name.
-  const customerOptions = useMemo(
-    () => [
-      "Select Customer",
-      ...partners
-        .filter((p) => p.bp_name)
-        .map((p) => {
-          const name = String(p.bp_name).trim();
-          const code = p.bp_grp_code ?? p.bp_code ?? p.record_id ?? "";
-          return { value: p.bp_name, label: code ? `${code} - ${name}` : name };
-        }),
-    ],
-    [partners]
-  );
   const branchOptions = [
     "Select Branch",
     ...locations.map((loc) => `${loc.loc_code} - ${loc.loc_name}`).filter(Boolean),
   ];
-  const handleSetForm = (updatedForm) => setForm(updatedForm);
+  const branchSelected = !!(form.billing_branch && form.billing_branch !== "Select Branch");
+  const isDebitNote = form.billing_type === "Debit Note";
+  const selectedLocCode = useMemo(
+    () => (form.billing_branch || "").split(" - ")[0].trim(),
+    [form.billing_branch]
+  );
+
+  // Customers of the selected billing branch only (BP loc_code). Searchable by code and name.
+  const customerOptions = useMemo(() => {
+    if (!selectedLocCode) return [];
+    const loc = selectedLocCode.toUpperCase();
+    return partners
+      .filter((p) => {
+        const bpLoc = String(p.loc_code || "").split(" - ")[0].trim().toUpperCase();
+        return bpLoc === loc && (p.bp_name || p.bp_grp_code || p.bp_code);
+      })
+      .map((p) => {
+        const name = String(p.bp_name || "").trim();
+        const code = String(p.bp_grp_code ?? p.bp_code ?? "").trim();
+        return {
+          value: String(p.record_id ?? p.bp_id ?? ""),
+          code,
+          name,
+          label: code ? `${code} - ${name}` : name,
+        };
+      })
+      .filter((o) => o.value);
+  }, [partners, selectedLocCode]);
+
+  const handleSetForm = (updatedForm) => {
+    const next = typeof updatedForm === "function" ? updatedForm(form) : updatedForm;
+    if (next.billing_branch !== form.billing_branch) {
+      setForm({ ...next, customer: "" });
+      return;
+    }
+    setForm(next);
+  };
 
   const getCurrentUser = () => {
     try {
@@ -223,12 +242,24 @@ export default function CustomerBill() {
     }
   };
 
+  const chargeCodeToColumn = useMemo(() => {
+    const map = {};
+    (Array.isArray(chargeMaster) ? chargeMaster : []).forEach((m) => {
+      const code = String(m.charge_code || "").toUpperCase().trim();
+      if (!code) return;
+      const col = columnFromMasterDesc(m.charge_desc);
+      if (col) map[code] = col;
+    });
+    return map;
+  }, [chargeMaster]);
+
   const mapChargeToColumn = (chargeCode, chargeDesc) => {
-    const upperCode = (chargeCode || "").toUpperCase();
-    const upperDesc = ((chargeDesc || "") + " " + upperCode).toUpperCase();
-    for (const m of CHARGE_MAP) {
-      if (m.keywords.some((k) => upperDesc.includes(k.toUpperCase()))) return m.key;
-    }
+    const upperCode = String(chargeCode || "").toUpperCase().trim();
+    if (upperCode && chargeCodeToColumn[upperCode]) return chargeCodeToColumn[upperCode];
+    const master = (chargeMaster || []).find(
+      (m) => String(m.charge_code || "").toUpperCase().trim() === upperCode
+    );
+    if (master) return columnFromMasterDesc(master.charge_desc);
     return null;
   };
 
@@ -257,23 +288,12 @@ export default function CustomerBill() {
 
     (Array.isArray(charges) ? charges : []).forEach((c) => {
       const master = chargeMaster.find((m) => m.charge_code === c.charge_code);
-      const desc = master?.charge_desc || c.charge_desc || c.charge_code;
+      const desc = master?.charge_desc || c.charge_name || c.charge_desc || c.charge_code;
       const colKey = mapChargeToColumn(c.charge_code, desc);
       if (colKey && colKey in chargeAmounts) {
-        chargeAmounts[colKey] = parseFloat(c.charge_amt) || 0;
-      } else if (colKey === null) {
-        chargeAmounts.other_charges += parseFloat(c.charge_amt) || 0;
+        chargeAmounts[colKey] += parseFloat(c.charge_amt) || 0;
       }
     });
-
-    if (chargeAmounts.freight === 0) {
-      const rate = parseFloat(docket.docket_rate || docket.rate) || 0;
-      const chrgWt = parseFloat(docket.docket_chrg_wt || docket.chrg_wt) || 0;
-      if (rate > 0) {
-        const uom = (docket.docket_rate_uom || docket.rate_uom || "").toLowerCase();
-        chargeAmounts.freight = uom.includes("kg") ? rate * chrgWt : rate;
-      }
-    }
 
     const taxable =
       chargeAmounts.freight +
@@ -304,12 +324,13 @@ export default function CustomerBill() {
       id: docket.docket_no + "_" + docket.docket_date,
       docket_no: docket.docket_no || "",
       docket_date: toDate(docket.docket_date),
-      origin: docket.docket_loc || "",
-      destination: docket.docket_to_loc || docket.docket_dly_town || "",
+      origin: locTownLabel(docket.docket_loc, docket.docket_pickup_town || docket.docket_from_town),
+      destination: locTownLabel(docket.docket_to_loc, docket.docket_dly_town || docket.docket_to_town),
       consignee: docket.cnee_name || "",
       booking_branch: docket.docket_loc || "",
       delivery_branch: docket.docket_to_loc || "",
       pay_type: docket.docket_pay_type || docket.pay_type || "",
+      pay_loc: docket.docket_pay_loc || docket.pay_loc || "",
       packages: docket.docket_tot_pkgs ?? docket.total_pkgs ?? "",
       actual_wt: docket.docket_act_wt ?? docket.actual_wt ?? "",
       charge_wt: docket.docket_chrg_wt ?? docket.chrg_wt ?? "",
@@ -343,7 +364,7 @@ export default function CustomerBill() {
   const isDocketOnEditingInvoice = (docketNo) => editingDocketNos.current.has(String(docketNo));
 
   const selectedCustomer = useMemo(
-    () => partners.find((p) => p.bp_name === form.customer) || null,
+    () => partners.find((p) => String(p.record_id ?? p.bp_id ?? "") === String(form.customer)) || null,
     [partners, form.customer]
   );
 
@@ -354,11 +375,6 @@ export default function CustomerBill() {
     const id = selectedCustomer.record_id ?? selectedCustomer.bp_id ?? null;
     return id == null ? null : String(id);
   }, [selectedCustomer]);
-
-  const selectedLocCode = useMemo(
-    () => (form.billing_branch || "").split(" - ")[0].trim(),
-    [form.billing_branch]
-  );
 
   // A docket belongs to the customer when its cnor_id OR cnee_id equals the
   // selected business partner's record_id.
@@ -383,8 +399,8 @@ export default function CustomerBill() {
   // Optionally narrowed to the selected billing branch. Dockets already attached
   // to a saved invoice are flagged as Billed so the user never bills them twice.
   useEffect(() => {
-    const customerName = form.customer;
-    if (!customerName || customerName === "Select Customer" || !selectedCustomerId) {
+    const customerName = selectedCustomer?.bp_name;
+    if (!form.customer || !selectedCustomerId) {
       docketLoadToken.current++;
       setBillingRows([]);
       setSelectedDocketNos(new Set());
@@ -400,17 +416,14 @@ export default function CustomerBill() {
     (async () => {
       try {
         setLoadingDockets(true);
-        const [dockets, invoices] = await Promise.all([fetchAllDockets(true), fetchAllInvoices()]);
+        const [dockets, billedList] = await Promise.all([
+          fetchAllDockets(true),
+          fetchBilledDocketNos().catch(() => []),
+        ]);
 
-        // Collect every docket already saved on some invoice
-        const detailsLists = await Promise.all(
-          (Array.isArray(invoices) ? invoices : []).map((inv) =>
-            fetchInvoiceDetails(inv.invoice_no, inv.invoice_date, inv.loc_code).catch(() => [])
-          )
-        );
         const billedMap = {};
-        detailsLists.flat().forEach((d) => {
-          if (d.docket_no) billedMap[d.docket_no] = true;
+        (Array.isArray(billedList) ? billedList : []).forEach((no) => {
+          if (no) billedMap[String(no).trim()] = true;
         });
 
         if (cancelled || token !== docketLoadToken.current) return;
@@ -421,26 +434,40 @@ export default function CustomerBill() {
         // Dockets already attached to a saved invoice are not billable again.
         // Ones belonging to the invoice currently being edited stay visible so
         // an existing invoice can be re-opened and updated.
-        const isBilledElsewhere = (docketNo) =>
-          !!billedMap[docketNo] && !isDocketOnEditingInvoice(docketNo);
+        const isBilled = (docketNo) =>
+          !!billedMap[String(docketNo).trim()] || isDocketOnEditingInvoice(docketNo);
 
         const filtered = docketList.filter((d) => {
           if (!d.docket_no) return false;
           // cnor_id or cnee_id must equal the selected partner's record_id
           if (!docketBelongsToCustomer(d, customerId, selectedCustomer?.bp_name)) return false;
-          // skip dockets that already have a bill
-          if (isBilledElsewhere(d.docket_no)) return false;
-          // skip dockets already present in the delivery note table
-          if (deliveryNotesMap[d.docket_no]) return false;
-          if (locCode && (d.docket_loc || "").trim() !== locCode) return false;
+          // Regular: unbilled only. Debit Note: already billed only.
+          if (isDebitNote) {
+            if (!isBilled(d.docket_no)) return false;
+          } else if (isBilled(d.docket_no) && !isDocketOnEditingInvoice(d.docket_no)) {
+            return false;
+          }
+          // only dockets delivered in sst_dly_note (delivery note)
+          if (!deliveredDocketNos.has(String(d.docket_no))) return false;
+          // payment location must be the selected billing branch
+          if (locCode && locCodeOf(d.docket_pay_loc || d.pay_loc) !== locCodeOf(locCode)) return false;
           return true;
         });
 
+        const chargeRows = await fetchChargesBulk(filtered.map((d) => d.docket_no)).catch(() => []);
+        const chargesByDocket = {};
+        (Array.isArray(chargeRows) ? chargeRows : []).forEach((c) => {
+          const no = String(c.docket_no || "").trim();
+          if (!no) return;
+          if (!chargesByDocket[no]) chargesByDocket[no] = [];
+          chargesByDocket[no].push(c);
+        });
+
         const rows = filtered.map((d) => ({
-          ...buildBillingRow(d, []),
+          ...buildBillingRow(d, chargesByDocket[String(d.docket_no).trim()] || []),
           id: d.docket_no,
-          invoice_status: billedMap[d.docket_no] ? "Billed" : "Unbilled",
-          _chargesLoaded: false,
+          invoice_status: billedMap[String(d.docket_no).trim()] ? "Billed" : "Unbilled",
+          _chargesLoaded: true,
         }));
 
         setBillingRows(rows);
@@ -470,7 +497,7 @@ export default function CustomerBill() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.customer, form.billing_branch, selectedCustomerId, partners, chargeMaster, deliveryNotesMap]);
+  }, [form.customer, form.billing_branch, form.billing_type, selectedCustomerId, partners, chargeMaster, deliveryNotesMap, deliveredDocketNos, isDebitNote]);
 
   // Recalculate derived fields (taxable, GST, amount) when charge values change
   const recalculateRow = (row) => {
@@ -487,8 +514,8 @@ export default function CustomerBill() {
       (freight + loading + unloading + detention + add_toll + green_tax + other_charges - discount) * 100
     ) / 100;
 
-    const fromLoc = (row.origin || "").toLowerCase();
-    const toLoc = (row.destination || "").toLowerCase();
+    const fromLoc = locCodeOf(row.booking_branch || row.origin);
+    const toLoc = locCodeOf(row.delivery_branch || row.destination);
     const interState = fromLoc !== toLoc;
 
     const gstRate = 0.18;
@@ -512,16 +539,16 @@ export default function CustomerBill() {
   // has already typed (manual entries win over the fetched charge).
   const applyChargesToRow = (row, charges) => {
     const merged = { ...row };
+    ["freight", "loading", "unloading", "detention", "add_toll", "green_tax", "other_charges", "discount"].forEach((k) => {
+      if (!row._edited?.[k]) merged[k] = "0.00";
+    });
     (Array.isArray(charges) ? charges : []).forEach((c) => {
       const master = chargeMaster.find((m) => m.charge_code === c.charge_code);
-      const desc = master?.charge_desc || c.charge_desc || c.charge_code;
+      const desc = master?.charge_desc || c.charge_name || c.charge_desc || c.charge_code;
       const colKey = mapChargeToColumn(c.charge_code, desc);
-      if (row._edited?.[colKey]) return; // user override - keep it
-      if (colKey && colKey in merged) {
-        merged[colKey] = (parseFloat(c.charge_amt) || 0).toFixed(2);
-      } else {
-        merged.other_charges = ((parseFloat(merged.other_charges) || 0) + (parseFloat(c.charge_amt) || 0)).toFixed(2);
-      }
+      if (!colKey || !(colKey in merged)) return;
+      if (row._edited?.[colKey]) return;
+      merged[colKey] = ((parseFloat(merged[colKey]) || 0) + (parseFloat(c.charge_amt) || 0)).toFixed(2);
     });
     merged._chargesLoaded = true;
     return recalculateRow(merged);
@@ -578,6 +605,7 @@ export default function CustomerBill() {
       booking_branch: "",
       delivery_branch: "",
       pay_type: "",
+      pay_loc: "",
       packages: "",
       actual_wt: "",
       charge_wt: "",
@@ -637,11 +665,37 @@ export default function CustomerBill() {
           return { ...newRow, docket_no: oldRow.docket_no };
         }
 
-        // Validate that the docket's branch matches the selected billing branch
-        const selectedLocCode = selectedBranch.split(" - ")[0].trim();
-        const docketLoc = (docketObj.docket_loc || "").trim();
-        if (selectedLocCode && docketLoc && selectedLocCode !== docketLoc) {
-          showError("Docket " + newRow.docket_no + " does not belong to billing branch " + selectedBranch);
+        const selectedLoc = locCodeOf(selectedBranch);
+        const payLoc = locCodeOf(docketObj.docket_pay_loc || docketObj.pay_loc);
+        if (selectedLoc && payLoc !== selectedLoc) {
+          showError("Docket " + newRow.docket_no + " payment location is not billing branch " + selectedBranch);
+          return { ...newRow, docket_no: oldRow.docket_no };
+        }
+
+        let note = deliveryNotesMap[docketObj.docket_no] || deliveryNotesMap[newRow.docket_no];
+        if (!note) {
+          try {
+            note = await fetchDeliveryNoteByDocketNo(docketObj.docket_no || newRow.docket_no);
+          } catch {
+            note = null;
+          }
+        }
+        if (!isDeliveredStatus(note?.delivery_status)) {
+          showError("Docket " + newRow.docket_no + " is not delivered");
+          return { ...newRow, docket_no: oldRow.docket_no };
+        }
+
+        const billedList = await fetchBilledDocketNos().catch(() => []);
+        const billedSet = new Set((Array.isArray(billedList) ? billedList : []).map((n) => String(n).trim()));
+        const alreadyBilled =
+          billedSet.has(String(newRow.docket_no).trim()) || isDocketOnEditingInvoice(newRow.docket_no);
+        if (isDebitNote) {
+          if (!alreadyBilled) {
+            showError("Debit Note: docket " + newRow.docket_no + " has no bill prepared yet");
+            return { ...newRow, docket_no: oldRow.docket_no };
+          }
+        } else if (alreadyBilled && !isDocketOnEditingInvoice(newRow.docket_no)) {
+          showError("Docket " + newRow.docket_no + " already has a bill prepared");
           return { ...newRow, docket_no: oldRow.docket_no };
         }
 
@@ -741,49 +795,21 @@ export default function CustomerBill() {
     setDocketsLoaded(false);
     setLoadingDockets(false);
     setEditingInvoice(null);
-    setBillDocUrl(null);
-  };
-
-  const handleBillDocUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!e.target) return;
-    e.target.value = "";
-    if (!file) return;
-    if (!editingInvoice) {
-      showError("Please save the invoice before uploading a document");
-      return;
-    }
-    try {
-      showLoading();
-      const result = await uploadBillDocument(
-        file,
-        editingInvoice.invoice_no,
-        editingInvoice.invoice_date,
-        editingInvoice.loc_code
-      );
-      setBillDocUrl(result?.url || null);
-      showSuccess("Bill document uploaded successfully");
-    } catch (err) {
-      showError(err.message || "Failed to upload bill document");
-      console.error("Bill doc upload error:", err);
-    } finally {
-      hideLoading();
-    }
   };
 
   const buildInvoicePayload = () => {
     const currentUser = getCurrentUser();
     const selectedBranch = form.billing_branch || "";
     const selectedLocCode = selectedBranch.split(" - ")[0].trim();
-    const customer = partners.find((p) => p.bp_name === form.customer);
+    const customer = selectedCustomer;
     const totalAmt = selectedRows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
 
     const header = {
       division_code: currentUser?.division_code ?? null,
       loc_code: selectedLocCode || null,
-      bp_code: customer?.bp_code ?? 0,
-      bp_name: form.customer === "Select Customer" ? null : form.customer || null,
-      invoice_type: form.billing_type === "Complimentory" ? "CM" : "C",
+      bp_code: customer?.bp_grp_code ?? customer?.bp_code ?? 0,
+      bp_name: customer?.bp_name || null,
+      invoice_type: isDebitNote ? "D" : "R",
       invoice_no: editingInvoice?.invoice_no ?? null,
       invoice_date: form.invoice_date || null,
       total_inv_amt: Math.round(totalAmt * 100) / 100,
@@ -796,10 +822,11 @@ export default function CustomerBill() {
         division_code: currentUser?.division_code ?? null,
         invoice_loc: selectedLocCode || null,
         invoice_date: form.invoice_date || null,
+        invoice_type: isDebitNote ? "D" : "R",
         inv_sr_no: index + 1,
         docket_no: row.docket_no || null,
-        docket_from_loc: row.origin || null,
-        docket_to_loc: row.destination || null,
+        docket_from_loc: locCodeOf(row.booking_branch || row.origin) || null,
+        docket_to_loc: locCodeOf(row.delivery_branch || row.destination) || null,
         docket_date: row.docket_date ? moment(row.docket_date, getDateFormat()).format("YYYY-MM-DD") : null,
         docket_chrwt: parseFloat(row.charge_wt) || 0,
         freight: parseFloat(row.freight) || 0,
@@ -828,23 +855,23 @@ export default function CustomerBill() {
       showError("Please select at least one docket before printing");
       return;
     }
-    if (!form.customer || form.customer === "Select Customer") {
+    if (!form.customer || !selectedCustomer) {
       showError("Please select a customer before printing");
       return;
     }
     const selectedBranch = form.billing_branch || "";
     const locCode = selectedBranch.split(" - ")[0].trim();
-    const customer = partners.find((p) => p.bp_name === form.customer);
+    const customer = selectedCustomer;
     const totalAmt = selectedRows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
 
     const invoice = {
       invoice_no: form.invoice_no || "AUTO",
       invoice_date: form.invoice_date || "",
-      bp_name: form.customer === "Select Customer" ? "" : form.customer || "",
-      bp_code: customer?.bp_code || "",
+      bp_name: customer?.bp_name || "",
+      bp_code: customer?.bp_grp_code || customer?.bp_code || "",
       loc_code: locCode || "",
       loc_label: selectedBranch || "",
-      invoice_type: form.billing_type === "Complimentory" ? "CM" : "C",
+      invoice_type: isDebitNote ? "D" : "R",
       total_inv_amt: totalAmt.toFixed(2),
     };
 
@@ -866,7 +893,7 @@ export default function CustomerBill() {
     const locCode = selectedBranch.split(" - ")[0].trim();
 
     // Validate customer is selected
-    if (!form.customer || form.customer === "Select Customer") {
+    if (!form.customer || !selectedCustomer) {
       showError("Please select a customer before saving");
       return;
     }
@@ -888,30 +915,36 @@ export default function CustomerBill() {
       return;
     }
 
-    // Block dockets that already belong to another saved invoice
-    const alreadyBilled = selectedRows
-      .filter((row) => row.invoice_status === "Billed" && !isDocketOnEditingInvoice(row.docket_no))
-      .map((row) => row.docket_no);
-    if (alreadyBilled.length > 0) {
-      showError(
-        "Cannot save. The following docket(s) are already billed on another invoice: " +
-        alreadyBilled.join(", ")
-      );
-      return;
+    if (!isDebitNote) {
+      const alreadyBilled = selectedRows
+        .filter((row) => row.invoice_status === "Billed" && !isDocketOnEditingInvoice(row.docket_no))
+        .map((row) => row.docket_no);
+      if (alreadyBilled.length > 0) {
+        showError(
+          "Cannot save. The following docket(s) are already billed on another invoice: " +
+          alreadyBilled.join(", ")
+        );
+        return;
+      }
     }
 
-    // Validate the docket's own booking branch matches the billing branch.
-    // (Delivery-note presence is no longer checked here - dockets that already
-    // have a delivery note are filtered out of the list when it is loaded.)
     const wrongBranchDockets = selectedRows
-      .filter((row) => locCode && (row.origin || "").trim() !== locCode)
+      .filter((row) => locCode && locCodeOf(row.pay_loc) !== locCodeOf(locCode))
       .map((row) => row.docket_no);
 
     if (wrongBranchDockets.length > 0) {
       showError(
-        "Cannot save. The following docket(s) do not belong to billing branch " +
+        "Cannot save. The following docket(s) do not have payment location " +
         selectedBranch + ": " + wrongBranchDockets.join(", ")
       );
+      return;
+    }
+
+    const notDelivered = selectedRows
+      .filter((row) => !isDeliveredStatus(row.delivery_status) && !deliveredDocketNos.has(String(row.docket_no)))
+      .map((row) => row.docket_no);
+    if (notDelivered.length > 0) {
+      showError("Cannot save. The following docket(s) are not delivered: " + notDelivered.join(", "));
       return;
     }
 
@@ -949,7 +982,6 @@ export default function CustomerBill() {
             invoice_date: result.header.invoice_date,
             loc_code: result.header.loc_code,
           });
-          if (result.header.bill_doc_url) setBillDocUrl(result.header.bill_doc_url);
         }
       }
 
@@ -970,6 +1002,8 @@ export default function CustomerBill() {
   return (
     <MainLayout>
       <PageBody title="Customer Invoice Generation">
+        <style>{billPageFontCss}</style>
+        <div className="customer-bill-page">
         <div className="pageToolbar" style={{ alignItems: "center", justifyContent: "flex-end", gap: 12, marginBottom: 12 }}>
           <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} sx={saveHeaderButtonStyle}>
             Save
@@ -977,26 +1011,6 @@ export default function CustomerBill() {
           <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint} sx={printHeaderButtonStyle}>
             Print
           </Button>
-          <Tooltip title={editingInvoice ? "Upload bill document (PDF/image)" : "Save invoice first to upload a document"}>
-            <span>
-              <Button
-                variant="contained"
-                startIcon={<UploadFileIcon />}
-                onClick={() => billDocInputRef.current?.click()}
-                disabled={!editingInvoice}
-                sx={uploadHeaderButtonStyle}
-              >
-                Upload Bill
-              </Button>
-            </span>
-          </Tooltip>
-          <input
-            ref={billDocInputRef}
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png,.gif,.heic,.heif"
-            style={{ display: "none" }}
-            onChange={handleBillDocUpload}
-          />
           <Button variant="contained" startIcon={<DeleteIcon />} onClick={handleDeleteInvoice} sx={deleteHeaderButtonStyle}>
             Delete
           </Button>
@@ -1010,12 +1024,54 @@ export default function CustomerBill() {
           <div style={sectionGridStyle}>
             {invoiceFields.map((field) => (
               <div key={field.name} style={fieldCellStyle}>
-                <FormField
-                  {...field}
-                  options={field.name === "customer" ? customerOptions : field.name === "billing_branch" ? branchOptions : field.options}
-                  form={form}
-                  setForm={handleSetForm}
-                />
+                {field.name === "customer" ? (
+                  <Autocomplete
+                    size="small"
+                    disabled={!branchSelected}
+                    options={customerOptions}
+                    value={customerOptions.find((o) => String(o.value) === String(form.customer)) || null}
+                    getOptionLabel={(opt) => {
+                      if (!opt) return "";
+                      if (typeof opt === "string") return opt;
+                      return opt.label || (opt.code ? `${opt.code} - ${opt.name}` : opt.name || "");
+                    }}
+                    isOptionEqualToValue={(a, b) => String(a?.value) === String(b?.value)}
+                    filterOptions={(opts, state) => {
+                      const q = String(state.inputValue || "").trim().toLowerCase();
+                      if (!q) return opts;
+                      return opts.filter((o) => {
+                        const code = String(o.code || "").toLowerCase();
+                        const name = String(o.name || "").toLowerCase();
+                        const label = String(o.label || "").toLowerCase();
+                        return code.includes(q) || name.includes(q) || label.includes(q);
+                      });
+                    }}
+                    onChange={(_, v) => handleSetForm({ ...form, customer: v?.value || "" })}
+                    slotProps={{
+                      paper: {
+                        sx: {
+                          "& .MuiAutocomplete-option": { fontSize: 11, fontWeight: 700, minHeight: 28, py: 0.5 },
+                        },
+                      },
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Customer"
+                        size="small"
+                        sx={customerFieldSx}
+                        placeholder={branchSelected ? "Search code or name" : "Select billing branch first"}
+                      />
+                    )}
+                  />
+                ) : (
+                  <FormField
+                    {...field}
+                    options={field.name === "billing_branch" ? branchOptions : field.options}
+                    form={form}
+                    setForm={handleSetForm}
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -1023,11 +1079,11 @@ export default function CustomerBill() {
 
         <div style={{ marginTop: 10 }}>
           <div style={{ ...tableTitleStyle, display: "flex", alignItems: "center", gap: 8 }}>
-            <span>Available Dockets for Billing</span>
+            <span>{isDebitNote ? "Available Dockets for Debit Note" : "Available Dockets for Billing"}</span>
             {selectedCustomer && !docketsLoaded && !loadingDockets && (
               <Chip
                 size="small"
-                label="Select a customer to load dockets"
+                label="Select billing branch, then customer, to load dockets"
                 sx={{ ml: 2, fontSize: 12, fontWeight: 600, bgcolor: "#fff8e1", color: "#b45309" }}
               />
             )}
@@ -1089,16 +1145,21 @@ export default function CustomerBill() {
             <div
               style={{
                 padding: "16px 14px",
-                fontSize: 13,
+                fontSize: 11,
+                fontWeight: 700,
                 color: "#6b7280",
                 background: "#fff",
                 border: "1px solid #dfeaf8",
                 borderTop: "none",
               }}
             >
-              No dockets found for {selectedCustomer.bp_name} (record_id {selectedCustomerId})
-              {selectedLocCode ? ` at branch ${selectedLocCode}` : ""}. Tick the dockets you want to bill,
-              then click Save.
+              {isDebitNote
+                ? `No billed delivered dockets found for ${selectedCustomer.bp_name}`
+                : `No unbilled delivered dockets found for ${selectedCustomer.bp_name}`}
+              {selectedLocCode ? ` with payment location ${selectedLocCode}` : ""}.
+              {isDebitNote
+                ? " Debit Note lists dockets that already have a bill prepared."
+                : " Regular billing lists dockets that are delivered and not yet billed."}
             </div>
           )}
           <DataTable
@@ -1107,7 +1168,7 @@ export default function CustomerBill() {
             getKey={(row) => row.id || row.docket_no}
             checkboxSelection
             // autoHeight
-            scroll={{ horizontal: true, afterRows: 8 }}
+            scroll={{ afterRows: 8 }}
             editable
             singleClick
             onRowUpdate={handleRowUpdate}
@@ -1125,7 +1186,6 @@ export default function CustomerBill() {
               <div style={totalCellStyle}>{totals.add_toll.toFixed(2)}</div>
               <div style={totalCellStyle}>{totals.green_tax.toFixed(2)}</div>
               <div style={totalCellStyle}>{totals.other_charges.toFixed(2)}</div>
-              <div style={totalCellStyle}>{totals.discount.toFixed(2)}</div>
               <div style={totalCellStyle}>{totals.taxable.toFixed(2)}</div>
               <div style={totalCellStyle}>{totals.cgst.toFixed(2)}</div>
               <div style={totalCellStyle}>{totals.sgst.toFixed(2)}</div>
@@ -1145,23 +1205,11 @@ export default function CustomerBill() {
               setForm={handleSetForm}
             />
           </div>
-          {billDocUrl && (
-            <div style={billDocLinkStyle}>
-              <AttachFileIcon sx={{ fontSize: 16, mr: 0.5, color: "#0d6efd" }} />
-              <a
-                href={buildBillDocUrl(billDocUrl)}
-                target="_blank"
-                rel="noreferrer"
-                style={{ color: "#0d6efd", fontWeight: 600, fontSize: 13, textDecoration: "none" }}
-              >
-                View Bill Document
-              </a>
-            </div>
-          )}
         </div>
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
         <LoadingOverlay isLoading={isLoading} message="Loading Customer Bill..." />
+        </div>
       </PageBody>
     </MainLayout>
   );
@@ -1178,7 +1226,7 @@ const sectionTitleStyle = {
   background: "#dfeeff",
   borderBottom: "1px solid #dfeaf8",
   padding: "10px 14px",
-  fontSize: 15,
+  fontSize: 12,
   fontWeight: 700,
   color: "#0d6efd",
   lineHeight: 1.3,
@@ -1213,7 +1261,7 @@ const tableTitleStyle = {
   padding: "10px 14px",
   fontWeight: 700,
   color: "#0d6efd",
-  fontSize: 15,
+  fontSize: 12,
   lineHeight: 1.3,
 };
 
@@ -1234,8 +1282,8 @@ const totalCellStyle = {
   justifyContent: "center",
   borderRight: "1px solid #dfeaf8",
   padding: "8px 6px",
-  minWidth: 90,
-  fontSize: 12,
+  minWidth: 56,
+  fontSize: 11,
   fontWeight: 700,
 };
 
@@ -1243,24 +1291,12 @@ const statusBadgeStyle = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  minWidth: "80px",
-  height: "24px",
+  minWidth: "44px",
+  height: "18px",
   borderRadius: "4px",
-  fontSize: 11,
+  fontSize: 10,
   fontWeight: 700,
   padding: "0 8px",
-};
-
-const deliveredBadge = {
-  background: "#e8f5e9",
-  color: "#1b5e20",
-  border: "1px solid #a5d6a7",
-};
-
-const pendingBadge = {
-  background: "#fff8e1",
-  color: "#b45309",
-  border: "1px solid #f7d58c",
 };
 
 const yesBadge = {
@@ -1273,18 +1309,6 @@ const noBadge = {
   background: "#ffe7e7",
   color: "#b91c1c",
   border: "1px solid #f7b5b5",
-};
-
-const billedBadge = {
-  background: "#e3f2fd",
-  color: "#0d6efd",
-  border: "1px solid #90caf9",
-};
-
-const unbilledBadge = {
-  background: "#fff8e1",
-  color: "#b45309",
-  border: "1px solid #f7d58c",
 };
 
 const saveHeaderButtonStyle = {
@@ -1329,26 +1353,4 @@ const deleteHeaderButtonStyle = {
   padding: "8px 16px",
   boxShadow: "none",
   "&:hover": { background: "linear-gradient(135deg, #c81e1e, #991b1b)" },
-};
-
-const uploadHeaderButtonStyle = {
-  background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
-  borderRadius: "6px",
-  fontWeight: 700,
-  textTransform: "none",
-  boxShadow: "none",
-  minWidth: "140px",
-  padding: "8px 16px",
-  "&:hover": { background: "linear-gradient(135deg, #6d28d9, #5b21b6)" },
-  "&.Mui-disabled": { background: "#d1d5db", color: "#9ca3af" },
-};
-
-const billDocLinkStyle = {
-  display: "flex",
-  alignItems: "center",
-  background: "#f0f7ff",
-  border: "1px solid #bfdbfe",
-  borderRadius: 6,
-  padding: "6px 12px",
-  whiteSpace: "nowrap",
 };

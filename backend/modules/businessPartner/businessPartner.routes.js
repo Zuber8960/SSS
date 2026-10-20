@@ -48,6 +48,16 @@ router.post('/documents', (req, res) => {
     });
 });
 
+router.get('/lorry-brokers', async (req, res) => {
+    try {
+        const data = await BusinessPartnerController.listLorryBrokers(req.tenant_id);
+        res.status(200).json({ success: true, data });
+    } catch (error) {
+        console.error('BP Lorry Brokers error:', error);
+        res.status(500).json({ success: false, message: 'Error retrieving lorry brokers' });
+    }
+});
+
 router.get('/types', async (req, res) => {
     try {
         const data = await BusinessPartnerController.getAllBpTypes();

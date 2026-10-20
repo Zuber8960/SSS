@@ -1,6 +1,7 @@
 import Api from '../services/Api';
 
 export const fetchAllBusinessPartners = ()               => Api.get('/businessPartner').then(r => r.data.data || []);
+export const fetchLorryBrokers         = ()               => Api.get('/businessPartner/lorry-brokers').then(r => r.data.data || []);
 export const fetchBusinessPartnerById  = (recId)         => Api.get(`/businessPartner/${encodeURIComponent(recId)}`).then(r => r.data.data);
 export const fetchBpTypes              = ()               => Api.get('/businessPartner/types').then(r => r.data.data || []);
 export const saveBusinessPartner       = (payload)        => Api.post('/businessPartner', payload).then(r => r.data.data || []);

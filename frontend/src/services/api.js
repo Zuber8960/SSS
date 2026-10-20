@@ -13,7 +13,11 @@ Api.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_KEY) || localStorage.getItem(TENANT_TOKEN_KEY);
   if (token) config.headers.Authorization = `Bearer ${token}`;
   const currentUser = JSON.parse(localStorage.getItem('current_user') || 'null');
-  if (currentUser?.company_code) config.headers['x-company-code'] = currentUser.company_code;
+  if (currentUser?.company_code || currentUser?.tenant_id) {
+    config.headers['x-company-code'] = currentUser.company_code || currentUser.tenant_id;
+  }
+  const divisionCode = currentUser?.division_code || localStorage.getItem('division_code');
+  if (divisionCode) config.headers['x-division-code'] = divisionCode;
 
   // The instance sets a default JSON content-type. For FormData bodies the
   // browser must supply the multipart boundary itself, so drop the default
@@ -29,8 +33,9 @@ Api.interceptors.response.use(
   (response) => response,
   (error) => {
     const isLoginRequest = error.config?.url?.includes('/login');
+    const isPublicVahan  = error.config?.url?.includes('/public/vahan');
     const hasToken       = !!localStorage.getItem(TOKEN_KEY);
-    if (error.response?.status === 401 && !isLoginRequest && hasToken) {
+    if (error.response?.status === 401 && !isLoginRequest && !isPublicVahan && hasToken) {
       localStorage.removeItem(TOKEN_KEY);
       window.location.href = '/';
     }

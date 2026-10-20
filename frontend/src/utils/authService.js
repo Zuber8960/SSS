@@ -81,3 +81,12 @@ export const getDivisionCode = () => {
 export const getStoredCompanyCode = () => {
   return localStorage.getItem('company_code');
 };
+
+export const getSessionLocCode = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem('current_user') || 'null');
+    return user?.loc_code || user?.location_id || localStorage.getItem('loc_code') || '';
+  } catch {
+    return localStorage.getItem('loc_code') || '';
+  }
+};

@@ -121,7 +121,7 @@ export default function InvoiceReport() {
         const invDate = toDate(inv.invoice_date);
         const bpName = inv.bp_name || p.bp_name || "";
         const locLabel = loc.loc_name ? `${loc.loc_code} - ${loc.loc_name}` : inv.loc_code || "";
-        const typeLabel = inv.invoice_type === "CM" ? "Complimentary" : inv.invoice_type === "C" ? "Regular" : inv.invoice_type || "";
+        const typeLabel = inv.invoice_type === "D" || inv.invoice_type === "DN" ? "Debit Note" : inv.invoice_type === "CM" ? "Complimentary" : inv.invoice_type === "R" || inv.invoice_type === "C" ? "Regular" : inv.invoice_type || "";
 
         const lines = Array.isArray(details) ? details : [];
         const sum = {

@@ -1,5 +1,53 @@
 const db = require('../../config/db');
 
+const calcHireAmt = (rateUom, rate, gtdWt) => {
+  const r = Number(rate) || 0;
+  const w = Number(gtdWt) || 0;
+  const u = Number(rateUom);
+  if (u === 2) return Number((r * w).toFixed(2));
+  if (u === 3) return Number(((r * w) / 1000).toFixed(2));
+  return Number(r.toFixed(2));
+};
+
+const isSettled = (row) => String(row?.vha_settled || '').trim().toUpperCase() === 'Y';
+const hasSettlementDate = (header) => Boolean(String(header?.vha_final_pay_date || '').trim());
+
+const freezeSettlement = (existing, data) => ({
+  ...data,
+  vha_dtn_amt: existing.vha_dtn_amt,
+  vha_dd_amt: existing.vha_dd_amt,
+  vha_final_pay_date: existing.vha_final_pay_date,
+  vha_settle_tds_amt: existing.vha_settle_tds_amt,
+  vha_gross_payable: existing.vha_gross_payable,
+  vha_net_payable: existing.vha_net_payable,
+  vha_settled: 'Y',
+  vha_settled_on: existing.vha_settled_on,
+});
+
+const updateHireVoucherWithSettlement = async (keys, data) => {
+  const existing = await getHireVoucherByKey(keys);
+  if (!existing) {
+    const err = new Error('Hire voucher not found');
+    err.status = 404;
+    throw err;
+  }
+  if (isSettled(existing)) {
+    return updateHireVoucher(keys, freezeSettlement(existing, data));
+  }
+  if (hasSettlementDate(data)) {
+    return updateHireVoucher(keys, {
+      ...data,
+      vha_settled: 'Y',
+      vha_settled_on: new Date(),
+    });
+  }
+  return updateHireVoucher(keys, {
+    ...data,
+    vha_settled: 'N',
+    vha_settled_on: null,
+  });
+};
+
 /* ================= GET ALL HIRE VOUCHERS ================= */
 
 const getAllHireVouchers = async () => {
@@ -56,9 +104,10 @@ const getHireVoucherDetails = async ({ vha_no, vha_loc, vha_date }) => {
 
 /* ================= GENERATE NEXT HIRE VOUCHER NO ================= */
 
-const getNextHireVoucherNo = async () => {
-  const result = await db.raw(
-    "SELECT COALESCE(MAX(CAST(vha_no AS INTEGER)), 0) + 1 AS next_no FROM sss.sst_vha_hdr"
+const getNextHireVoucherNo = async (trx = db) => {
+  await trx.raw('LOCK TABLE sss.sst_vha_hdr IN SHARE ROW EXCLUSIVE MODE');
+  const result = await trx.raw(
+    "SELECT COALESCE(MAX(CAST(vha_no AS INTEGER)), 0) + 1 AS next_no FROM sss.sst_vha_hdr WHERE vha_no ~ '^[0-9]+$'"
   );
   const nextNo = result.rows?.[0]?.next_no || 1;
   return String(nextNo);
@@ -67,26 +116,38 @@ const getNextHireVoucherNo = async () => {
 /* ================= CREATE HIRE VOUCHER (header + details in transaction) ================= */
 
 const createHireVoucher = async (headerData, detailsData) => {
-  // Generate next vha no BEFORE starting the transaction
-  const nextNo = await getNextHireVoucherNo();
+  const manifestRows = (detailsData || []).filter((r) => String(r?.mnf_no || '').trim());
+  if (!manifestRows.length) {
+    const err = new Error('Please select at least one manifest');
+    err.status = 400;
+    throw err;
+  }
+  const selectedActWt = manifestRows.reduce((sum, r) => sum + (Number(r.mnf_act_weight) || 0), 0);
 
   // ── Header: computed amounts (server-side source of truth) ──
   const n = (v) => {
     const x = Number(v);
     return Number.isFinite(x) ? x : 0;
   };
-  const hireAmt = n(headerData.vha_hire_amt);
+  const hireAmt = calcHireAmt(headerData.vha_rate_uom, headerData.vha_rate_per_uom, headerData.vha_guarantee_weight);
   const loadingAmt = n(headerData.vha_loading_amt);
   const dcAmt = n(headerData.vha_dc_amt);
-  const grossAmt = n(headerData.vha_total_amt) || hireAmt + loadingAmt + dcAmt;
+  const grossAmt = hireAmt + loadingAmt + dcAmt;
   const advDiesel = n(headerData.vha_advance_diesel);
   const advCash = n(headerData.vha_advance_cash);
   const advTotal = n(headerData.vha_advance_total) || advDiesel + advCash;
   const tdsAmt = n(headerData.vha_tds_amt);
-  const advNet = advTotal - tdsAmt;
+  const advNet = advTotal + tdsAmt;
+  const balAmt = grossAmt - advNet;
+  const dtnAmt = n(headerData.vha_dtn_amt);
+  const ddAmt = n(headerData.vha_dd_amt);
+  const settleTds = n(headerData.vha_settle_tds_amt);
+  const grossPayable = balAmt + dtnAmt + ddAmt;
+  const netPayable = grossPayable - settleTds;
 
   const trx = await db.transaction();
   try {
+    const nextNo = await getNextHireVoucherNo(trx);
     // Build header row (only known sst_vha_hdr columns are accepted)
     const headerRow = {
       ...headerData,
@@ -96,7 +157,7 @@ const createHireVoucher = async (headerData, detailsData) => {
       vha_to_loc: headerData.vha_to_loc || '',
       vha_to_loc_state: headerData.vha_to_loc_state || '',
       // numeric columns — cast to numbers (vha_rate_uom is numeric: 1=Fixed, 2=Per Kg, 3=Per Ton, 4=Per Trip)
-      dwb_actual_weight: headerData.dwb_actual_weight != null && headerData.dwb_actual_weight !== "" ? Number(headerData.dwb_actual_weight) : null,
+      dwb_actual_weight: selectedActWt,
       vha_guarantee_weight: headerData.vha_guarantee_weight != null && headerData.vha_guarantee_weight !== "" ? Number(headerData.vha_guarantee_weight) : null,
       vha_rate_uom: headerData.vha_rate_uom != null && headerData.vha_rate_uom !== "" ? Number(headerData.vha_rate_uom) : null,
       vha_rate_per_uom: headerData.vha_rate_per_uom != null && headerData.vha_rate_per_uom !== "" ? Number(headerData.vha_rate_per_uom) : null,
@@ -109,7 +170,15 @@ const createHireVoucher = async (headerData, detailsData) => {
       vha_advance_total: advTotal,
       vha_tds_amt: tdsAmt,
       vha_advance_net: advNet,
-      vha_balance_amt: n(headerData.vha_balance_amt) || grossAmt - advTotal - tdsAmt,
+      vha_balance_amt: balAmt,
+      vha_dtn_amt: dtnAmt,
+      vha_dd_amt: ddAmt,
+      vha_final_pay_date: headerData.vha_final_pay_date || null,
+      vha_settle_tds_amt: settleTds,
+      vha_gross_payable: grossPayable,
+      vha_net_payable: netPayable,
+      vha_settled: headerData.vha_final_pay_date ? 'Y' : 'N',
+      vha_settled_on: headerData.vha_final_pay_date ? new Date() : null,
       aud_date: new Date(),
     };
 
@@ -119,7 +188,7 @@ const createHireVoucher = async (headerData, detailsData) => {
     // Build detail rows with composite key (only sst_vha_dtl columns).
     // mnf_loc / mnf_no (varchar) and mnf_date (date) are NOT NULL, so blanks
     // are coerced to '' / an epoch date rather than null.
-    const detailRows = (detailsData || []).map((row) => ({
+    const detailRows = manifestRows.map((row) => ({
       company_code: headerData.company_code || null,
       division_code: headerData.division_code || null,
       vha_no: nextNo,
@@ -239,6 +308,58 @@ const getVendorByLorryNo = async (lorryNo) => {
     .first();
 };
 
+/* Manifests for a vehicle that are not already on an active hire voucher.
+   currentVhaNo: when editing, keep rows already linked to this voucher. */
+const getUncoveredManifestsByVehicle = async (vehicleNo, currentVhaNo, fromLoc) => {
+  const veh = String(vehicleNo || '').replace(/\s+/g, '').toUpperCase();
+  if (!veh) return [];
+
+  const bindings = [veh];
+  let excludeCurrent = '';
+  if (currentVhaNo) {
+    excludeCurrent = 'AND vh.vha_no <> ?';
+    bindings.push(String(currentVhaNo));
+  }
+  let fromFilter = '';
+  if (fromLoc) {
+    fromFilter = `AND REPLACE(UPPER(TRIM(COALESCE(h.mnf_loc, ''))), ' ', '') = ?`;
+    bindings.push(String(fromLoc).replace(/\s+/g, '').toUpperCase());
+  }
+
+  const result = await db.raw(
+    `
+    SELECT
+      h.mnf_no,
+      h.mnf_date,
+      h.mnf_loc,
+      h.mnf_to_loc,
+      h.mnf_actual_wt,
+      h.mnf_no_of_dwb,
+      h.mnf_no_of_pkgs,
+      h.desp_veh_no
+    FROM sss.sst_mnf_hdr h
+    WHERE REPLACE(UPPER(TRIM(COALESCE(h.desp_veh_no, ''))), ' ', '') = ?
+      AND COALESCE(h.record_status, 0) = 0
+      AND NOT EXISTS (
+        SELECT 1
+        FROM sss.sst_vha_dtl d
+        INNER JOIN sss.sst_vha_hdr vh
+          ON vh.vha_no = d.vha_no
+         AND vh.vha_loc = d.vha_loc
+         AND vh.vha_date = d.vha_date
+        WHERE d.mnf_no = h.mnf_no
+          AND COALESCE(d.mnf_loc, '') = COALESCE(h.mnf_loc, '')
+          AND COALESCE(vh.record_status, 0) = 0
+          ${excludeCurrent}
+      )
+      ${fromFilter}
+    ORDER BY h.mnf_date, h.mnf_no
+    `,
+    bindings
+  );
+  return result.rows || [];
+};
+
 module.exports = {
   getAllHireVouchers,
   getHireVoucherByKey,
@@ -248,7 +369,10 @@ module.exports = {
   getNextHireVoucherNo,
   createHireVoucher,
   updateHireVoucher,
+  updateHireVoucherWithSettlement,
   updateHireVoucherDetails,
   deleteHireVoucher,
-  getVendorByLorryNo
+  getVendorByLorryNo,
+  getUncoveredManifestsByVehicle,
+  calcHireAmt,
 };

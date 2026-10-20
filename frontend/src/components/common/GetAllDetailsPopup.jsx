@@ -231,7 +231,7 @@ export default function GetAllDetailsPopup({ open, onClose }) {
       id: (inv.invoice_no || "") + "_" + (inv.invoice_date || "") + "_" + i,
       invoice_date: toDate(inv.invoice_date),
       total_inv_amt: fmtAmt(inv.total_inv_amt),
-      invoice_type: inv.invoice_type === "CM" ? "Complimentary" : inv.invoice_type === "C" ? "Regular" : inv.invoice_type || "",
+      invoice_type: inv.invoice_type === "D" || inv.invoice_type === "DN" ? "Debit Note" : inv.invoice_type === "CM" ? "Complimentary" : inv.invoice_type === "R" || inv.invoice_type === "C" ? "Regular" : inv.invoice_type || "",
     })), [filteredInvoices]);
 
   const mappedCustomers = useMemo(() =>

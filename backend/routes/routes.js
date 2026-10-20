@@ -19,6 +19,7 @@ const UserController = require('../modules/userMaster/user.controller');
 const TenantController = require('../modules/tenantMaster/tenant.controller');
 const manifestRoutes = require("../modules/manifest/manifest.routes");
 const lorryMasterRoutes = require("../modules/lorryMaster/lorryMaster.routes");
+const lorryOwnerVehicleRoutes = require("../modules/lorryOwnerVehicle/lorryOwnerVehicle.routes");
 const hireVoucherRoutes = require("../modules/hireVoucher/hireVoucher.routes");
 const materialGroupRoutes = require("../modules/materialGroup/materialGroup.routes");
 const deliveryNoteRoutes = require("../modules/deliveryNote/deliveryNote.routes");
@@ -60,11 +61,12 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    let tenant_id = null, locId, divisionId;
+    let tenant_id = null, locId, divisionId, company_code = null;
     if (tenantToken) {
       const secret = process.env.JWT_SECRET || 'your_jwt_secret_key';
       const decoded = jwt.verify(tenantToken, secret);
       tenant_id = decoded.tenant_id ?? null;
+      company_code = decoded.company_code ?? null;
     }
 
     const user = await UserController.authenticateUser(userId, password, tenant_id, loc_id);
@@ -85,7 +87,14 @@ router.post('/login', async (req, res) => {
       query.where({ loc_code: loc_id });
       const locRow = await query;
       locId = locRow?.loc_id || '000';
-      divisionId = division_code > 0 ? division_code : '0';
+      divisionId = division_code > 0 ? division_code : (user.division_code || '0');
+      if (!company_code && user.tenant_id) {
+        const tenantRow = await db('sss.ssm_tenant_master')
+          .select('company_code')
+          .where({ rec_id: user.tenant_id })
+          .first();
+        company_code = tenantRow?.company_code ?? user.tenant_id;
+      }
 
       const secret = process.env.JWT_SECRET || 'your_jwt_secret_key';
       const token = jwt.sign(
@@ -95,6 +104,8 @@ router.post('/login', async (req, res) => {
           userName: user.user_name,
           isAdmin: user.is_admin,
           tenant_id: user.tenant_id,
+          company_code: company_code ?? user.tenant_id,
+          division_code: division_code || user.division_code || divisionId,
           locId,
           divisionId,
           loc_code: loc_id,
@@ -135,6 +146,8 @@ router.post('/login', async (req, res) => {
           mobile_no: user.mobile_no,
           is_admin: user.is_admin,
           tenant_id: user.tenant_id,
+          company_code: company_code ?? user.tenant_id,
+          division_code: division_code || user.division_code || divisionId,
           loc_code: loc_id,
         }
       });
@@ -262,6 +275,7 @@ router.use('/userRole', authMiddleware, userRoleRoutes);
 router.use('/roleMenu', authMiddleware, roleMenuRoutes);
 router.use('/manifest', authMiddleware, manifestRoutes);
 router.use('/lorryMaster', authMiddleware, lorryMasterRoutes);
+router.use('/lorryOwnerVehicle', authMiddleware, lorryOwnerVehicleRoutes);
 router.use('/hireVoucher', authMiddleware, hireVoucherRoutes);
 router.use('/materialGroup', authMiddleware, materialGroupRoutes);
 router.use('/deliveryNote', authMiddleware, deliveryNoteRoutes);

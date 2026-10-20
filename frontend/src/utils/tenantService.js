@@ -1,3 +1,4 @@
+import moment from 'moment';
 import Api from '../services/Api';
 import { clearTenantScopedStorage } from './authService';
 
@@ -33,10 +34,41 @@ export const getTenantConfig = () => {
 };
 
 const oracleToMoment = (fmt) =>
-  fmt.replace(/\bMONTH\b/g, "MMMM").replace(/\bMON\b/g, "MMM");
+  String(fmt || "")
+    .replace(/\bMONTH\b/g, "MMMM")
+    .replace(/\bMON\b/g, "MMM")
+    .replace(/\bRRRR\b/g, "YYYY")
+    .replace(/\bRR\b/g, "YY");
 
 export const getDateFormat = () =>
-  oracleToMoment(getTenantConfig()?.dateFormate || "DD-MON-YY");
+  oracleToMoment(getTenantConfig()?.dateFormate || "DD-MON-RR");
+
+const DATE_PARSE = [
+  "YYYY-MM-DDTHH:mm:ss.SSSZ",
+  "YYYY-MM-DD",
+  "DD-MMM-YYYY",
+  "DD-MMM-YY",
+  "DD/MM/YYYY",
+  "MM/DD/YYYY",
+];
+
+export const parseDate = (val) => {
+  if (!val) return null;
+  const strict = moment(val, [...DATE_PARSE, getDateFormat()], true);
+  if (strict.isValid()) return strict;
+  const loose = moment(val);
+  return loose.isValid() ? loose : null;
+};
+
+export const formatDateDisplay = (val) => {
+  const m = parseDate(val);
+  return m ? m.format(getDateFormat()).toUpperCase() : "";
+};
+
+export const formatDateIso = (val) => {
+  const m = parseDate(val);
+  return m ? m.format("YYYY-MM-DD") : "";
+};
 
 export const clearTenantConfig = () => {
   localStorage.removeItem(TENANT_KEY);

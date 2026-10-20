@@ -58,6 +58,29 @@ module.exports = {
             .orderBy('rec_name');
     },
 
+    async listLorryBrokers(tenant_id) {
+        const query = db('sss.ssm_business_partner as bp')
+            .leftJoin('sss.ssm_business_partner_type as bpt', 'bp.bp_type', 'bpt.rec_id')
+            .select(
+                'bp.record_id',
+                'bp.bp_name',
+                'bp.bp_grp_code',
+                'bp.bp_pan_no',
+                'bp.bp_city',
+                'bp.loc_code',
+                'bp.bp_supplier_type',
+                'bpt.rec_name as bp_type_name'
+            )
+            .where(function () {
+                this.whereRaw("LOWER(TRIM(COALESCE(bpt.rec_name, ''))) = ?", ['supplier'])
+                    .orWhereRaw("LOWER(TRIM(COALESCE(bp.bp_type::text, ''))) = ?", ['supplier']);
+            })
+            .andWhereRaw("LOWER(TRIM(COALESCE(bp.bp_supplier_type, ''))) = ?", ['lorry broker'])
+            .orderBy('bp.bp_name');
+        if (tenant_id) query.andWhere('bp.tenant_id', tenant_id);
+        return query;
+    },
+
     async getBusinessPartnerByPanName(panName, tenant_id) {
         return db('sss.ssm_business_partner')
             .select('record_id', 'bp_name', 'bp_addres', 'bp_city', 'bp_state', 'bp_pincode', 'bp_gstin')

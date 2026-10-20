@@ -19,6 +19,12 @@ export const getDocketByRecId = (recId, docketNo) => {
 
 export const fetchChargeMaster = () => Api.get('/docket/charge-master').then(r => r.data.data || r.data || []);
 export const fetchCharges = (docketId) => Api.get(`/docket/${docketId}/charges`).then(r => r.data.data || r.data || []);
+export const fetchChargesBulk = (docketNos = []) => {
+  const nos = (Array.isArray(docketNos) ? docketNos : []).map((n) => String(n || "").trim()).filter(Boolean);
+  if (nos.length === 0) return Promise.resolve([]);
+  return Api.get("/docket/charges-bulk", { params: { docket_nos: nos.join(",") } })
+    .then((r) => r.data.data || r.data || []);
+};
 export const createCharge = (docketId, data) => Api.post(`/docket/${docketId}/charges`, data).then(r => r.data.data || r.data);
 export const updateCharge = (chargeId, data) => Api.put(`/docket/charges/${chargeId}`, data).then(r => r.data.data || r.data);
 export const deleteCharge = (chargeId) => Api.delete(`/docket/charges/${chargeId}`).then(r => r.data);
