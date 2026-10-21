@@ -47,7 +47,8 @@ export const validateLongHaul = (docketNo, fromLoc, fromTown) =>
  *   unld_loc_code = MANIFEST FROM LOC
  *   and (pkgs_received - desp_pkgs) > 0
  *   docket_to_loc = manifest_from_loc
- *   manifest_to_town = docket_to_town
+ *   docket_to_loc = MANIFEST TO LOC
+ *   docket_to_town = MANIFEST TO TOWN
  */
 export const validateLocalDelivery = (docketNo, fromLoc, toLoc, toTown) =>
   Api.get(`/cns/validate/local-delivery`, {
@@ -58,3 +59,13 @@ export const validateLocalDelivery = (docketNo, fromLoc, toLoc, toTown) =>
       toTown,
     },
   }).then((r) => r.data.data || r.data);
+
+export const fetchLocalPickupDockets = (fromLoc, fromTown, manifestDate) =>
+  Api.get(`/cns/local-pickup-dockets`, {
+    params: { fromLoc, fromTown, manifestDate },
+  }).then((r) => r.data.data || []);
+
+export const fetchLocalDeliveryDockets = (fromLoc, toLoc, toTown, manifestDate) =>
+  Api.get(`/cns/local-delivery-dockets`, {
+    params: { fromLoc, toLoc, toTown, manifestDate },
+  }).then((r) => r.data.data || []);

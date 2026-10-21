@@ -37,15 +37,22 @@ const saveUnloading = async (unloadingData) => {
       document_hold: parseInt(d.document_hold) || 0,
       part_hold: parseInt(d.part_hold) || 0,
       dispatch_flag: d.dispatch_flag || null,
-      desp_pkgs: parseFloat(d.received_pkgs - d.damage_qty - d.short_qty) || null,
-      desp_wt: parseFloat(d.desp_wt) || null,
+      desp_pkgs: 0,
+      desp_wt: 0,
       record_created_by: headerData.record_created_by || 'ADMIN',
       record_created_on: new Date(),
     }));
 
-    // Insert all unloading records
-    await trx('sss.sst_unloading_dtl').insert(rows);
+    for (const row of rows) {
+      const docket = await trx('sss.sst_docket')
+        .where({ docket_no: row.docket_no })
+        .first();
+      if (docket?.docket_to_loc) {
+        row.docket_to_loc = docket.docket_to_loc;
+      }
+    }
 
+    await trx('sss.sst_unloading_dtl').insert(rows);
 
     const manifestKey = {
       mnf_no: headerData.mnf_no,
@@ -59,27 +66,6 @@ const saveUnloading = async (unloadingData) => {
           mnf_arrival_time: `${headerData.arrival_date} ${headerData.arrival_time}:00` || null,
           aud_date: new Date(),
         });
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // 3. Update docket header with received pkgs, weight, and arrival time
-    // ─────────────────────────────────────────────────────────
-    for (const row of rows) {
-      if (row.docket_no) {
-        // Build the docket key — try to match by docket_no + docket_loc + docket_date
-        const docketKey = {
-          docket_no: row.docket_no,
-        };
-        if (row.docket_from_loc) docketKey.docket_loc = row.docket_from_loc;
-        if (row.docket_date) docketKey.docket_date = row.docket_date;
-
-        await trx('sss.sst_docket')
-          .where(docketKey)
-          .update({
-            desp_pkgs: row.pkgs_received,
-            aud_date: new Date(),
-          });
-      }
     }
 
     await trx.commit();

@@ -50,6 +50,60 @@ const getNextManifestNo = async () => {
   return String(nextNo);
 };
 
+/* Apply / reverse dispatched pkgs on the unloading stock at this from-loc */
+const applyUnloadingDispatch = async (trx, { fromLoc, details, sign }) => {
+  if (!fromLoc || !details?.length) return;
+
+  for (const row of details) {
+    const docketNo = row.dwb_no || row.docket_no;
+    const pkgs = parseFloat(row.mnf_pkgs || row.dwb_pkgs) || 0;
+    const wt = parseFloat(row.dwb_actual_wt) || 0;
+    if (!docketNo || pkgs <= 0) continue;
+
+    const unld = await trx('sss.sst_unloading_dtl')
+      .where({ docket_no: docketNo })
+      .whereRaw("UPPER(TRIM(COALESCE(unld_loc_code, ''))) = UPPER(TRIM(?))", [fromLoc])
+      .orderByRaw('arrival_date DESC NULLS LAST')
+      .first();
+
+    if (!unld) continue;
+
+    if (sign > 0) {
+      const pending = Number(unld.pkgs_received || 0) - Number(unld.desp_pkgs || 0);
+      if (pkgs > pending + 0.0001) {
+        throw new Error(
+          `Docket ${docketNo}: only ${pending} pkg(s) pending at ${fromLoc} to dispatch`
+        );
+      }
+    }
+
+    const q = trx('sss.sst_unloading_dtl').where({ docket_no: docketNo });
+    if (unld.record_id != null) q.andWhere({ record_id: unld.record_id });
+    else {
+      q.whereRaw("UPPER(TRIM(COALESCE(unld_loc_code, ''))) = UPPER(TRIM(?))", [fromLoc]);
+      if (unld.mnf_no) q.andWhere({ mnf_no: unld.mnf_no });
+    }
+
+    await q.update({
+      desp_pkgs: trx.raw('GREATEST(COALESCE(desp_pkgs, 0) + ?, 0)', [sign * pkgs]),
+      desp_wt: trx.raw('GREATEST(COALESCE(desp_wt, 0) + ?, 0)', [sign * wt]),
+    });
+  }
+};
+
+const validManifestDetails = (detailsData) =>
+  (detailsData || []).filter(
+    (row) =>
+      row.dwb_no &&
+      row.dwb_no.toString().trim() !== '' &&
+      row.dwb_date &&
+      row.dwb_date.toString().trim() !== '' &&
+      row.dwb_loc &&
+      row.dwb_loc.toString().trim() !== '' &&
+      row.dwb_to_loc &&
+      row.dwb_to_loc.toString().trim() !== ''
+  );
+
 /* ================= CREATE MANIFEST (header + details in transaction) ================= */
 
 const createManifest = async (headerData, detailsData) => {
@@ -98,9 +152,13 @@ const createManifest = async (headerData, detailsData) => {
       aud_date: new Date(),
     }));
 
-    // Insert details
     if (detailRows.length > 0) {
       await trx('sss.sst_mnf_dtl').insert(detailRows);
+      await applyUnloadingDispatch(trx, {
+        fromLoc: headerData.mnf_loc,
+        details: detailRows,
+        sign: 1,
+      });
     }
 
     await trx.commit();
@@ -127,18 +185,18 @@ const updateManifest = async (keys, data, trx = db) => {
 const updateManifestDetails = async (keys, detailsData) => {
   const trx = await db.transaction();
   try {
-    // Delete existing details
+    const oldDetails = await trx('sss.sst_mnf_dtl').where(keys).select('*');
+    await applyUnloadingDispatch(trx, {
+      fromLoc: keys.mnf_loc,
+      details: oldDetails,
+      sign: -1,
+    });
+
     await trx('sss.sst_mnf_dtl')
       .where(keys)
       .del();
 
-    // Filter out detail rows with missing required fields (NOT NULL columns)
-    const validDetails = detailsData.filter(row =>
-      row.dwb_no && row.dwb_no.toString().trim() !== '' &&
-      row.dwb_date && row.dwb_date.toString().trim() !== '' &&
-      row.dwb_loc && row.dwb_loc.toString().trim() !== '' &&
-      row.dwb_to_loc && row.dwb_to_loc.toString().trim() !== ''
-    );
+    const validDetails = validManifestDetails(detailsData);
 
     // Insert new details
     const detailRows = validDetails.map((row, index) => ({
@@ -163,6 +221,11 @@ const updateManifestDetails = async (keys, detailsData) => {
 
     if (detailRows.length > 0) {
       await trx('sss.sst_mnf_dtl').insert(detailRows);
+      await applyUnloadingDispatch(trx, {
+        fromLoc: keys.mnf_loc,
+        details: detailRows,
+        sign: 1,
+      });
     }
 
     await trx.commit();

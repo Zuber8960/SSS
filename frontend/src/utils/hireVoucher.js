@@ -1,7 +1,9 @@
 import Api from '../services/Api';
 
-export const fetchAllHireVouchers = () =>
-  Api.get('/hireVoucher').then(r => r.data.data || r.data || []);
+export const fetchAllHireVouchers = (vhaLoc) =>
+  Api.get('/hireVoucher', {
+    params: vhaLoc ? { vha_loc: vhaLoc } : {},
+  }).then(r => r.data.data || r.data || []);
 
 export const fetchHireVoucherByNo = (hvNo) =>
   Api.get(`/hireVoucher/by-no/${encodeURIComponent(hvNo)}`).then(r => r.data.data || r.data);

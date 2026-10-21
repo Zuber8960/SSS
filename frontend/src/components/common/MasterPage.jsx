@@ -1,5 +1,26 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { DataGrid, useGridApiContext, useGridApiRef } from "@mui/x-data-grid";
+import {
+  DataGrid,
+  useGridApiContext,
+  useGridApiRef,
+  getGridStringOperators,
+  getGridNumericOperators,
+  getGridSingleSelectOperators,
+  gridFilteredSortedRowIdsSelector,
+} from "@mui/x-data-grid";
+
+const isTotalRow = (row) =>
+  Boolean(row?.is_total || row?.id === "__total__" || row?.row_tone === "Total");
+
+const keepTotalFilterOps = (operators) =>
+  (operators || []).map((op) => ({
+    ...op,
+    getApplyFilterFn: (filterItem, column) => {
+      const fn = op.getApplyFilterFn?.(filterItem, column);
+      if (!fn) return fn;
+      return (value, row, colDef, api) => isTotalRow(row) || fn(value, row, colDef, api);
+    },
+  }));
 import { Box, Button, FormControl, InputLabel, Select, MenuItem, IconButton, TextField, Tooltip } from "@mui/material";
 import { formatDateDisplay, formatDateIso } from "../../utils/tenantService";
 
@@ -333,6 +354,7 @@ export function DataTable({
   rows,
   getKey,
   actions,
+  actionsPosition = "right",
   editable = false,
   singleClick = false,
   onCellChange,
@@ -351,6 +373,7 @@ export function DataTable({
   // Per-row background colours by status (mimics StatusGrid's rowColors).
   statusKey = "status",
   rowColors = {},
+  onFilteredRowsChange,
 }) {
   const apiRef = useGridApiRef();
   // Normalise the controlled selection prop to the v9 model shape. Memoised so the
@@ -468,18 +491,22 @@ export function DataTable({
     if (!scroll?.horizontal) return empty;
     const isFrozenLeft = (c) => c.frozen === true || c.frozen === "left";
     const isFrozenRight = (c) => c.frozen === "right";
-    if (!columns.some((c) => isFrozenLeft(c) || isFrozenRight(c))) return empty;
+    const actionsOnLeft = Boolean(actions?.length) && (actionsPosition === "left" || actionsPosition === "start");
+    if (!columns.some((c) => isFrozenLeft(c) || isFrozenRight(c)) && !actionsOnLeft) return empty;
 
-    // Same visible order the grid sees: selection column first, then the
-    // (draggable) column order, then the actions column appended at the far right.
+    // Same visible order the grid sees: selection column first, optional
+    // actions on the left, then the (draggable) column order, then actions
+    // appended at the far right by default.
     const visibleOrder = [
       ...(checkboxSelection ? [SELECTION_COLUMN_FIELD] : []),
+      ...(actionsOnLeft ? ["actions"] : []),
       ...columnOrder.filter((key) => columns.some((c) => c.key === key)),
-      ...(actions?.length ? ["actions"] : []),
+      ...(actions?.length && !actionsOnLeft ? ["actions"] : []),
     ];
     let lastFrozenLeft = -1;
     let firstFrozenRight = -1;
     visibleOrder.forEach((key, index) => {
+      if (key === "actions" && actionsOnLeft) lastFrozenLeft = Math.max(lastFrozenLeft, index);
       if (columns.some((c) => c.key === key && isFrozenLeft(c))) lastFrozenLeft = index;
       if (firstFrozenRight === -1 && columns.some((c) => c.key === key && isFrozenRight(c))) {
         firstFrozenRight = index;
@@ -489,7 +516,7 @@ export function DataTable({
       left: lastFrozenLeft === -1 ? [] : visibleOrder.slice(0, lastFrozenLeft + 1),
       right: firstFrozenRight === -1 ? [] : visibleOrder.slice(firstFrozenRight),
     };
-  }, [columns, columnOrder, actions, checkboxSelection, scroll]);
+  }, [columns, columnOrder, actions, actionsPosition, checkboxSelection, scroll]);
 
   // Push the frozen model into the grid state. `state.pinnedColumns` is what MUI's
   // column-pinning machinery reads (cells, headers, virtualization offsets), and the
@@ -511,6 +538,24 @@ export function DataTable({
       headerName: col.label,
       ...(scroll?.horizontal ? { width: col.minWidth ?? 120 } : { flex: 1, minWidth: col.minWidth ?? 100 }),
       sortable: true,
+      sortComparator: (v1, v2, c1, c2) => {
+        const r1 = c1.api.getRow(c1.id);
+        const r2 = c2.api.getRow(c2.id);
+        if (isTotalRow(r1)) return 1;
+        if (isTotalRow(r2)) return -1;
+        const a = v1 == null ? "" : v1;
+        const b = v2 == null ? "" : v2;
+        if (a < b) return -1;
+        if (a > b) return 1;
+        return 0;
+      },
+      filterOperators: keepTotalFilterOps(
+        col.options || col.type === "singleSelect"
+          ? getGridSingleSelectOperators()
+          : col.type === "number"
+            ? getGridNumericOperators()
+            : getGridStringOperators()
+      ),
       editable: col.editable ?? editable,
       type: col.options ? "singleSelect" : col.type,
       valueOptions: col.options,
@@ -595,7 +640,8 @@ export function DataTable({
     };
 
     const next = [...cols];
-    next.push(actionsColumn);
+    if (actionsPosition === "left" || actionsPosition === "start") next.unshift(actionsColumn);
+    else next.push(actionsColumn);
     return next;
   };
 
@@ -606,19 +652,35 @@ export function DataTable({
     ...row,
   }));
 
+  const emitFilteredRows = () => {
+    if (!onFilteredRowsChange || !apiRef.current?.getRow) return;
+    try {
+      const ids = gridFilteredSortedRowIdsSelector(apiRef);
+      const visible = ids
+        .map((id) => apiRef.current.getRow(id))
+        .filter((r) => r && !isTotalRow(r));
+      onFilteredRowsChange(visible);
+    } catch {
+      /* grid not ready */
+    }
+  };
+
   // Apply a per-column / optional global background colour based on status.
   const hasRowColors = Object.keys(rowColors).length > 0;
   const colorClassName = (status) =>
     "dgt-row-" + String(status).toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  const getRowClassName = (params) =>
-    rowColors[params.status ?? params[statusKey]]
-      ? colorClassName(params[statusKey] ?? params.status)
-      : "";
+  const getRowClassName = (params) => {
+    const row = params.row || {};
+    const status = row[statusKey] ?? params[statusKey] ?? params.status;
+    const tone = rowColors[status] ? colorClassName(status) : "";
+    return `${tone}${isTotalRow(row) ? " dgt-row-total" : ""}`.trim();
+  };
   const rowColorCss = hasRowColors
     ? Object.entries(rowColors)
-        .map(([status, color]) =>
-          `.dgt-row-${String(status).toLowerCase().replace(/[^a-z0-9]+/g, "-")} { background-color: ${color} !important; }`
-        )
+        .map(([status, color]) => {
+          const cls = `.dgt-row-${String(status).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+          return `${cls}, ${cls}:nth-of-type(even), ${cls}:hover { background-color: ${color} !important; }`;
+        })
         .join("\n")
     : "";
 
@@ -693,6 +755,9 @@ export function DataTable({
     "& .MuiDataGrid-cell:focus, & .MuiDataGrid-columnHeader:focus": {
       outline: "none",
     },
+    "& .dgt-row-total, & .dgt-row-total .MuiDataGrid-cell, & .dgt-row-total .MuiDataGrid-cell span": {
+      fontWeight: "700 !important",
+    },
   };
 
   const totalMinWidth = columns.reduce((sum, col) => sum + (col.minWidth ?? 120), 0)
@@ -723,7 +788,9 @@ export function DataTable({
         hideFooter
         disableVirtualization={false}
         rowSelection={true}
-        {...(hasRowColors ? { getRowClassName } : {})}
+        getRowClassName={getRowClassName}
+        onFilterModelChange={() => setTimeout(emitFilteredRows, 0)}
+        onSortModelChange={() => setTimeout(emitFilteredRows, 0)}
         {...(singleClick ? {
           onCellClick: (params) => {
             if (params.colDef.editable) {

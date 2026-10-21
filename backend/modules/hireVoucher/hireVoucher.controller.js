@@ -9,6 +9,49 @@ const calcHireAmt = (rateUom, rate, gtdWt) => {
   return Number(r.toFixed(2));
 };
 
+const sameLoc = (a, b) =>
+  String(a || '').replace(/\s+/g, '').toUpperCase() === String(b || '').replace(/\s+/g, '').toUpperCase();
+
+const formatDateOnly = (val) => {
+  if (!val) return '';
+  if (typeof val === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+    if (val.includes('T')) {
+      const d = new Date(val);
+      if (!Number.isNaN(d.getTime())) {
+        const ist = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
+        return ist.toISOString().slice(0, 10);
+      }
+    }
+    return String(val).slice(0, 10);
+  }
+  if (val instanceof Date && !Number.isNaN(val.getTime())) {
+    const h = val.getUTCHours();
+    const d = h >= 18 ? new Date(val.getTime() + 6 * 60 * 60 * 1000) : val;
+    return d.toISOString().slice(0, 10);
+  }
+  return String(val).slice(0, 10);
+};
+
+const mapVoucherHeader = (header) => {
+  if (!header) return header;
+  return {
+    ...header,
+    vha_date: formatDateOnly(header.vha_date) || header.vha_date,
+    vha_final_pay_date: header.vha_final_pay_date ? formatDateOnly(header.vha_final_pay_date) : header.vha_final_pay_date,
+    vha_rate_uom: header.vha_rate_uom == null || header.vha_rate_uom === '' ? 1 : Number(header.vha_rate_uom) || 1,
+  };
+};
+
+const mapVoucherDetail = (row) => {
+  if (!row) return row;
+  return {
+    ...row,
+    vha_date: formatDateOnly(row.vha_date) || row.vha_date,
+    mnf_date: formatDateOnly(row.mnf_date) || row.mnf_date,
+  };
+};
+
 const isSettled = (row) => String(row?.vha_settled || '').trim().toUpperCase() === 'Y';
 const hasSettlementDate = (header) => Boolean(String(header?.vha_final_pay_date || '').trim());
 
@@ -50,11 +93,20 @@ const updateHireVoucherWithSettlement = async (keys, data) => {
 
 /* ================= GET ALL HIRE VOUCHERS ================= */
 
-const getAllHireVouchers = async () => {
-  return db('sss.sst_vha_hdr')
+const getAllHireVouchers = async (vhaLoc) => {
+  const query = db('sss.sst_vha_hdr')
     .select('*')
     .where({ record_status: 0 })
-    .orderBy('aud_date', 'desc');
+    .orderBy('vha_date', 'desc')
+    .orderBy('vha_no', 'desc');
+  if (vhaLoc) {
+    query.andWhereRaw(
+      "UPPER(TRIM(REPLACE(COALESCE(vha_loc, ''), ' ', ''))) = ?",
+      [String(vhaLoc).replace(/\s+/g, '').toUpperCase()]
+    );
+  }
+  const rows = await query;
+  return (rows || []).map(mapVoucherHeader);
 };
 
 /* ================= GET HIRE VOUCHER BY KEY (composite) ================= */
@@ -281,22 +333,30 @@ const deleteHireVoucher = async (keys, trx = db) => {
 
 /* ================= GET HIRE VOUCHER BY VHV NO ================= */
 
-const getHireVoucherByVhvNo = async (vhvNo) => {
-  // record_status 0 = active. Soft-deleted vouchers must not be loaded for edit.
+const getHireVoucherByVhvNo = async (vhvNo, sessionLoc) => {
   const header = await db('sss.sst_vha_hdr')
     .where({ vha_no: vhvNo, record_status: 0 })
     .first();
 
   if (!header) return null;
 
+  if (sessionLoc && !sameLoc(header.vha_loc, sessionLoc)) {
+    const err = new Error('You can only open hire vouchers of your login branch');
+    err.status = 403;
+    throw err;
+  }
+
   const details = await db('sss.sst_vha_dtl')
     .where({
       vha_no: header.vha_no,
       vha_loc: header.vha_loc,
-      vha_date: header.vha_date
     })
+    .orderBy('rec_id');
 
-  return { header, details };
+  return {
+    header: mapVoucherHeader(header),
+    details: (details || []).map(mapVoucherDetail),
+  };
 };
 
 /* ================= GET VENDOR BY LORRY NO ================= */
@@ -375,4 +435,5 @@ module.exports = {
   getVendorByLorryNo,
   getUncoveredManifestsByVehicle,
   calcHireAmt,
+  sameLoc,
 };

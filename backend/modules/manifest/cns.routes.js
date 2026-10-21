@@ -4,6 +4,22 @@ const CNSController = require('./cns.controller');
 
 /* ================= LOCAL PICKUP VALIDATION ================= */
 
+router.get('/local-pickup-dockets', async (req, res) => {
+  try {
+    const { fromLoc, fromTown, manifestDate } = req.query;
+    if (!fromLoc || !fromTown) {
+      return res.status(400).json({
+        success: false,
+        message: 'fromLoc and fromTown are required',
+      });
+    }
+    const data = await CNSController.listLocalPickupDockets({ fromLoc, fromTown, manifestDate });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.get('/validate/local-pickup', async (req, res) => {
   try {
     const { docketNo, fromLoc, fromTown } = req.query;
@@ -39,6 +55,22 @@ router.get('/validate/long-haul', async (req, res) => {
 });
 
 /* ================= LOCAL DELIVERY VALIDATION ================= */
+
+router.get('/local-delivery-dockets', async (req, res) => {
+  try {
+    const { fromLoc, toLoc, toTown, manifestDate } = req.query;
+    if (!fromLoc || !toLoc || !toTown) {
+      return res.status(400).json({
+        success: false,
+        message: 'fromLoc, toLoc, and toTown are required',
+      });
+    }
+    const data = await CNSController.listLocalDeliveryDockets({ fromLoc, toLoc, toTown, manifestDate });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 router.get('/validate/local-delivery', async (req, res) => {
   try {

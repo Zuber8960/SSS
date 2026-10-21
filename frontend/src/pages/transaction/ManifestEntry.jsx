@@ -30,6 +30,7 @@ import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
 import { fetchDocketByDocketNo, fetchAllDockets } from "../../utils/docket";
+import { getSessionLocCode } from "../../utils/authService";
 import { fetchAllLocations, fetchLocationTowns } from "../../utils/locationMaster";
 import { EditIcon, SaveIcon, NoteAddIcon, ResetIcon, PrintIcon } from "../../components/common/icons";
 import { IconButton, Tooltip, Button } from "@mui/material";
@@ -46,6 +47,8 @@ import {
   validateLocalPickup,
   validateLongHaul,
   validateLocalDelivery,
+  fetchLocalPickupDockets,
+  fetchLocalDeliveryDockets,
 } from "../../utils/cnsValidation";
 
 // ✅ Detail Table Columns (Dockets inside Manifest)
@@ -90,11 +93,16 @@ const emptyForm = {
   remarks: "",
 };
 
+const sameLoc = (a, b) =>
+  String(a || "").replace(/\s+/g, "").toUpperCase() === String(b || "").replace(/\s+/g, "").toUpperCase();
+
+const blankManifestForm = () => ({ ...emptyForm, from_loc: getSessionLocCode() });
+
 export default function ManifestPage() {
   const { dialog, closeAlert, showSuccess, showError, showInfo } = useAlert();
   const { isLoading, showLoading, hideLoading } = useLoading();
 
-  const [form, setForm] = useState({ ...emptyForm });
+  const [form, setForm] = useState(() => blankManifestForm());
   const [details, setDetails] = useState([]);
   const [docketCache, setDocketCache] = useState({});
   const [locations, setLocations] = useState([]);
@@ -104,10 +112,15 @@ export default function ManifestPage() {
   const [availableSelectedIds, setAvailableSelectedIds] = useState(new Set());
 
   // Build location dropdown options
-  const locationOptions = locations.map((loc) => ({
-    label: `${loc.loc_code} - ${loc.loc_name}`,
-    value: loc.loc_code,
-  }));
+  const locationOptions = (() => {
+    const opts = locations.map((loc) => ({
+      label: `${loc.loc_code} - ${loc.loc_name}`,
+      value: loc.loc_code,
+    }));
+    const loc = form.from_loc || getSessionLocCode();
+    if (loc && !opts.some((o) => sameLoc(o.value, loc))) opts.push({ label: loc, value: loc });
+    return opts;
+  })();
 
   // Build town dropdown options
   const townFieldOptions = useMemo(() => ({
@@ -244,7 +257,7 @@ export default function ManifestPage() {
       } else if (manifestType === "ld") {
         // LOCAL DELIVERY: Check from sst_unloading_dtl
         // unld_loc_code = MANIFEST FROM LOC and (pkgs_received - desp_pkgs) > 0
-        // docket_to_loc = manifest_from_loc and manifest_to_town = docket_to_town
+        // docket_to_loc = MANIFEST TO LOC and docket_to_town = MANIFEST TO TOWN
         if (!toLoc || !toTown) {
           showError("Please select To Location and To Town for Local Delivery validation");
           return false;
@@ -399,50 +412,76 @@ export default function ManifestPage() {
 
     try {
       showLoading();
-      const allDockets = await fetchAllDockets(true);
-      const docketList = Array.isArray(allDockets) ? allDockets : [];
-
-      // Filter dockets: from location matches, date <= manifest date, and not already in details
-      const manifestDate = new Date(form.manifest_date);
       const existingNos = new Set(details.map((d) => d.docket_no).filter(Boolean));
+      let filtered = [];
 
-      const filtered = docketList.filter((d) => {
-        // Match from location
-        if ((d.docket_loc || "").toLowerCase() !== form.from_loc.toLowerCase()) return false;
-
-        // Match date <= manifest date
-        if (d.docket_date) {
-          const docketDate = new Date(d.docket_date.substring(0, 10));
-          if (docketDate > manifestDate) return false;
+      if (form.manifest_type === "ld") {
+        if (!form.to_loc || !form.to_town) {
+          showError("Please select To Location and To Town for Local Delivery");
+          return;
         }
-
-        // Skip already added dockets
-        if (existingNos.has(d.docket_no)) return false;
-
-        return true;
-      });
+        const rows = await fetchLocalDeliveryDockets(
+          form.from_loc,
+          form.to_loc,
+          form.to_town,
+          form.manifest_date
+        );
+        filtered = (Array.isArray(rows) ? rows : []).filter((d) => !existingNos.has(d.docket_no));
+      } else if (form.manifest_type === "lp") {
+        if (!form.from_town) {
+          showError("Please select From Town for Local Pickup");
+          return;
+        }
+        const rows = await fetchLocalPickupDockets(
+          form.from_loc,
+          form.from_town,
+          form.manifest_date
+        );
+        filtered = (Array.isArray(rows) ? rows : []).filter((d) => !existingNos.has(d.docket_no));
+      } else {
+        const allDockets = await fetchAllDockets(true);
+        const docketList = Array.isArray(allDockets) ? allDockets : [];
+        const manifestDate = new Date(form.manifest_date);
+        filtered = docketList.filter((d) => {
+          if ((d.docket_loc || "").toLowerCase() !== form.from_loc.toLowerCase()) return false;
+          if (d.docket_date) {
+            const docketDate = new Date(d.docket_date.substring(0, 10));
+            if (docketDate > manifestDate) return false;
+          }
+          if (existingNos.has(d.docket_no)) return false;
+          return true;
+        });
+      }
 
       // Map to display format
-      const mapped = filtered.map((d) => ({
+      const mapped = filtered.map((d) => {
+        const pendingPkgs =
+          d.pkgs_received != null
+            ? Number(d.pkgs_received || 0) - Number(d.desp_pkgs || 0)
+            : d.desp_pkgs != null
+              ? Number(d.docket_tot_pkgs || 0) - Number(d.desp_pkgs || 0)
+              : d.docket_tot_pkgs ?? d.total_pkgs ?? "";
+        return {
         docket_no: d.docket_no || "",
-        docket_date: d.docket_date ? d.docket_date.substring(0, 10) : "",
-        docket_loc: d.docket_loc || "",
+        docket_date: d.docket_date ? String(d.docket_date).substring(0, 10) : "",
+        docket_loc: d.docket_loc || d.docket_from_loc || "",
         docket_pickup_town: d.docket_pickup_town || d.docket_from_town || "",
         docket_to_loc: d.docket_to_loc || "",
         docket_dly_town: d.docket_dly_town || d.docket_to_town || "",
         cnor_name: d.cnor_name || "",
         cnee_name: d.cnee_name || "",
-        docket_tot_pkgs: d.docket_tot_pkgs ?? "",
+        docket_tot_pkgs: pendingPkgs,
         docket_act_wt: d.docket_act_wt ?? "",
         docket_chrg_wt: d.docket_chrg_wt ?? "",
         docket_pay_type: d.docket_pay_type || "",
-        docket_dispatch_pkgs: d.docket_tot_pkgs ?? "",
-        from_loc: d.docket_loc || "",
+        docket_dispatch_pkgs: pendingPkgs,
+        from_loc: d.docket_loc || d.docket_from_loc || "",
         to_loc: d.docket_to_loc || "",
-        packages: d.docket_tot_pkgs ?? d.total_pkgs ?? "",
+        packages: pendingPkgs,
         weight: d.docket_act_wt ?? d.actual_wt ?? "",
         docket_data: d,
-      }));
+        };
+      });
 
       setAvailableDockets(mapped);
       setShowDocketMode(true);
@@ -499,7 +538,7 @@ export default function ManifestPage() {
   // ✅ Map form fields to DB header columns
   const mapFormToHeader = () => ({
     division_code: localStorage.getItem("division_code") || "",
-    mnf_loc: form.from_loc,
+    mnf_loc: getSessionLocCode() || form.from_loc,
     mnf_date: form.manifest_date || null,
     mnf_to_loc: form.to_loc,
     mnf_from_town: form.from_town || "",
@@ -512,7 +551,7 @@ export default function ManifestPage() {
     mnf_actual_wt: computedTotals.total_wt,
     mnf_no_of_dwb: computedTotals.total_dockets,
     aud_user: form.remarks || "",
-    aud_loc: form.from_loc || "",
+    aud_loc: getSessionLocCode() || form.from_loc || "",
   });
 
   // ✅ Map detail rows to DB detail columns (skip rows with missing required fields)
@@ -571,8 +610,13 @@ export default function ManifestPage() {
 
       const hdr = data.header;
       const dtls = data.details || [];
+      const loginLoc = getSessionLocCode();
+      if (!loginLoc || !sameLoc(hdr.mnf_loc, loginLoc)) {
+        showError("You can only open manifests of your login branch");
+        return false;
+      }
 
-      setForm(mapHeaderToForm(hdr));
+      setForm({ ...mapHeaderToForm(hdr), from_loc: loginLoc });
       setDetails(dtls.map(mapDetailToForm));
 
       originalKey.current = {
@@ -599,7 +643,7 @@ export default function ManifestPage() {
 
   // ✅ Create New — clear form
   const handleCreateNew = () => {
-    setForm({ ...emptyForm });
+    setForm(blankManifestForm());
     setDetails([]);
     originalKey.current = null;
     setMode("create");
@@ -631,7 +675,7 @@ export default function ManifestPage() {
 
   // ✅ Clear — reset form and details
   const handleClear = () => {
-    setForm({ ...emptyForm });
+    setForm(blankManifestForm());
     setDetails([]);
     originalKey.current = null;
     setMode("create");
@@ -1126,7 +1170,7 @@ export default function ManifestPage() {
     { name: "manifest_no", label: "Manifest No", inputProps: { inputMode: "numeric" } },
     { name: "manifest_type", label: "Manifest Type", type: "select", options: [{ label: "Local Pickup", value: "lp" }, { label: "Long Haul", value: "lh" }, { label: "Local Delivery", value: "ld" }] },
     { name: "manifest_date", label: "Manifest Date", type: "date", slotProps: { inputLabel: { shrink: true } } },
-    { name: "from_loc", label: "From Location", type: "select", options: locationOptions },
+    { name: "from_loc", label: "From Location", type: "select", options: locationOptions, disabled: true },
     { name: "from_town", label: "From Town", type: "select", options: townFieldOptions.from },
     { name: "to_loc", label: "To Location", type: "select", options: locationOptions },
     { name: "to_town", label: "To Town", type: "select", options: townFieldOptions.to },

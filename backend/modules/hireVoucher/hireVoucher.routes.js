@@ -7,7 +7,8 @@ const db = require('../../config/db');
 
 router.get('/', async (req, res) => {
   try {
-    const data = await HireVoucherController.getAllHireVouchers();
+    const loc = req.query.vha_loc || req.query.from_loc || null;
+    const data = await HireVoucherController.getAllHireVouchers(loc);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -35,16 +36,11 @@ router.get('/:no/:loc/:date', async (req, res) => {
 router.get('/by-no/:no', async (req, res) => {
   try {
     const { no } = req.params;
-    const header = await HireVoucherController.getHireVoucherByNo(no);
-    if (!header) {
+    const data = await HireVoucherController.getHireVoucherByVhvNo(no, req.loc_code);
+    if (!data) {
       return res.status(404).json({ success: false, message: 'Hire Voucher not found' });
     }
-    const details = await HireVoucherController.getHireVoucherDetails({
-      vha_no: header.vha_no,
-      vha_loc: header.vha_loc || header.from_loc,
-      vha_date: header.vha_date
-    });
-    res.json({ success: true, data: { header, details } });
+    res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -108,6 +104,12 @@ router.put('/:no/:loc/:date', async (req, res) => {
   try {
     const { no, loc, date } = req.params;
     const { header, details } = req.body;
+    if (req.loc_code && !HireVoucherController.sameLoc(loc, req.loc_code)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only edit hire vouchers of your login branch',
+      });
+    }
     const keys = { vha_no: no, vha_loc: loc, vha_date: date };
     const selected = (Array.isArray(details) ? details : []).filter((r) => String(r?.mnf_no || '').trim());
     if (!selected.length) {
@@ -184,13 +186,13 @@ router.delete('/:no/:loc/:date', async (req, res) => {
 router.get('/by-vhv-no/:vhvNo', async (req, res) => {
   try {
     const { vhvNo } = req.params;
-    const data = await HireVoucherController.getHireVoucherByVhvNo(vhvNo);
+    const data = await HireVoucherController.getHireVoucherByVhvNo(vhvNo, req.loc_code);
     if (!data) {
       return res.status(404).json({ success: false, message: 'Hire Voucher not found for this VHV No' });
     }
     res.json({ success: true, data });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(err.status || 500).json({ success: false, message: err.message });
   }
 });
 

@@ -196,6 +196,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/reports/docket-enquiry", label: "Docket Enquiry", icon: <FindInPageIcon /> },
         { path: "/reports/docket-report", label: "All Docket Report", icon: <ListAltIcon /> },
         { path: "/reports/manifest-report", label: "Manifest Report", icon: <UnarchiveIcon /> },
+        { path: "/reports/hire-voucher-report", label: "Hire Voucher Report", icon: <ReceiptLongIcon /> },
         { path: "/reports/invoice-report", label: "Invoice Report", icon: <RequestQuoteIcon /> },
         { path: "/reports/customer-mis", label: "Customer MIS", icon: <QueryStatsIcon /> },
       ],

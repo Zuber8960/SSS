@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { SaveIcon, RefreshIcon, ClearIcon, NoteAddIcon, EditIcon, DeleteIcon, AddRowIcon } from "../../components/common/icons";
+import { SaveIcon, RefreshIcon, ClearIcon, NoteAddIcon, EditIcon, DeleteIcon, AddRowIcon, ExportIcon, CloseIcon } from "../../components/common/icons";
 import MainLayout from "../../layouts/MainLayout";
 import {
   PageBody,
@@ -16,10 +16,19 @@ import { getSessionLocCode } from "../../utils/authService";
 import { fetchAllLocations, fetchLocationTowns } from "../../utils/locationMaster";
 import {
   fetchHireVoucherByVhvNo,
+  fetchAllHireVouchers,
   createHireVoucher,
   updateHireVoucher,
   fetchUncoveredManifests,
 } from "../../utils/hireVoucher";
+import {
+  hireVoucherReportColumns,
+  mapHireVoucherRow,
+  buildHireVoucherTotalRow,
+  filterHireVoucherRows,
+  exportHireVouchersExcel,
+} from "../../utils/hireVoucherList";
+import moment from "moment";
 import { fetchManifestByNo } from "../../utils/manifest";
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
@@ -34,6 +43,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Autocomplete,
+  Button,
 } from "@mui/material";
 
 const fieldSx = { "& .MuiInputBase-input": { fontSize: 13 }, "& .MuiSelect-select": { fontSize: 13 }, "& .MuiInputLabel-root": { fontSize: 13 } };
@@ -178,13 +189,10 @@ const newManifestRow = (overrides = {}) => ({
 });
 
 
-// Voucher date is auto generated (creation date)
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function HireVoucherPage() {
   const sessionLoc = getSessionLocCode();
-  // Voucher date is auto-generated (creation date) — seed it once at mount
-  // instead of setting it from an effect.
   const [form, setForm] = useState(() => ({
     ...emptyVoucherForm,
     vha_date: today(),
@@ -193,13 +201,22 @@ export default function HireVoucherPage() {
   const [manifestRows, setManifestRows] = useState([]);
   const [originalVoucher, setOriginalVoucher] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [voucherNoEditable, setVoucherNoEditable] = useState(false);
   const [lorryBrokers, setLorryBrokers] = useState([]);
   const [lorryOwners, setLorryOwners] = useState([]);
   const [locations, setLocations] = useState([]);
   const [fromTowns, setFromTowns] = useState([]);
   const [toTowns, setToTowns] = useState([]);
   const [selectedManifestIds, setSelectedManifestIds] = useState(() => new Set());
+  const [locVouchers, setLocVouchers] = useState([]);
+  const [lvSearch, setLvSearch] = useState("");
+  const [lvToLoc, setLvToLoc] = useState("");
+  const [lvStatus, setLvStatus] = useState("Both");
+  const [lvFrom, setLvFrom] = useState("");
+  const [lvToDate, setLvToDate] = useState("");
+  const [lvGridFiltered, setLvGridFiltered] = useState(null);
   const gtdTouchedRef = useRef(false);
+  const skipVehicleFillRef = useRef(false);
   const { dialog, closeAlert, showSuccess, showError, showWarning } = useAlert();
 
   const updateField = (name, value) => {
@@ -213,6 +230,7 @@ export default function HireVoucherPage() {
     setSelectedManifestIds(new Set());
     setOriginalVoucher(null);
     setIsEditing(false);
+    setVoucherNoEditable(false);
   };
 
   // Load lookup lists at mount. Voucher no is assigned only on save.
@@ -277,6 +295,38 @@ export default function HireVoucherPage() {
   const netPayable = grossPayable - settleTdsAmt;
   const isVoucherSettled = String(form.vha_settled || "").trim().toUpperCase() === "Y";
 
+  const locMap = useMemo(() => {
+    const m = {};
+    (locations || []).forEach((l) => { if (l.loc_code) m[l.loc_code] = l; });
+    return m;
+  }, [locations]);
+
+  const locVoucherMapped = useMemo(
+    () => (locVouchers || []).map((r) => mapHireVoucherRow(r, locMap)),
+    [locVouchers, locMap]
+  );
+  const locVoucherRows = useMemo(
+    () => filterHireVoucherRows(locVoucherMapped, {
+      searchText: lvSearch,
+      fToLoc: lvToLoc,
+      fStatus: lvStatus,
+      dFrom: lvFrom,
+      dTo: lvToDate,
+    }),
+    [locVoucherMapped, lvSearch, lvToLoc, lvStatus, lvFrom, lvToDate]
+  );
+  useEffect(() => { setLvGridFiltered(null); }, [locVoucherRows]);
+  const locVoucherTotalSource = lvGridFiltered ?? locVoucherRows;
+  const locVoucherTotal = useMemo(() => buildHireVoucherTotalRow(locVoucherTotalSource), [locVoucherTotalSource]);
+  const locVoucherDisplay = useMemo(
+    () => (locVoucherRows.length ? [...locVoucherRows, locVoucherTotal] : []),
+    [locVoucherRows, locVoucherTotal]
+  );
+  const lvToOpts = useMemo(
+    () => [...new Set(locVoucherMapped.map((m) => m.vha_to_loc).filter(Boolean))].sort(),
+    [locVoucherMapped]
+  );
+
   const selectedManifests = useMemo(
     () => manifestRows.filter((r) => selectedManifestIds.has(String(r.id)) && String(r.mnf_no || "").trim()),
     [manifestRows, selectedManifestIds]
@@ -310,6 +360,7 @@ export default function HireVoucherPage() {
   };
 
   const fillFromVehicleNo = async () => {
+    if (skipVehicleFillRef.current) return;
     const vno = form.vehicle_regis_no?.trim();
     if (!vno) return;
     try {
@@ -366,9 +417,23 @@ export default function HireVoucherPage() {
     if (e.key === "Enter" || e.key === "Tab") fillFromVehicleNo();
   };
 
-  // Edit / View: load hire voucher by vha_no
-  const handleEditView = async () => {
-    const vno = form.vha_no?.trim();
+  const loadLocVouchers = () => {
+    const loc = getSessionLocCode();
+    if (!loc) {
+      setLocVouchers([]);
+      return;
+    }
+    fetchAllHireVouchers(loc)
+      .then((rows) => setLocVouchers(Array.isArray(rows) ? rows : []))
+      .catch(() => setLocVouchers([]));
+  };
+
+  useEffect(() => {
+    loadLocVouchers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loadVoucherByNo = async (vno) => {
     if (!vno) {
       showError("Please enter a Voucher Number first");
       return;
@@ -382,22 +447,32 @@ export default function HireVoucherPage() {
         return;
       }
       const hdr = data.header;
+      const loginLoc = getSessionLocCode();
+      if (!loginLoc || !sameLoc(hdr.vha_loc, loginLoc)) {
+        showError("You can only open hire vouchers of your login branch");
+        setIsEditing(false);
+        setOriginalVoucher(null);
+        return;
+      }
       gtdTouchedRef.current = true;
+      skipVehicleFillRef.current = true;
       const owner = matchBp(lorryOwners, hdr.vendor_code, hdr.vendor_name);
       const broker = matchBp(lorryBrokers, hdr.broker_code, hdr.broker_name);
-      setForm((prev) => ({
-        ...prev,
+      const rateUomNum = Number(hdr.vha_rate_uom);
+      const amt = (v) => (v === null || v === undefined || v === "" ? "" : String(num(v)));
+      setForm({
+        ...emptyVoucherForm,
         vha_no: hdr.vha_no ?? vno,
         vha_date: hdr.vha_date ? String(hdr.vha_date).slice(0, 10) : "",
         vha_type: hdr.vha_type ?? "",
         vha_sub_type: hdr.vha_sub_type ?? "",
         vehicle_regis_no: hdr.vehicle_regis_no ?? "",
-        vendor_name: owner.name,
-        vendor_code: owner.code,
-        broker_name: broker.name,
-        broker_code: broker.code,
+        vendor_name: owner.name || hdr.vendor_name || "",
+        vendor_code: owner.code || hdr.vendor_code || "",
+        broker_name: broker.name || hdr.broker_name || "",
+        broker_code: broker.code || hdr.broker_code || "",
         vha_adv_paid_to: hdr.vha_adv_paid_to ?? "",
-        vha_loc: hdr.vha_loc ?? "",
+        vha_loc: hdr.vha_loc ?? loginLoc,
         vha_from_town: hdr.vha_from_town ?? "",
         vha_to_loc: hdr.vha_to_loc ?? "",
         vha_to_loc_town: hdr.vha_to_loc_town ?? "",
@@ -405,24 +480,24 @@ export default function HireVoucherPage() {
         vha_via_loc_2: hdr.vha_via_loc_2 ?? "",
         vha_via_loc_3: hdr.vha_via_loc_3 ?? "",
         vha_via_loc_4: hdr.vha_via_loc_4 ?? "",
-        dwb_actual_weight: hdr.dwb_actual_weight ?? "",
-        vha_guarantee_weight: hdr.vha_guarantee_weight ?? "",
-        vha_rate_uom: hdr.vha_rate_uom ?? 1,
-        vha_rate_per_uom: hdr.vha_rate_per_uom ?? "",
-        vha_hire_amt: hdr.vha_hire_amt ?? "",
-        vha_loading_amt: hdr.vha_loading_amt ?? "",
-        vha_dc_amt: hdr.vha_dc_amt ?? "",
-        vha_advance_total: hdr.vha_advance_total ?? "",
-        vha_tds_amt: hdr.vha_tds_amt ?? "",
-        vha_advance_diesel: hdr.vha_advance_diesel ?? "",
-        vha_dtn_amt: hdr.vha_dtn_amt ?? "",
-        vha_dd_amt: hdr.vha_dd_amt ?? "",
-        vha_advance_cash: hdr.vha_advance_cash ?? "",
+        dwb_actual_weight: amt(hdr.dwb_actual_weight),
+        vha_guarantee_weight: amt(hdr.vha_guarantee_weight),
+        vha_rate_uom: rateUomNum === 2 || rateUomNum === 3 ? rateUomNum : 1,
+        vha_rate_per_uom: amt(hdr.vha_rate_per_uom),
+        vha_hire_amt: amt(hdr.vha_hire_amt),
+        vha_loading_amt: amt(hdr.vha_loading_amt),
+        vha_dc_amt: amt(hdr.vha_dc_amt),
+        vha_advance_total: amt(hdr.vha_advance_total),
+        vha_tds_amt: amt(hdr.vha_tds_amt),
+        vha_advance_diesel: amt(hdr.vha_advance_diesel),
+        vha_dtn_amt: amt(hdr.vha_dtn_amt),
+        vha_dd_amt: amt(hdr.vha_dd_amt),
+        vha_advance_cash: amt(hdr.vha_advance_cash),
         vha_final_pay_date: hdr.vha_final_pay_date ? String(hdr.vha_final_pay_date).slice(0, 10) : "",
-        vha_settle_tds_amt: hdr.vha_settle_tds_amt ?? "",
+        vha_settle_tds_amt: amt(hdr.vha_settle_tds_amt),
         vha_settled: hdr.vha_settled ?? "",
         vha_remarks: hdr.vha_remarks ?? "",
-      }));
+      });
       const loaded = (Array.isArray(data.details) ? data.details : []).map((d) => newManifestRow({
         mnf_no: d.mnf_no ?? "",
         mnf_date: d.mnf_date ? String(d.mnf_date).slice(0, 10) : "",
@@ -433,13 +508,31 @@ export default function HireVoucherPage() {
       }));
       setManifestRows(loaded);
       setSelectedManifestIds(new Set(loaded.map((r) => r.id)));
-      setOriginalVoucher(hdr);
+      setOriginalVoucher({
+        ...hdr,
+        vha_date: hdr.vha_date ? String(hdr.vha_date).slice(0, 10) : "",
+        vha_loc: hdr.vha_loc,
+      });
+      setVoucherNoEditable(true);
       setIsEditing(true);
+      setTimeout(() => { skipVehicleFillRef.current = false; }, 500);
       showSuccess("Voucher details loaded for editing");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       showError(err.message || "Failed to fetch voucher details");
       console.error("Fetch voucher error:", err);
     }
+  };
+
+  const handleEditView = async () => {
+    if (!voucherNoEditable) {
+      setVoucherNoEditable(true);
+      setIsEditing(false);
+      setOriginalVoucher(null);
+      showSuccess("Enter Voucher No, then click Edit again to load");
+      return;
+    }
+    await loadVoucherByNo(form.vha_no?.trim());
   };
 
   const saveForm = async () => {
@@ -449,6 +542,11 @@ export default function HireVoucherPage() {
     }
     if (!form.vha_loc?.trim() || !form.vha_date) {
       showError("From Location and Voucher Date are required");
+      return;
+    }
+    const loginLoc = getSessionLocCode();
+    if (!loginLoc || !sameLoc(form.vha_loc, loginLoc)) {
+      showError("You can only save hire vouchers for your login branch");
       return;
     }
 
@@ -530,6 +628,7 @@ export default function HireVoucherPage() {
         showSuccess(form.vha_final_pay_date && !isVoucherSettled
           ? "Hire voucher settled successfully"
           : "Hire voucher updated successfully");
+        loadLocVouchers();
       } else {
         const res = await createHireVoucher(header, details);
         // The server generates vha_no itself and may return a DIFFERENT number
@@ -545,6 +644,7 @@ export default function HireVoucherPage() {
         }));
         setIsEditing(true);
         showSuccess(`Hire voucher saved successfully (No: ${savedNo})`);
+        loadLocVouchers();
       }
     } catch (err) {
       showError(err.message || "Failed to save hire voucher");
@@ -693,9 +793,11 @@ export default function HireVoucherPage() {
         <FormPanel>
           <TextField size="small" label="Voucher No" fullWidth sx={fieldSx}
             value={form.vha_no}
-            placeholder="Auto generated on save"
-            disabled />
-          <FormField label="Voucher Date" name="vha_date" form={form} setForm={setForm} type="date" disabled />
+            onChange={(e) => updateField("vha_no", e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && voucherNoEditable) handleEditView(); }}
+            placeholder={voucherNoEditable ? "Enter voucher no" : "Auto generated on save"}
+            disabled={!voucherNoEditable} />
+          <FormField label="Voucher Date" name="vha_date" form={form} setForm={setForm} type="date" />
           <TextField size="small" label="Vehicle No" fullWidth sx={fieldSx}
             value={form.vehicle_regis_no} onChange={(e) => updateField("vehicle_regis_no", e.target.value.toUpperCase().replace(/\s+/g, ""))}
             onKeyDown={handleVehicleNoKeyDown} onBlur={fillFromVehicleNo} placeholder="e.g. HR55AB1234" />
@@ -943,6 +1045,100 @@ export default function HireVoucherPage() {
               value={`₹ ${fmt(netPayable)}`} />
           </FormPanel>
         </Box>
+
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1, mt: "10px" }}>
+          <h3 style={{ ...sectionStyle, margin: 0 }}>4. Hire Vouchers ({sessionLoc || "this branch"})</h3>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Tooltip title="Refresh list">
+              <IconButton onClick={loadLocVouchers} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+            <Button variant="contained" size="small" startIcon={<ExportIcon />}
+              onClick={() => {
+                if (!locVoucherRows.length) { showError("No data to export"); return; }
+                exportHireVouchersExcel(
+                  locVoucherTotalSource.length ? [...locVoucherTotalSource, locVoucherTotal] : [],
+                  `hire_vouchers_${sessionLoc || "branch"}_${moment().format("YYYYMMDD_HHmmss")}.xls`
+                );
+                showSuccess("Excel export started");
+              }}
+              sx={{ background: "linear-gradient(135deg, #1ca562, #119154)", textTransform: "none", fontWeight: 600, borderRadius: 2 }}>
+              Export
+            </Button>
+          </Box>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", mb: 1 }}>
+          <TextField size="small" placeholder="Search voucher, vehicle, owner..."
+            value={lvSearch} onChange={(e) => setLvSearch(e.target.value)}
+            sx={{ flex: "1 1 180px", minWidth: 160, "& .MuiInputBase-input": { fontSize: 13 } }} />
+          <Autocomplete
+            size="small"
+            options={lvToOpts}
+            value={lvToLoc || null}
+            onChange={(_, v) => setLvToLoc(v || "")}
+            sx={{ flex: "1 1 140px", minWidth: 130 }}
+            renderInput={(params) => <TextField {...params} placeholder="To Loc" sx={{ "& .MuiInputBase-input": { fontSize: 13 } }} />}
+          />
+          <Autocomplete
+            size="small"
+            options={["Both", "Open", "Settled"]}
+            value={lvStatus || "Both"}
+            disableClearable
+            onChange={(_, v) => setLvStatus(v || "Both")}
+            sx={{ flex: "1 1 120px", minWidth: 110 }}
+            renderInput={(params) => <TextField {...params} placeholder="Status" sx={{ "& .MuiInputBase-input": { fontSize: 13 } }} />}
+          />
+          <div style={{ position: "relative", display: "flex", alignItems: "center", border: "1.5px solid #d8b4fe", borderRadius: 6, padding: "4px 8px", background: "#fff", flex: "1 1 240px", minWidth: 220 }}>
+            <span style={{ position: "absolute", top: -9, left: 8, background: "#fff", padding: "0 4px", fontSize: 11, fontWeight: 600, color: "#7e22ce", lineHeight: 1 }}>Voucher Date</span>
+            <input type="date" value={lvFrom} onChange={(e) => setLvFrom(e.target.value)}
+              style={{ border: "none", outline: "none", fontSize: 13, background: "transparent", width: "100%" }} />
+            <span style={{ fontSize: 12, color: "#7e22ce", fontWeight: 700, padding: "0 4px" }}>→</span>
+            <input type="date" value={lvToDate} onChange={(e) => setLvToDate(e.target.value)}
+              style={{ border: "none", outline: "none", fontSize: 13, background: "transparent", width: "100%" }} />
+          </div>
+          {(lvSearch.trim() || lvToLoc || (lvStatus && lvStatus !== "Both") || lvFrom || lvToDate) && (
+            <Tooltip title="Clear Filters">
+              <IconButton onClick={() => { setLvSearch(""); setLvToLoc(""); setLvStatus("Both"); setLvFrom(""); setLvToDate(""); }} size="small" sx={{ color: "#dc2626" }}>
+                <CloseIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+        <div style={{ marginBottom: 8, padding: "8px 14px", background: "#faf5ff", borderRadius: 8, border: "1.5px solid #d8b4fe", fontSize: 12, display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", fontWeight: 700, color: "#6d28d9" }}>
+          <span>Totals ({locVoucherTotalSource.length})</span>
+          <span>Hire ₹ {locVoucherTotal.vha_hire_amt}</span>
+          <span>Advance ₹ {locVoucherTotal.vha_advance_total}</span>
+          <span>TDS ₹ {locVoucherTotal.vha_tds_amt}</span>
+          <span>Net Adv ₹ {locVoucherTotal.vha_advance_net}</span>
+          <span>Balance ₹ {locVoucherTotal.vha_balance_amt}</span>
+          <span>Paid Detention ₹ {locVoucherTotal.vha_dtn_amt}</span>
+          <span>Paid Others ₹ {locVoucherTotal.vha_dd_amt}</span>
+          <span>Paid Gross ₹ {locVoucherTotal.vha_gross_payable}</span>
+          <span>Paid TDS ₹ {locVoucherTotal.vha_settle_tds_amt}</span>
+          <span>Paid Net ₹ {locVoucherTotal.vha_net_payable}</span>
+        </div>
+        <DataTable
+          columns={hireVoucherReportColumns}
+          rows={locVoucherDisplay}
+          getKey={(r, i) => r.id || i}
+          autoHeight
+          scroll={{ afterRows: 8, horizontal: true }}
+          statusKey="row_tone"
+          rowColors={{ Settled: "#7CFC00", Total: "#f3e8ff" }}
+          onFilteredRowsChange={setLvGridFiltered}
+          actionsPosition="left"
+          actions={[
+            {
+              label: "Edit",
+              icon: <EditIcon />,
+              onClick: (row) => {
+                if (row?.is_total || !row?.vha_no) return;
+                loadVoucherByNo(row.vha_no);
+              },
+            },
+          ]}
+        />
       </PageBody>
       <CommonAlertDialog
         dialog={dialog}
