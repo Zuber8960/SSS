@@ -89,6 +89,19 @@ router.post('/ewayfile/db', async (req, res) => {
 
 /* ================= CHARGES ROUTES ================= */
 
+router.post('/cust-rate', async (req, res) => {
+  try {
+    const data = await DocketController.getCustRate(req.body || {});
+    const message =
+      data.code === 'RNA' ? 'Rate not applicable for this customer'
+      : data.code === 'RNF' ? 'Rate not found for this lane / weight / date'
+      : 'Customer rate loaded';
+    res.json({ success: data.code === 'OK', data, message });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+  }
+});
+
 router.get('/charge-master', async (req, res) => {
   try {
     // const { tenant_id } = req;

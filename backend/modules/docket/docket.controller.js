@@ -260,8 +260,8 @@ const sanitizeDocketData = (data) => {
       }
     }
   }
-  if ('docket_act_wt' in sanitized && sanitized.docket_act_wt === null) sanitized.docket_act_wt = 30;
-  if ('docket_chrg_wt' in sanitized && sanitized.docket_chrg_wt === null) sanitized.docket_chrg_wt = 30;
+  if ('docket_act_wt' in sanitized && sanitized.docket_act_wt === null) sanitized.docket_act_wt = 1;
+  if ('docket_chrg_wt' in sanitized && sanitized.docket_chrg_wt === null) sanitized.docket_chrg_wt = 1;
   if ('docket_po_date' in sanitized && !sanitized.docket_po_date) sanitized.docket_po_date = null;
   // Coerce FK id fields to integer or null
   for (const field of ['cnor_id', 'cnee_id']) {
@@ -1106,6 +1106,67 @@ const findOrCreateBp = async ({ bp_name, bp_gstin, bp_addres, bp_city, bp_pincod
   return null;
 };
 
+const parseCustRateString = (raw) => {
+  const text = String(raw || '').trim();
+  if (!text || text === 'RNA' || text === 'RNF') {
+    return { code: text || 'RNF', items: [] };
+  }
+  const items = text
+    .split('://')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((seg) => {
+      const [rate_type, uom, rate, min_rate] = seg.split('//');
+      return {
+        rate_type: rate_type || '',
+        uom: uom || '',
+        rate: parseFloat(rate) || 0,
+        min_rate: parseFloat(min_rate) || 0,
+      };
+    })
+    .filter((r) => r.rate_type);
+  return { code: items.length ? 'OK' : 'RNF', items };
+};
+
+const getCustRate = async (params = {}) => {
+  let ccode = params.bp_grp_code || null;
+  let loccode = params.bp_loc_code || params.docket_loc || null;
+
+  if (params.cnor_id) {
+    const bp = await db('sss.ssm_business_partner')
+      .where({ record_id: params.cnor_id })
+      .first();
+    if (bp) {
+      ccode = bp.bp_grp_code || ccode;
+      loccode = bp.loc_code || loccode;
+    }
+  }
+
+  if (!ccode || !loccode) {
+    const err = new Error('Consignor contract code / location is required to fetch customer rate');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const styp = String(params.load_type || params.service_type || '').trim().toUpperCase();
+  const result = await db.raw(
+    `SELECT sss.get_cust_rate(?, ?, ?, ?, ?, ?, ?, ?::numeric, ?, ?::date) AS rate`,
+    [
+      String(ccode),
+      String(loccode),
+      styp,
+      params.from_loc || '',
+      params.from_town || '',
+      params.to_loc || '',
+      params.to_town || '',
+      params.chrg_wt ?? 0,
+      params.veh_type || '',
+      params.docket_date || null,
+    ]
+  );
+  return parseCustRateString(result.rows?.[0]?.rate);
+};
+
 module.exports = {
   getAllDockets,
   getDocketById,
@@ -1134,4 +1195,5 @@ module.exports = {
   saveEwayBillToDB,
   updateEwayBillByRecId,
   findOrCreateBp,
+  getCustRate,
 };

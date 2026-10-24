@@ -17,6 +17,9 @@ export const getDocketByRecId = (recId, docketNo) => {
   return Api.get(`/docket/rec/${encodeURIComponent(recId)}?docketNo=${docketNo ? encodeURIComponent(docketNo) :''}`).then(r => r.data.data || r.data);
 };
 
+export const fetchCustRate = (payload) =>
+  Api.post('/docket/cust-rate', payload).then((r) => r.data);
+
 export const fetchChargeMaster = () => Api.get('/docket/charge-master').then(r => r.data.data || r.data || []);
 export const fetchCharges = (docketId) => Api.get(`/docket/${docketId}/charges`).then(r => r.data.data || r.data || []);
 export const fetchChargesBulk = (docketNos = []) => {

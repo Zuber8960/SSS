@@ -26,10 +26,26 @@ const getManifestByNo = async (mnf_no) => {
 };
 
 const getManifestByLocation = async (loc) => {
-  return db('sss.sst_mnf_hdr')
-    .where({ mnf_to_loc: loc })
-    .where({mnf_arrival_time: null})
-
+  // Pending unload: destined to this loc and at least one docket not yet in sst_unloading_dtl.
+  // Do not hide a manifest just because mnf_arrival_time was set on a partial save.
+  return db('sss.sst_mnf_hdr as h')
+    .where('h.mnf_to_loc', loc)
+    .andWhere('h.record_status', 0)
+    .whereExists(function () {
+      this.select(db.raw('1'))
+        .from('sss.sst_mnf_dtl as d')
+        .whereRaw('d.mnf_no = h.mnf_no')
+        .andWhereRaw('d.mnf_loc = h.mnf_loc')
+        .andWhereRaw('d.mnf_date::date = h.mnf_date::date')
+        .whereNotExists(function () {
+          this.select(db.raw('1'))
+            .from('sss.sst_unloading_dtl as u')
+            .whereRaw('u.mnf_no = d.mnf_no')
+            .andWhereRaw('u.docket_no = d.dwb_no');
+        });
+    })
+    .select('h.*')
+    .orderBy('h.mnf_date', 'desc');
 };
 
 /* ================= GET MANIFEST DETAILS ================= */

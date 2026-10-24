@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { Typography, Box, TextField } from "@mui/material";
 
-import { DataTable } from "../../../components/common/MasterPage";
 import {
   fetchChargeMaster,
   fetchCharges,
@@ -16,12 +15,25 @@ const toNumber = (value) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+const normRateKey = (v) => String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+const matchChargeCode = (rateType, masterList) => {
+  const key = normRateKey(rateType);
+  if (!key) return null;
+  if (key === "FREIGHT") return "DK01";
+  const hit = (masterList || []).find((m) => {
+    const desc = normRateKey(m.charge_desc);
+    return desc === key || desc.startsWith(key) || key.startsWith(desc.replace("CHARGE", "")) || desc.includes(key);
+  });
+  return hit?.charge_code || null;
+};
+
 const formatAmount = (value) => {
   const n = Number(value);
   return Number.isFinite(n) ? Number(n.toFixed(2)) : 0;
 };
 
-const calculateChargeRow = (row, rows, invValue, docketRate = 0, rateUom = "", chargeWeight = 0, totalPkgs = 0) => {
+const calculateChargeRow = (row, rows, invValue, docketRate = 0, rateUom = "", chargeWeight = 0, totalPkgs = 0, minFreightRate = 0) => {
   const inv = toNumber(invValue);
   let chargeAmount;
   let newUserCode = row.user_code;
@@ -41,6 +53,9 @@ const calculateChargeRow = (row, rows, invValue, docketRate = 0, rateUom = "", c
     } else {
       chargeAmount = rate;
     }
+    if (toNumber(minFreightRate) > 0) {
+      chargeAmount = Math.max(chargeAmount, toNumber(minFreightRate));
+    }
   } else if (row.charge_code === "DK02") {
     // Surcharge: user-entered rate % of DK01 charge amount
     const userValue = toNumber(row.user_code);
@@ -59,15 +74,15 @@ const calculateChargeRow = (row, rows, invValue, docketRate = 0, rateUom = "", c
 };
 
 // Two-pass: DK01 first so its charge_amt is ready when DK02 is calculated
-const recalculateChargeList = (rows, invValue, docketRate = 0, rateUom = "", chargeWeight = 0, totalPkgs = 0) => {
+const recalculateChargeList = (rows, invValue, docketRate = 0, rateUom = "", chargeWeight = 0, totalPkgs = 0, minFreightRate = 0) => {
   const pass1 = rows.map((row) =>
     row.charge_code === "DK01"
-      ? calculateChargeRow(row, rows, invValue, docketRate, rateUom, chargeWeight, totalPkgs)
+      ? calculateChargeRow(row, rows, invValue, docketRate, rateUom, chargeWeight, totalPkgs, minFreightRate)
       : row
   );
   return pass1.map((row) =>
     row.charge_code !== "DK01"
-      ? calculateChargeRow(row, pass1, invValue, docketRate, rateUom, chargeWeight, totalPkgs)
+      ? calculateChargeRow(row, pass1, invValue, docketRate, rateUom, chargeWeight, totalPkgs, minFreightRate)
       : row
   );
 };
@@ -79,6 +94,7 @@ const ChargesSection = forwardRef(function ChargesSection({
   rateUom = "",
   chargeWeight = 0,
   totalPkgs = 0,
+  freightMinRate = 0,
   sectionHeaderStyle,
   onChargesChange,
   singleClick = false,
@@ -99,6 +115,7 @@ const ChargesSection = forwardRef(function ChargesSection({
   const rateUomRef = useRef(rateUom);
   const chargeWeightRef = useRef(chargeWeight);
   const totalPkgsRef = useRef(totalPkgs);
+  const freightMinRateRef = useRef(freightMinRate);
 
   // Keep refs in sync with props on every render
   docketIdRef.current = docketId;
@@ -107,6 +124,7 @@ const ChargesSection = forwardRef(function ChargesSection({
   rateUomRef.current = rateUom;
   chargeWeightRef.current = chargeWeight;
   totalPkgsRef.current = totalPkgs;
+  freightMinRateRef.current = freightMinRate;
 
   const buildMasterRows = (master) =>
     recalculateChargeList(
@@ -120,7 +138,37 @@ const ChargesSection = forwardRef(function ChargesSection({
       rateUomRef.current,
       chargeWeightRef.current,
       totalPkgsRef.current,
+      freightMinRateRef.current,
     );
+
+  const mergeSavedWithMaster = (saved, master) => {
+    const list = Array.isArray(saved) ? saved : [];
+    const masters = Array.isArray(master) ? master : [];
+    const byCode = Object.fromEntries(list.map((r) => [r.charge_code, r]));
+    const used = new Set();
+    const rows = masters.map((m) => {
+      used.add(m.charge_code);
+      const existing = byCode[m.charge_code];
+      if (existing) return existing;
+      return {
+        rec_id: tempIdCounter.current--,
+        charge_code: m.charge_code,
+        user_code: m.default_rate ?? "",
+      };
+    });
+    list.forEach((r) => {
+      if (!used.has(r.charge_code)) rows.push(r);
+    });
+    return recalculateChargeList(
+      rows,
+      invoiceValueRef.current,
+      docketRateRef.current,
+      rateUomRef.current,
+      chargeWeightRef.current,
+      totalPkgsRef.current,
+      freightMinRateRef.current,
+    );
+  };
 
   // Load charge master once on mount
   useEffect(() => {
@@ -128,11 +176,13 @@ const ChargesSection = forwardRef(function ChargesSection({
       .then((master) => {
         chargeMasterRef.current = master;
         setChargeMaster(master);
-        // Only auto-populate if no docket is loaded AND no charges exist yet
-        if (!docketIdRef.current && master.length > 0) {
+        if (!master.length) return;
+        if (!docketIdRef.current) {
           setChargeList(buildMasterRows(master));
           chargesLoaded.current = true;
+          return;
         }
+        setChargeList((prev) => mergeSavedWithMaster(prev, master));
       })
       .catch(console.error);
   }, []);
@@ -159,10 +209,45 @@ const ChargesSection = forwardRef(function ChargesSection({
               rateUomRef.current,
               chargeWeightRef.current,
               totalPkgsRef.current,
+              freightMinRateRef.current,
             )
           : []
       );
       setDirtyRecIds(new Set());
+    },
+    applyCustRates: (items = [], extras = {}) => {
+      const rate = extras.rate ?? docketRateRef.current;
+      const uom = extras.rateUom ?? rateUomRef.current;
+      const minRate = extras.minRate ?? freightMinRateRef.current;
+      const master = chargeMasterRef.current;
+      setChargeList((prev) => {
+        const source = mergeSavedWithMaster(prev, master);
+        const next = source.map((row) => {
+          const item = items.find((it) => matchChargeCode(it.rate_type, master) === row.charge_code);
+          if (!item) return row;
+          const mappedUom = String(item.uom || "").toUpperCase();
+          const isFixed = mappedUom.includes("FIX");
+          const value = isFixed
+            ? Math.max(toNumber(item.rate), toNumber(item.min_rate))
+            : toNumber(item.rate);
+          return { ...row, user_code: value };
+        });
+        const recalculated = recalculateChargeList(
+          next,
+          invoiceValueRef.current,
+          rate,
+          uom,
+          chargeWeightRef.current,
+          totalPkgsRef.current,
+          minRate
+        );
+        setDirtyRecIds((d) => {
+          const n = new Set(d);
+          recalculated.forEach((r) => { if (r.rec_id > 0) n.add(r.rec_id); });
+          return n;
+        });
+        return recalculated;
+      });
     },
     saveCharges: async (docketIdOverride) => {
       const targetDocketId = docketIdOverride || docketId;
@@ -195,7 +280,7 @@ const ChargesSection = forwardRef(function ChargesSection({
       }
 
       const updatedCharges = await fetchCharges(targetDocketId);
-      setChargeList(updatedCharges);
+      setChargeList(mergeSavedWithMaster(updatedCharges, chargeMasterRef.current));
       setDirtyRecIds(new Set());
       tempIdCounter.current = -1;
 
@@ -224,15 +309,8 @@ const ChargesSection = forwardRef(function ChargesSection({
     fetchCharges(docketId)
       .then((charges) => {
         chargesLoaded.current = true;
-        if (charges.length > 0) {
-          setChargeList(
-            recalculateChargeList(charges, invoiceValueRef.current, docketRateRef.current, rateUomRef.current, chargeWeightRef.current, totalPkgsRef.current)
-          );
-        } else {
-          // Docket has no saved charges — fall back to master rows
-          const master = chargeMasterRef.current;
-          setChargeList(master.length > 0 ? buildMasterRows(master) : []);
-        }
+        const master = chargeMasterRef.current;
+        setChargeList(mergeSavedWithMaster(charges, master.length ? master : []));
         setDirtyRecIds(new Set());
         tempIdCounter.current = -1;
       })
@@ -244,7 +322,7 @@ const ChargesSection = forwardRef(function ChargesSection({
     if (!chargesLoaded.current) return;
     setChargeList((prev) => {
       if (prev.length === 0) return prev;
-      const recalculated = recalculateChargeList(prev, invoiceValue, docketRate, rateUom, chargeWeight, totalPkgs);
+      const recalculated = recalculateChargeList(prev, invoiceValue, docketRate, rateUom, chargeWeight, totalPkgs, freightMinRate);
       // Mark existing DB rows whose amount changed as dirty so saveCharges persists them
       const changedIds = recalculated
         .filter((r, i) => r.rec_id > 0 && r.charge_amt !== prev[i]?.charge_amt)
@@ -258,7 +336,7 @@ const ChargesSection = forwardRef(function ChargesSection({
       }
       return recalculated;
     });
-  }, [invoiceValue, docketRate, rateUom, chargeWeight, totalPkgs]);
+  }, [invoiceValue, docketRate, rateUom, chargeWeight, totalPkgs, freightMinRate]);
 
   // Notify parent of chargeList changes (ref avoids making the callback a dependency)
   useEffect(() => {
@@ -314,7 +392,7 @@ const ChargesSection = forwardRef(function ChargesSection({
       setDirtyRecIds((d) => new Set(d).add(existingRow.rec_id));
     }
 
-    const recalculated = recalculateChargeList(updated, invoiceValue, docketRate, rateUom, chargeWeight, totalPkgs);
+    const recalculated = recalculateChargeList(updated, invoiceValue, docketRate, rateUom, chargeWeight, totalPkgs, freightMinRate);
     setChargeList(recalculated);
 
     const displayRow = recalculated[idx];
@@ -335,9 +413,131 @@ const ChargesSection = forwardRef(function ChargesSection({
   const totalChargeAmount = chargeList.reduce((sum, r) => sum + toNumber(r.charge_amt), 0);
 
   return (
-    <div>
-      <Box sx={{ ...sectionHeaderStyle, marginBottom: 1.5 }}>
-        <Typography variant="h6" fontWeight={600}>Charges</Typography>
+    <div
+      style={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        background: "#fffefe",
+        borderRadius: 12,
+        border: "1px solid #e9e5f0",
+        boxShadow: "0 2px 12px rgba(126, 34, 206, 0.06)",
+        overflow: "hidden",
+      }}
+    >
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          padding: "6px 14px",
+          background: "linear-gradient(135deg, #f6f3ff 0%, #f0ecf9 100%)",
+          borderBottom: "1px solid #e9e5f0",
+        }}
+      >
+        <Typography
+          variant="subtitle2"
+          sx={{ fontWeight: 700, fontSize: 12, color: "#4a3466", textTransform: "uppercase", letterSpacing: 0.4 }}
+        >
+          Charges
+        </Typography>
+      </Box>
+
+      <div
+        style={{
+          flex: 1,
+          background: "linear-gradient(180deg, #ffffff 0%, #fcfbff 100%)",
+          overflow: "auto",
+        }}
+      >
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            tableLayout: "fixed",
+            fontSize: 12,
+          }}
+        >
+          <thead>
+            <tr>
+              {chargeColumns.map((col) => (
+                <th
+                  key={col.key}
+                  style={{
+                    textAlign: "left",
+                    padding: "8px 10px",
+                    background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
+                    color: "#fff",
+                    fontSize: 11,
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                  }}
+                >
+                  {col.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {displayRows.map((row, idx) => (
+              <tr
+                key={row.rec_id}
+                style={{ background: idx % 2 === 0 ? "#ffffff" : "#fcfbff" }}
+              >
+                <td style={{ padding: "4px 8px", borderBottom: "1px solid #f3e8ff" }}>
+                  <select
+                    value={row.charge_code || ""}
+                    onChange={(e) => updateChargeRow(row.rec_id, "charge_code", e.target.value)}
+                    style={{
+                      width: "100%",
+                      border: "1px solid #e9d5ff",
+                      borderRadius: 6,
+                      padding: "4px 6px",
+                      fontSize: 12,
+                      background: "#fff",
+                    }}
+                  >
+                    {!chargeDescOptions.includes(row.charge_code) && row.charge_code ? (
+                      <option value={row.charge_code}>{row.charge_code}</option>
+                    ) : null}
+                    {chargeDescOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </td>
+                <td style={{ padding: "4px 8px", borderBottom: "1px solid #f3e8ff" }}>
+                  <input
+                    type="number"
+                    value={row.user_code ?? ""}
+                    onChange={(e) => updateChargeRow(row.rec_id, "user_code", e.target.value)}
+                    style={{
+                      width: "100%",
+                      border: "1px solid #e9d5ff",
+                      borderRadius: 6,
+                      padding: "4px 6px",
+                      fontSize: 12,
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </td>
+                <td style={{ padding: "4px 10px", borderBottom: "1px solid #f3e8ff", fontWeight: 600 }}>
+                  {formatAmount(row.charge_amt)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          padding: "8px 12px",
+          borderTop: "1px solid #e9e5f0",
+          background: "#faf7ff",
+        }}
+      >
         <TextField
           label="Total Charge Amount"
           value={formatAmount(totalChargeAmount)}
@@ -346,19 +546,6 @@ const ChargesSection = forwardRef(function ChargesSection({
           sx={{ width: 180 }}
         />
       </Box>
-
-      <DataTable
-        columns={chargeColumns}
-        rows={displayRows}
-        getKey={(row) => row.rec_id}
-
-        editable
-        singleClick={singleClick}
-        autoHeight
-        onCellChange={(rowIndex, key, value) =>
-          updateChargeRow(rowIndex, key, value)
-        }
-      />
       <CommonAlertDialog
         dialog={dialog}
         onClose={closeAlert}

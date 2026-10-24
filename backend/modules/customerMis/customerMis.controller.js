@@ -64,8 +64,15 @@ function buildMisQuery(filters = {}, tenant_id = null) {
       'd.docket_transit_type',
       'd.docket_pay_type',
       'd.docket_remark',
-      'd.docket_inv_no',
-      'd.docket_inv_date',
+      db.raw(`COALESCE(
+        (SELECT STRING_AGG(
+                  inv.inv_no::text || ' / ' || UPPER(TO_CHAR(inv.inv_date::date, 'DD-MON-YY')),
+                  ', ' ORDER BY inv.inv_date, inv.inv_no)
+           FROM sss.sst_docket_inv inv
+          WHERE inv.docket_no = d.docket_no),
+        NULLIF(TRIM(COALESCE(d.docket_inv_no, '')), '')
+      ) as docket_inv_no`),
+      'd.docket_transit_days',
       // Customer = consignor (falls back to consignee when no consignor is set).
       'cnor.record_id as bp_id',
       db.raw('COALESCE(cnor.bp_name, cnee.bp_name) as bp_name'),
@@ -79,6 +86,8 @@ function buildMisQuery(filters = {}, tenant_id = null) {
                            ELSE ', ' || COALESCE(cnor.bp_state, cnee.bp_state) END
                    || CASE WHEN COALESCE(cnor.bp_pincode, cnee.bp_pincode) IS NULL THEN ''
                            ELSE ' - ' || COALESCE(cnor.bp_pincode, cnee.bp_pincode) END) as bp_address`),
+      db.raw('COALESCE(cnee.bp_name, cnor.bp_name) as party_name'),
+      db.raw('COALESCE(cnee.bp_pincode, cnor.bp_pincode) as pin_code'),
       'bpt.rec_name as bp_type_name',
       // Scalar subqueries (not joins) so a duplicate loc_code can't fan out rows.
       db.raw(`(SELECT fl.loc_name FROM sss.ssm_location fl
@@ -98,15 +107,49 @@ function buildMisQuery(filters = {}, tenant_id = null) {
                 NULLIF(regexp_replace(d.docket_no, '[0-9]', '', 'g'), ''),
                 d.docket_no) as docket_no_series`),
       db.raw(
-        `(SELECT STRING_AGG(ewb_no::text, ', ' ORDER BY ewb_no)
+        `(SELECT STRING_AGG(
+                   e.ewb_no::text
+                   || CASE WHEN e.ewb_valid_upto IS NULL THEN ''
+                           ELSE ' / ' || UPPER(TO_CHAR(e.ewb_valid_upto::date, 'DD-MON-YY')) END,
+                   ', ' ORDER BY e.ewb_no)
            FROM sss.sst_docket_ewb e
           WHERE e.docket_no = d.docket_no) as ewb_no`
       ),
-      // Earliest E-Way Bill expiry across the docket's e-way bills.
       db.raw(
-        `(SELECT MIN(e.ewb_valid_upto)
-           FROM sss.sst_docket_ewb e
-          WHERE e.docket_no = d.docket_no) as ewb_date_expiry`
+        `(SELECT tz.zone_name FROM sss.ssm_town_zone tz
+           WHERE UPPER(TRIM(tz.town_name)) = UPPER(TRIM(COALESCE(d.docket_dly_town, '')))
+           LIMIT 1) as region`
+      ),
+      db.raw(
+        `(SELECT dc.charge_amt FROM sss.sst_docket_charges dc
+           WHERE dc.docket_no = d.docket_no AND dc.charge_code = 'DK06'
+             AND dc.record_status = 0 LIMIT 1) as handling_charge`
+      ),
+      db.raw(
+        `(SELECT dc.charge_amt FROM sss.sst_docket_charges dc
+           WHERE dc.docket_no = d.docket_no AND dc.charge_code = 'DK04'
+             AND dc.record_status = 0 LIMIT 1) as factory_charge`
+      ),
+      db.raw(
+        `(SELECT id.invoice_no FROM sss.sst_invoice_dtl id
+           WHERE id.docket_no = d.docket_no
+           ORDER BY id.invoice_date DESC NULLS LAST LIMIT 1) as bill_no`
+      ),
+      db.raw(
+        `(SELECT id.invoice_date FROM sss.sst_invoice_dtl id
+           WHERE id.docket_no = d.docket_no
+           ORDER BY id.invoice_date DESC NULLS LAST LIMIT 1) as bill_date`
+      ),
+      db.raw(
+        `COALESCE(NULLIF(TRIM(d.veh_no), ''),
+          (SELECT h.desp_veh_no FROM sss.sst_mnf_dtl dt
+            INNER JOIN sss.sst_mnf_hdr h
+              ON h.mnf_no = dt.mnf_no AND h.mnf_loc = dt.mnf_loc AND h.mnf_date = dt.mnf_date
+           WHERE dt.dwb_no = d.docket_no
+             AND COALESCE(h.desp_veh_no, '') <> ''
+           ORDER BY h.mnf_date DESC, h.mnf_no DESC
+           LIMIT 1)
+        ) as veh_no`
       )
     );
 
@@ -132,25 +175,41 @@ function buildMisQuery(filters = {}, tenant_id = null) {
 }
 
 /** Map a raw DB row to the shape the grid consumes. */
+function addDays(date, days) {
+  const n = parseInt(days, 10);
+  if (!date || !Number.isFinite(n)) return null;
+  const d = new Date(date);
+  if (isNaN(d)) return null;
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+function dayDiff(from, to) {
+  if (!from || !to) return null;
+  const a = new Date(from);
+  const b = new Date(to);
+  if (isNaN(a) || isNaN(b)) return null;
+  return Math.round((b - a) / 86400000);
+}
+
 function mapMisRow(r) {
-  // Delay days = days between the docket date and the actual delivery date.
-  let delayDays = null;
-  if (r.docket_date && r.actual_delivery_date) {
-    const from = new Date(r.docket_date);
-    const to = new Date(r.actual_delivery_date);
-    if (!isNaN(from) && !isNaN(to)) {
-      delayDays = Math.round((to - from) / 86400000);
-    }
-  }
+  const estimateDate = addDays(r.docket_date, r.docket_transit_days);
+  const tatDays = dayDiff(r.docket_date, r.actual_delivery_date);
+  const delayDays = dayDiff(estimateDate, r.actual_delivery_date);
+  const loadType = String(r.docket_load_type || "").toUpperCase();
+  const rateUom = String(r.docket_rate_uom || "").toUpperCase();
+  const rateDisplay = loadType === "FIX" || rateUom === "FIX" ? "FIX" : r.docket_rate;
   return {
     rec_id: r.rec_id,
     docket_no: r.docket_no,
     docket_no_series: r.docket_no_series || "",
     docket_date: r.docket_date,
-    docket_inv_no: r.docket_inv_no,
+    docket_inv_no: r.docket_inv_no || "",
     docket_inv_date: r.docket_inv_date,
     bp_id: r.bp_id,
     bp_name: r.bp_name,
+    party_name: r.party_name || r.bp_name || "",
+    pin_code: r.pin_code || "",
     bp_gstin: r.bp_gstin,
     bp_address: r.bp_address || "",
     bp_type_name: r.bp_type_name,
@@ -162,29 +221,38 @@ function mapMisRow(r) {
     docket_tot_pkgs: r.docket_tot_pkgs,
     docket_act_wt: r.docket_act_wt,
     docket_chrg_wt: r.docket_chrg_wt,
-    docket_rate: r.docket_rate,
+    docket_rate: rateDisplay,
     docket_rate_uom: r.docket_rate_uom,
     docket_tot_amt: r.docket_tot_amt,
     docket_load_type: r.docket_load_type,
     docket_transit_type: r.docket_transit_type,
     docket_pay_type: r.docket_pay_type,
     docket_remark: r.docket_remark,
+    handling_charge: r.handling_charge || 0,
+    factory_charge: r.factory_charge || 0,
+    estimate_delivery_date: estimateDate,
+    region: r.region || "",
+    bill_no: r.bill_no || "",
+    bill_date: r.bill_date || null,
+    veh_no: r.veh_no || "",
     delivery_status: r.delivery_status,
     actual_delivery_date: r.actual_delivery_date,
     delivery_remarks: r.delivery_remarks,
     delivery_update_date: r.delivery_updated_on || null,
     dly_note_no: r.dly_note_no || "",
     pod_url: r.pod_url,
-    ewb_no: r.ewb_no,
+    ewb_no: r.ewb_no || "NO EWB",
+    delay_responsible: r.delivery_remarks || "",
     ewb_date_expiry: r.ewb_date_expiry,
+    delivery_tat_days: tatDays,
     delay_days: delayDays,
   };
 }
 
 const getCustomerMisList = async (filters = {}, tenant_id = null) => {
   const rows = await buildMisQuery(filters, tenant_id)
-    .orderBy('d.docket_date', 'desc')
-    .orderBy('d.docket_no', 'desc')
+    .orderBy('d.docket_date', 'asc')
+    .orderBy('d.docket_no', 'asc')
     .limit(filters.limit || 5000);
   return rows.map(mapMisRow);
 };

@@ -367,6 +367,9 @@ export function DataTable({
   autoHeight = false,
   isHeight,
   scroll,
+  dense = false,
+  rowHeight: rowHeightProp,
+  headerHeight: headerHeightProp,
   // Row-click behaviour: when true, clicking a row toggles its selection
   // (an already-selected row can be unchecked by clicking it again).
   toggleRowSelectionOnClick = false,
@@ -459,8 +462,8 @@ export function DataTable({
     pageSize: 5,
   });
 
-  const ROW_HEIGHT = 55;
-  const HEADER_HEIGHT = 42;
+  const ROW_HEIGHT = rowHeightProp ?? (dense ? 40 : 55);
+  const HEADER_HEIGHT = headerHeightProp ?? (dense ? 36 : 42);
   const maxRows = scroll?.afterRows ?? null;
   const useScrollHeight = maxRows != null && rows.length > maxRows;
   const resolvedAutoHeight = autoHeight && !useScrollHeight;
@@ -698,7 +701,8 @@ export function DataTable({
       background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
       borderBottom: "none",
       color: "#fff",
-      minHeight: "42px !important",
+      minHeight: `${HEADER_HEIGHT}px !important`,
+      maxHeight: `${HEADER_HEIGHT}px !important`,
     },
     "& .MuiDataGrid-columnHeader": {
       borderRight: "1px solid rgba(255,255,255,0.18)",
@@ -708,10 +712,13 @@ export function DataTable({
     },
     "& .MuiDataGrid-columnHeaderTitle": {
       fontWeight: 700,
-      fontSize: "12px",
-      letterSpacing: "0.04em",
+      fontSize: dense ? "11px" : "12px",
+      letterSpacing: dense ? "0.02em" : "0.04em",
       textTransform: "uppercase",
       color: "#0f0b0b",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
     },
     "& .MuiDataGrid-columnSeparator": {
       display: "none",
@@ -723,8 +730,8 @@ export function DataTable({
       borderBottom: "1px solid #f3e8ff",
       borderRight: "1px solid #f3e8ff",
       color: "#334155",
-      padding: "6px 12px",
-      fontSize: "13px",
+      padding: dense ? "4px 8px" : "6px 12px",
+      fontSize: dense ? "12px" : "13px",
       minHeight: "unset",
       lineHeight: 1.3,
       backgroundColor: "transparent",
@@ -736,7 +743,8 @@ export function DataTable({
       transition: "all 0.2s ease",
       backgroundColor: "#ffffff",
       margin: 0,
-      minHeight: "36px !important",
+      minHeight: `${ROW_HEIGHT}px !important`,
+      maxHeight: `${ROW_HEIGHT}px !important`,
       "&:hover": {
         backgroundColor: "#f8f5ff !important",
       },
@@ -770,8 +778,9 @@ export function DataTable({
       className="dataTableWrapper"
       style={{
         width: "100%",
-        marginBottom: 24,
+        marginBottom: dense ? 8 : 24,
         overflowX: scroll?.horizontal ? "auto" : "visible",
+        overflowY: resolvedAutoHeight ? "visible" : "auto",
       }}
     >
       {hasRowColors && <style>{rowColorCss}</style>}
@@ -782,11 +791,11 @@ export function DataTable({
         disableRowSelectionOnClick={!toggleRowSelectionOnClick}
         disableColumnMenu={false}
         density="compact"
-        rowHeight={55}
-        headerHeight={42}
+        rowHeight={ROW_HEIGHT}
+        headerHeight={HEADER_HEIGHT}
         autoHeight={resolvedAutoHeight}
         hideFooter
-        disableVirtualization={false}
+        disableVirtualization={resolvedAutoHeight}
         rowSelection={true}
         getRowClassName={getRowClassName}
         onFilterModelChange={() => setTimeout(emitFilteredRows, 0)}

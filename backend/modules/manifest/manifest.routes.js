@@ -57,6 +57,13 @@ router.get('/by-no/:no', async (req, res) => {
       mnf_loc: header.mnf_loc,
       mnf_date: header.mnf_date
     });
+    const unloaded = await db('sss.sst_unloading_dtl')
+      .where({ mnf_no: header.mnf_no })
+      .select('docket_no');
+    const unloadedSet = new Set(unloaded.map((u) => u.docket_no));
+    details.forEach((d) => {
+      if (unloadedSet.has(d.dwb_no)) d.unloading_status = d.unloading_status || 'SAVED';
+    });
     res.json({ success: true, data: { header, details } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

@@ -27,6 +27,7 @@ import {
   fetchDocketInvoices,
   fetchDocketPackages,
   saveDocketPackages,
+  fetchCustRate,
 } from "../../utils/docket";
 import { fetchAllLocations, fetchLocationTowns } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
@@ -117,18 +118,18 @@ const headerFields = [
     ]
   },
 
-  { label: "Actual Wt", name: "act_wt", type: "number" },
-  { label: "Charge Wt", name: "chrg_wt", type: "number" },
+  { label: "Actual Wt", name: "act_wt", type: "number", compact: true },
+  { label: "Charge Wt", name: "chrg_wt", type: "number", compact: true },
 
-  { label: "No of CB", name: "no_cb", type: "number" },
-  { label: "NOS W. Crate", name: "no_w_crate", type: "number" },
-  { label: "No of W. CBox", name: "no_w_cbox", type: "number" },
-  { label: "No of Loose", name: "no_loose", type: "number" },
-  { label: "No of Others", name: "no_others", type: "number" },
-  { label: "Total Pkgs", name: "tot_pkgs", type: "number", required: true },
+  { label: "CB", name: "no_cb", type: "number", compact: true },
+  { label: "W.Crate", name: "no_w_crate", type: "number", compact: true },
+  { label: "W.CBox", name: "no_w_cbox", type: "number", compact: true },
+  { label: "Loose", name: "no_loose", type: "number", compact: true },
+  { label: "Others", name: "no_others", type: "number", compact: true },
+  { label: "Tot Pkgs", name: "tot_pkgs", type: "number", required: true, compact: true },
 
   {
-    label: "Dimension Unit", name: "dim_unit", options: [
+    label: "Dim Unit", name: "dim_unit", compact: true, options: [
       { label: "Inches", value: "inches" },
       { label: "MM", value: "mm" },
       { label: "CM", value: "cm" },
@@ -246,6 +247,7 @@ const formSections = [
     ],
     half: true,
     columns: 2,
+    stackLeft: true,
   },
   {
     title: "Goods Details",
@@ -253,18 +255,20 @@ const formSections = [
     fields: ["goods_grp", "goods_subgrp", "goods_desc"],
     half: true,
     columns: 2,
+    stackLeft: true,
   },
   {
     title: "Rate & Charges",
     icon: SECTION_ICONS.rateCharges,
     fields: ["rate", "rate_uom"],
     half: true,
+    columns: 2,
+    stackLeft: true,
   },
   {
     title: "Remarks",
     icon: SECTION_ICONS.remarks,
     fields: ["remark"],
-    half: true,
   },
 ];
 
@@ -299,8 +303,8 @@ const emptyForm = {
   pay_loc: "",
   dly_type: "",
   cc: "",
-  act_wt: 30,
-  chrg_wt: 30,
+  act_wt: 1,
+  chrg_wt: 1,
   no_cb: 0,
   no_w_crate: 0,
   no_w_cbox: 0,
@@ -365,11 +369,14 @@ export default function DocketPage() {
   // Package dimension rows (sst_docket_pkg)
   const [packageRows, setPackageRows] = useState([]);
   const pkgRowIdRef = useRef(0);
+  const chrgWtManualRef = useRef(false);
   const emptyPkgRow = () => ({ rowId: `pkg_${++pkgRowIdRef.current}`, no_of_pkg: "", dim_length: "", dim_breadth: "", dim_height: "" });
   const searchTimeoutRef = useRef(null);
   const prevLocRef = useRef({ docket_loc: "", docket_to_loc: "" });
   const ewbPopulatedRef = useRef({ cnor: false, cnee: false });
   const chargesRef = useRef(null);
+  const [freightMinRate, setFreightMinRate] = useState(0);
+  const [rateMode, setRateMode] = useState(""); // "" | "contract" | "adhoc"
   const [printAnchor, setPrintAnchor] = useState(null);
   const [printDtAnchor, setPrintDtAnchor] = useState(null);
 
@@ -431,7 +438,7 @@ export default function DocketPage() {
     });
   };
 
-  const calculateVolumetricWeight = (length, breadth, height, unit) => {
+  const calculateVolumeCft = (length, breadth, height, unit) => {
     if (!length || !breadth || !height || !unit) return null;
 
     const l = parseFloat(length);
@@ -442,36 +449,22 @@ export default function DocketPage() {
       return null;
     }
 
-    let volumeCubicFeet;
-    if (unit === "mm") {
-      const volumeCubicMm = l * b * h;
-      volumeCubicFeet = volumeCubicMm / (304.8 ** 3);
-    } else if (unit === "cm") {
-      const volumeCubicCm = l * b * h;
-      volumeCubicFeet = volumeCubicCm / (30.48 ** 3);
-    } else if (unit === "inches") {
-      const volumeCubicInches = l * b * h;
-      volumeCubicFeet = volumeCubicInches / 1728;
-    } else {
-      return null;
-    }
-
-    return volumeCubicFeet * 10;
+    if (unit === "mm") return (l * b * h) / (304.8 ** 3);
+    if (unit === "cm") return (l * b * h) / (30.48 ** 3);
+    if (unit === "inches") return (l * b * h) / 1728;
+    return null;
   };
 
   const handleWeightBlur = (field, value) => {
     let num = parseFloat(value);
     if (!Number.isFinite(num) || num < minWeight) num = minWeight;
+    if (field === "chrg_wt") chrgWtManualRef.current = true;
 
     setForm((prev) => {
       const updated = { ...prev, [field]: num };
-      // Ensure act_wt <= chrg_wt
-      if (field === "act_wt" && updated.act_wt > updated.chrg_wt) {
+      if (!chrgWtManualRef.current && field === "act_wt" && updated.act_wt > updated.chrg_wt) {
         updated.chrg_wt = updated.act_wt;
         setDirtyFields((d) => new Set(d).add("chrg_wt"));
-      }
-      if (field === "chrg_wt" && updated.chrg_wt < updated.act_wt) {
-        updated.chrg_wt = updated.act_wt;
       }
       return updated;
     });
@@ -479,11 +472,24 @@ export default function DocketPage() {
   };
 
   const recalcChargeWeight = (rows, actWt, dimUnit) => {
-    const totalVol = rows.reduce((sum, r) => {
-      const v = calculateVolumetricWeight(r.dim_length, r.dim_breadth, r.dim_height, dimUnit);
-      return sum + (v ?? 0);
+    let hasDims = false;
+    const totalVolKg = (rows || []).reduce((sum, r) => {
+      const cft = calculateVolumeCft(r.dim_length, r.dim_breadth, r.dim_height, dimUnit);
+      if (cft == null) return sum;
+      hasDims = true;
+      const qty = parseFloat(r.no_of_pkg);
+      const n = Number.isFinite(qty) && qty > 0 ? qty : 1;
+      return sum + cft * n * 6;
     }, 0);
-    return Math.max(totalVol, parseFloat(actWt) || minWeight, minWeight);
+    if (!hasDims) return null;
+    const volKg = Math.floor(totalVolKg);
+    return Math.max(volKg, parseFloat(actWt) || minWeight, minWeight);
+  };
+
+  const applyChargeWeight = (calc, current) => {
+    if (chrgWtManualRef.current) return current;
+    if (calc == null) return current;
+    return calc;
   };
 
   const handleDimensionChange = (field, value) => {
@@ -699,6 +705,104 @@ export default function DocketPage() {
     display: "flex",
     gap: 10,
     flexWrap: "wrap",
+  };
+
+  const mapCustUom = (uom) => {
+    const k = String(uom || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (k === "PERKG" || k === "KG") return "Per KG";
+    if (k === "FIXED" || k === "FIX") return "Fixed";
+    if (k === "PERTRIP" || k === "TRIP") return "Per Trip";
+    if (k === "PERUNIT" || k === "UNIT" || k === "PERPKG") return "Per Unit";
+    if (k === "PERTONNE" || k === "PERTON" || k === "TONNE") return "Per Tonne";
+    return uom || "";
+  };
+
+  const applyAdhocRate = (reason) => {
+    setRateMode("adhoc");
+    setFreightMinRate(0);
+    chargesRef.current?.applyCustRates([], {
+      rate: form.rate,
+      rateUom: form.rate_uom,
+      minRate: 0,
+    });
+    showInfo(
+      `${reason} Enter Rate, UOM and charges manually. Freight will calculate from the values you type.`,
+      "Ad hoc rate"
+    );
+  };
+
+  const handleGetCustRate = async () => {
+    if (!form.cnor_id && !form.cnor_name) {
+      showError("Select consignor before fetching customer rate");
+      return;
+    }
+    if (!form.load_type) {
+      showError("Load Type is required to fetch customer rate");
+      return;
+    }
+    if (!form.docket_loc || !form.docket_from_town || !form.docket_to_loc || !form.docket_to_town) {
+      showError("From / To location and town are required to fetch customer rate");
+      return;
+    }
+    if (!form.docket_date) {
+      showError("Docket date is required to fetch customer rate");
+      return;
+    }
+    try {
+      showLoading();
+      const res = await fetchCustRate({
+        cnor_id: form.cnor_id,
+        docket_loc: form.docket_loc,
+        load_type: form.load_type,
+        from_loc: form.docket_loc,
+        from_town: form.docket_from_town,
+        to_loc: form.docket_to_loc,
+        to_town: form.docket_to_town,
+        chrg_wt: form.chrg_wt,
+        veh_type: form.veh_type || "",
+        docket_date: toDbDateValue(form.docket_date),
+      });
+      const payload = res?.data || {};
+      if (payload.code !== "OK") {
+        const reason =
+          payload.code === "RNA"
+            ? "Rate is not applicable for this customer."
+            : payload.code === "RNF"
+              ? "No customer rate found for this lane / weight / date."
+              : (res?.message || "Customer rate is not available.");
+        applyAdhocRate(reason);
+        return;
+      }
+      const items = payload.items || [];
+      const freight = items.find((it) => String(it.rate_type || "").toUpperCase() === "FREIGHT");
+      const nextRate = freight ? freight.rate : form.rate;
+      const nextUom = freight ? mapCustUom(freight.uom) : form.rate_uom;
+      const nextMin = freight ? (parseFloat(freight.min_rate) || 0) : 0;
+      setRateMode("contract");
+      setFreightMinRate(nextMin);
+      setForm((prev) => ({
+        ...prev,
+        ...(freight ? { rate: nextRate, rate_uom: nextUom } : {}),
+      }));
+      setDirtyFields((prev) => {
+        const s = new Set(prev);
+        if (freight) {
+          s.add("rate");
+          s.add("rate_uom");
+        }
+        return s;
+      });
+      chargesRef.current?.applyCustRates(items, {
+        rate: nextRate,
+        rateUom: nextUom,
+        minRate: nextMin,
+      });
+      showSuccess("Customer rate applied");
+    } catch (err) {
+      applyAdhocRate(err.message || "Could not fetch customer rate.");
+    } finally {
+      hideLoading();
+    }
   };
 
   // ✅ Add rows
@@ -1091,6 +1195,7 @@ export default function DocketPage() {
           setExtraPoInvoiceRows([]);
           setBaseEwbNo("");
           setPackageRows([]);
+          chrgWtManualRef.current = false;
           // Load the saved invoice rows for this docket
           try {
             const invRows = await fetchDocketInvoices(docketData.docket_no);
@@ -1158,8 +1263,10 @@ export default function DocketPage() {
       setExtraPoInvoiceRows([]);
       setBaseEwbNo("");
       setPackageRows([]);
+      chrgWtManualRef.current = false;
       ewbPopulatedRef.current = { cnor: false, cnee: false };
       setForm({ ...emptyForm, act_wt: minWeight, chrg_wt: minWeight });
+      setFreightMinRate(0);
       setEwbNoDisplay("");
     }
   };
@@ -1291,10 +1398,10 @@ export default function DocketPage() {
   ];
 
   const packageDimColumns = [
-    { key: "no_of_pkg",   label: "No of Pkg", width: 35, minWidth: 20, editable: isFormEditMode, type: "number" },
-    { key: "dim_length",  label: "Length",    width: 30, minWidth: 20, editable: isFormEditMode, type: "number" },
-    { key: "dim_breadth", label: "Breadth",   width: 30, minWidth: 20, editable: isFormEditMode, type: "number" },
-    { key: "dim_height",  label: "Height",    width: 30, minWidth: 20, editable: isFormEditMode, type: "number" },
+    { key: "no_of_pkg",   label: "Pkg",     minWidth: 56, editable: isFormEditMode, type: "number" },
+    { key: "dim_length",  label: "L",       minWidth: 48, editable: isFormEditMode, type: "number" },
+    { key: "dim_breadth", label: "B",       minWidth: 48, editable: isFormEditMode, type: "number" },
+    { key: "dim_height",  label: "H",       minWidth: 48, editable: isFormEditMode, type: "number" },
   ];
 
   const handleAddPkgRow = () => setPackageRows((prev) => [...prev, emptyPkgRow()]);
@@ -1302,9 +1409,11 @@ export default function DocketPage() {
   const handleRemovePkgRow = (rowId) => {
     const updated = packageRows.filter((r) => r.rowId !== rowId);
     setPackageRows(updated);
-    const newChrg = recalcChargeWeight(updated, form.act_wt, form.dim_unit);
-    setForm((f) => ({ ...f, chrg_wt: newChrg }));
-    setDirtyFields((d) => new Set(d).add("chrg_wt"));
+    const newChrg = applyChargeWeight(recalcChargeWeight(updated, form.act_wt, form.dim_unit), form.chrg_wt);
+    if (newChrg !== form.chrg_wt) {
+      setForm((f) => ({ ...f, chrg_wt: newChrg }));
+      setDirtyFields((d) => new Set(d).add("chrg_wt"));
+    }
   };
 
   const handlePkgCellChange = (rowId, name, value) => {
@@ -1313,9 +1422,11 @@ export default function DocketPage() {
       return { ...r, [name]: value };
     });
     setPackageRows(updated);
-    const newChrg = recalcChargeWeight(updated, form.act_wt, form.dim_unit);
-    setForm((f) => ({ ...f, chrg_wt: newChrg }));
-    setDirtyFields((d) => new Set(d).add("chrg_wt"));
+    const newChrg = applyChargeWeight(recalcChargeWeight(updated, form.act_wt, form.dim_unit), form.chrg_wt);
+    if (newChrg !== form.chrg_wt) {
+      setForm((f) => ({ ...f, chrg_wt: newChrg }));
+      setDirtyFields((d) => new Set(d).add("chrg_wt"));
+    }
     return updated.find((r) => r.rowId === rowId) ?? {};
   };
 
@@ -1474,15 +1585,20 @@ export default function DocketPage() {
         (isCnor || isCnee) &&
         [`${prefix}_address`, `${prefix}_city`, `${prefix}_state`, `${prefix}_pincode`, `${prefix}_gstin`].includes(field.name);
 
+      const isRateField = field.name === "rate" || field.name === "rate_uom";
       const isDisabled =
         field.name === "tot_pkgs" ||
         isCnorCneeDetail ||
-        !isFormEditMode ||
+        (!isRateField && !isFormEditMode) ||
         (field.name === "docket_no" && !(prePrinted && isFormEditMode));
 
       const handleChange = (name, value) => {
         let updated = { ...form, [name]: value };
         setDirtyFields((prev) => new Set(prev).add(name));
+        if (name === "rate" || name === "rate_uom") {
+          setFreightMinRate(0);
+          setRateMode((prev) => (prev === "contract" ? "adhoc" : prev));
+        }
 
         // Vehicle No is displayed uppercase like elsewhere in the app
         if (name === "veh_no") {
@@ -1501,15 +1617,22 @@ export default function DocketPage() {
         }
 
         // Recalculate charge weight when actual weight or dimension unit changes
+        if (name === "chrg_wt") {
+          chrgWtManualRef.current = true;
+        }
         if (name === "act_wt") {
-          const newChrg = recalcChargeWeight(packageRows, value, form.dim_unit);
-          updated.chrg_wt = newChrg;
-          setDirtyFields((prev) => new Set(prev).add("chrg_wt"));
+          const newChrg = applyChargeWeight(recalcChargeWeight(packageRows, value, form.dim_unit), updated.chrg_wt);
+          if (newChrg != null && newChrg !== updated.chrg_wt) {
+            updated.chrg_wt = newChrg;
+            setDirtyFields((prev) => new Set(prev).add("chrg_wt"));
+          }
         }
         if (name === "dim_unit") {
-          const newChrg = recalcChargeWeight(packageRows, form.act_wt, value);
-          updated.chrg_wt = newChrg;
-          setDirtyFields((prev) => new Set(prev).add("chrg_wt"));
+          const newChrg = applyChargeWeight(recalcChargeWeight(packageRows, form.act_wt, value), updated.chrg_wt);
+          if (newChrg != null && newChrg !== updated.chrg_wt) {
+            updated.chrg_wt = newChrg;
+            setDirtyFields((prev) => new Set(prev).add("chrg_wt"));
+          }
         }
 
         // Auto-populate goods_desc when goods_subgrp is selected
@@ -1584,6 +1707,13 @@ export default function DocketPage() {
       };
 
       const tooltipText = getTooltipText();
+      const compactSx = field.compact
+        ? {
+            "& .MuiInputBase-input": { fontSize: 12, py: "8px" },
+            "& .MuiInputLabel-root": { fontSize: 12 },
+            "& .MuiSelect-select": { fontSize: 12, py: "8px" },
+          }
+        : undefined;
 
       return (
         <Tooltip title={tooltipText} placement="top" arrow={!!tooltipText}>
@@ -1600,6 +1730,7 @@ export default function DocketPage() {
                 options={fieldProps.options}
                 disabled={isDisabled}
                 required={fieldProps.required}
+                sx={compactSx}
               />
             ) : (
               <MuiField
@@ -1610,6 +1741,7 @@ export default function DocketPage() {
                 type={isTextarea ? "text" : (fieldProps.type || "text")}
                 disabled={isDisabled}
                 required={fieldProps.required}
+                sx={compactSx}
                 {...(["act_wt", "chrg_wt"].includes(field.name) ? {
                   onBlur: () => handleWeightBlur(field.name, form[field.name]),
                 } : {})}
@@ -1620,31 +1752,76 @@ export default function DocketPage() {
       );
     };
 
-    const packageTopFields = isPackageDetails
-      ? filteredFields.filter((field) => ["act_wt", "chrg_wt"].includes(field.name))
+    const packageScalarFields = isPackageDetails
+      ? filteredFields.filter((field) => field.name !== "chrg_wt")
       : [];
-    const packageCompactFields = isPackageDetails
-      ? filteredFields.filter((field) => field.compact)
+    const packageChargeFields = isPackageDetails
+      ? filteredFields.filter((field) => field.name === "chrg_wt")
       : [];
-    const packageBottomFields = isPackageDetails
-      ? filteredFields.filter((field) => !["act_wt", "chrg_wt"].includes(field.name) && !field.compact)
-      : filteredFields;
 
     return (
       <div
         key={section.title}
         style={{
           ...sectionCardStyles.sectionCard,
-          gridColumn: section.span
-            ? "1 / -1"
-            : section.half
-              ? undefined
-              : "1 / -1",
+          gridColumn: section.stackLeft
+            ? "auto"
+            : section.span
+              ? "1 / -1"
+              : section.half
+                ? undefined
+                : "1 / -1",
         }}
       >
-        <div style={sectionCardStyles.sectionHeader}>
+        <div style={{
+          ...sectionCardStyles.sectionHeader,
+          ...(section.stackLeft ? { padding: "10px 16px" } : {}),
+          ...(section.title === "Remarks" ? { padding: "6px 14px", gap: 8 } : {}),
+        }}>
           <span style={sectionCardStyles.sectionIcon}>{section.icon}</span>
-          <h4 style={sectionCardStyles.sectionTitle}>{section.title}</h4>
+          {section.title === "Rate & Charges" ? (
+            <>
+              <button
+                type="button"
+                onClick={handleGetCustRate}
+                disabled={!isFormEditMode}
+                style={{
+                  ...sectionCardStyles.sectionTitle,
+                  border: "none",
+                  background: isFormEditMode ? "#7e22ce" : "#d8ccef",
+                  color: "#fff",
+                  borderRadius: 6,
+                  padding: "6px 12px",
+                  cursor: isFormEditMode ? "pointer" : "not-allowed",
+                  letterSpacing: 0.4,
+                }}
+                title="Get customer rate"
+              >
+                {section.title}
+              </button>
+              {rateMode === "adhoc" ? (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: 0.6,
+                    color: "#92400e",
+                    background: "#fef3c7",
+                    border: "1px solid #f59e0b",
+                    borderRadius: 999,
+                    padding: "2px 8px",
+                  }}
+                >
+                  AD HOC
+                </span>
+              ) : null}
+            </>
+          ) : (
+            <h4 style={{
+              ...sectionCardStyles.sectionTitle,
+              ...(section.title === "Remarks" ? { fontSize: 12 } : {}),
+            }}>{section.title}</h4>
+          )}
           {section.addable && (
             <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: "#4a3466" }}>
@@ -1693,24 +1870,24 @@ export default function DocketPage() {
         </div>
         <div style={{
           ...sectionCardStyles.sectionFields,
+          ...(section.stackLeft ? { padding: "10px 12px", gap: 8 } : {}),
           ...(section.columns && filteredFields.length > 1 ? {
-            gridTemplateColumns: `repeat(auto-fill, minmax(min(${section.columns === 2 ? 150 : 100}px, 100%), 1fr))`,
-            gap: 10,
+            gridTemplateColumns: `repeat(auto-fill, minmax(min(${section.columns === 2 ? 150 : isPackageDetails ? 90 : 100}px, 100%), 1fr))`,
+            gap: section.stackLeft ? 8 : 10,
           } : {}),
         }}>
           {isPackageDetails ? (
             <>
-              <div style={{ gridColumn: "1 / -1", display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))" }}>
-                {packageTopFields.map((field) => renderFieldInput(field))}
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(78px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {packageScalarFields.map((field) => renderFieldInput(field))}
               </div>
-              <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #ece7f4", margin: "4px 0 2px" }} />
-              {packageBottomFields.map((field) => renderFieldInput(field))}
-              {packageCompactFields.length > 0 && (
-                <div style={{ gridColumn: "1 / -1", display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fill, minmax(min(80px, 100%), 1fr))" }}>
-                  {packageCompactFields.map((field) => renderFieldInput(field))}
-                </div>
-              )}
-              <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #ece7f4", margin: "4px 0 2px" }} />
               <div style={{ gridColumn: "1 / -1" }}>
                 <DataTable
                   columns={packageDimColumns}
@@ -1719,10 +1896,21 @@ export default function DocketPage() {
                   actions={packageDimActions}
                   editable={isFormEditMode}
                   singleClick={isFormEditMode}
-                  autoHeight
-                  scroll={{ afterRows: 2 }}
+                  dense
+                  scroll={{ afterRows: 3 }}
+                  isHeight={158}
                   onCellChange={handlePkgCellChange}
                 />
+              </div>
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(78px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {packageChargeFields.map((field) => renderFieldInput(field))}
               </div>
             </>
           ) : isPoInvoice ? (
@@ -2023,6 +2211,7 @@ export default function DocketPage() {
                 onClearAll={() => {
                   setEwbList([]);
                   setForm({ ...emptyForm, act_wt: minWeight, chrg_wt: minWeight });
+                  setFreightMinRate(0);
                   setDocketNumberInput("");
                   setEwbNoDisplay("");
                   setIsFormEditMode(false);
@@ -2030,6 +2219,7 @@ export default function DocketPage() {
                   setExtraPoInvoiceRows([]);
                   setBaseEwbNo("");
                   setPackageRows([]);
+                  chrgWtManualRef.current = false;
                   prevLocRef.current = { docket_loc: "", docket_to_loc: "" };
                   ewbPopulatedRef.current = { cnor: false, cnee: false };
                 }}
@@ -2095,8 +2285,11 @@ export default function DocketPage() {
                   <IconButton
                     onClick={() => {
                       setForm({ ...emptyForm, act_wt: minWeight, chrg_wt: minWeight });
+                      setFreightMinRate(0);
+                      setRateMode("");
                       setDocketNumberInput("");
                       setEwbNoDisplay("");
+                      chrgWtManualRef.current = false;
                       setIsFormEditMode(false);
                       setDirtyFields(new Set());
                       setDocketExists(false);
@@ -2129,37 +2322,59 @@ export default function DocketPage() {
                 padding: "1px",
                 boxShadow: "0 2px 12px rgba(126, 34, 206, 0.06)",
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
                 gap: 8,
               }}
             >
-              {formSections.map((section) => renderFormSection(section))}
+              {formSections
+                .filter((section) => !section.stackLeft && section.title !== "Remarks")
+                .map((section) => renderFormSection(section))}
+            </div>
+            <div
+              style={{
+                marginTop: 8,
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                gap: 8,
+                alignItems: "stretch",
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
+                {formSections
+                  .filter((section) => section.stackLeft)
+                  .map((section) => renderFormSection(section))}
+              </div>
+              <div style={{ minWidth: 0, height: "100%" }}>
+                <ChargesSection
+                  key="charges"
+                  ref={chargesRef}
+                  docketId={form.docket_no}
+                  invoiceValue={totalInvoiceValue}
+                  docketRate={form.rate}
+                  rateUom={form.rate_uom}
+                  chargeWeight={form.chrg_wt}
+                  totalPkgs={form.tot_pkgs}
+                  freightMinRate={freightMinRate}
+                  buttonStyle={sectionButtonStyle}
+                  sectionHeaderStyle={sectionHeaderStyle}
+                  sectionActionsStyle={sectionActionsStyle}
+                  singleClick
+                  onChargesChange={(charges) => {
+                    const total = charges.reduce((sum, c) => sum + (parseFloat(c.charge_amt) || 0), 0);
+                    const rounded = Math.round(total * 100) / 100;
+                    setForm((prev) => prev.tot_amt === rounded ? prev : { ...prev, tot_amt: rounded });
+                    setDirtyFields((prev) => new Set(prev).add("tot_amt"));
+                  }}
+                />
+              </div>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              {formSections
+                .filter((section) => section.title === "Remarks")
+                .map((section) => renderFormSection(section))}
             </div>
           </>
         )}
-
-        <div style={{ marginTop: 16 }}>
-            <ChargesSection
-              key="charges"
-              ref={chargesRef}
-              docketId={form.docket_no}
-              invoiceValue={totalInvoiceValue}
-              docketRate={form.rate}
-              rateUom={form.rate_uom}
-              chargeWeight={form.chrg_wt}
-              totalPkgs={form.tot_pkgs}
-              buttonStyle={sectionButtonStyle}
-              sectionHeaderStyle={sectionHeaderStyle}
-              sectionActionsStyle={sectionActionsStyle}
-              singleClick
-              onChargesChange={(charges) => {
-                const total = charges.reduce((sum, c) => sum + (parseFloat(c.charge_amt) || 0), 0);
-                const rounded = Math.round(total * 100) / 100;
-                setForm((prev) => prev.tot_amt === rounded ? prev : { ...prev, tot_amt: rounded });
-                setDirtyFields((prev) => new Set(prev).add("tot_amt"));
-              }}
-            />
-          </div>
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
         <LoadingOverlay isLoading={isLoading} message="Please wait..." />

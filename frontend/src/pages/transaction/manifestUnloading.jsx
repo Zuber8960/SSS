@@ -17,6 +17,7 @@ import LoadingOverlay from "../../components/common/LoadingOverlay";
 
 import { fetchManifestByNo, fetchManifestsByLocation } from "../../utils/manifest";
 import { fetchDocketByDocketNo } from "../../utils/docket";
+import { getSessionLocCode } from "../../utils/authService";
 
 // ------------------- DOCKET COLUMNS (original) -------------------
 const statusOptions = ["OK", "Short", "Excess", "Damage", "Leakage", "Missing", "Returned", "Hold"];
@@ -111,7 +112,7 @@ export default function ManifestUnloading() {
       try {
         // Get location from current_user or loc_code stored during login
         const currentUser = JSON.parse(localStorage.getItem("current_user") || "{}");
-        const locId = currentUser?.location_id || localStorage.getItem("loc_code");
+        const locId = getSessionLocCode() || currentUser?.location_id || localStorage.getItem("loc_code");
 
         if (!locId) {
           showInfo("No location found for the logged-in user. Please login again.");
@@ -268,7 +269,7 @@ export default function ManifestUnloading() {
           // Skip dockets that were already saved & unloaded so they are not
           // shown again in the grid (and cannot be re-processed).
           const source = docketData || detail;
-          if (isAlreadyUnloaded(source)) continue;
+          if (isAlreadyUnloaded(detail) || isAlreadyUnloaded(source)) continue;
 
           fetchedDockets.push(mapDocketToRow(source, fetchedDockets.length));
         }

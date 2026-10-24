@@ -52,18 +52,40 @@ const saveUnloading = async (unloadingData) => {
       }
     }
 
-    await trx('sss.sst_unloading_dtl').insert(rows);
+    const existing = await trx('sss.sst_unloading_dtl')
+      .where({ mnf_no: headerData.mnf_no })
+      .whereIn('docket_no', rows.map((r) => r.docket_no))
+      .select('docket_no');
+    const alreadySaved = new Set(existing.map((e) => e.docket_no));
+    const newRows = rows.filter((r) => !alreadySaved.has(r.docket_no));
+    if (newRows.length) {
+      await trx('sss.sst_unloading_dtl').insert(newRows);
+    }
 
     const manifestKey = {
       mnf_no: headerData.mnf_no,
       mnf_loc: headerData.mnf_loc || headerData.mnf_from_loc || ''
     };
 
+    const pending = await trx('sss.sst_mnf_dtl as d')
+      .where('d.mnf_no', headerData.mnf_no)
+      .whereNotExists(function () {
+        this.select(db.raw('1'))
+          .from('sss.sst_unloading_dtl as u')
+          .whereRaw('u.mnf_no = d.mnf_no')
+          .andWhereRaw('u.docket_no = d.dwb_no');
+      })
+      .first();
+
     if (manifestKey.mnf_no) {
+      const arrival =
+        !pending && headerData.arrival_date
+          ? `${headerData.arrival_date} ${headerData.arrival_time || '00:00'}:00`
+          : null;
       await trx('sss.sst_mnf_hdr')
         .where(manifestKey)
         .update({
-          mnf_arrival_time: `${headerData.arrival_date} ${headerData.arrival_time}:00` || null,
+          mnf_arrival_time: arrival,
           aud_date: new Date(),
         });
     }

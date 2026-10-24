@@ -100,34 +100,34 @@ const StatusBadge = ({ raw }) => {
 };
 
 const columns = [
-  { key: "docket_no", label: "LR No", minWidth: 150 },
-  { key: "docket_no_series", label: "Docket No. Series", minWidth: 140 },
-  { key: "docket_date", label: "LR Date", minWidth: 100 },
-  { key: "bp_name", label: "Customer Name", minWidth: 240 },
-  { key: "bp_gstin", label: "Customer GSTIN", minWidth: 150 },
-  { key: "bp_address", label: "Address", minWidth: 260 },
-  { key: "docket_inv_no", label: "Invoice No", minWidth: 150 },
-  { key: "from_place", label: "From", minWidth: 130 },
-  { key: "to_place", label: "To", minWidth: 140 },
-  { key: "from_town", label: "From Town", minWidth: 130 },
-  { key: "to_town", label: "To Town", minWidth: 140 },
-  { key: "docket_tot_pkgs", label: "Pkt", minWidth: 70 },
-  { key: "docket_chrg_wt", label: "Charge Wt", minWidth: 100 },
-  { key: "docket_act_wt", label: "Actual Wt", minWidth: 100 },
-  { key: "docket_rate", label: "Rate", minWidth: 80 },
-  { key: "docket_rate_uom", label: "UOM", minWidth: 80 },
-  { key: "docket_tot_amt", label: "Amount", minWidth: 110 },
-  { key: "docket_load_type", label: "Load Type", minWidth: 100 },
-  { key: "docket_transit_type", label: "Transit Type", minWidth: 110 },
-  { key: "docket_pay_type", label: "Pay Type", minWidth: 100 },
-  { key: "delivery_status", label: "Delivery Status", minWidth: 130, render: (r) => <StatusBadge raw={r.delivery_status} /> },
-  { key: "actual_delivery_date", label: "Actual Delivery", minWidth: 120 },
-  { key: "delivery_update_date", label: "Delivery Update", minWidth: 130 },
-  { key: "delay_days", label: "Delay (Days)", minWidth: 100 },
-  { key: "ewb_no", label: "EWB No", minWidth: 200 },
-  { key: "ewb_date_expiry", label: "EWB Date Ex.", minWidth: 120 },
-  { key: "delivery_remarks", label: "Delivery Remarks", minWidth: 160 },
-  { key: "docket_remark", label: "Remark", minWidth: 150 },
+  { key: "sr_no", label: "SR.NO.", minWidth: 60 },
+  { key: "docket_no", label: "MANUL LR", minWidth: 140 },
+  { key: "bill_no", label: "BILL NO", minWidth: 100 },
+  { key: "docket_date", label: "LR DATE", minWidth: 100 },
+  { key: "from_town", label: "FROM", minWidth: 120 },
+  { key: "to_town", label: "TO", minWidth: 120 },
+  { key: "pin_code", label: "PIN CODE", minWidth: 90 },
+  { key: "docket_inv_no", label: "INVOICE NO/DATE", minWidth: 200 },
+  { key: "party_name", label: "PARTY NAME", minWidth: 220 },
+  { key: "docket_tot_pkgs", label: "PKT", minWidth: 60 },
+  { key: "docket_chrg_wt", label: "SHIPMENT WEIGHT KG/MT", minWidth: 150 },
+  { key: "docket_rate", label: "RATE", minWidth: 70 },
+  { key: "docket_tot_amt", label: "CHARGE", minWidth: 90 },
+  { key: "docket_load_type", label: "VEH LOAD TYPE", minWidth: 110 },
+  { key: "handling_charge", label: "HANDLING CHARGE", minWidth: 120 },
+  { key: "factory_charge", label: "FACTORY CHARGE", minWidth: 110 },
+  { key: "estimate_delivery_date", label: "ESTIMATE SHIPMENT DELIVERY DATE", minWidth: 180 },
+  { key: "region", label: "REGION", minWidth: 90 },
+  { key: "actual_delivery_date", label: "ACTUAL DELIVERY DATE", minWidth: 140 },
+  { key: "delivery_status", label: "SHIPMENT STATUS", minWidth: 130, render: (r) => <StatusBadge raw={r.delivery_status} /> },
+  { key: "ewb_no", label: "EWB NO/EXP DATE", minWidth: 220 },
+  { key: "delivery_tat_days", label: "DELIVERY TAT DAY", minWidth: 120 },
+  { key: "delay_responsible", label: "DELAY FOR RESPONSIBLE", minWidth: 160 },
+  { key: "docket_remark", label: "REMARK", minWidth: 140 },
+  { key: "bill_no_end", label: "BILL NO", minWidth: 100 },
+  { key: "bill_date", label: "DATE", minWidth: 100 },
+  { key: "veh_no", label: "VEHICLE NO", minWidth: 110 },
+  { key: "date2", label: "DATE2", minWidth: 100 },
 ];
 
 export default function CustomerMIS() {
@@ -148,8 +148,8 @@ export default function CustomerMIS() {
   const [searchText, setSearchText] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [customer, setCustomer] = useState(null); // { bp_id, bp_name, bp_gstin } | null
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(() => moment().startOf("month").format("YYYY-MM-DD"));
+  const [dateTo, setDateTo] = useState(() => moment().endOf("month").format("YYYY-MM-DD"));
   const [status, setStatus] = useState(null);
 
   const [filterAnchor, setFilterAnchor] = useState(null);
@@ -189,8 +189,8 @@ export default function CustomerMIS() {
         setSummary(totals);
       } catch (err) {
         if (cancelled) return;
-        showError(err.message || "Failed to load Customer MIS data");
-        console.error("Customer MIS load error:", err);
+        showError(err.message || "Failed to load Toyota MIS data");
+        console.error("Toyota MIS load error:", err);
       } finally {
         if (!cancelled) hideLoading();
       }
@@ -216,8 +216,11 @@ export default function CustomerMIS() {
         ...r,
         docket_date: fmtDate(r.docket_date),
         actual_delivery_date: fmtDate(r.actual_delivery_date),
+        estimate_delivery_date: fmtDate(r.estimate_delivery_date),
         delivery_update_date: fmtDate(r.delivery_update_date),
-        ewb_date_expiry: fmtDate(r.ewb_date_expiry),
+        bill_date: fmtDate(r.bill_date),
+        bill_no_end: r.bill_no || "",
+        date2: "",
       })),
     [allRows]
   );
@@ -231,8 +234,10 @@ export default function CustomerMIS() {
   // Status badge labels are derived client-side, so the label filter is applied
   // here rather than in SQL.
   const gridRows = useMemo(() => {
-    if (!activeFilters.status || !status) return mappedRows;
-    return mappedRows.filter((r) => statusStyle(r.delivery_status).label === status);
+    const src = !activeFilters.status || !status
+      ? mappedRows
+      : mappedRows.filter((r) => statusStyle(r.delivery_status).label === status);
+    return src.map((r, i) => ({ ...r, sr_no: i + 1 }));
   }, [mappedRows, status, activeFilters.status]);
 
   // Delivered count follows the (client-side) status filter.
@@ -250,8 +255,8 @@ export default function CustomerMIS() {
   const handleClearFilters = () => {
     setSearchText("");
     setCustomer(null);
-    setDateFrom("");
-    setDateTo("");
+    setDateFrom(moment().startOf("month").format("YYYY-MM-DD"));
+    setDateTo(moment().endOf("month").format("YYYY-MM-DD"));
     setStatus(null);
   };
 
@@ -265,7 +270,7 @@ export default function CustomerMIS() {
       setAllRows(Array.isArray(rows) ? rows : []);
       setSummary(totals);
     } catch (err) {
-      showError(err.message || "Failed to refresh Customer MIS data");
+      showError(err.message || "Failed to refresh Toyota MIS data");
     } finally {
       hideLoading();
     }
@@ -289,7 +294,7 @@ export default function CustomerMIS() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `customer_mis_${moment().format("YYYYMMDD_HHmmss")}.csv`;
+    a.download = `TOYOTA_MIS_${moment().format("YYYYMMDD_HHmmss")}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -307,7 +312,7 @@ export default function CustomerMIS() {
 
   return (
     <MainLayout>
-      <PageBody title="Customer MIS">
+      <PageBody title="Toyota MIS">
         {/* ── Toolbar ── */}
         <div className="pageToolbar" style={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", width: "100%" }}>
@@ -583,7 +588,7 @@ export default function CustomerMIS() {
         </div>
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
-        <LoadingOverlay isLoading={isLoading} message="Loading Customer MIS data..." />
+        <LoadingOverlay isLoading={isLoading} message="Loading Toyota MIS data..." />
       </PageBody>
     </MainLayout>
   );

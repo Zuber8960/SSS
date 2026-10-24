@@ -198,7 +198,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/reports/manifest-report", label: "Manifest Report", icon: <UnarchiveIcon /> },
         { path: "/reports/hire-voucher-report", label: "Hire Voucher Report", icon: <ReceiptLongIcon /> },
         { path: "/reports/invoice-report", label: "Invoice Report", icon: <RequestQuoteIcon /> },
-        { path: "/reports/customer-mis", label: "Customer MIS", icon: <QueryStatsIcon /> },
+        { path: "/reports/customer-mis", label: "Toyota MIS", icon: <QueryStatsIcon /> },
       ],
     },
   ];
