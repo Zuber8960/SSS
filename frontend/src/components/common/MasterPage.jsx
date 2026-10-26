@@ -362,6 +362,7 @@ export function DataTable({
   onCellEditStop,
   checkboxSelection = false,
   disableMultipleRowSelection = false,
+  isRowSelectable,
   onRowSelectionModelChange,
   rowSelectionModel,
   autoHeight = false,
@@ -377,6 +378,8 @@ export function DataTable({
   statusKey = "status",
   rowColors = {},
   onFilteredRowsChange,
+  footer,
+  selectedRowColor,
 }) {
   const apiRef = useGridApiRef();
   // Normalise the controlled selection prop to the v9 model shape. Memoised so the
@@ -457,11 +460,6 @@ export function DataTable({
     });
   });
 
-  const [paginationModel, setPaginationModel] = useState({
-    page: 0,
-    pageSize: 5,
-  });
-
   const ROW_HEIGHT = rowHeightProp ?? (dense ? 40 : 55);
   const HEADER_HEIGHT = headerHeightProp ?? (dense ? 36 : 42);
   const maxRows = scroll?.afterRows ?? null;
@@ -470,12 +468,13 @@ export function DataTable({
   const resolvedHeight = useScrollHeight
     ? maxRows * ROW_HEIGHT + HEADER_HEIGHT + 2
     : isHeight;
-
-  const lastPage = Math.max(Math.ceil(rows.length / paginationModel.pageSize) - 1, 0);
-  const effectivePaginationModel = {
-    ...paginationModel,
-    page: paginationModel.page > lastPage ? lastPage : paginationModel.page,
+  // Community DataGrid always paginates. hideFooter does not turn that off, so
+  // pageSize must cover every row or later invoices (5, 6, 7, …) never render.
+  const paginationModel = {
+    page: 0,
+    pageSize: Math.max(rows.length, 1),
   };
+  const disableVirtual = resolvedAutoHeight || rows.length <= 50;
 
   const orderedColumns = useMemo(() => {
     const colMap = Object.fromEntries(columns.map((c) => [c.key, c]));
@@ -539,13 +538,16 @@ export function DataTable({
     ...orderedColumns.map((col) => ({
       field: col.key,
       headerName: col.label,
-      ...(scroll?.horizontal ? { width: col.minWidth ?? 120 } : { flex: 1, minWidth: col.minWidth ?? 100 }),
+      ...(scroll?.horizontal
+        ? { width: col.minWidth ?? 120 }
+        : { flex: col.flex ?? 1, minWidth: col.minWidth ?? 100 }),
       sortable: true,
       sortComparator: (v1, v2, c1, c2) => {
         const r1 = c1.api.getRow(c1.id);
         const r2 = c2.api.getRow(c2.id);
         if (isTotalRow(r1)) return 1;
         if (isTotalRow(r2)) return -1;
+        if (typeof col.sortComparator === "function") return col.sortComparator(v1, v2, c1, c2);
         const a = v1 == null ? "" : v1;
         const b = v2 == null ? "" : v2;
         if (a < b) return -1;
@@ -562,8 +564,8 @@ export function DataTable({
       editable: col.editable ?? editable,
       type: col.options ? "singleSelect" : col.type,
       valueOptions: col.options,
-      headerAlign: "center",
-      align: "center",
+      headerAlign: col.headerAlign || col.align || "center",
+      align: col.align || "center",
 
       renderCell: (params) => {
         const value = col.render ? col.render(params.row) : params.value;
@@ -606,14 +608,17 @@ export function DataTable({
   // given it is spliced in at that index instead (clamped to the column range).
   const addActionsColumn = (cols) => {
     if (!actions?.length) return cols;
+    const actionsColWidth = Math.max(48, 20 + actions.length * 36);
     const actionsColumn = {
       field: "actions",
-      headerName: "Actions",
+      headerName: "Act.",
       headerAlign: "center",
       align: "center",
       sortable: false,
-      flex: 1,
-      minWidth: 170,
+      width: actionsColWidth,
+      minWidth: actionsColWidth,
+      maxWidth: actionsColWidth,
+      flex: 0,
       color: "primary",
       renderCell: (params) => (
         <Box style={{
@@ -692,11 +697,32 @@ export function DataTable({
     borderRadius: "16px",
     background: "linear-gradient(180deg, #ffffff 0%, #fcfbff 100%)",
     boxShadow: "none",
+    "--DataGrid-headerHeight": `${HEADER_HEIGHT}px`,
+    "--DataGrid-headersTotalHeight": `${HEADER_HEIGHT}px`,
+    "--DataGrid-topContainerHeight": `${HEADER_HEIGHT}px`,
     "& .MuiDataGrid-main": {
       background: "transparent",
     },
+    ...(disableVirtual
+      ? {
+          "& .MuiDataGrid-container--top, & .MuiDataGrid-topContainer": {
+            position: "sticky",
+            top: 0,
+            zIndex: 40,
+            flex: `0 0 ${HEADER_HEIGHT}px`,
+            height: HEADER_HEIGHT,
+            minHeight: HEADER_HEIGHT,
+          },
+          "& .MuiDataGrid-virtualScrollerRenderZone": {
+            position: "relative !important",
+            top: "0 !important",
+            transform: "none !important",
+          },
+        }
+      : {}),
     ...(resolvedAutoHeight ? {} : { height: resolvedHeight ?? 320 }),
-    width: "100%",
+    width: scroll?.horizontal ? "max-content" : "100%",
+    minWidth: scroll?.horizontal ? undefined : "100%",
     "& .MuiDataGrid-columnHeaders": {
       background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
       borderBottom: "none",
@@ -752,6 +778,22 @@ export function DataTable({
     "& .MuiDataGrid-row:nth-of-type(even)": {
       backgroundColor: "#fcfbff",
     },
+    ...(selectedRowColor
+      ? {
+          "& .MuiDataGrid-row.Mui-selected": {
+            backgroundColor: `${selectedRowColor} !important`,
+          },
+          "& .MuiDataGrid-row.Mui-selected:nth-of-type(even)": {
+            backgroundColor: `${selectedRowColor} !important`,
+          },
+          "& .MuiDataGrid-row.Mui-selected:hover": {
+            backgroundColor: "#c8f0d4 !important",
+          },
+          "& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell": {
+            backgroundColor: "transparent !important",
+          },
+        }
+      : {}),
     "& .MuiDataGrid-footerContainer": {
       borderTop: "1px solid #f3e8ff",
       background: "#faf7ff",
@@ -769,7 +811,7 @@ export function DataTable({
   };
 
   const totalMinWidth = columns.reduce((sum, col) => sum + (col.minWidth ?? 120), 0)
-    + (actions?.length ? 170 : 0)
+    + (actions?.length ? Math.max(48, 20 + actions.length * 36) : 0)
     + (checkboxSelection ? 50 : 0);
 
   return (
@@ -792,10 +834,13 @@ export function DataTable({
         disableColumnMenu={false}
         density="compact"
         rowHeight={ROW_HEIGHT}
-        headerHeight={HEADER_HEIGHT}
+        columnHeaderHeight={HEADER_HEIGHT}
         autoHeight={resolvedAutoHeight}
         hideFooter
-        disableVirtualization={resolvedAutoHeight}
+        pagination
+        paginationModel={paginationModel}
+        pageSizeOptions={[paginationModel.pageSize]}
+        disableVirtualization={disableVirtual}
         rowSelection={true}
         getRowClassName={getRowClassName}
         onFilterModelChange={() => setTimeout(emitFilteredRows, 0)}
@@ -809,6 +854,7 @@ export function DataTable({
         } : {})}
         {...(checkboxSelection ? { checkboxSelection: true } : {})}
         {...(disableMultipleRowSelection ? { disableMultipleRowSelection: true } : {})}
+        {...(isRowSelectable ? { isRowSelectable } : {})}
         {...(onRowSelectionModelChange ? { onRowSelectionModelChange } : {})}
         {...(rowSelectionModel !== undefined ? { rowSelectionModel: controlledSelectionModel } : {})}
         {...(onCellEditStop || (editable && onCellChange) ? {
@@ -856,8 +902,8 @@ export function DataTable({
 
         sx={tableSx}
       />
+      {footer}
       </div>
-    // </div>
   );
 }
 

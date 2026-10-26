@@ -29,7 +29,11 @@ module.exports = {
   async getAllDeliveryNotes(filters = {}) {
     const query = db('sss.sst_dly_note').select('*');
 
-    if (filters.company_code) query.where({ company_code: filters.company_code });
+    if (filters.company_code) {
+      query.where((q) =>
+        q.where({ company_code: filters.company_code }).orWhereNull('company_code')
+      );
+    }
     if (filters.division_code) query.andWhere({ division_code: filters.division_code });
     if (filters.dly_note_no) query.andWhere({ dly_note_no: filters.dly_note_no });
     if (filters.docket_no) query.andWhere({ docket_no: filters.docket_no });

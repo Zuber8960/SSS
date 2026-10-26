@@ -255,6 +255,24 @@ router.post('/bp/find-or-create', async (req, res) => {
 
 /* ================= LIST ================= */
 
+router.get('/for-billing', async (req, res) => {
+  try {
+    const { tenant_id } = req;
+    const data = await DocketController.getDocketsForBilling({
+      tenant_id,
+      loc_code: req.query.loc_code || req.loc_code || null,
+      customer_ids: req.query.customer_ids || "",
+      customer_name: req.query.customer_name || "",
+      billed_mode: req.query.billed_mode || "unbilled",
+      from_date: req.query.from_date || null,
+      to_date: req.query.to_date || null,
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.get('/', async (req, res) => {
   try {
     const { tenant_id } = req;

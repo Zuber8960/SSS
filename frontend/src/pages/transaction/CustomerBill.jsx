@@ -1,47 +1,67 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
 import { FormField, PageBody, DataTable } from "../../components/common/MasterPage";
 import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
-import { SaveIcon, PrintIcon, AddIcon, DeleteIcon } from "../../components/common/icons";
+import { SaveIcon, PrintIcon, AddIcon, DeleteIcon, EditIcon } from "../../components/common/icons";
 import { fetchAllBusinessPartners } from "../../utils/businessPartner";
-import { fetchAllDockets, fetchCharges, fetchChargesBulk, fetchChargeMaster, fetchDocketByDocketNo } from "../../utils/docket";
+import { fetchDocketsForBilling, fetchCharges, fetchChargesBulk, fetchChargeMaster, fetchDocketByDocketNo } from "../../utils/docket";
 import { fetchDeliveryNotes, fetchDeliveryNoteByDocketNo } from "../../utils/deliveryNote";
 import { fetchAllLocations } from "../../utils/locationMaster";
-import { saveInvoice, updateInvoice, deleteInvoice, fetchBilledDocketNos } from "../../utils/customerBill";
+import { saveInvoice, updateInvoice, deleteInvoice, fetchBilledDocketNos, fetchInvoiceByKeys, fetchInvoiceByNumber } from "../../utils/customerBill";
 import { fetchAllCompanies } from "../../utils/companyMaster";
+import { getSessionLocCode } from "../../utils/authService";
 import { printInvoice } from "../../components/common/InvoicePrint";
-import { Autocomplete, Button, Chip, IconButton, TextField, Tooltip } from "@mui/material";
+import { Autocomplete, Button, Chip, FormControl, IconButton, InputLabel, MenuItem, Select, TextField, Tooltip } from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
 import moment from "moment";
 import { getDateFormat } from "../../utils/tenantService";
+import { DEFAULT_SAC_CODE, LOGISTICS_SAC_CODES, formatSac, sacLabel } from "../../utils/sacCodes";
+
+const docketNumericIndex = (no) => {
+  const digits = String(no || "").replace(/\D/g, "");
+  if (!digits) return 0;
+  return parseInt(digits.slice(-6), 10) || 0;
+};
 
 const billingColumns = [
-  { key: "docket_no", label: "Docket", minWidth: 100 },
-  { key: "docket_date", label: "Date", minWidth: 70 },
-  { key: "origin", label: "Origin", minWidth: 110 },
-  { key: "destination", label: "Dest", minWidth: 110 },
-  { key: "consignee", label: "Consignee", minWidth: 150 },
-  { key: "actual_wt", label: "Act Wt", minWidth: 60 },
-  { key: "charge_wt", label: "Chg Wt", minWidth: 60 },
-  { key: "freight", label: "Freight", minWidth: 64 },
-  { key: "loading", label: "Handling", minWidth: 68 },
-  { key: "unloading", label: "Fuel Surcharge", minWidth: 88 },
-  { key: "detention", label: "Factory Charge", minWidth: 88 },
-  { key: "add_toll", label: "ODA Charge", minWidth: 78 },
-  { key: "green_tax", label: "FOV", minWidth: 52 },
-  { key: "other_charges", label: "Stationery", minWidth: 76 },
-  { key: "taxable", label: "Taxable", minWidth: 62 },
-  { key: "cgst", label: "CGST", minWidth: 50 },
-  { key: "sgst", label: "SGST", minWidth: 50 },
-  { key: "igst", label: "IGST", minWidth: 50 },
-  { key: "amount", label: "Amount", minWidth: 66 },
+  {
+    key: "docket_no",
+    label: "Docket",
+    minWidth: 118,
+    flex: 1.35,
+    align: "left",
+    sortComparator: (a, b) => {
+      const diff = docketNumericIndex(a) - docketNumericIndex(b);
+      if (diff !== 0) return diff;
+      return String(a || "").localeCompare(String(b || ""), undefined, { numeric: true, sensitivity: "base" });
+    },
+  },
+  { key: "docket_date", label: "Date", minWidth: 62 },
+  { key: "origin", label: "Origin", minWidth: 120, flex: 1.4, align: "left" },
+  { key: "destination", label: "Dest", minWidth: 120, flex: 1.4, align: "left" },
+  { key: "consignee", label: "Cnee.", minWidth: 200, flex: 2.1, align: "left" },
+  { key: "actual_wt", label: "Act\nWt", minWidth: 36, flex: 0.45 },
+  { key: "charge_wt", label: "Chg\nWt", minWidth: 36, flex: 0.45 },
+  { key: "freight", label: "Frt.", minWidth: 96 },
+  { key: "loading", label: "Hand.", minWidth: 68, flex: 0.5 },
+  { key: "unloading", label: "Fuel\nChrg", minWidth: 72, flex: 0.5 },
+  { key: "detention", label: "Fact.\nChrg", minWidth: 74 },
+  { key: "add_toll", label: "ODA\nChrg", minWidth: 66, flex: 0.5 },
+  { key: "green_tax", label: "FOV", minWidth: 58, flex: 0.4 },
+  { key: "other_charges", label: "Stnry.", minWidth: 74 },
+  { key: "taxable", label: "Taxable", minWidth: 100 },
+  { key: "cgst", label: "CGST", minWidth: 60, flex: 0.4 },
+  { key: "sgst", label: "SGST", minWidth: 60, flex: 0.4 },
+  { key: "igst", label: "IGST", minWidth: 60, flex: 0.4 },
+  { key: "amount", label: "Amt.", minWidth: 84 },
   {
     key: "pod",
     label: "POD",
-    minWidth: 56,
+    minWidth: 40,
     render: (row) => (
       <span style={{ ...statusBadgeStyle, ...(row.pod === "YES" ? yesBadge : noBadge) }}>
         {row.pod}
@@ -50,22 +70,129 @@ const billingColumns = [
   },
 ];
 
-const invoiceFields = [
-  { label: "Invoice No", name: "invoice_no", disabled: true },
-  { label: "Invoice Date", name: "invoice_date", type: "date" },
-  { label: "Billing Type", name: "billing_type", type: "select", options: ["Regular", "Debit Note"], required: true },
-  { label: "Billing Branch", name: "billing_branch", type: "select", options: ["Select Branch"], required: true },
-  { label: "Customer", name: "customer", type: "select", options: ["Select Customer"] },
+const BILL_AMOUNT_COL_KEYS = [
+  "freight", "loading", "unloading", "detention", "add_toll", "green_tax",
+  "other_charges", "taxable", "cgst", "sgst", "igst", "amount",
 ];
+
+function BillGridTotalRow({ totals }) {
+  const rowRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const sync = () => {
+      const headers = document.querySelectorAll(".customer-bill-page .MuiDataGrid-columnHeader[data-field]");
+      const cells = rowRef.current?.children;
+      if (!headers.length || !cells?.length) return;
+      const count = Math.min(headers.length, cells.length);
+      for (let i = 0; i < count; i++) {
+        const w = Math.round(headers[i].getBoundingClientRect().width);
+        cells[i].style.boxSizing = "border-box";
+        cells[i].style.width = `${w}px`;
+        cells[i].style.minWidth = `${w}px`;
+        cells[i].style.maxWidth = `${w}px`;
+        cells[i].style.flex = `0 0 ${w}px`;
+      }
+    };
+    sync();
+    const timer = window.setTimeout(sync, 50);
+    const grid = document.querySelector(".customer-bill-page .MuiDataGrid-root");
+    const ro = grid ? new ResizeObserver(sync) : null;
+    if (grid && ro) ro.observe(grid);
+    window.addEventListener("resize", sync);
+    return () => {
+      window.clearTimeout(timer);
+      ro?.disconnect();
+      window.removeEventListener("resize", sync);
+    };
+  }, [totals]);
+
+  const fields = ["__check__", ...billingColumns.map((c) => c.key)];
+  return (
+    <div ref={rowRef} style={totalRowStyle}>
+      {fields.map((key) => (
+        <div
+          key={key}
+          style={{
+            ...totalCellStyle,
+            justifyContent: key === "docket_no" ? "flex-start" : "center",
+            paddingLeft: key === "docket_no" ? 8 : 4,
+          }}
+        >
+          {key === "docket_no"
+            ? "TOTAL"
+            : BILL_AMOUNT_COL_KEYS.includes(key)
+              ? Number(totals[key] || 0).toFixed(2)
+              : ""}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const invoiceFields = [
+  { label: "Invoice No", name: "invoice_no", disabled: true, width: 108 },
+  { label: "Invoice Date", name: "invoice_date", type: "date", width: 128 },
+  { label: "Billing Type", name: "billing_type", type: "select", options: ["Regular", "Debit Note"], required: true, width: 124 },
+  { label: "Billing Branch", name: "billing_branch", type: "select", options: ["Select Branch"], required: true, disabled: true, width: 168 },
+  { label: "From Date", name: "from_date", type: "date", required: true, width: 128 },
+  { label: "To Date", name: "to_date", type: "date", required: true, width: 128 },
+  { label: "Customer", name: "customer", type: "select", options: ["Select Customer"], width: 220 },
+];
+
+const sessionBranchLabel = (locations = []) => {
+  const loc = String(getSessionLocCode() || "").trim();
+  if (!loc) return "Select Branch";
+  const locRow = (locations || []).find(
+    (l) => String(l.loc_code || "").trim().toUpperCase() === loc.toUpperCase()
+  );
+  return locRow?.loc_name ? `${loc} - ${locRow.loc_name}` : loc;
+};
+
+const isoDateOnly = (val) => {
+  if (!val) return "";
+  const m = moment(val);
+  return m.isValid() ? m.format("YYYY-MM-DD") : "";
+};
+
+const capBillDateRange = (formValues) => {
+  const invoiceDate = isoDateOnly(formValues.invoice_date);
+  let fromDate = isoDateOnly(formValues.from_date);
+  let toDate = isoDateOnly(formValues.to_date);
+  if (invoiceDate && toDate && toDate > invoiceDate) toDate = invoiceDate;
+  if (fromDate && toDate && fromDate > toDate) fromDate = toDate;
+  return {
+    ...formValues,
+    invoice_date: invoiceDate || formValues.invoice_date || "",
+    from_date: fromDate || formValues.from_date || "",
+    to_date: toDate || formValues.to_date || "",
+  };
+};
+
+const defaultBillDates = () => {
+  const today = moment().format("YYYY-MM-DD");
+  return capBillDateRange({
+    invoice_date: today,
+    from_date: moment().startOf("month").format("YYYY-MM-DD"),
+    to_date: today,
+  });
+};
 
 const emptyForm = {
   customer: "",
   invoice_no: "AUTO",
-  invoice_date: "",
-  billing_branch: "Select Branch",
+  invoice_date: moment().format("YYYY-MM-DD"),
+  billing_branch: sessionBranchLabel(),
   billing_type: "Regular",
+  sac_code: DEFAULT_SAC_CODE,
   invoice_remarks: "",
+  ...defaultBillDates(),
 };
+
+const blankBillForm = (locations = []) => ({
+  ...emptyForm,
+  billing_branch: sessionBranchLabel(locations),
+  ...defaultBillDates(),
+});
 
 const customerFieldSx = {
   "& .MuiInputBase-input": { fontSize: 11, fontWeight: 700 },
@@ -85,11 +212,109 @@ const billPageFontCss = `
   font-size: 11px !important;
   font-weight: 700 !important;
 }
+.customer-bill-page .MuiDataGrid-cell[data-field="freight"],
+.customer-bill-page .MuiDataGrid-cell[data-field="loading"],
+.customer-bill-page .MuiDataGrid-cell[data-field="unloading"],
+.customer-bill-page .MuiDataGrid-cell[data-field="detention"],
+.customer-bill-page .MuiDataGrid-cell[data-field="add_toll"],
+.customer-bill-page .MuiDataGrid-cell[data-field="green_tax"],
+.customer-bill-page .MuiDataGrid-cell[data-field="other_charges"],
+.customer-bill-page .MuiDataGrid-cell[data-field="taxable"],
+.customer-bill-page .MuiDataGrid-cell[data-field="cgst"],
+.customer-bill-page .MuiDataGrid-cell[data-field="sgst"],
+.customer-bill-page .MuiDataGrid-cell[data-field="igst"],
+.customer-bill-page .MuiDataGrid-cell[data-field="amount"],
+.customer-bill-page .MuiDataGrid-cell[data-field="freight"] *,
+.customer-bill-page .MuiDataGrid-cell[data-field="loading"] *,
+.customer-bill-page .MuiDataGrid-cell[data-field="unloading"] *,
+.customer-bill-page .MuiDataGrid-cell[data-field="detention"] *,
+.customer-bill-page .MuiDataGrid-cell[data-field="add_toll"] *,
+.customer-bill-page .MuiDataGrid-cell[data-field="green_tax"] *,
+.customer-bill-page .MuiDataGrid-cell[data-field="other_charges"] *,
+.customer-bill-page .MuiDataGrid-cell[data-field="taxable"] *,
+.customer-bill-page .MuiDataGrid-cell[data-field="cgst"] *,
+.customer-bill-page .MuiDataGrid-cell[data-field="sgst"] *,
+.customer-bill-page .MuiDataGrid-cell[data-field="igst"] *,
+.customer-bill-page .MuiDataGrid-cell[data-field="amount"] * {
+  font-size: 13px !important;
+}
 .customer-bill-page .MuiDataGrid-cell {
-  padding: 2px 4px !important;
+  padding: 0 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 26px !important;
+}
+.customer-bill-page .MuiDataGrid-cell > span,
+.customer-bill-page .MuiDataGrid-cellContent {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100%;
+  height: 100%;
+  line-height: 1.15 !important;
+}
+.customer-bill-page .MuiDataGrid-cell--textLeft,
+.customer-bill-page .MuiDataGrid-cell--textLeft > span,
+.customer-bill-page .MuiDataGrid-cell--textLeft .MuiDataGrid-cellContent {
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+.customer-bill-page .MuiDataGrid-columnHeader--alignLeft .MuiDataGrid-columnHeaderTitle {
+  text-align: left !important;
+}
+.customer-bill-page .MuiDataGrid-row {
+  min-height: 26px !important;
+  max-height: 26px !important;
+}
+.customer-bill-page .MuiDataGrid-row.Mui-selected,
+.customer-bill-page .MuiDataGrid-row.Mui-selected:nth-of-type(even) {
+  background-color: #dcfce7 !important;
+}
+.customer-bill-page .MuiDataGrid-row.Mui-selected:hover {
+  background-color: #bbf7d0 !important;
 }
 .customer-bill-page .MuiDataGrid-columnHeader {
   padding: 0 4px !important;
+  height: 42px !important;
+}
+.customer-bill-page .MuiDataGrid-columnHeaders,
+.customer-bill-page .MuiDataGrid-columnHeaderRow {
+  min-height: 42px !important;
+  max-height: 42px !important;
+}
+.customer-bill-page .MuiDataGrid-container--top,
+.customer-bill-page .MuiDataGrid-topContainer {
+  height: 42px !important;
+  min-height: 42px !important;
+  flex: 0 0 42px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+.customer-bill-page .MuiDataGrid-virtualScrollerRenderZone {
+  position: relative !important;
+  top: 0 !important;
+  transform: none !important;
+}
+.customer-bill-page .MuiDataGrid-columnHeaderTitleContainer,
+.customer-bill-page .MuiDataGrid-columnHeaderTitleContainerContent {
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+}
+.customer-bill-page .MuiDataGrid-columnHeaderTitle {
+  white-space: pre-line !important;
+  line-height: 1.15 !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  text-align: center !important;
+  text-transform: uppercase;
+}
+.customer-bill-page .MuiDataGrid-cellEmpty {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
 }
 `;
 
@@ -121,6 +346,26 @@ const toDate = (val) => {
 
 const locCodeOf = (val) => String(val || "").split(" - ")[0].split(">")[0].trim().toUpperCase();
 
+const docketMatchesSessionLoc = (d, sessionLoc) => {
+  const session = locCodeOf(sessionLoc);
+  if (!session) return true;
+  const pay = locCodeOf(d.docket_pay_loc || d.pay_loc);
+  const booked = locCodeOf(d.docket_loc || d.booking_branch);
+  return pay === session || booked === session;
+};
+
+const sortDocketsByNo = (rows) =>
+  [...(rows || [])].sort((a, b) => {
+    const an = String(a?.docket_no || "").trim();
+    const bn = String(b?.docket_no || "").trim();
+    if (!an && !bn) return 0;
+    if (!an) return 1;
+    if (!bn) return -1;
+    const diff = docketNumericIndex(an) - docketNumericIndex(bn);
+    if (diff !== 0) return diff;
+    return an.localeCompare(bn, undefined, { numeric: true, sensitivity: "base" });
+  });
+
 const locTownLabel = (loc, town) => {
   const l = String(loc || "").trim();
   const t = String(town || "").trim();
@@ -128,12 +373,61 @@ const locTownLabel = (loc, town) => {
   return l || t || "";
 };
 
-const isDeliveredStatus = (status) => String(status || "").trim().toLowerCase() === "delivered";
+const isDeliveredStatus = (status) => {
+  const s = String(status || "").trim().toLowerCase();
+  if (!s || /(un|not |pending|cancel)/.test(s)) return false;
+  return /deliver|dly|closed|complete|^y$|^yes$/.test(s);
+};
+
+const invoiceDetailToRow = (d, locCode) => {
+  const handling = d.handling ?? d.loading;
+  const fuel = d.fuel_surcharge ?? d.unloading;
+  const factory = d.factory_charge ?? d.detention;
+  const oda = d.oda_charge ?? d.additional_toll;
+  const fov = d.fov ?? d.green_tax;
+  const stationery = d.stationery ?? d.other_charges;
+  return {
+    id: String(d.docket_no || "").trim(),
+    docket_no: d.docket_no || "",
+    docket_date: toDate(d.docket_date),
+    origin: locTownLabel(d.docket_from_loc, d.docket_from_town),
+    destination: locTownLabel(d.docket_to_loc, d.docket_to_town),
+    consignee: d.consignee || "",
+    booking_branch: d.docket_from_loc || "",
+    delivery_branch: d.docket_to_loc || "",
+    pay_type: "",
+    pay_loc: locCode || "",
+    packages: "",
+    actual_wt: d.docket_actwt ?? "",
+    charge_wt: d.docket_chrwt ?? "",
+    freight: (parseFloat(d.freight) || 0).toFixed(2),
+    loading: (parseFloat(handling) || 0).toFixed(2),
+    unloading: (parseFloat(fuel) || 0).toFixed(2),
+    detention: (parseFloat(factory) || 0).toFixed(2),
+    add_toll: (parseFloat(oda) || 0).toFixed(2),
+    green_tax: (parseFloat(fov) || 0).toFixed(2),
+    other_charges: (parseFloat(stationery) || 0).toFixed(2),
+    discount: "0.00",
+    taxable: (parseFloat(d.taxable_amt) || 0).toFixed(2),
+    cgst: (parseFloat(d.cgst) || 0).toFixed(2),
+    sgst: (parseFloat(d.sgst) || 0).toFixed(2),
+    igst: (parseFloat(d.igst) || 0).toFixed(2),
+    amount: (parseFloat(d.total_amt) || 0).toFixed(2),
+    pod: d.pod_flag === "Y" || d.pod_flag === "YES" ? "YES" : "NO",
+    delivery_status: d.delivery_status || "Delivered",
+    invoice_status: "Billed",
+    _chargesLoaded: true,
+    _fromInvoice: true,
+    _edited: { loading: true, unloading: true, detention: true, add_toll: true, green_tax: true, other_charges: true },
+  };
+};
 
 export default function CustomerBill() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { dialog, closeAlert, showError, showSuccess } = useAlert();
   const { isLoading, showLoading, hideLoading } = useLoading();
-  const [form, setForm] = useState({ ...emptyForm });
+  const [form, setForm] = useState(() => blankBillForm());
   const [partners, setPartners] = useState([]);
   const [billingRows, setBillingRows] = useState([]);
   const [chargeMaster, setChargeMaster] = useState([]);
@@ -145,8 +439,12 @@ export default function CustomerBill() {
   const [loadingDockets, setLoadingDockets] = useState(false);
   const [docketsLoaded, setDocketsLoaded] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null); // { invoice_no, invoice_date, loc_code }
+  const [isViewOnly, setIsViewOnly] = useState(false);
+  const [editNoMode, setEditNoMode] = useState(false);
   // Guards against a stale customer/branch fetch resolving after a newer one
   const docketLoadToken = useRef(0);
+  const editOverlayRef = useRef(null);
+  const editLoadedKey = useRef("");
 
   useEffect(() => {
     (async () => {
@@ -182,9 +480,10 @@ export default function CustomerBill() {
         const map = {};
         const delivered = new Set();
         (Array.isArray(notes) ? notes : []).forEach((n) => {
-          if (!n.docket_no) return;
-          map[n.docket_no] = n;
-          if (isDeliveredStatus(n.delivery_status)) delivered.add(String(n.docket_no));
+          const no = String(n.docket_no || "").trim();
+          if (!no) return;
+          map[no] = n;
+          if (isDeliveredStatus(n.delivery_status)) delivered.add(no);
         });
         setDeliveryNotesMap(map);
         setDeliveredDocketNos(delivered);
@@ -192,11 +491,16 @@ export default function CustomerBill() {
       .catch((err) => console.error("Failed to load delivery notes:", err));
   }, []);
 
-  const branchOptions = [
-    "Select Branch",
-    ...locations.map((loc) => `${loc.loc_code} - ${loc.loc_name}`).filter(Boolean),
-  ];
-  const branchSelected = !!(form.billing_branch && form.billing_branch !== "Select Branch");
+  const loginBranchLabel = useMemo(() => sessionBranchLabel(locations), [locations]);
+  const branchOptions = [loginBranchLabel].filter(Boolean);
+  const branchSelected = !!(loginBranchLabel && loginBranchLabel !== "Select Branch");
+
+  useEffect(() => {
+    if (!loginBranchLabel || loginBranchLabel === "Select Branch") return;
+    setForm((prev) =>
+      prev.billing_branch === loginBranchLabel ? prev : { ...prev, billing_branch: loginBranchLabel }
+    );
+  }, [loginBranchLabel]);
   const isDebitNote = form.billing_type === "Debit Note";
   const selectedLocCode = useMemo(
     () => (form.billing_branch || "").split(" - ")[0].trim(),
@@ -227,11 +531,19 @@ export default function CustomerBill() {
 
   const handleSetForm = (updatedForm) => {
     const next = typeof updatedForm === "function" ? updatedForm(form) : updatedForm;
-    if (next.billing_branch !== form.billing_branch) {
-      setForm({ ...next, customer: "" });
-      return;
+    const lockedBranch = loginBranchLabel || form.billing_branch;
+    const capped = capBillDateRange({ ...next, billing_branch: lockedBranch });
+    const bill = isoDateOnly(capped.invoice_date);
+    const wantedTo = isoDateOnly(next.to_date);
+    if (
+      bill &&
+      wantedTo &&
+      wantedTo > bill &&
+      isoDateOnly(next.to_date) !== isoDateOnly(form.to_date)
+    ) {
+      showError("To Date cannot be later than Invoice Date");
     }
-    setForm(next);
+    setForm(capped);
   };
 
   const getCurrentUser = () => {
@@ -363,6 +675,161 @@ export default function CustomerBill() {
   const editingDocketNos = useRef(new Set());
   const isDocketOnEditingInvoice = (docketNo) => editingDocketNos.current.has(String(docketNo));
 
+  const applyLoadedInvoice = (data) => {
+    try {
+    const submitted = !!(data.inv_sub_date);
+    const details = Array.isArray(data.details) ? data.details : [];
+    const loginLoc = getSessionLocCode();
+    if (loginLoc && locCodeOf(data.loc_code) && locCodeOf(data.loc_code) !== locCodeOf(loginLoc)) {
+      showError("Bill " + data.invoice_no + " belongs to another branch");
+      return false;
+    }
+    const bpCode = String(data.bp_code ?? "").trim();
+    const hasCode = bpCode && bpCode !== "0";
+    const bpName = String(data.bp_name || "").trim().toLowerCase();
+    const billLoc = String(data.loc_code || "").trim().toUpperCase();
+    const partner =
+      partners.find((p) => {
+        const code = String(p.bp_grp_code ?? p.bp_code ?? "").trim();
+        const name = String(p.bp_name || "").trim().toLowerCase();
+        const pLoc = String(p.loc_code || "").split(" - ")[0].trim().toUpperCase();
+        return hasCode && code === bpCode && (!billLoc || !pLoc || pLoc === billLoc);
+      }) ||
+      partners.find((p) => {
+        const name = String(p.bp_name || "").trim().toLowerCase();
+        const pLoc = String(p.loc_code || "").split(" - ")[0].trim().toUpperCase();
+        return bpName && name === bpName && (!billLoc || !pLoc || pLoc === billLoc);
+      }) ||
+      partners.find((p) => {
+        const name = String(p.bp_name || "").trim().toLowerCase();
+        return bpName && name === bpName;
+      });
+    if (!partner) {
+      showError("Customer master row was not matched; bill data is still loaded");
+    }
+    const overlay = {};
+    details.forEach((d) => {
+      const no = String(d.docket_no || "").trim();
+      if (!no) return;
+      overlay[no] = invoiceDetailToRow(d, data.loc_code);
+    });
+    editOverlayRef.current = overlay;
+    editingDocketNos.current = new Set(Object.keys(overlay));
+    const overlayRows = Object.keys(overlay).map((no) => ({ ...overlay[no], id: no }));
+    const invDate = moment(data.invoice_date);
+    const isoDate = invDate.isValid() ? invDate.format("YYYY-MM-DD") : "";
+    const sacFromBill = String(data.sac_code || "").trim();
+    const safeSac = LOGISTICS_SAC_CODES.some((s) => s.code === sacFromBill)
+      ? sacFromBill
+      : DEFAULT_SAC_CODE;
+    docketLoadToken.current++;
+    setEditNoMode(false);
+    setIsViewOnly(submitted);
+    setEditingInvoice({
+      invoice_no: data.invoice_no,
+      invoice_date: isoDate,
+      loc_code: data.loc_code,
+    });
+    setBillingRows(sortDocketsByNo(overlayRows));
+    setSelectedDocketNos(new Set(Object.keys(overlay)));
+    setDocketsLoaded(true);
+    setLoadingDockets(false);
+    const detailDates = details
+      .map((d) => moment(d.docket_date))
+      .filter((m) => m.isValid())
+      .sort((a, b) => a.valueOf() - b.valueOf());
+    const dates = defaultBillDates();
+    setForm((prev) => capBillDateRange({
+      customer: partner ? String(partner.record_id ?? partner.bp_id ?? "") : "",
+      invoice_no: String(data.invoice_no || ""),
+      invoice_date: isoDate,
+      billing_branch: loginBranchLabel || sessionBranchLabel(locations),
+      billing_type: data.invoice_type === "D" || data.invoice_type === "DN" ? "Debit Note" : "Regular",
+      sac_code: safeSac,
+      invoice_remarks: prev.invoice_remarks || "",
+      from_date: detailDates.length ? detailDates[0].format("YYYY-MM-DD") : (prev.from_date || dates.from_date),
+      to_date: detailDates.length ? detailDates[detailDates.length - 1].format("YYYY-MM-DD") : (prev.to_date || dates.to_date),
+    }));
+    showSuccess(
+      submitted
+        ? "Invoice " + data.invoice_no + " opened in view-only mode (already submitted)"
+        : "Invoice " + data.invoice_no + " opened for edit"
+    );
+    return true;
+    } catch (err) {
+      console.error("applyLoadedInvoice error:", err);
+      showError(err.message || "Failed to display the bill");
+      return false;
+    }
+  };
+
+  const loadInvoiceByNo = async (invoiceNo) => {
+    const no = String(invoiceNo || "").trim();
+    if (!no || no.toUpperCase() === "AUTO") {
+      showError("Please enter a bill number");
+      return;
+    }
+    try {
+      showLoading();
+      const loc = locCodeOf(selectedLocCode) || locCodeOf(getSessionLocCode());
+      const data = await fetchInvoiceByNumber(no, loc || null).catch(() => null);
+      if (!data) {
+        showError("Bill number " + no + " not found for this branch");
+        return;
+      }
+      applyLoadedInvoice(data);
+    } catch (err) {
+      showError(err.message || "Failed to load invoice");
+      console.error("Load invoice by number error:", err);
+    } finally {
+      hideLoading();
+    }
+  };
+
+  const handleEditClick = () => {
+    if (!editNoMode) {
+      setEditNoMode(true);
+      setForm((prev) => ({
+        ...prev,
+        invoice_no: prev.invoice_no === "AUTO" ? "" : String(prev.invoice_no || ""),
+      }));
+      return;
+    }
+    loadInvoiceByNo(form.invoice_no);
+  };
+
+  useEffect(() => {
+    const req = location.state?.editInvoice;
+    if (!req || !partners.length || !locations.length) return;
+    const key = `${req.invoice_no}|${req.invoice_date}|${req.loc_code}`;
+    if (editLoadedKey.current === key) return;
+    editLoadedKey.current = key;
+
+    (async () => {
+      try {
+        showLoading();
+        const loginLoc = getSessionLocCode();
+        if (loginLoc && locCodeOf(req.loc_code) && locCodeOf(req.loc_code) !== locCodeOf(loginLoc)) {
+          showError("This bill belongs to another branch");
+          return;
+        }
+        const data = await fetchInvoiceByKeys(req.invoice_no, req.invoice_date, req.loc_code);
+        if (!data) {
+          showError("Invoice not found");
+          return;
+        }
+        applyLoadedInvoice(data);
+        navigate(location.pathname, { replace: true, state: {} });
+      } catch (err) {
+        showError(err.message || "Failed to open invoice for edit");
+        console.error("Load invoice for edit error:", err);
+      } finally {
+        hideLoading();
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, partners, locations]);
+
   const selectedCustomer = useMemo(
     () => partners.find((p) => String(p.record_id ?? p.bp_id ?? "") === String(form.customer)) || null,
     [partners, form.customer]
@@ -380,12 +847,15 @@ export default function CustomerBill() {
   // selected business partner's record_id.
   // The name comparison is only a safety net for dockets whose cnor_id/cnee_id
   // columns came back NULL, so nothing silently disappears from the list.
-  const docketBelongsToCustomer = (docket, customerId, customerName) => {
-    const cnorId = docket.cnor_id == null ? "" : String(docket.cnor_id);
-    const cneeId = docket.cnee_id == null ? "" : String(docket.cnee_id);
-    if (cnorId || cneeId) {
-      return (!!customerId && (cnorId === customerId || cneeId === customerId)) || false;
-    }
+  const docketBelongsToCustomer = (docket, customerId, customerName, partner) => {
+    const ids = new Set(
+      [customerId, partner?.record_id, partner?.bp_id, partner?.bp_grp_code, partner?.bp_code]
+        .map((v) => String(v ?? "").trim())
+        .filter((v) => v && v !== "0")
+    );
+    const cnorId = docket.cnor_id == null ? "" : String(docket.cnor_id).trim();
+    const cneeId = docket.cnee_id == null ? "" : String(docket.cnee_id).trim();
+    if ((cnorId && ids.has(cnorId)) || (cneeId && ids.has(cneeId))) return true;
     if (!customerName) return false;
     const name = customerName.trim().toLowerCase();
     return (
@@ -400,7 +870,18 @@ export default function CustomerBill() {
   // to a saved invoice are flagged as Billed so the user never bills them twice.
   useEffect(() => {
     const customerName = selectedCustomer?.bp_name;
+    if (isViewOnly) return;
     if (!form.customer || !selectedCustomerId) {
+      if (editingInvoice) return;
+      docketLoadToken.current++;
+      setBillingRows([]);
+      setSelectedDocketNos(new Set());
+      setDocketsLoaded(false);
+      setLoadingDockets(false);
+      return;
+    }
+    if (!form.from_date || !form.to_date) {
+      if (editingInvoice) return;
       docketLoadToken.current++;
       setBillingRows([]);
       setSelectedDocketNos(new Set());
@@ -411,15 +892,28 @@ export default function CustomerBill() {
 
     const token = ++docketLoadToken.current;
     const customerId = selectedCustomerId;
+    const locCode = selectedLocCode;
     let cancelled = false;
 
     (async () => {
       try {
         setLoadingDockets(true);
-        const [dockets, billedList] = await Promise.all([
-          fetchAllDockets(true),
-          fetchBilledDocketNos().catch(() => []),
-        ]);
+        const customerIds = [
+          customerId,
+          selectedCustomer?.record_id,
+          selectedCustomer?.bp_id,
+          selectedCustomer?.bp_grp_code,
+          selectedCustomer?.bp_code,
+        ].filter((v) => v != null && String(v).trim() && String(v).trim() !== "0");
+        const dockets = await fetchDocketsForBilling({
+          locCode,
+          customerIds,
+          customerName: selectedCustomer?.bp_name || customerName || "",
+          billedMode: isDebitNote ? "billed" : "unbilled",
+          fromDate: form.from_date,
+          toDate: form.to_date,
+        });
+        const billedList = await fetchBilledDocketNos().catch(() => []);
 
         const billedMap = {};
         (Array.isArray(billedList) ? billedList : []).forEach((no) => {
@@ -428,7 +922,6 @@ export default function CustomerBill() {
 
         if (cancelled || token !== docketLoadToken.current) return;
 
-        const locCode = selectedLocCode;
         const docketList = Array.isArray(dockets) ? dockets : [];
 
         // Dockets already attached to a saved invoice are not billable again.
@@ -439,18 +932,11 @@ export default function CustomerBill() {
 
         const filtered = docketList.filter((d) => {
           if (!d.docket_no) return false;
-          // cnor_id or cnee_id must equal the selected partner's record_id
-          if (!docketBelongsToCustomer(d, customerId, selectedCustomer?.bp_name)) return false;
-          // Regular: unbilled only. Debit Note: already billed only.
           if (isDebitNote) {
-            if (!isBilled(d.docket_no)) return false;
+            if (!isBilled(d.docket_no) && !isDocketOnEditingInvoice(d.docket_no)) return false;
           } else if (isBilled(d.docket_no) && !isDocketOnEditingInvoice(d.docket_no)) {
             return false;
           }
-          // only dockets delivered in sst_dly_note (delivery note)
-          if (!deliveredDocketNos.has(String(d.docket_no))) return false;
-          // payment location must be the selected billing branch
-          if (locCode && locCodeOf(d.docket_pay_loc || d.pay_loc) !== locCodeOf(locCode)) return false;
           return true;
         });
 
@@ -463,15 +949,41 @@ export default function CustomerBill() {
           chargesByDocket[no].push(c);
         });
 
-        const rows = filtered.map((d) => ({
+        let rows = filtered.map((d) => ({
           ...buildBillingRow(d, chargesByDocket[String(d.docket_no).trim()] || []),
           id: d.docket_no,
           invoice_status: billedMap[String(d.docket_no).trim()] ? "Billed" : "Unbilled",
           _chargesLoaded: true,
         }));
 
-        setBillingRows(rows);
-        setSelectedDocketNos(new Set());
+        const overlay = editOverlayRef.current;
+        if (overlay && Object.keys(overlay).length) {
+          const have = new Set(rows.map((r) => String(r.docket_no).trim()));
+          rows = rows.map((r) => {
+            const saved = overlay[String(r.docket_no).trim()];
+            if (!saved) return r;
+            return {
+              ...r,
+              ...saved,
+              id: String(r.docket_no).trim(),
+              pay_loc: r.pay_loc || saved.pay_loc,
+              origin: r.origin || saved.origin,
+              destination: r.destination || saved.destination,
+              consignee: r.consignee || saved.consignee,
+              invoice_status: "Billed",
+              _fromInvoice: true,
+              _chargesLoaded: true,
+            };
+          });
+          Object.entries(overlay).forEach(([no, saved]) => {
+            if (!have.has(no)) rows.push({ ...saved, id: no });
+          });
+          setSelectedDocketNos(new Set(Object.keys(overlay)));
+        } else {
+          setSelectedDocketNos(new Set());
+        }
+
+        setBillingRows(sortDocketsByNo(rows));
         setDocketsLoaded(true);
 
         // Helpful when a customer unexpectedly shows no dockets
@@ -497,7 +1009,7 @@ export default function CustomerBill() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.customer, form.billing_branch, form.billing_type, selectedCustomerId, partners, chargeMaster, deliveryNotesMap, deliveredDocketNos, isDebitNote]);
+  }, [form.customer, form.billing_branch, form.billing_type, form.from_date, form.to_date, selectedCustomerId, chargeMaster, isDebitNote, isViewOnly, editingInvoice]);
 
   // Recalculate derived fields (taxable, GST, amount) when charge values change
   const recalculateRow = (row) => {
@@ -586,14 +1098,37 @@ export default function CustomerBill() {
 
   // Multi-select: ticks decide which dockets get saved on the invoice
   const handleRowSelectionModelChange = (model) => {
-    const ids = model?.ids instanceof Set ? model.ids : new Set(Array.isArray(model) ? model : []);
-    const docketNos = new Set([...ids].map(String));
-    setSelectedDocketNos(docketNos);
-    loadChargesForSelected([...docketNos]);
+    if (isViewOnly) return;
+    let ids;
+    if (model?.type === "exclude") {
+      const excluded = new Set([...(model.ids || [])].map(String));
+      ids = billingRows.map((r) => String(r.id)).filter((id) => id && !excluded.has(id));
+    } else {
+      const rawIds = model?.ids instanceof Set
+        ? model.ids
+        : Array.isArray(model)
+          ? model
+          : model?.ids
+            ? [...model.ids]
+            : [];
+      ids = [...rawIds].map(String);
+    }
+    const next = new Set(ids);
+    setSelectedDocketNos((prev) => {
+      if (prev instanceof Set && prev.size === next.size && [...next].every((id) => prev.has(id))) {
+        return prev;
+      }
+      return next;
+    });
+    loadChargesForSelected([...next]);
   };
 
   // Add a new empty row so the user can enter a docket number
   const handleAddRow = () => {
+    if (isViewOnly) {
+      showError("Submitted bills are view only");
+      return;
+    }
     const id = "new_" + Date.now() + "_" + billingRows.length;
     const emptyRow = {
       id,
@@ -633,6 +1168,7 @@ export default function CustomerBill() {
 
   // When a docket number is entered in a row, fetch all docket data and populate the row
   const handleRowUpdate = async (newRow, oldRow) => {
+    if (isViewOnly) return oldRow;
     // Check if a charge field was edited - recalculate derived fields
     const changedChargeKeys = editableChargeKeys.filter((key) => newRow[key] !== oldRow[key]);
     if (changedChargeKeys.length > 0) {
@@ -665,10 +1201,8 @@ export default function CustomerBill() {
           return { ...newRow, docket_no: oldRow.docket_no };
         }
 
-        const selectedLoc = locCodeOf(selectedBranch);
-        const payLoc = locCodeOf(docketObj.docket_pay_loc || docketObj.pay_loc);
-        if (selectedLoc && payLoc !== selectedLoc) {
-          showError("Docket " + newRow.docket_no + " payment location is not billing branch " + selectedBranch);
+        if (!docketMatchesSessionLoc(docketObj, selectedBranch)) {
+          showError("Docket " + newRow.docket_no + " does not belong to billing branch " + selectedBranch);
           return { ...newRow, docket_no: oldRow.docket_no };
         }
 
@@ -723,16 +1257,25 @@ export default function CustomerBill() {
   // Only Docket and charge columns should be editable
   const tableColumns = billingColumns.map((col) => ({
     ...col,
-    editable: col.key === "docket_no" || editableChargeKeys.includes(col.key),
+    editable: !isViewOnly && (col.key === "docket_no" || editableChargeKeys.includes(col.key)),
   }));
 
   // Stable array reference - DataTable memoises its controlled model on this,
   // so a fresh array every render would keep resetting the user's ticks
-  const selectionIds = useMemo(() => [...selectedDocketNos], [selectedDocketNos]);
+  const selectionIds = useMemo(() => {
+    if (selectedDocketNos instanceof Set) return [...selectedDocketNos];
+    if (Array.isArray(selectedDocketNos)) return selectedDocketNos.map(String);
+    return [];
+  }, [selectedDocketNos]);
 
   // The rows the user has ticked - these are the ones that get saved
   const selectedRows = useMemo(
-    () => billingRows.filter((r) => selectedDocketNos.has(String(r.id)) && r.docket_no),
+    () =>
+      billingRows.filter((r) => {
+        const id = String(r.id ?? "");
+        const no = String(r.docket_no ?? "").trim();
+        return no && (selectedDocketNos.has(id) || selectedDocketNos.has(no));
+      }),
     [billingRows, selectedDocketNos]
   );
 
@@ -757,16 +1300,31 @@ export default function CustomerBill() {
 
   // Removes the ticked dockets from the working list (nothing is sent to the server)
   const handleDeleteRow = () => {
+    if (isViewOnly) {
+      showError("Submitted bills are view only");
+      return;
+    }
     if (selectedDocketNos.size === 0) {
       showError("Please select at least one docket row to remove");
       return;
     }
     setBillingRows((prev) => prev.filter((row) => !selectedDocketNos.has(String(row.id))));
+    if (editOverlayRef.current) {
+      selectedDocketNos.forEach((id) => {
+        const row = billingRows.find((r) => String(r.id) === String(id));
+        const no = String(row?.docket_no || id).trim();
+        delete editOverlayRef.current[no];
+      });
+    }
     setSelectedDocketNos(new Set());
-    showSuccess("Selected docket(s) removed");
+    showSuccess("Selected docket(s) removed from this bill");
   };
 
   const handleDeleteInvoice = async () => {
+    if (isViewOnly) {
+      showError("Submitted bills cannot be deleted");
+      return;
+    }
     if (!editingInvoice) {
       showError("No saved invoice to delete. Save the invoice first.");
       return;
@@ -775,10 +1333,15 @@ export default function CustomerBill() {
       showLoading();
       await deleteInvoice(editingInvoice.invoice_no, editingInvoice.invoice_date, editingInvoice.loc_code);
       showSuccess("Invoice deleted successfully");
-      setForm({ ...emptyForm });
+      setForm(blankBillForm(locations));
       setBillingRows([]);
       setSelectedDocketNos(new Set());
       setEditingInvoice(null);
+      setIsViewOnly(false);
+      setEditNoMode(false);
+      editOverlayRef.current = null;
+      editingDocketNos.current = new Set();
+      editLoadedKey.current = "";
     } catch (err) {
       showError(err.message || "Failed to delete invoice");
       console.error("Delete invoice error:", err);
@@ -789,12 +1352,17 @@ export default function CustomerBill() {
 
   const handleClear = () => {
     docketLoadToken.current++;
-    setForm({ ...emptyForm });
+    setForm(blankBillForm(locations));
     setBillingRows([]);
     setSelectedDocketNos(new Set());
     setDocketsLoaded(false);
     setLoadingDockets(false);
     setEditingInvoice(null);
+    setIsViewOnly(false);
+    setEditNoMode(false);
+    editOverlayRef.current = null;
+    editingDocketNos.current = new Set();
+    editLoadedKey.current = "";
   };
 
   const buildInvoicePayload = () => {
@@ -812,6 +1380,7 @@ export default function CustomerBill() {
       invoice_type: isDebitNote ? "D" : "R",
       invoice_no: editingInvoice?.invoice_no ?? null,
       invoice_date: form.invoice_date || null,
+      sac_code: form.sac_code || DEFAULT_SAC_CODE,
       total_inv_amt: Math.round(totalAmt * 100) / 100,
       created_by: currentUser?.user_id ?? null,
       modified_by: currentUser?.user_id ?? null,
@@ -829,6 +1398,10 @@ export default function CustomerBill() {
         docket_to_loc: locCodeOf(row.delivery_branch || row.destination) || null,
         docket_date: row.docket_date ? moment(row.docket_date, getDateFormat()).format("YYYY-MM-DD") : null,
         docket_chrwt: parseFloat(row.charge_wt) || 0,
+        docket_actwt: parseFloat(row.actual_wt) || 0,
+        consignee: row.consignee || null,
+        docket_from_town: String(row.origin || "").split(">").slice(1).join(">").trim() || null,
+        docket_to_town: String(row.destination || "").split(">").slice(1).join(">").trim() || null,
         freight: parseFloat(row.freight) || 0,
         loading: parseFloat(row.loading) || 0,
         unloading: parseFloat(row.unloading) || 0,
@@ -836,6 +1409,12 @@ export default function CustomerBill() {
         green_tax: parseFloat(row.green_tax) || 0,
         additional_toll: parseFloat(row.add_toll) || 0,
         other_charges: parseFloat(row.other_charges) || 0,
+        handling: parseFloat(row.loading) || 0,
+        fuel_surcharge: parseFloat(row.unloading) || 0,
+        factory_charge: parseFloat(row.detention) || 0,
+        oda_charge: parseFloat(row.add_toll) || 0,
+        fov: parseFloat(row.green_tax) || 0,
+        stationery: parseFloat(row.other_charges) || 0,
         taxable_amt: parseFloat(row.taxable) || 0,
         sgst: parseFloat(row.sgst) || 0,
         cgst: parseFloat(row.cgst) || 0,
@@ -869,9 +1448,17 @@ export default function CustomerBill() {
       invoice_date: form.invoice_date || "",
       bp_name: customer?.bp_name || "",
       bp_code: customer?.bp_grp_code || customer?.bp_code || "",
+      bp_address: customer?.bp_addres || customer?.bp_address || "",
+      bp_city: customer?.bp_city || "",
+      bp_state: customer?.bp_state || "",
+      bp_pincode: customer?.bp_pincode || "",
+      bp_gstin: customer?.bp_gstin || "",
+      bp_phone: customer?.bp_mobile1 || customer?.bp_mobile2 || "",
       loc_code: locCode || "",
       loc_label: selectedBranch || "",
       invoice_type: isDebitNote ? "D" : "R",
+      sac_code: form.sac_code || DEFAULT_SAC_CODE,
+      sac_label: formatSac(form.sac_code || DEFAULT_SAC_CODE),
       total_inv_amt: totalAmt.toFixed(2),
     };
 
@@ -880,10 +1467,16 @@ export default function CustomerBill() {
       details: selectedRows,
       company,
       locationsMap: Object.fromEntries(locations.map((l) => [l.loc_code, l])),
+      customer,
+      partners,
     });
   };
 
   const handleSave = async () => {
+    if (isViewOnly) {
+      showError("Submitted bills are view only and cannot be saved");
+      return;
+    }
     // Validate billing branch is selected
     const selectedBranch = form.billing_branch || "";
     if (!selectedBranch || selectedBranch === "Select Branch") {
@@ -901,6 +1494,11 @@ export default function CustomerBill() {
     // Validate invoice date
     if (!form.invoice_date) {
       showError("Please select an invoice date before saving");
+      return;
+    }
+
+    if (!form.sac_code) {
+      showError("Please select a SAC code before saving");
       return;
     }
 
@@ -929,7 +1527,7 @@ export default function CustomerBill() {
     }
 
     const wrongBranchDockets = selectedRows
-      .filter((row) => locCode && locCodeOf(row.pay_loc) !== locCodeOf(locCode))
+      .filter((row) => !docketMatchesSessionLoc(row, locCode))
       .map((row) => row.docket_no);
 
     if (wrongBranchDockets.length > 0) {
@@ -941,7 +1539,12 @@ export default function CustomerBill() {
     }
 
     const notDelivered = selectedRows
-      .filter((row) => !isDeliveredStatus(row.delivery_status) && !deliveredDocketNos.has(String(row.docket_no)))
+      .filter((row) =>
+        !row._fromInvoice &&
+        !isDocketOnEditingInvoice(row.docket_no) &&
+        !isDeliveredStatus(row.delivery_status) &&
+        !deliveredDocketNos.has(String(row.docket_no))
+      )
       .map((row) => row.docket_no);
     if (notDelivered.length > 0) {
       showError("Cannot save. The following docket(s) are not delivered: " + notDelivered.join(", "));
@@ -955,8 +1558,21 @@ export default function CustomerBill() {
       return;
     }
 
-    const savedDocketNos = payload.details.map((d) => String(d.docket_no));
+    const savedDocketNos = payload.details.map((d) => String(d.docket_no).trim());
     editingDocketNos.current = new Set(savedDocketNos);
+    const overlay = {};
+    selectedRows.forEach((r) => {
+      const no = String(r.docket_no || "").trim();
+      if (!no) return;
+      overlay[no] = {
+        ...r,
+        id: no,
+        invoice_status: "Billed",
+        _fromInvoice: true,
+        _chargesLoaded: true,
+      };
+    });
+    editOverlayRef.current = overlay;
 
     try {
       showLoading();
@@ -977,9 +1593,10 @@ export default function CustomerBill() {
             ...prev,
             invoice_no: String(result.header.invoice_no || ""),
           }));
+          const savedDate = moment(result.header.invoice_date);
           setEditingInvoice({
             invoice_no: result.header.invoice_no,
-            invoice_date: result.header.invoice_date,
+            invoice_date: savedDate.isValid() ? savedDate.format("YYYY-MM-DD") : result.header.invoice_date,
             loc_code: result.header.loc_code,
           });
         }
@@ -988,7 +1605,9 @@ export default function CustomerBill() {
       // The saved dockets are now billed - flag them so they cannot be billed twice
       setBillingRows((prev) =>
         prev.map((row) =>
-          savedDocketNos.includes(String(row.id)) ? { ...row, invoice_status: "Billed" } : row
+          savedDocketNos.includes(String(row.docket_no).trim()) || savedDocketNos.includes(String(row.id).trim())
+            ? { ...row, invoice_status: "Billed", _fromInvoice: true }
+            : row
         )
       );
     } catch (err) {
@@ -1005,13 +1624,16 @@ export default function CustomerBill() {
         <style>{billPageFontCss}</style>
         <div className="customer-bill-page">
         <div className="pageToolbar" style={{ alignItems: "center", justifyContent: "flex-end", gap: 12, marginBottom: 12 }}>
-          <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} sx={saveHeaderButtonStyle}>
+          <Button variant="contained" startIcon={<EditIcon />} onClick={handleEditClick} sx={editHeaderButtonStyle}>
+            Edit
+          </Button>
+          <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} disabled={isViewOnly} sx={saveHeaderButtonStyle}>
             Save
           </Button>
           <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint} sx={printHeaderButtonStyle}>
             Print
           </Button>
-          <Button variant="contained" startIcon={<DeleteIcon />} onClick={handleDeleteInvoice} sx={deleteHeaderButtonStyle}>
+          <Button variant="contained" startIcon={<DeleteIcon />} onClick={handleDeleteInvoice} disabled={isViewOnly} sx={deleteHeaderButtonStyle}>
             Delete
           </Button>
           <Button variant="contained" startIcon={<ClearIcon />} onClick={handleClear} sx={clearHeaderButtonStyle}>
@@ -1020,60 +1642,175 @@ export default function CustomerBill() {
         </div>
 
         <div style={sectionWrap}>
-          <div style={sectionTitleStyle}>Invoice Information</div>
+          <div style={{ ...sectionTitleStyle, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+            Invoice Information
+            {editNoMode ? (
+              <Chip
+                size="small"
+                label="Enter bill number, then click Edit again to load"
+                sx={{ ml: 2, fontSize: 11, fontWeight: 700, bgcolor: "#fef3c7", color: "#92400e" }}
+              />
+            ) : null}
+            {editingInvoice ? (
+              <Chip
+                size="small"
+                label={
+                  isViewOnly
+                    ? `Invoice ${editingInvoice.invoice_no} — submitted (view only)`
+                    : `Editing Invoice ${editingInvoice.invoice_no} — add or remove dockets, then Save`
+                }
+                sx={{
+                  ml: 2,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  bgcolor: isViewOnly ? "#e2e8f0" : "#f3e8ff",
+                  color: isViewOnly ? "#334155" : "#6b21a8",
+                }}
+              />
+            ) : null}
+          </div>
           <div style={sectionGridStyle}>
-            {invoiceFields.map((field) => (
-              <div key={field.name} style={fieldCellStyle}>
-                {field.name === "customer" ? (
-                  <Autocomplete
-                    size="small"
-                    disabled={!branchSelected}
-                    options={customerOptions}
-                    value={customerOptions.find((o) => String(o.value) === String(form.customer)) || null}
-                    getOptionLabel={(opt) => {
-                      if (!opt) return "";
-                      if (typeof opt === "string") return opt;
-                      return opt.label || (opt.code ? `${opt.code} - ${opt.name}` : opt.name || "");
-                    }}
-                    isOptionEqualToValue={(a, b) => String(a?.value) === String(b?.value)}
-                    filterOptions={(opts, state) => {
-                      const q = String(state.inputValue || "").trim().toLowerCase();
-                      if (!q) return opts;
-                      return opts.filter((o) => {
-                        const code = String(o.code || "").toLowerCase();
-                        const name = String(o.name || "").toLowerCase();
-                        const label = String(o.label || "").toLowerCase();
-                        return code.includes(q) || name.includes(q) || label.includes(q);
-                      });
-                    }}
-                    onChange={(_, v) => handleSetForm({ ...form, customer: v?.value || "" })}
-                    slotProps={{
-                      paper: {
-                        sx: {
-                          "& .MuiAutocomplete-option": { fontSize: 11, fontWeight: 700, minHeight: 28, py: 0.5 },
-                        },
-                      },
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Customer"
-                        size="small"
-                        sx={customerFieldSx}
-                        placeholder={branchSelected ? "Search code or name" : "Select billing branch first"}
-                      />
-                    )}
-                  />
-                ) : (
+            {invoiceFields
+              .filter((field) => field.name !== "customer" && field.name !== "from_date" && field.name !== "to_date")
+              .map((field) => (
+                <div key={field.name} style={fieldCellStyle}>
                   <FormField
                     {...field}
+                    disabled={
+                      field.name === "invoice_no"
+                        ? !editNoMode
+                        : field.name === "billing_branch" ||
+                          field.disabled ||
+                          isViewOnly ||
+                          (!!editingInvoice && field.name === "billing_type")
+                    }
                     options={field.name === "billing_branch" ? branchOptions : field.options}
                     form={form}
                     setForm={handleSetForm}
+                    onKeyDown={
+                      field.name === "invoice_no" && editNoMode
+                        ? (e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              loadInvoiceByNo(form.invoice_no);
+                            }
+                          }
+                        : undefined
+                    }
+                  />
+                </div>
+              ))}
+            <div style={{ ...fieldCellStyle, gridColumn: "span 2" }}>
+              <FormControl size="small" fullWidth>
+                <InputLabel sx={{ fontSize: 11, fontWeight: 700 }}>SAC Code</InputLabel>
+                <Select
+                  label="SAC Code"
+                  value={
+                    LOGISTICS_SAC_CODES.some((s) => s.code === form.sac_code)
+                      ? form.sac_code
+                      : DEFAULT_SAC_CODE
+                  }
+                  disabled={isViewOnly}
+                  onChange={(e) => handleSetForm({ ...form, sac_code: e.target.value })}
+                  sx={{
+                    ...customerFieldSx,
+                    "& .MuiSelect-select": { fontSize: 11, fontWeight: 700 },
+                  }}
+                  MenuProps={{
+                    PaperProps: {
+                      sx: { "& .MuiMenuItem-root": { fontSize: 11, fontWeight: 700, minHeight: 28, py: 0.5 } },
+                    },
+                  }}
+                >
+                  {LOGISTICS_SAC_CODES.map((s) => (
+                    <MenuItem key={s.code} value={s.code}>
+                      {sacLabel(s.code, s.desc)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </div>
+            {invoiceFields
+              .filter((field) => field.name === "from_date" || field.name === "to_date")
+              .map((field) => (
+                <div key={field.name} style={fieldCellStyle}>
+                  <FormField
+                    {...field}
+                    disabled={isViewOnly}
+                    form={form}
+                    setForm={handleSetForm}
+                  />
+                </div>
+              ))}
+            <div style={{ ...fieldCellStyle, gridColumn: "span 4" }}>
+              <Autocomplete
+                size="small"
+                disabled={!branchSelected || !!editingInvoice}
+                options={
+                  (() => {
+                    const current = customerOptions.find((o) => String(o.value) === String(form.customer));
+                    if (current || !selectedCustomer) return customerOptions;
+                    const name = String(selectedCustomer.bp_name || "").trim();
+                    const code = String(selectedCustomer.bp_grp_code ?? selectedCustomer.bp_code ?? "").trim();
+                    return [
+                      {
+                        value: String(selectedCustomer.record_id ?? selectedCustomer.bp_id ?? form.customer),
+                        code,
+                        name,
+                        label: code ? `${code} - ${name}` : name,
+                      },
+                      ...customerOptions,
+                    ];
+                  })()
+                }
+                value={
+                  customerOptions.find((o) => String(o.value) === String(form.customer))
+                  || (selectedCustomer
+                    ? {
+                        value: String(selectedCustomer.record_id ?? selectedCustomer.bp_id ?? form.customer),
+                        code: String(selectedCustomer.bp_grp_code ?? selectedCustomer.bp_code ?? "").trim(),
+                        name: String(selectedCustomer.bp_name || "").trim(),
+                        label: String(selectedCustomer.bp_grp_code ?? selectedCustomer.bp_code ?? "").trim()
+                          ? `${String(selectedCustomer.bp_grp_code ?? selectedCustomer.bp_code ?? "").trim()} - ${String(selectedCustomer.bp_name || "").trim()}`
+                          : String(selectedCustomer.bp_name || "").trim(),
+                      }
+                    : null)
+                }
+                getOptionLabel={(opt) => {
+                  if (!opt) return "";
+                  if (typeof opt === "string") return opt;
+                  return opt.label || (opt.code ? `${opt.code} - ${opt.name}` : opt.name || "");
+                }}
+                isOptionEqualToValue={(a, b) => String(a?.value) === String(b?.value)}
+                filterOptions={(opts, state) => {
+                  const q = String(state.inputValue || "").trim().toLowerCase();
+                  if (!q) return opts;
+                  return opts.filter((o) => {
+                    const code = String(o.code || "").toLowerCase();
+                    const name = String(o.name || "").toLowerCase();
+                    const label = String(o.label || "").toLowerCase();
+                    return code.includes(q) || name.includes(q) || label.includes(q);
+                  });
+                }}
+                onChange={(_, v) => handleSetForm({ ...form, customer: v?.value || "" })}
+                slotProps={{
+                  paper: {
+                    sx: {
+                      "& .MuiAutocomplete-option": { fontSize: 11, fontWeight: 700, minHeight: 28, py: 0.5 },
+                    },
+                  },
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Customer"
+                    size="small"
+                    sx={customerFieldSx}
+                    placeholder={branchSelected ? "Search code or name" : "Select billing branch first"}
                   />
                 )}
-              </div>
-            ))}
+              />
+            </div>
           </div>
         </div>
 
@@ -1083,7 +1820,7 @@ export default function CustomerBill() {
             {selectedCustomer && !docketsLoaded && !loadingDockets && (
               <Chip
                 size="small"
-                label="Select billing branch, then customer, to load dockets"
+                label="Set From/To dates and customer to load dockets"
                 sx={{ ml: 2, fontSize: 12, fontWeight: 600, bgcolor: "#fff8e1", color: "#b45309" }}
               />
             )}
@@ -1110,35 +1847,43 @@ export default function CustomerBill() {
             )}
             <span style={{ flex: 1 }} />
             <Tooltip title="Remove Selected Rows">
-              <IconButton
-                onClick={handleDeleteRow}
-                size="small"
-                sx={{
-                  color: "#dc2626",
-                  background: "#fee2e2",
-                  width: 34,
-                  height: 34,
-                  mr: 1,
-                  "&:hover": { background: "#fecaca" },
-                }}
-              >
-                <DeleteIcon />
-              </IconButton>
+              <span>
+                <IconButton
+                  onClick={handleDeleteRow}
+                  disabled={isViewOnly}
+                  size="small"
+                  sx={{
+                    color: "#dc2626",
+                    background: "#fee2e2",
+                    width: 34,
+                    height: 34,
+                    mr: 1,
+                    "&:hover": { background: "#fecaca" },
+                    "&.Mui-disabled": { color: "#9ca3af", background: "#f3f4f6" },
+                  }}
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </span>
             </Tooltip>
             <Tooltip title="Add Docket Manually">
-              <IconButton
-                onClick={handleAddRow}
-                size="small"
-                sx={{
-                  color: "#0d6efd",
-                  background: "#e3f2fd",
-                  width: 34,
-                  height: 34,
-                  "&:hover": { background: "#bbdefb" },
-                }}
-              >
-                <AddIcon />
-              </IconButton>
+              <span>
+                <IconButton
+                  onClick={handleAddRow}
+                  disabled={isViewOnly}
+                  size="small"
+                  sx={{
+                    color: "#0d6efd",
+                    background: "#e3f2fd",
+                    width: 34,
+                    height: 34,
+                    "&:hover": { background: "#bbdefb" },
+                    "&.Mui-disabled": { color: "#9ca3af", background: "#f3f4f6" },
+                  }}
+                >
+                  <AddIcon />
+                </IconButton>
+              </span>
             </Tooltip>
           </div>
           {selectedCustomer && docketsLoaded && billingRows.length === 0 && (
@@ -1164,36 +1909,24 @@ export default function CustomerBill() {
           )}
           <DataTable
             columns={tableColumns}
-            rows={billingRows}
+            rows={sortDocketsByNo(billingRows)}
             getKey={(row) => row.id || row.docket_no}
             checkboxSelection
+            dense
+            rowHeight={26}
+            headerHeight={42}
             // autoHeight
-            scroll={{ afterRows: 8 }}
-            editable
+            scroll={{ afterRows: 10, horizontal: true }}
+            editable={!isViewOnly}
             singleClick
-            onRowUpdate={handleRowUpdate}
+            onRowUpdate={isViewOnly ? undefined : handleRowUpdate}
             isHeight={320}
             rowSelectionModel={selectionIds}
             onRowSelectionModelChange={handleRowSelectionModelChange}
+            isRowSelectable={isViewOnly ? () => false : undefined}
+            selectedRowColor="#dcfce7"
+            footer={selectedRows.length > 0 ? <BillGridTotalRow totals={totals} /> : null}
           />
-          {selectedRows.length > 0 && (
-            <div style={totalRowStyle}>
-              <div style={{ ...totalCellStyle, justifyContent: "flex-start", paddingLeft: 14 }}>TOTAL</div>
-              <div style={totalCellStyle}>{totals.freight.toFixed(2)}</div>
-              <div style={totalCellStyle}>{totals.loading.toFixed(2)}</div>
-              <div style={totalCellStyle}>{totals.unloading.toFixed(2)}</div>
-              <div style={totalCellStyle}>{totals.detention.toFixed(2)}</div>
-              <div style={totalCellStyle}>{totals.add_toll.toFixed(2)}</div>
-              <div style={totalCellStyle}>{totals.green_tax.toFixed(2)}</div>
-              <div style={totalCellStyle}>{totals.other_charges.toFixed(2)}</div>
-              <div style={totalCellStyle}>{totals.taxable.toFixed(2)}</div>
-              <div style={totalCellStyle}>{totals.cgst.toFixed(2)}</div>
-              <div style={totalCellStyle}>{totals.sgst.toFixed(2)}</div>
-              <div style={totalCellStyle}>{totals.igst.toFixed(2)}</div>
-              <div style={totalCellStyle}>{totals.amount.toFixed(2)}</div>
-              <div style={{ ...totalCellStyle, minWidth: 120 }}></div>
-            </div>
-          )}
         </div>
 
         <div style={bottomSectionStyle}>
@@ -1203,6 +1936,7 @@ export default function CustomerBill() {
               name="invoice_remarks"
               form={form}
               setForm={handleSetForm}
+              disabled={isViewOnly}
             />
           </div>
         </div>
@@ -1234,9 +1968,11 @@ const sectionTitleStyle = {
 
 const sectionGridStyle = {
   display: "grid",
-  gridTemplateColumns: "repeat(5, minmax(180px, 1fr))",
-  gap: "12px 18px",
-  padding: "18px 18px 8px",
+  gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+  gap: "12px 14px",
+  padding: "14px 16px 16px",
+  alignItems: "start",
+  background: "#f8fafc",
 };
 
 const fieldCellStyle = {
@@ -1266,14 +2002,16 @@ const tableTitleStyle = {
 };
 
 const totalRowStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(15, minmax(80px, 1fr))",
+  display: "flex",
+  flexWrap: "nowrap",
+  width: "max-content",
   background: "#f5f0d6",
   border: "1px solid #dfeaf8",
   borderTop: "none",
   fontWeight: 700,
   color: "#1f2937",
-  minHeight: 36,
+  minHeight: 30,
+  boxSizing: "border-box",
 };
 
 const totalCellStyle = {
@@ -1281,9 +2019,9 @@ const totalCellStyle = {
   alignItems: "center",
   justifyContent: "center",
   borderRight: "1px solid #dfeaf8",
-  padding: "8px 6px",
-  minWidth: 56,
-  fontSize: 11,
+  padding: "4px 4px",
+  boxSizing: "border-box",
+  fontSize: 13,
   fontWeight: 700,
 };
 
@@ -1309,6 +2047,17 @@ const noBadge = {
   background: "#ffe7e7",
   color: "#b91c1c",
   border: "1px solid #f7b5b5",
+};
+
+const editHeaderButtonStyle = {
+  background: "linear-gradient(135deg, #7e22ce, #6b21a8)",
+  borderRadius: "6px",
+  fontWeight: 700,
+  textTransform: "none",
+  boxShadow: "none",
+  minWidth: "120px",
+  padding: "8px 16px",
+  "&:hover": { background: "linear-gradient(135deg, #6d28d9, #581c87)" },
 };
 
 const saveHeaderButtonStyle = {

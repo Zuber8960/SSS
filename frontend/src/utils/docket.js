@@ -4,6 +4,18 @@ const TOKEN_KEY = 'authToken';
 const hasAuthToken = () => !!localStorage.getItem(TOKEN_KEY);
 
 export const fetchAllDockets = (cnor_cnee) => Api.get(`/docket?cnor_cnee=${cnor_cnee}`).then(r => r.data.data || r.data || []);
+export const fetchDocketsForBilling = ({ locCode, customerIds = [], customerName = "", billedMode = "unbilled", fromDate = "", toDate = "" } = {}) =>
+  Api.get("/docket/for-billing", {
+    timeout: 120000,
+    params: {
+      loc_code: locCode || "",
+      customer_ids: (Array.isArray(customerIds) ? customerIds : [customerIds]).filter(Boolean).join(","),
+      customer_name: customerName || "",
+      billed_mode: billedMode || "unbilled",
+      from_date: fromDate || "",
+      to_date: toDate || "",
+    },
+  }).then((r) => r.data.data || r.data || []);
 export const fetchEwayBill = (ewbLists) => Api.get(`/docket/ewbDetails/${encodeURIComponent(ewbLists)}`).then(r => r.data?.length ? r.data.data : r.data || []);
 export const fetchDocketById = (recId) => Api.get(`/user/${recId}`).then(r => r.data.data);
 export const fetchDocketByDocketNo = (docketNo) => Api.get(`/docket/${encodeURIComponent(docketNo)}`).then(r => r.data.data || r.data);
@@ -22,11 +34,20 @@ export const fetchCustRate = (payload) =>
 
 export const fetchChargeMaster = () => Api.get('/docket/charge-master').then(r => r.data.data || r.data || []);
 export const fetchCharges = (docketId) => Api.get(`/docket/${docketId}/charges`).then(r => r.data.data || r.data || []);
-export const fetchChargesBulk = (docketNos = []) => {
+export const fetchChargesBulk = async (docketNos = []) => {
   const nos = (Array.isArray(docketNos) ? docketNos : []).map((n) => String(n || "").trim()).filter(Boolean);
-  if (nos.length === 0) return Promise.resolve([]);
-  return Api.get("/docket/charges-bulk", { params: { docket_nos: nos.join(",") } })
-    .then((r) => r.data.data || r.data || []);
+  if (nos.length === 0) return [];
+  const chunkSize = 40;
+  const chunks = [];
+  for (let i = 0; i < nos.length; i += chunkSize) chunks.push(nos.slice(i, i + chunkSize));
+  const parts = await Promise.all(
+    chunks.map((chunk) =>
+      Api.get("/docket/charges-bulk", { params: { docket_nos: chunk.join(",") } })
+        .then((r) => r.data.data || r.data || [])
+        .catch(() => [])
+    )
+  );
+  return parts.flat();
 };
 export const createCharge = (docketId, data) => Api.post(`/docket/${docketId}/charges`, data).then(r => r.data.data || r.data);
 export const updateCharge = (chargeId, data) => Api.put(`/docket/charges/${chargeId}`, data).then(r => r.data.data || r.data);

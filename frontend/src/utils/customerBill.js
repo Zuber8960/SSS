@@ -10,6 +10,11 @@ export const fetchInvoiceByKeys = (invoiceNo, invoiceDate, invoiceLoc) =>
   Api.get(`/customerBill/${encodeURIComponent(invoiceNo)}/${encodeURIComponent(invoiceDate)}/${encodeURIComponent(invoiceLoc)}`)
     .then((r) => r.data.data || r.data || null);
 
+export const fetchInvoiceByNumber = (invoiceNo, locCode = null) =>
+  Api.get(`/customerBill/by-number/${encodeURIComponent(invoiceNo)}`, {
+    params: locCode ? { loc_code: locCode } : {},
+  }).then((r) => r.data.data || r.data || null);
+
 export const fetchInvoiceDetails = (invoiceNo, invoiceDate, invoiceLoc) =>
   Api.get(`/customerBill/${encodeURIComponent(invoiceNo)}/${encodeURIComponent(invoiceDate)}/${encodeURIComponent(invoiceLoc)}/details`)
     .then((r) => r.data.data || r.data || []);

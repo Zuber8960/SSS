@@ -142,10 +142,92 @@ const getListEwayDetails = async (ewbLists) => {
   }
 };
 
-const getAllDockets = async (tenant_id, cnor_cnee) => {
-  const query = db('sss.sst_docket as d').select('*').where({ record_status: 0 }).orderBy('d.aud_date', 'desc');
+const getDocketsForBilling = async ({
+  tenant_id,
+  loc_code,
+  customer_ids = [],
+  customer_name = "",
+  billed_mode = "unbilled",
+  from_date = null,
+  to_date = null,
+}) => {
+  const loc = String(loc_code || "").trim().toUpperCase();
+  const name = String(customer_name || "").trim().toLowerCase();
+  const rawIds = (Array.isArray(customer_ids) ? customer_ids : String(customer_ids || "").split(","))
+    .map((v) => String(v ?? "").trim())
+    .filter((v) => v && v !== "0");
+  const numIds = rawIds.map((v) => Number(v)).filter((n) => Number.isFinite(n));
+
+  const query = db("sss.sst_docket as d")
+    .leftJoin("sss.ssm_business_partner as cnor", "d.cnor_id", "cnor.record_id")
+    .leftJoin("sss.ssm_business_partner as cnee", "d.cnee_id", "cnee.record_id")
+    .select("d.*", "cnor.bp_name as cnor_name", "cnee.bp_name as cnee_name")
+    .where({ "d.record_status": 0 });
+
   if (tenant_id) {
-    query.andWhere('d.tenant_id', tenant_id);
+    query.andWhere((q) => q.where("d.tenant_id", tenant_id).orWhereNull("d.tenant_id"));
+  }
+
+  if (rawIds.length || name) {
+    query.andWhere((q) => {
+      if (numIds.length) {
+        q.whereIn("d.cnor_id", numIds).orWhereIn("d.cnee_id", numIds);
+      }
+      if (name) {
+        q.orWhereRaw("LOWER(TRIM(COALESCE(cnor.bp_name, ''))) = ?", [name])
+          .orWhereRaw("LOWER(TRIM(COALESCE(cnee.bp_name, ''))) = ?", [name]);
+      }
+    });
+  }
+
+  if (loc) {
+    query.andWhere((q) => {
+      q.whereRaw("UPPER(TRIM(COALESCE(d.docket_loc::text, ''))) = ?", [loc])
+        .orWhereRaw("UPPER(SPLIT_PART(TRIM(COALESCE(d.docket_pay_loc, '')::text), ' - ', 1)) = ?", [loc])
+        .orWhereRaw("d.docket_no ILIKE ?", [`${loc}CN%`]);
+    });
+  }
+
+  if (from_date) {
+    query.andWhereRaw("d.docket_date::date >= ?::date", [from_date]);
+  }
+  if (to_date) {
+    query.andWhereRaw("d.docket_date::date <= ?::date", [to_date]);
+  }
+
+  query.whereExists(function () {
+    this.select(db.raw("1"))
+      .from("sss.sst_dly_note as n")
+      .whereRaw("n.docket_no = d.docket_no");
+  });
+
+  if (billed_mode === "unbilled") {
+    query.whereNotExists(function () {
+      this.select(db.raw("1"))
+        .from("sss.sst_invoice_dtl as i")
+        .whereRaw("i.docket_no = d.docket_no");
+    });
+  } else if (billed_mode === "billed") {
+    query.whereExists(function () {
+      this.select(db.raw("1"))
+        .from("sss.sst_invoice_dtl as i")
+        .whereRaw("i.docket_no = d.docket_no");
+    });
+  }
+
+  return query.orderByRaw(`
+    COALESCE(NULLIF(RIGHT(REGEXP_REPLACE(COALESCE(d.docket_no, '')::text, '[^0-9]', '', 'g'), 6), '')::bigint, 0) ASC,
+    d.docket_no ASC
+  `);
+};
+
+const getAllDockets = async (tenant_id, cnor_cnee) => {
+  const query = db('sss.sst_docket as d')
+    .select('d.*')
+    .where({ 'd.record_status': 0 })
+    .orderBy('d.aud_date', 'desc');
+  if (tenant_id) {
+    query.andWhere((q) => q.where('d.tenant_id', tenant_id).orWhereNull('d.tenant_id'));
   }
   if (cnor_cnee) {
     query.leftJoin('sss.ssm_business_partner as cnor', 'd.cnor_id', 'cnor.record_id')
@@ -153,7 +235,7 @@ const getAllDockets = async (tenant_id, cnor_cnee) => {
       .select(
         'cnor.bp_name as cnor_name',
         'cnee.bp_name as cnee_name',
-      )
+      );
   }
   return query;
 };
@@ -1169,6 +1251,7 @@ const getCustRate = async (params = {}) => {
 
 module.exports = {
   getAllDockets,
+  getDocketsForBilling,
   getDocketById,
   getDocketByNo,
   getDocketByRecId,

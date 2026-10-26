@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
 import { DataTable, PageBody } from "../../components/common/MasterPage";
 import useAlert from "../../components/common/UseAlert";
@@ -9,35 +10,225 @@ import { fetchAllInvoices, fetchInvoiceDetails } from "../../utils/customerBill"
 import { fetchAllBusinessPartners } from "../../utils/businessPartner";
 import { fetchAllLocations } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
-import { RefreshIcon, PrintIcon, ExportIcon, CloseIcon } from "../../components/common/icons";
-import { printInvoice } from "../../components/common/InvoicePrint";
+import { RefreshIcon, PrintIcon, ExportIcon, CloseIcon, EditIcon, ViewIcon } from "../../components/common/icons";
+import { printInvoice, resolveBillToCustomer } from "../../components/common/InvoicePrint";
 import { IconButton, Tooltip, Button, TextField, Autocomplete, Menu, MenuItem, ListItemIcon, ListItemText } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import moment from "moment";
 import { getDateFormat } from "../../utils/tenantService";
+import { formatSac } from "../../utils/sacCodes";
+
+const formatInvoiceNo = (v) => {
+  const n = Number(v);
+  if (Number.isFinite(n)) return String(Math.trunc(n));
+  return String(v ?? "").trim();
+};
+
+const isRealBpCode = (v) => {
+  const s = String(v ?? "").trim();
+  return !!s && s !== "0";
+};
+
+const formatCustomer = (inv, partners = []) => {
+  const rawCode = String(inv?.bp_code ?? "").trim();
+  const name = String(inv?.bp_name ?? "").trim();
+  const loc = String(inv?.loc_code ?? "").split(" - ")[0].trim().toUpperCase();
+  const norm = (s) => String(s || "").replace(/["']/g, "").trim().toLowerCase();
+  const list = Array.isArray(partners) ? partners : [];
+
+  let partner = null;
+  if (isRealBpCode(rawCode)) {
+    partner = list.find((p) => {
+      const grp = String(p.bp_grp_code ?? "").trim();
+      const code = String(p.bp_code ?? "").trim();
+      return grp === rawCode || code === rawCode;
+    }) || null;
+  }
+  if (!partner && name) {
+    const want = norm(name);
+    partner = list.find((p) => {
+      if (norm(p.bp_name) !== want) return false;
+      if (!loc) return true;
+      const bpLoc = String(p.loc_code || "").split(" - ")[0].trim().toUpperCase();
+      return !bpLoc || bpLoc === loc;
+    }) || list.find((p) => norm(p.bp_name) === want) || null;
+  }
+
+  const code = String(partner?.bp_grp_code ?? partner?.bp_code ?? (isRealBpCode(rawCode) ? rawCode : "")).trim();
+  const displayName = name || String(partner?.bp_name ?? "").trim();
+  return {
+    code,
+    name: displayName,
+    label: code && displayName ? `${code} - ${displayName}` : (displayName || code),
+  };
+};
 
 const combinedColumns = [
-  { key: "invoice_no", label: "Invoice No", minWidth: 110 },
-  { key: "invoice_date", label: "Invoice Date", minWidth: 100 },
-  { key: "bp_name", label: "Customer", minWidth: 140 },
-  { key: "loc_label", label: "Branch", minWidth: 100 },
-  { key: "invoice_type", label: "Type", minWidth: 90 },
-  { key: "docket_chrwt", label: "Chg Wt", minWidth: 80 },
-  { key: "freight", label: "Freight", minWidth: 90 },
-  { key: "loading", label: "Loading", minWidth: 85 },
-  { key: "unloading", label: "Unloading", minWidth: 90 },
-  { key: "detention", label: "Detention", minWidth: 90 },
-  { key: "additional_toll", label: "Add Toll", minWidth: 90 },
-  { key: "green_tax", label: "Green Tax", minWidth: 90 },
-  { key: "other_charges", label: "Other Chg", minWidth: 90 },
-  { key: "taxable_amt", label: "Taxable", minWidth: 90 },
-  { key: "cgst", label: "CGST", minWidth: 80 },
-  { key: "sgst", label: "SGST", minWidth: 80 },
-  { key: "igst", label: "IGST", minWidth: 80 },
-  { key: "total_amt", label: "Total", minWidth: 100 },
-  { key: "total_inv_amt", label: "Inv Amount", minWidth: 100 },
-  { key: "created_by", label: "Created By", minWidth: 90 },
+  { key: "invoice_no", label: "Inv\nNo", minWidth: 72, align: "left", sortComparator: (a, b) => Number(a) - Number(b) },
+  { key: "invoice_date", label: "Inv\nDate", minWidth: 78 },
+  { key: "bp_name", label: "Customer", minWidth: 240, flex: 2.2, align: "left" },
+  { key: "loc_label", label: "Branch", minWidth: 110, align: "left" },
+  { key: "invoice_type", label: "Type", minWidth: 56 },
+  { key: "sac_label", label: "SAC", minWidth: 88, flex: 0.55, align: "left" },
+  { key: "docket_chrwt", label: "Chg\nWt", minWidth: 44 },
+  { key: "freight", label: "Frt.", minWidth: 96 },
+  { key: "handling", label: "Hand.", minWidth: 68 },
+  { key: "fuel_surcharge", label: "Fuel\nChrg", minWidth: 72 },
+  { key: "factory_charge", label: "Fact.\nChrg", minWidth: 74 },
+  { key: "oda_charge", label: "ODA\nChrg", minWidth: 66 },
+  { key: "fov", label: "FOV", minWidth: 58 },
+  { key: "stationery", label: "Stnry.", minWidth: 74 },
+  { key: "taxable_amt", label: "Taxable", minWidth: 100 },
+  { key: "cgst", label: "CGST", minWidth: 60 },
+  { key: "sgst", label: "SGST", minWidth: 60 },
+  { key: "igst", label: "IGST", minWidth: 60 },
+  { key: "total_inv_amt", label: "Inv\nAmt", minWidth: 84 },
+  { key: "inv_sub_date", label: "Subm.\nDate", minWidth: 78 },
 ];
+
+const invoiceReportGridCss = `
+.invoice-report-page .MuiDataGrid-cell,
+.invoice-report-page .MuiDataGrid-cell *,
+.invoice-report-page .MuiDataGrid-columnHeaderTitle {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+}
+.invoice-report-page .MuiDataGrid-cell[data-field="freight"],
+.invoice-report-page .MuiDataGrid-cell[data-field="handling"],
+.invoice-report-page .MuiDataGrid-cell[data-field="fuel_surcharge"],
+.invoice-report-page .MuiDataGrid-cell[data-field="factory_charge"],
+.invoice-report-page .MuiDataGrid-cell[data-field="oda_charge"],
+.invoice-report-page .MuiDataGrid-cell[data-field="fov"],
+.invoice-report-page .MuiDataGrid-cell[data-field="stationery"],
+.invoice-report-page .MuiDataGrid-cell[data-field="taxable_amt"],
+.invoice-report-page .MuiDataGrid-cell[data-field="cgst"],
+.invoice-report-page .MuiDataGrid-cell[data-field="sgst"],
+.invoice-report-page .MuiDataGrid-cell[data-field="igst"],
+.invoice-report-page .MuiDataGrid-cell[data-field="total_inv_amt"],
+.invoice-report-page .MuiDataGrid-cell[data-field="freight"] *,
+.invoice-report-page .MuiDataGrid-cell[data-field="handling"] *,
+.invoice-report-page .MuiDataGrid-cell[data-field="fuel_surcharge"] *,
+.invoice-report-page .MuiDataGrid-cell[data-field="factory_charge"] *,
+.invoice-report-page .MuiDataGrid-cell[data-field="oda_charge"] *,
+.invoice-report-page .MuiDataGrid-cell[data-field="fov"] *,
+.invoice-report-page .MuiDataGrid-cell[data-field="stationery"] *,
+.invoice-report-page .MuiDataGrid-cell[data-field="taxable_amt"] *,
+.invoice-report-page .MuiDataGrid-cell[data-field="cgst"] *,
+.invoice-report-page .MuiDataGrid-cell[data-field="sgst"] *,
+.invoice-report-page .MuiDataGrid-cell[data-field="igst"] *,
+.invoice-report-page .MuiDataGrid-cell[data-field="total_inv_amt"] * {
+  font-size: 13px !important;
+}
+.invoice-report-page .MuiDataGrid-cell {
+  padding: 0 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 26px !important;
+}
+.invoice-report-page .MuiDataGrid-cell > span,
+.invoice-report-page .MuiDataGrid-cellContent {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100%;
+  height: 100%;
+  line-height: 1.15 !important;
+}
+.invoice-report-page .MuiDataGrid-cell--textLeft,
+.invoice-report-page .MuiDataGrid-cell--textLeft > span,
+.invoice-report-page .MuiDataGrid-cell--textLeft .MuiDataGrid-cellContent {
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+.invoice-report-page .MuiDataGrid-columnHeader--alignLeft .MuiDataGrid-columnHeaderTitle {
+  text-align: left !important;
+}
+.invoice-report-page .MuiDataGrid-row {
+  min-height: 26px !important;
+  max-height: 26px !important;
+}
+.invoice-report-page .MuiDataGrid-row.Mui-selected,
+.invoice-report-page .MuiDataGrid-row.Mui-selected:nth-of-type(even) {
+  background-color: #dcfce7 !important;
+}
+.invoice-report-page .MuiDataGrid-row.Mui-selected:hover {
+  background-color: #bbf7d0 !important;
+}
+.invoice-report-page .MuiDataGrid-columnHeader {
+  padding: 0 4px !important;
+  height: 48px !important;
+}
+.invoice-report-page .MuiDataGrid-columnHeaders,
+.invoice-report-page .MuiDataGrid-columnHeaderRow {
+  min-height: 48px !important;
+  max-height: 48px !important;
+}
+.invoice-report-page .MuiDataGrid-container--top,
+.invoice-report-page .MuiDataGrid-topContainer {
+  height: 48px !important;
+  min-height: 48px !important;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  flex: 0 0 48px;
+}
+.invoice-report-page .MuiDataGrid-virtualScrollerRenderZone {
+  position: relative !important;
+  top: 0 !important;
+  transform: none !important;
+}
+.invoice-report-page .MuiDataGrid-columnHeaderTitleContainer,
+.invoice-report-page .MuiDataGrid-columnHeaderTitleContainerContent {
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+}
+.invoice-report-page .MuiDataGrid-columnHeaderTitle {
+  white-space: pre-line !important;
+  line-height: 1.15 !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  text-align: center !important;
+  text-transform: uppercase;
+}
+.invoice-report-page .dataTableWrapper,
+.invoice-report-page .MuiDataGrid-root,
+.invoice-report-page .MuiDataGrid-main {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+.invoice-report-page .dataTableWrapper,
+.invoice-report-page .MuiDataGrid-root {
+  min-height: 520px !important;
+  height: 520px !important;
+  --DataGrid-headerHeight: 48px;
+  --DataGrid-headersTotalHeight: 48px;
+  --DataGrid-topContainerHeight: 48px;
+}
+.invoice-report-page .MuiDataGrid-virtualScroller {
+  overflow: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #93c5fd #e3f2fd;
+}
+.invoice-report-page .MuiDataGrid-virtualScroller::-webkit-scrollbar {
+  display: block !important;
+  width: 10px !important;
+  height: 10px !important;
+}
+.invoice-report-page .MuiDataGrid-virtualScroller::-webkit-scrollbar-thumb {
+  background: #60a5fa;
+  border-radius: 8px;
+}
+.invoice-report-page .MuiDataGrid-virtualScroller::-webkit-scrollbar-track {
+  background: #e3f2fd;
+}
+.invoice-report-page .MuiDataGrid-cellEmpty {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+}
+`;
 
 const toDate = (v) => {
   if (!v) return "";
@@ -50,12 +241,8 @@ const fmtAmt = (v) => {
   return Number.isFinite(n) ? n.toFixed(2) : "0.00";
 };
 
-const fmtNum = (v) => {
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? String(n) : "0";
-};
-
 export default function InvoiceReport() {
+  const navigate = useNavigate();
   const { dialog, closeAlert, showError, showSuccess } = useAlert();
   const { isLoading, showLoading, hideLoading } = useLoading();
 
@@ -79,12 +266,6 @@ export default function InvoiceReport() {
     fetchAllLocations().then((d) => setLocations(Array.isArray(d) ? d : [])).catch(() => {});
     fetchAllCompanies().then((d) => { if (Array.isArray(d) && d.length) setCompany(d[0]); }).catch(() => {});
   }, []);
-
-  const pMap = useMemo(() => {
-    const m = {};
-    (partners || []).forEach((p) => { if (p.bp_code) m[p.bp_code] = p; });
-    return m;
-  }, [partners]);
 
   const lMap = useMemo(() => {
     const m = {};
@@ -115,45 +296,62 @@ export default function InvoiceReport() {
       // Group: ONE row per invoice, summing all docket lines
       const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
       const rows = [];
-      results.forEach(({ inv, details }) => {
-        const p = pMap[inv.bp_code] || {};
+      results.forEach(({ inv, details }, index) => {
         const loc = lMap[inv.loc_code] || {};
         const invDate = toDate(inv.invoice_date);
-        const bpName = inv.bp_name || p.bp_name || "";
+        const customer = formatCustomer(inv, partners);
         const locLabel = loc.loc_name ? `${loc.loc_code} - ${loc.loc_name}` : inv.loc_code || "";
         const typeLabel = inv.invoice_type === "D" || inv.invoice_type === "DN" ? "Debit Note" : inv.invoice_type === "CM" ? "Complimentary" : inv.invoice_type === "R" || inv.invoice_type === "C" ? "Regular" : inv.invoice_type || "";
 
         const lines = Array.isArray(details) ? details : [];
         const sum = {
-          docket_chrwt: 0, freight: 0, loading: 0, unloading: 0, detention: 0,
-          additional_toll: 0, green_tax: 0, other_charges: 0,
+          docket_chrwt: 0, freight: 0, handling: 0, fuel_surcharge: 0, factory_charge: 0,
+          oda_charge: 0, fov: 0, stationery: 0,
           taxable_amt: 0, cgst: 0, sgst: 0, igst: 0, total_amt: 0,
         };
         lines.forEach((d) => {
-          Object.keys(sum).forEach((k) => { sum[k] += num(d[k]); });
+          sum.docket_chrwt += num(d.docket_chrwt);
+          sum.freight += num(d.freight);
+          sum.handling += num(d.handling ?? d.loading);
+          sum.fuel_surcharge += num(d.fuel_surcharge ?? d.unloading);
+          sum.factory_charge += num(d.factory_charge ?? d.detention);
+          sum.oda_charge += num(d.oda_charge ?? d.additional_toll);
+          sum.fov += num(d.fov ?? d.green_tax);
+          sum.stationery += num(d.stationery ?? d.other_charges);
+          sum.taxable_amt += num(d.taxable_amt);
+          sum.cgst += num(d.cgst);
+          sum.sgst += num(d.sgst);
+          sum.igst += num(d.igst);
+          sum.total_amt += num(d.total_amt);
         });
         const docketNos = lines.map((d) => d.docket_no).filter(Boolean).join(", ");
 
+        const invoiceNo = formatInvoiceNo(inv.invoice_no);
         rows.push({
-          id: `${inv.invoice_no}_${inv.invoice_date || ""}_${inv.loc_code || ""}`,
-          invoice_no: inv.invoice_no || "",
+          id: inv.record_id != null ? `inv-${inv.record_id}` : `inv-${invoiceNo}-${inv.loc_code || ""}-${index}`,
+          invoice_no: invoiceNo,
           invoice_date: invDate,
-          bp_name: bpName,
-          bp_code: inv.bp_code || "",
+          bp_name: customer.label,
+          bp_code: customer.code,
           loc_code: inv.loc_code || "",
           loc_label: locLabel,
           invoice_type: typeLabel,
+          sac_code: inv.sac_code || "",
+          sac_label: formatSac(inv.sac_code),
           docket_count: lines.length,
           docket_nos: docketNos,
           docket_chrwt: String(sum.docket_chrwt),
-          freight: fmtAmt(sum.freight), loading: fmtAmt(sum.loading), unloading: fmtAmt(sum.unloading),
-          detention: fmtAmt(sum.detention), additional_toll: fmtAmt(sum.additional_toll), green_tax: fmtAmt(sum.green_tax), other_charges: fmtAmt(sum.other_charges),
+          freight: fmtAmt(sum.freight), handling: fmtAmt(sum.handling), fuel_surcharge: fmtAmt(sum.fuel_surcharge),
+          factory_charge: fmtAmt(sum.factory_charge), oda_charge: fmtAmt(sum.oda_charge), fov: fmtAmt(sum.fov), stationery: fmtAmt(sum.stationery),
           taxable_amt: fmtAmt(sum.taxable_amt), cgst: fmtAmt(sum.cgst), sgst: fmtAmt(sum.sgst), igst: fmtAmt(sum.igst),
           total_amt: fmtAmt(sum.total_amt),
           total_inv_amt: fmtAmt(inv.total_inv_amt ?? sum.total_amt),
-          created_by: inv.created_by || "",
+          invoice_date_iso: moment(inv.invoice_date).isValid() ? moment(inv.invoice_date).format("YYYY-MM-DD") : "",
+          inv_sub_date: toDate(inv.inv_sub_date),
+          is_submitted: !!inv.inv_sub_date,
         });
       });
+      rows.sort((a, b) => (Number(a.invoice_no) || 0) - (Number(b.invoice_no) || 0));
       setAllGridRows(rows);
       if (showLoadingSpinner) showSuccess("Data refreshed");
     } catch (e) {
@@ -166,7 +364,7 @@ export default function InvoiceReport() {
   useEffect(() => {
     loadAllData(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pMap, lMap]);
+  }, [partners, lMap]);
 
   const custOpts = useMemo(() => [...new Set((allGridRows).map((r) => r.bp_name).filter(Boolean))].sort(), [allGridRows]);
   const brOpts = useMemo(() => [...new Set((allGridRows).map((r) => r.loc_label).filter(Boolean))].sort(), [allGridRows]);
@@ -187,7 +385,7 @@ export default function InvoiceReport() {
           if (dt && rd.isAfter(dt, "day")) return false;
         }
       }
-      if (q && !["invoice_no","bp_name","loc_label","loc_code","invoice_type","docket_nos","created_by"]
+      if (q && !["invoice_no","bp_name","bp_code","loc_label","loc_code","invoice_type","sac_label","sac_code","docket_nos","inv_sub_date"]
         .some((k) => String(row[k] ?? "").toLowerCase().includes(q))) return false;
       return true;
     });
@@ -220,6 +418,23 @@ export default function InvoiceReport() {
     URL.revokeObjectURL(url); showSuccess("Export started");
   };
 
+  const openInvoiceForEdit = (row) => {
+    if (!row) { showError("Please select an invoice"); return; }
+    const apiDate = row.invoice_date_iso
+      || (moment(row.invoice_date, getDateFormat()).isValid()
+        ? moment(row.invoice_date, getDateFormat()).format("YYYY-MM-DD")
+        : row.invoice_date);
+    navigate("/transaction/customer-bill", {
+      state: {
+        editInvoice: {
+          invoice_no: row.invoice_no,
+          invoice_date: apiDate,
+          loc_code: row.loc_code,
+        },
+      },
+    });
+  };
+
   const handlePrint = async (withDetails) => {
     if (!selectedRow) { showError("Please select an invoice to print"); return; }
     try {
@@ -228,20 +443,34 @@ export default function InvoiceReport() {
       const m = moment(inv.invoice_date, getDateFormat());
       const apiDate = m.isValid() ? m.format("YYYY-MM-DD") : inv.invoice_date;
       const res = await fetchInvoiceDetails(inv.invoice_no, apiDate, inv.loc_code);
+      const customer = resolveBillToCustomer(
+        { bp_code: inv.bp_code, bp_name: inv.bp_name, loc_code: inv.loc_code },
+        partners
+      );
       printInvoice({
         invoice: {
           invoice_no: inv.invoice_no,
           invoice_date: inv.invoice_date,
-          bp_name: inv.bp_name,
-          bp_code: inv.bp_code || "",
+          bp_name: customer?.bp_name || inv.bp_name,
+          bp_code: customer?.bp_grp_code || customer?.bp_code || inv.bp_code || "",
+          bp_address: customer?.bp_addres || customer?.bp_address || "",
+          bp_city: customer?.bp_city || "",
+          bp_state: customer?.bp_state || "",
+          bp_pincode: customer?.bp_pincode || "",
+          bp_gstin: customer?.bp_gstin || "",
+          bp_phone: customer?.bp_mobile1 || customer?.bp_mobile2 || "",
           loc_code: inv.loc_code,
           loc_label: inv.loc_label || inv.loc_code,
           invoice_type: inv.invoice_type,
+          sac_code: inv.sac_code,
+          sac_label: inv.sac_label || formatSac(inv.sac_code),
           total_inv_amt: inv.total_inv_amt,
         },
         details: withDetails ? (Array.isArray(res) ? res : []) : [],
         company,
         locationsMap: lMap,
+        customer,
+        partners,
       });
     } catch (e) { showError(e.message || "Print failed"); }
     finally { hideLoading(); }
@@ -250,6 +479,8 @@ export default function InvoiceReport() {
   return (
     <MainLayout>
       <PageBody title="Invoice Report">
+        <style>{invoiceReportGridCss}</style>
+        <div className="invoice-report-page">
         <div className="pageToolbar" style={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", width: "100%" }}>
             <Tooltip title="Refresh">
@@ -379,6 +610,26 @@ export default function InvoiceReport() {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Button
               variant="contained"
+              startIcon={selectedRow?.inv_sub_date ? <ViewIcon /> : <EditIcon />}
+              onClick={() => openInvoiceForEdit(selectedRow)}
+              sx={{
+                background: selectedRow?.inv_sub_date
+                  ? "linear-gradient(135deg, #475569, #334155)"
+                  : "linear-gradient(135deg, #7e22ce, #6b21a8)",
+                "&:hover": {
+                  background: selectedRow?.inv_sub_date
+                    ? "linear-gradient(135deg, #334155, #1e293b)"
+                    : "linear-gradient(135deg, #6d28d9, #581c87)",
+                },
+                textTransform: "none",
+                fontWeight: 600,
+                borderRadius: 2,
+              }}
+            >
+              {selectedRow?.inv_sub_date ? "View" : "Edit"}
+            </Button>
+            <Button
+              variant="contained"
               endIcon={<ArrowDropDownIcon />}
               startIcon={<PrintIcon />}
               onClick={(e) => setPrintAnchor(e.currentTarget)}
@@ -441,8 +692,24 @@ export default function InvoiceReport() {
         <div style={{ marginTop: 10 }}>
           <DataTable columns={combinedColumns} rows={gridRows}
             getKey={(r, i) => r.id || i}
-            actions={[]} autoHeight scroll={{ afterRows: 10, horizontal: true }}
-            checkboxSelection disableMultipleRowSelection onRowSelectionModelChange={onSelect} />
+            actions={[
+              {
+                label: "Edit",
+                icon: <EditIcon />,
+                onClick: (row) => openInvoiceForEdit(row),
+              },
+            ]}
+            actionsPosition="left"
+            dense
+            rowHeight={26}
+            headerHeight={48}
+            autoHeight={false}
+            isHeight={520}
+            checkboxSelection
+            disableMultipleRowSelection
+            selectedRowColor="#dcfce7"
+            onRowSelectionModelChange={onSelect} />
+        </div>
         </div>
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />

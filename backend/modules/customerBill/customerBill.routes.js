@@ -34,6 +34,27 @@ router.get('/billed-dockets', async (req, res) => {
   }
 });
 
+/* ================= GET BY BILL NUMBER (no date/loc required) ================= */
+
+router.get('/by-number/:invoiceNo', async (req, res) => {
+  try {
+    const { invoiceNo } = req.params;
+    const loc_code = req.query.loc_code || req.loc_code || null;
+    const company_code = req.tenant_id || null;
+    const data = await CustomerBillController.getInvoiceByNumber(
+      invoiceNo,
+      loc_code,
+      company_code
+    );
+    if (!data) {
+      return res.status(404).json({ success: false, message: `Bill number ${invoiceNo} not found` });
+    }
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 /* ================= GET SINGLE INVOICE (header + details) ================= */
 
 router.get('/:invoiceNo/:invoiceDate/:invoiceLoc', async (req, res) => {
@@ -115,7 +136,8 @@ router.delete('/:invoiceNo/:invoiceDate/:invoiceLoc', async (req, res) => {
     const deletedCount = await CustomerBillController.deleteInvoice(
       Number(invoiceNo),
       invoiceDate,
-      invoiceLoc
+      invoiceLoc,
+      req.tenant_id || null
     );
     if (!deletedCount) {
       return res.status(404).json({ success: false, message: 'Invoice not found' });
