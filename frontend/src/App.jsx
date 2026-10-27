@@ -36,6 +36,7 @@ import ManifestReport from "./pages/reports/ManifestReport";
 import HireVoucherReport from "./pages/reports/HireVoucherReport";
 import CustomerMIS from "./pages/reports/CustomerMIS";
 import CustomerBill from "./pages/transaction/CustomerBill";
+import MoneyReceipt from "./pages/transaction/MoneyReceipt";
 import { isAuthenticated } from "./utils/authService";
 import { useMenuAccess } from "./utils/accessControl";
 import DistanceCalculator from "./pages/dev/DistanceCalculator";
@@ -75,6 +76,7 @@ const appRoutes = [
   { path: "/transaction/manifest-unloading", element: <ManifestUnloading />, protected: true },
   { path: "/reports/docket-enquiry", element: <DocketEnquiry />, protected: true },
   { path: "/transaction/customer-bill", element: <CustomerBill />, protected: true },
+  { path: "/transaction/money-receipt", element: <MoneyReceipt />, protected: true },
   { path: "/transaction/bill-submission", element: <BillSubmissionPage />, protected: true },
   { path: "/transaction/job-card-creation", element: <JobCardCreationPage />, protected: true },
   { path: "/transaction/job-approval", element: <JobApprovalPage />, protected: true },

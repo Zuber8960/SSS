@@ -323,7 +323,7 @@ export default function ManifestReport() {
         <div style={{ marginTop: 10 }}>
           <DataTable columns={manifestColumns} rows={gridRows}
             getKey={(r, i) => r.id || i}
-            actions={[]} autoHeight scroll={{ afterRows: 10, horizontal: true }}
+            actions={[]} compact rowsPerPage={50} autoHeight scroll={{ afterRows: 25, horizontal: true }}
             checkboxSelection disableMultipleRowSelection onRowSelectionModelChange={onSelect} />
         </div>
 

@@ -226,7 +226,7 @@ export default function HireVoucherReport() {
         <div style={{ marginTop: 10 }}>
           <DataTable columns={hireVoucherReportColumns} rows={displayRows}
             getKey={(r, i) => r.id || i}
-            actions={[]} autoHeight scroll={{ afterRows: 10, horizontal: true }}
+            actions={[]} compact rowsPerPage={50} autoHeight scroll={{ afterRows: 25, horizontal: true }}
             checkboxSelection disableMultipleRowSelection onRowSelectionModelChange={onSelect}
             statusKey="row_tone"
             rowColors={{ Settled: "#7CFC00", Total: "#f3e8ff" }}

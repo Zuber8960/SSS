@@ -582,8 +582,10 @@ export default function CustomerMIS() {
             rows={gridRows}
             getKey={(r) => r.rec_id}
             actions={[]}
+            compact
+            rowsPerPage={50}
             autoHeight
-            scroll={{ afterRows: 10, horizontal: true }}
+            scroll={{ afterRows: 25, horizontal: true }}
           />
         </div>
 

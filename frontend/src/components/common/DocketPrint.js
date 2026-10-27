@@ -44,6 +44,8 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
   const totalFreight = filteredCharges.reduce((s, c) => s + (parseFloat(c.charge_amt) || 0), 0);
   const gstPct = 0;
   const gstAmt = (totalFreight * gstPct) / 100;
+  const printVehNo = form.veh_no || ewb.vehicle_no || "";
+  const printVehType = form.veh_type || "";
 
   return `
     <div class="slip">
@@ -84,7 +86,7 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
               <td>${fmt(form.docket_to_town || form.docket_to_loc)}</td>
               <td>${fmt(form.transit_type)}</td>
               <td>${fmt(form.pay_loc)}</td>
-              <td>${fmt(ewb.vehicle_no)}</td>
+              <td>${fmt(printVehNo)}</td>
               <td>${fmt(form.load_type)}</td>
               <td>${fmtDate(form.docket_date)}</td>
             </tr>
@@ -208,11 +210,11 @@ const buildSlipHtml = ({ form, charges, ewb, printEwbNo, company, currentLoc, co
               <tbody>
                 <tr>
                   <td class="pkg-label" style="white-space:nowrap;">Vehicle Type</td>
-                  <td>${fmt(form.load_type === "FTL" ? form.veh_type : "")}</td>
+                  <td>${fmt(printVehType)}</td>
                 </tr>
                 <tr>
                   <td class="pkg-label" style="white-space:nowrap;">Vehicle No</td>
-                  <td>${fmt(form.load_type === "FTL" ? form.veh_no : "")}</td>
+                  <td>${fmt(printVehNo)}</td>
                 </tr>
               </tbody>
             </table>

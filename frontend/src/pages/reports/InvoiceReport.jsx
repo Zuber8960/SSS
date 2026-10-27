@@ -700,11 +700,10 @@ export default function InvoiceReport() {
               },
             ]}
             actionsPosition="left"
-            dense
-            rowHeight={26}
-            headerHeight={48}
-            autoHeight={false}
-            isHeight={520}
+            compact
+            rowsPerPage={50}
+            autoHeight
+            scroll={{ afterRows: 25, horizontal: true }}
             checkboxSelection
             disableMultipleRowSelection
             selectedRowColor="#dcfce7"

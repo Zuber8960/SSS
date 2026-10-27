@@ -22,6 +22,8 @@ const keepTotalFilterOps = (operators) =>
     },
   }));
 import { Box, Button, FormControl, InputLabel, Select, MenuItem, IconButton, TextField, Tooltip } from "@mui/material";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { formatDateDisplay, formatDateIso } from "../../utils/tenantService";
 
 function DateEditCell(props) {
@@ -369,6 +371,8 @@ export function DataTable({
   isHeight,
   scroll,
   dense = false,
+  compact = false,
+  rowsPerPage,
   rowHeight: rowHeightProp,
   headerHeight: headerHeightProp,
   // Row-click behaviour: when true, clicking a row toggles its selection
@@ -460,21 +464,44 @@ export function DataTable({
     });
   });
 
-  const ROW_HEIGHT = rowHeightProp ?? (dense ? 40 : 55);
-  const HEADER_HEIGHT = headerHeightProp ?? (dense ? 36 : 42);
+  const ROW_HEIGHT = rowHeightProp ?? (compact ? 22 : dense ? 40 : 55);
+  const HEADER_HEIGHT = headerHeightProp ?? (compact ? 32 : dense ? 36 : 42);
   const maxRows = scroll?.afterRows ?? null;
   const useScrollHeight = maxRows != null && rows.length > maxRows;
   const resolvedAutoHeight = autoHeight && !useScrollHeight;
   const resolvedHeight = useScrollHeight
     ? maxRows * ROW_HEIGHT + HEADER_HEIGHT + 2
     : isHeight;
-  // Community DataGrid always paginates. hideFooter does not turn that off, so
-  // pageSize must cover every row or later invoices (5, 6, 7, …) never render.
-  const paginationModel = {
+  // MIT DataGrid throws if pageSize > 100. Small lists still use pageSize = all
+  // rows so hideFooter does not clip later records. Reports request 50 per page.
+  const COMMUNITY_MAX_PAGE_SIZE = 100;
+  const MIN_PAGE_SIZE = Math.min(
+    Math.max(Number(rowsPerPage) > 0 ? Number(rowsPerPage) : 100, 1),
+    COMMUNITY_MAX_PAGE_SIZE
+  );
+  const cappedPageSize = Math.min(Math.max(rows.length, 1), COMMUNITY_MAX_PAGE_SIZE);
+  const showPager = rows.length > MIN_PAGE_SIZE;
+  const [paginationModel, setPaginationModel] = useState({
     page: 0,
-    pageSize: Math.max(rows.length, 1),
+    pageSize: showPager ? MIN_PAGE_SIZE : cappedPageSize,
+  });
+  useEffect(() => {
+    setPaginationModel({
+      page: 0,
+      pageSize: showPager ? MIN_PAGE_SIZE : cappedPageSize,
+    });
+  }, [rows.length, cappedPageSize, showPager, MIN_PAGE_SIZE]);
+  // Community grid never shows more than 100 rows at once. Keep virtualization
+  // off so the first data row is not painted under the sticky header.
+  const disableVirtual = true;
+  const pageCount = Math.max(1, Math.ceil(Math.max(rows.length, 1) / Math.max(paginationModel.pageSize, 1)));
+  const currentPage = Math.min(paginationModel.page, pageCount - 1) + 1;
+  const goPage = (nextPage) => {
+    setPaginationModel((prev) => ({
+      ...prev,
+      page: Math.max(0, Math.min(pageCount - 1, nextPage)),
+    }));
   };
-  const disableVirtual = resolvedAutoHeight || rows.length <= 50;
 
   const orderedColumns = useMemo(() => {
     const colMap = Object.fromEntries(columns.map((c) => [c.key, c]));
@@ -585,6 +612,7 @@ export function DataTable({
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
+                textAlign: "center",
               }}
             >
               {value}
@@ -702,24 +730,27 @@ export function DataTable({
     "--DataGrid-topContainerHeight": `${HEADER_HEIGHT}px`,
     "& .MuiDataGrid-main": {
       background: "transparent",
+      display: "flex",
+      flexDirection: "column",
     },
-    ...(disableVirtual
-      ? {
-          "& .MuiDataGrid-container--top, & .MuiDataGrid-topContainer": {
-            position: "sticky",
-            top: 0,
-            zIndex: 40,
-            flex: `0 0 ${HEADER_HEIGHT}px`,
-            height: HEADER_HEIGHT,
-            minHeight: HEADER_HEIGHT,
-          },
-          "& .MuiDataGrid-virtualScrollerRenderZone": {
-            position: "relative !important",
-            top: "0 !important",
-            transform: "none !important",
-          },
-        }
-      : {}),
+    "& .MuiDataGrid-container--top, & .MuiDataGrid-topContainer": {
+      position: "sticky",
+      top: 0,
+      zIndex: 40,
+      flex: `0 0 ${HEADER_HEIGHT}px`,
+      height: `${HEADER_HEIGHT}px !important`,
+      minHeight: `${HEADER_HEIGHT}px !important`,
+      maxHeight: `${HEADER_HEIGHT}px !important`,
+    },
+    "& .MuiDataGrid-virtualScroller": {
+      marginTop: "0 !important",
+      paddingTop: "0 !important",
+    },
+    "& .MuiDataGrid-virtualScrollerRenderZone": {
+      position: "relative !important",
+      top: "0 !important",
+      transform: "none !important",
+    },
     ...(resolvedAutoHeight ? {} : { height: resolvedHeight ?? 320 }),
     width: scroll?.horizontal ? "max-content" : "100%",
     minWidth: scroll?.horizontal ? undefined : "100%",
@@ -738,13 +769,15 @@ export function DataTable({
     },
     "& .MuiDataGrid-columnHeaderTitle": {
       fontWeight: 700,
-      fontSize: dense ? "11px" : "12px",
-      letterSpacing: dense ? "0.02em" : "0.04em",
+      fontSize: compact ? "10px" : dense ? "11px" : "12px",
+      letterSpacing: dense || compact ? "0.02em" : "0.04em",
       textTransform: "uppercase",
       color: "#0f0b0b",
       whiteSpace: "nowrap",
       overflow: "hidden",
       textOverflow: "ellipsis",
+      textAlign: "center",
+      width: "100%",
     },
     "& .MuiDataGrid-columnSeparator": {
       display: "none",
@@ -756,11 +789,15 @@ export function DataTable({
       borderBottom: "1px solid #f3e8ff",
       borderRight: "1px solid #f3e8ff",
       color: "#334155",
-      padding: dense ? "4px 8px" : "6px 12px",
-      fontSize: dense ? "12px" : "13px",
+      padding: compact ? "0 4px" : dense ? "4px 8px" : "6px 12px",
+      fontSize: compact ? "11px" : dense ? "12px" : "13px",
       minHeight: "unset",
-      lineHeight: 1.3,
+      lineHeight: compact ? 1.1 : 1.3,
       backgroundColor: "transparent",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      textAlign: "center",
     },
     "& .MuiDataGrid-cell:last-of-type": {
       borderRight: "none",
@@ -815,12 +852,55 @@ export function DataTable({
     + (checkboxSelection ? 50 : 0);
 
   return (
-    <div
+    <div style={{ width: "100%", marginBottom: dense ? 8 : 24 }}>
+      {showPager && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: 8,
+            marginBottom: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#6d28d9" }}>
+            Page {currentPage} of {pageCount}
+          </span>
+          <span style={{ fontSize: 12, color: "#6b7280" }}>
+            {rows.length.toLocaleString()} rows
+          </span>
+          <Tooltip title="Previous page">
+            <span>
+              <IconButton
+                size="small"
+                onClick={() => goPage(paginationModel.page - 1)}
+                disabled={currentPage <= 1}
+                sx={{ color: "#7e22ce", border: "1px solid #d8b4fe", borderRadius: 1.5 }}
+              >
+                <ChevronLeftIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title="Next page">
+            <span>
+              <IconButton
+                size="small"
+                onClick={() => goPage(paginationModel.page + 1)}
+                disabled={currentPage >= pageCount}
+                sx={{ color: "#7e22ce", border: "1px solid #d8b4fe", borderRadius: 1.5 }}
+              >
+                <ChevronRightIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </div>
+      )}
+      <div
       ref={wrapperRef}
       className="dataTableWrapper"
       style={{
         width: "100%",
-        marginBottom: dense ? 8 : 24,
         overflowX: scroll?.horizontal ? "auto" : "visible",
         overflowY: resolvedAutoHeight ? "visible" : "auto",
       }}
@@ -839,7 +919,8 @@ export function DataTable({
         hideFooter
         pagination
         paginationModel={paginationModel}
-        pageSizeOptions={[paginationModel.pageSize]}
+        onPaginationModelChange={setPaginationModel}
+        pageSizeOptions={showPager ? [MIN_PAGE_SIZE, 75, 100].filter((n, i, a) => n <= 100 && a.indexOf(n) === i) : [paginationModel.pageSize]}
         disableVirtualization={disableVirtual}
         rowSelection={true}
         getRowClassName={getRowClassName}
@@ -902,8 +983,9 @@ export function DataTable({
 
         sx={tableSx}
       />
-      {footer}
       </div>
+      {footer}
+    </div>
   );
 }
 

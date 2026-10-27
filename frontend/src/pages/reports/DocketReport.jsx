@@ -101,7 +101,7 @@ export default function DocketReport() {
   const loadDockets = async () => {
     try {
       showLoading();
-      const data = await fetchAllDockets(true);
+      const data = await fetchAllDockets(true, { loc_code: branchCode });
       setAllDockets(Array.isArray(data) ? data : []);
     } catch (err) {
       showError(err.message || "Failed to fetch dockets");
@@ -113,7 +113,7 @@ export default function DocketReport() {
 
   // Initial mount — call fetches in .then() so no setState is synchronous in effect body
   useEffect(() => {
-    fetchAllDockets(true)
+    fetchAllDockets(true, { loc_code: branchCode })
       .then((data) => setAllDockets(Array.isArray(data) ? data : []))
       .catch((err) => showError(err.message || "Failed to fetch dockets"));
     fetchAllLocations()
@@ -872,10 +872,12 @@ export default function DocketReport() {
           <DataTable
             columns={docketColumns}
             rows={gridRows}
-            getKey={(row, index) => row.docket_no + (row.docket_date || "") + index}
+            getKey={(row, index) => row.rec_id || row.id || (row.docket_no + (row.docket_date || "") + index)}
             actions={[]}
+            compact
+            rowsPerPage={50}
             autoHeight
-            scroll={{ afterRows: 10, horizontal: true }}
+            scroll={{ afterRows: 25, horizontal: true }}
             checkboxSelection
             onRowSelectionModelChange={handleRowSelection}
           />

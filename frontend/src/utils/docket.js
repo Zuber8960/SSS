@@ -3,7 +3,14 @@ import Api from '../services/Api';
 const TOKEN_KEY = 'authToken';
 const hasAuthToken = () => !!localStorage.getItem(TOKEN_KEY);
 
-export const fetchAllDockets = (cnor_cnee) => Api.get(`/docket?cnor_cnee=${cnor_cnee}`).then(r => r.data.data || r.data || []);
+export const fetchAllDockets = (cnor_cnee, extra = {}) =>
+  Api.get("/docket", {
+    timeout: 120000,
+    params: {
+      cnor_cnee,
+      ...(extra && typeof extra === "object" ? extra : {}),
+    },
+  }).then((r) => r.data.data || r.data || []);
 export const fetchDocketsForBilling = ({ locCode, customerIds = [], customerName = "", billedMode = "unbilled", fromDate = "", toDate = "" } = {}) =>
   Api.get("/docket/for-billing", {
     timeout: 120000,

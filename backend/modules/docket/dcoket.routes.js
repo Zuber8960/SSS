@@ -277,7 +277,8 @@ router.get('/', async (req, res) => {
   try {
     const { tenant_id } = req;
     const cnor_cnee = req.query.cnor_cnee === 'true' ? true : false; // Optional query parameter for docket number
-    const data = await DocketController.getAllDockets(tenant_id, cnor_cnee);
+    const loc_code = req.query.loc_code || null;
+    const data = await DocketController.getAllDockets(tenant_id, cnor_cnee, loc_code);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

@@ -221,13 +221,17 @@ const getDocketsForBilling = async ({
   `);
 };
 
-const getAllDockets = async (tenant_id, cnor_cnee) => {
+const getAllDockets = async (tenant_id, cnor_cnee, loc_code) => {
   const query = db('sss.sst_docket as d')
     .select('d.*')
     .where({ 'd.record_status': 0 })
     .orderBy('d.aud_date', 'desc');
   if (tenant_id) {
     query.andWhere((q) => q.where('d.tenant_id', tenant_id).orWhereNull('d.tenant_id'));
+  }
+  const loc = String(loc_code || '').split(' - ')[0].trim();
+  if (loc) {
+    query.andWhereRaw('UPPER(TRIM(d.docket_loc::text)) = UPPER(TRIM(?))', [loc]);
   }
   if (cnor_cnee) {
     query.leftJoin('sss.ssm_business_partner as cnor', 'd.cnor_id', 'cnor.record_id')
