@@ -5,15 +5,13 @@ const toDate = (v) => (v ? String(v).slice(0, 10) : '');
 module.exports = {
   async listPendingBills({ loc_code, bp_code, submit_type, annexure_no }) {
     const query = db('sss.sst_invoice_hdr as h')
-      .leftJoin('sss.sst_invoice_dtl as d', function () {
-        this.on('h.invoice_no', '=', 'd.invoice_no')
-          .andOn('h.invoice_date', '=', 'd.invoice_date')
-          .andOn('h.loc_code', '=', 'd.invoice_loc');
+      .innerJoin('sss.sst_invoice_dtl as d', function () {
+        this.on(db.raw('CAST(h.invoice_no AS INTEGER) = CAST(d.invoice_no AS INTEGER)'))
+          .andOn(db.raw('CAST(h.invoice_date AS DATE) = CAST(d.invoice_date AS DATE)'))
+          .andOn(db.raw("UPPER(TRIM(h.loc_code::text)) = UPPER(TRIM(d.invoice_loc::text))"));
       })
       .whereNull('h.inv_sub_date')
-      .where(function () {
-        this.whereNull('h.cancel_flag').orWhere('h.cancel_flag', '<>', 'Y');
-      })
+      .whereRaw("COALESCE(UPPER(TRIM(h.cancel_flag::text)), '') NOT IN ('Y', 'C', '1', 'TRUE')")
       .select(
         'h.invoice_no',
         db.raw("to_char(h.invoice_date::date, 'YYYY-MM-DD') as invoice_date"),
@@ -162,6 +160,7 @@ module.exports = {
           .where({ invoice_no, loc_code })
           .andWhereRaw('invoice_date::date = ?::date', [invoice_date])
           .whereNull('inv_sub_date')
+          .whereRaw("COALESCE(UPPER(TRIM(cancel_flag::text)), '') NOT IN ('Y', 'C', '1', 'TRUE')")
           .update({
             inv_sub_date: submission_date,
             modified_on: new Date(),

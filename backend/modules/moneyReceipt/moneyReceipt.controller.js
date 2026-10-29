@@ -55,77 +55,109 @@ async function listBanks() {
     .orderBy('bank_name');
 }
 
-async function getOutstandingInvoices({ loc_code, bp_code, bp_name, company_code }) {
+async function getOutstandingDockets({ loc_code, bp_code, bp_name, bp_id, mr_reason }) {
   const loc = locOf(loc_code);
+  const reason = parseInt(mr_reason, 10);
   const code = String(bp_code ?? '').trim();
   const name = String(bp_name ?? '').trim();
-  if (!loc) return [];
+  const bpId = String(bp_id ?? '').trim();
+  if (!loc || (reason !== 1 && reason !== 2)) return [];
+  if (!name && (!code || code === '0') && !bpId) return [];
 
-  const query = db('sss.sst_invoice_hdr as h')
-    .leftJoin('sss.sst_mr_dtl as r', function () {
-      this.on('h.loc_code', '=', 'r.invoice_loc')
-        .andOn(db.raw('CAST(h.invoice_no AS INTEGER) = CAST(r.invoice_no AS INTEGER)'))
-        .andOn(db.raw('CAST(h.invoice_date AS DATE) = CAST(r.invoice_date AS DATE)'));
-    })
-    .whereRaw("UPPER(TRIM(h.loc_code::text)) = UPPER(TRIM(?))", [loc])
-    .where(function () {
-      this.whereNull('h.cancel_flag').orWhereNot('h.cancel_flag', 'Y');
-    })
-    .groupBy('h.invoice_no', 'h.invoice_date', 'h.loc_code', 'h.bp_code', 'h.bp_name', 'h.total_inv_amt')
-    .select(
-      'h.invoice_no',
-      db.raw("to_char(h.invoice_date::date, 'YYYY-MM-DD') as invoice_date"),
-      'h.loc_code',
-      'h.bp_code',
-      'h.bp_name',
-      'h.total_inv_amt',
-      db.raw('COALESCE(SUM(r.received_amt), 0) as already_received'),
-      db.raw('COALESCE(SUM(r.tds_amt), 0) as already_tds'),
-      db.raw('COALESCE(SUM(r.deduction_amt), 0) as already_deduction')
-    )
-    .havingRaw(
-      'COALESCE(h.total_inv_amt, 0) - COALESCE(SUM(r.received_amt), 0) - COALESCE(SUM(r.tds_amt), 0) - COALESCE(SUM(r.deduction_amt), 0) > 0.009'
-    )
-    .orderByRaw('CAST(h.invoice_no AS INTEGER) ASC');
+  const payType = reason === 1 ? 'PAID' : 'TO PAY';
+  const partyIdCol = reason === 1 ? 'd.cnor_id' : 'd.cnee_id';
+  const locClause = reason === 1
+    ? 'UPPER(TRIM(d.docket_loc::text)) = UPPER(TRIM(?))'
+    : 'UPPER(TRIM(COALESCE(d.docket_to_loc, \'\')::text)) = UPPER(TRIM(?))';
 
-  if (code && code !== '0') {
-    query.andWhere(function () {
-      this.whereRaw('CAST(h.bp_code AS TEXT) = ?', [code]);
-      if (name) this.orWhereRaw('LOWER(TRIM(h.bp_name)) = LOWER(TRIM(?))', [name]);
-    });
-  } else if (name) {
-    query.andWhereRaw('LOWER(TRIM(h.bp_name)) = LOWER(TRIM(?))', [name]);
+  const params = [payType, loc];
+  const extraWhere = [];
+
+  if (reason === 2) {
+    extraWhere.push(`EXISTS (
+      SELECT 1 FROM sss.sst_dly_note n
+      WHERE UPPER(TRIM(n.docket_no::text)) = UPPER(TRIM(d.docket_no::text))
+        AND UPPER(TRIM(COALESCE(n.docket_to_loc, d.docket_to_loc, '')::text)) = UPPER(TRIM(?))
+        AND LOWER(TRIM(COALESCE(n.delivery_status, ''))) ~ '(deliver|dly|closed|complete|^y$|^yes$)'
+        AND LOWER(TRIM(COALESCE(n.delivery_status, ''))) !~ '(un|not |pending|cancel)'
+    )`);
+    params.push(loc);
+  }
+
+  const partyParts = [];
+  if (reason === 2) {
+    if (code && code !== '0') {
+      partyParts.push(`TRIM(CAST(bp.bp_grp_code AS TEXT)) = TRIM(?)`);
+      params.push(code);
+    }
+    if (bpId && bpId !== '0') {
+      partyParts.push(`CAST(d.cnee_id AS TEXT) = ?`);
+      params.push(bpId);
+    }
   } else {
-    return [];
+    if (name) {
+      partyParts.push(`LOWER(TRIM(COALESCE(bp.bp_name, ''))) = LOWER(TRIM(?))`);
+      params.push(name);
+    }
+    if (code && code !== '0') {
+      partyParts.push(`CAST(bp.bp_grp_code AS TEXT) = ?`);
+      params.push(code);
+    }
+    if (bpId && bpId !== '0') {
+      partyParts.push(`CAST(${partyIdCol} AS TEXT) = ?`);
+      params.push(bpId);
+    }
   }
+  if (!partyParts.length) return [];
 
-  if (company_code) {
-    query.andWhere((q) =>
-      q.where({ 'h.company_code': company_code })
-        .orWhere({ 'h.tenant_id': company_code })
-        .orWhereNull('h.company_code')
-        .orWhereNull('h.tenant_id')
-    );
-  }
+  const partyClause = reason === 2 && partyParts.length > 1
+    ? partyParts.join(' AND ')
+    : partyParts.join(' OR ');
 
-  const rows = await query;
-  return (rows || []).map((r) => {
-    const bill = n(r.total_inv_amt);
-    const rec = n(r.already_received);
-    const tds = n(r.already_tds);
-    const ded = n(r.already_deduction);
-    const balance = Math.round((bill - rec - tds - ded) * 100) / 100;
+  const result = await db.raw(
+    `SELECT
+        d.docket_no::text AS docket_no,
+        to_char(d.docket_date::date, 'YYYY-MM-DD') AS docket_date,
+        d.docket_loc,
+        d.docket_to_loc,
+        d.docket_pickup_town AS docket_from_town,
+        d.docket_dly_town AS docket_to_town,
+        d.docket_pay_type,
+        COALESCE(d.docket_tot_amt, 0) AS docket_tot_amt,
+        bp.bp_name AS party_name
+      FROM sss.sst_docket d
+      LEFT JOIN sss.ssm_business_partner bp
+        ON CAST(bp.record_id AS TEXT) = CAST(${partyIdCol} AS TEXT)
+      WHERE COALESCE(d.record_status, 0) = 0
+        AND UPPER(TRIM(COALESCE(d.docket_pay_type, ''))) = ?
+        AND ${locClause}
+        ${extraWhere.length ? `AND ${extraWhere.join(' AND ')}` : ''}
+        AND COALESCE(d.docket_tot_amt, 0) > 0.009
+        AND NOT EXISTS (
+          SELECT 1 FROM sss.sst_mr_dtl r
+          WHERE UPPER(TRIM(COALESCE(r.docket_no, '')::text)) = UPPER(TRIM(d.docket_no::text))
+            AND UPPER(TRIM(COALESCE(r.docket_loc, '')::text)) = UPPER(TRIM(d.docket_loc::text))
+        )
+        AND (${partyClause})
+      ORDER BY d.docket_date ASC, d.docket_no ASC`,
+    params
+  );
+
+  return (result.rows || []).map((r) => {
+    const bill = n(r.docket_tot_amt);
     return {
-      id: `${r.invoice_no}_${r.invoice_date}_${r.loc_code}`,
-      invoice_no: String(Math.trunc(n(r.invoice_no))),
-      invoice_date: r.invoice_date,
-      loc_code: r.loc_code,
-      bp_code: r.bp_code,
-      bp_name: r.bp_name,
+      id: `${r.docket_no}_${r.docket_date}_${r.docket_loc}`,
+      docket_no: String(r.docket_no || '').trim(),
+      docket_date: r.docket_date,
+      loc_code: r.docket_loc,
+      docket_to_loc: r.docket_to_loc,
+      docket_from_town: r.docket_from_town,
+      docket_to_town: r.docket_to_town,
+      docket_pay_type: r.docket_pay_type,
+      party_name: r.party_name,
       bill_amt: bill.toFixed(2),
-      already_received: rec.toFixed(2),
-      balance: balance.toFixed(2),
-      received_amt: '0.00',
+      net_received: bill.toFixed(2),
+      received_amt: bill.toFixed(2),
       tds_amt: '0.00',
       deduction_amt: '0.00',
     };
@@ -134,11 +166,22 @@ async function getOutstandingInvoices({ loc_code, bp_code, bp_name, company_code
 
 async function getDetails(mrNo, mrDate, loc, trx = db) {
   const no = normalizeMrNo(mrNo, loc) || String(mrNo || '').trim();
-  return trx('sss.sst_mr_dtl')
-    .where({ loc_code: loc })
-    .andWhereRaw('UPPER(TRIM(mr_no::text)) = UPPER(TRIM(?))', [no])
-    .andWhereRaw('CAST(mr_date AS DATE) = CAST(? AS DATE)', [mrDate])
-    .orderBy('sr_no');
+  return trx('sss.sst_mr_dtl as r')
+    .leftJoin('sss.sst_docket as d', function () {
+      this.on(trx.raw("UPPER(TRIM(COALESCE(r.docket_no, '')::text)) = UPPER(TRIM(d.docket_no::text))"))
+        .andOn(trx.raw("UPPER(TRIM(COALESCE(r.docket_loc, '')::text)) = UPPER(TRIM(d.docket_loc::text))"));
+    })
+    .select(
+      'r.*',
+      'd.docket_to_loc',
+      'd.docket_pickup_town as docket_from_town',
+      'd.docket_dly_town as docket_to_town',
+      'd.docket_pay_type'
+    )
+    .whereRaw('UPPER(TRIM(r.loc_code::text)) = UPPER(TRIM(?))', [loc])
+    .andWhereRaw('UPPER(TRIM(r.mr_no::text)) = UPPER(TRIM(?))', [no])
+    .andWhereRaw('CAST(r.mr_date AS DATE) = CAST(? AS DATE)', [toDate(mrDate) || mrDate])
+    .orderBy('r.sr_no');
 }
 
 async function getByNumber(mrNo, loc_code) {
@@ -161,9 +204,22 @@ async function saveReceipt(payload = {}, company_code = null, userId = null) {
   if (!loc) throw new Error('Branch is required');
   if (!header.mr_date) throw new Error('Receipt date is required');
   if (!header.bp_name && !header.bp_code) throw new Error('Customer is required');
+  const mrReason = parseInt(header.mr_reason, 10);
+  if (![1, 2, 3, 4].includes(mrReason)) throw new Error('Please select MR Reason');
 
+  const needsDetails = mrReason === 1 || mrReason === 2;
   const lines = (Array.isArray(details) ? details : []).filter((d) => n(d.received_amt) > 0 || n(d.tds_amt) > 0 || n(d.deduction_amt) > 0);
-  if (!lines.length) throw new Error('Select at least one bill and enter received amount');
+  if (needsDetails && !lines.length) throw new Error('Select at least one docket and enter received amount');
+  if (!needsDetails && n(header.received_amt) <= 0) throw new Error('Enter received amount');
+  if (mrReason === 1) {
+    const partial = lines.find((d) => {
+      const gross = n(d.bill_amt) + n(d.sgst_amt) + n(d.cgst_amt) + n(d.igst_amt);
+      return Math.abs(n(d.received_amt) + n(d.tds_amt) + n(d.deduction_amt) - gross) > 0.009;
+    });
+    if (partial) {
+      throw new Error(`Paid booking must clear docket ${partial.docket_no} in full including GST`);
+    }
+  }
 
   const trx = await db.transaction();
   try {
@@ -176,9 +232,9 @@ async function saveReceipt(payload = {}, company_code = null, userId = null) {
       .andWhereRaw('CAST(mr_date AS DATE) = CAST(? AS DATE)', [toDate(header.mr_date)])
       .first();
 
-    const recSum = lines.reduce((s, d) => s + n(d.received_amt), 0);
-    const tdsSum = lines.reduce((s, d) => s + n(d.tds_amt), 0);
-    const dedSum = lines.reduce((s, d) => s + n(d.deduction_amt), 0);
+    const recSum = needsDetails ? lines.reduce((s, d) => s + n(d.received_amt), 0) : n(header.received_amt);
+    const tdsSum = needsDetails ? lines.reduce((s, d) => s + n(d.tds_amt), 0) : n(header.tds_amt);
+    const dedSum = needsDetails ? lines.reduce((s, d) => s + n(d.deduction_amt), 0) : n(header.deduction_amt);
 
     const hdr = {
       company_code: company_code || header.company_code || null,
@@ -193,6 +249,7 @@ async function saveReceipt(payload = {}, company_code = null, userId = null) {
       instr_no: header.instr_no || null,
       instr_date: toDate(header.instr_date),
       bank_name: header.bank_name || null,
+      mr_reason: mrReason,
       received_amt: Math.round(recSum * 100) / 100,
       tds_amt: Math.round(tdsSum * 100) / 100,
       deduction_amt: Math.round(dedSum * 100) / 100,
@@ -223,10 +280,16 @@ async function saveReceipt(payload = {}, company_code = null, userId = null) {
       mr_no: saved.mr_no,
       mr_date: saved.mr_date,
       sr_no: i + 1,
-      invoice_no: n(d.invoice_no),
+      invoice_no: n(d.invoice_no) || 0,
       invoice_date: toDate(d.invoice_date),
       invoice_loc: d.invoice_loc || loc,
+      docket_no: d.docket_no || null,
+      docket_date: toDate(d.docket_date),
+      docket_loc: d.docket_loc || d.loc_code || loc,
       bill_amt: n(d.bill_amt),
+      sgst_amt: n(d.sgst_amt),
+      cgst_amt: n(d.cgst_amt),
+      igst_amt: n(d.igst_amt),
       received_amt: n(d.received_amt),
       tds_amt: n(d.tds_amt),
       deduction_amt: n(d.deduction_amt),
@@ -272,7 +335,7 @@ async function deleteReceipt(mrNo, mrDate, loc_code) {
 
 module.exports = {
   listBanks,
-  getOutstandingInvoices,
+  getOutstandingDockets,
   getByNumber,
   saveReceipt,
   deleteReceipt,

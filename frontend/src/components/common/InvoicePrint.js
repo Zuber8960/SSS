@@ -127,7 +127,7 @@ const branchLines = (invoice = {}, loc = {}) => {
  * @param {object} props.company      - Company master record
  * @param {object} props.locationsMap - Map of loc_code -> location record
  */
-export function printInvoice({ invoice, details, company, locationsMap, customer, partners }) {
+export function printInvoice({ invoice = {}, details = [], company = {}, locationsMap = {}, customer, partners } = {}) {
   const co = company || {};
   const tc = getTenantConfig();
   const logoUrl = tc?.logo_url || "";
@@ -151,6 +151,19 @@ export function printInvoice({ invoice, details, company, locationsMap, customer
   const hasDetails = rows.length > 0;
 
   // Compute totals
+  const lineTaxable = (d) => {
+    const freight = parseFloat(d.freight) || 0;
+    const loading = parseFloat(d.handling ?? d.loading) || 0;
+    const unloading = parseFloat(d.fuel_surcharge ?? d.unloading) || 0;
+    const detention = parseFloat(d.factory_charge ?? d.detention) || 0;
+    const toll = parseFloat(d.oda_charge ?? d.add_toll ?? d.additional_toll) || 0;
+    const greenTax = parseFloat(d.fov ?? d.green_tax) || 0;
+    const other = parseFloat(d.stationery ?? d.other_charges) || 0;
+    const doorColl = parseFloat(d.door_collection) || 0;
+    const doorDly = parseFloat(d.door_delivery) || 0;
+    return freight + loading + unloading + detention + toll + greenTax + other + doorColl + doorDly;
+  };
+
   const sums = rows.reduce(
     (a, d) => {
       a.freight += parseFloat(d.freight) || 0;
@@ -160,28 +173,29 @@ export function printInvoice({ invoice, details, company, locationsMap, customer
       a.toll += parseFloat(d.oda_charge ?? d.add_toll ?? d.additional_toll) || 0;
       a.greenTax += parseFloat(d.fov ?? d.green_tax) || 0;
       a.other += parseFloat(d.stationery ?? d.other_charges) || 0;
-      a.taxable += parseFloat(d.taxable ?? d.taxable_amt) || 0;
+      a.doorColl += parseFloat(d.door_collection) || 0;
+      a.doorDly += parseFloat(d.door_delivery) || 0;
+      a.taxable += lineTaxable(d);
       a.cgst += parseFloat(d.cgst) || 0;
       a.sgst += parseFloat(d.sgst) || 0;
       a.igst += parseFloat(d.igst) || 0;
       a.total += parseFloat(d.amount ?? d.total_amt) || 0;
       return a;
     },
-    { freight: 0, loading: 0, unloading: 0, detention: 0, toll: 0, greenTax: 0, other: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0 }
+    { freight: 0, loading: 0, unloading: 0, detention: 0, toll: 0, greenTax: 0, other: 0, doorColl: 0, doorDly: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0 }
   );
 
   // Detail rows table HTML (supports both CustomerBill row shape and API detail shape)
   const rowsHtml = rows
     .map((d, i) => {
-      const isBillRow = d.docket_no && d.amount !== undefined;
       return `
         <tr>
           <td>${i + 1}</td>
-          <td>${d.docket_no || ""}</td>
-          <td>${toDate(d.docket_date || d.docket_date)}</td>
-          <td>${d.origin || d.docket_from_loc || ""}</td>
-          <td>${d.destination || d.docket_to_loc || ""}</td>
-          <td>${d.charge_wt ?? d.docket_chrwt ?? ""}</td>
+          <td>${esc(d.docket_no || "")}</td>
+          <td>${esc(toDate(d.docket_date || d.docket_date))}</td>
+          <td>${esc(d.origin || d.docket_from_loc || "")}</td>
+          <td>${esc(d.destination || d.docket_to_loc || "")}</td>
+          <td>${esc(d.charge_wt ?? d.docket_chrwt ?? "")}</td>
           <td>${fmtAmt(d.freight)}</td>
           <td>${fmtAmt(d.handling ?? d.loading)}</td>
           <td>${fmtAmt(d.fuel_surcharge ?? d.unloading)}</td>
@@ -189,7 +203,9 @@ export function printInvoice({ invoice, details, company, locationsMap, customer
           <td>${fmtAmt(d.oda_charge ?? d.add_toll ?? d.additional_toll)}</td>
           <td>${fmtAmt(d.fov ?? d.green_tax)}</td>
           <td>${fmtAmt(d.stationery ?? d.other_charges)}</td>
-          <td>${fmtAmt(d.taxable ?? d.taxable_amt)}</td>
+          <td>${fmtAmt(d.door_collection)}</td>
+          <td>${fmtAmt(d.door_delivery)}</td>
+          <td>${fmtAmt(lineTaxable(d))}</td>
           <td>${fmtAmt(d.cgst)}</td>
           <td>${fmtAmt(d.sgst)}</td>
           <td>${fmtAmt(d.igst)}</td>
@@ -232,9 +248,9 @@ export function printInvoice({ invoice, details, company, locationsMap, customer
     .info-box { flex: 1; border: 1px solid #ccc; padding: 10px; }
     .info-box h4 { background: #eee; margin: -10px -10px 8px; padding: 4px 8px; font-size: 11px; }
     table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 10px; }
-    th { background: #2d3748; color: #fff; padding: 6px 4px; }
+    th { color: #000; padding: 6px 4px; border: 1px solid #333; font-weight: 700; text-align: center; }
     td { border: 1px solid #ccc; padding: 4px; }
-    .tot-row td { background: #edf2f7; font-weight: 700; }
+    .tot-row td { font-weight: 700; }
     .footer { display: flex; justify-content: space-between; margin-top: 24px; padding-top: 12px; border-top: 1px solid #ccc; font-size: 11px; }
     .sign { text-align: center; }
     .btn { padding: 10px 32px; font-size: 14px; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; margin: 0 8px; }
@@ -281,6 +297,7 @@ export function printInvoice({ invoice, details, company, locationsMap, customer
       <tr>
         <th>Sr</th><th>Docket No</th><th>Date</th><th>Origin</th><th>Dest</th><th>Wt</th>
         <th>Freight</th><th>Handling</th><th>Fuel Surcharge</th><th>Factory Charge</th><th>ODA Charge</th><th>FOV</th><th>Stationery</th>
+        <th>Door Pkp</th><th>Door Dly</th>
         <th>Taxable</th><th>CGST</th><th>SGST</th><th>IGST</th><th>Total</th>
       </tr>
     </thead>
@@ -295,6 +312,8 @@ export function printInvoice({ invoice, details, company, locationsMap, customer
         <td>${sums.toll.toFixed(2)}</td>
         <td>${sums.greenTax.toFixed(2)}</td>
         <td>${sums.other.toFixed(2)}</td>
+        <td>${sums.doorColl.toFixed(2)}</td>
+        <td>${sums.doorDly.toFixed(2)}</td>
         <td>${sums.taxable.toFixed(2)}</td>
         <td>${sums.cgst.toFixed(2)}</td>
         <td>${sums.sgst.toFixed(2)}</td>

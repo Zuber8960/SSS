@@ -63,6 +63,11 @@ const formatCustomer = (inv, partners = []) => {
   };
 };
 
+const isCancelFlag = (value) => {
+  const v = String(value ?? "").trim().toUpperCase();
+  return v === "Y" || v === "C" || v === "1" || v === "TRUE";
+};
+
 const combinedColumns = [
   { key: "invoice_no", label: "Inv\nNo", minWidth: 72, align: "left", sortComparator: (a, b) => Number(a) - Number(b) },
   { key: "invoice_date", label: "Inv\nDate", minWidth: 78 },
@@ -78,12 +83,20 @@ const combinedColumns = [
   { key: "oda_charge", label: "ODA\nChrg", minWidth: 66 },
   { key: "fov", label: "FOV", minWidth: 58 },
   { key: "stationery", label: "Stnry.", minWidth: 74 },
+  { key: "door_collection", label: "Door\nPkp", minWidth: 74 },
+  { key: "door_delivery", label: "Door\nDly", minWidth: 74 },
   { key: "taxable_amt", label: "Taxable", minWidth: 100 },
   { key: "cgst", label: "CGST", minWidth: 60 },
   { key: "sgst", label: "SGST", minWidth: 60 },
   { key: "igst", label: "IGST", minWidth: 60 },
   { key: "total_inv_amt", label: "Inv\nAmt", minWidth: 84 },
   { key: "inv_sub_date", label: "Subm.\nDate", minWidth: 78 },
+  {
+    key: "cancel_flag",
+    label: "Cancel",
+    minWidth: 64,
+    render: (row) => (isCancelFlag(row.cancel_flag) ? "Y" : ""),
+  },
 ];
 
 const invoiceReportGridCss = `
@@ -100,6 +113,8 @@ const invoiceReportGridCss = `
 .invoice-report-page .MuiDataGrid-cell[data-field="oda_charge"],
 .invoice-report-page .MuiDataGrid-cell[data-field="fov"],
 .invoice-report-page .MuiDataGrid-cell[data-field="stationery"],
+.invoice-report-page .MuiDataGrid-cell[data-field="door_collection"],
+.invoice-report-page .MuiDataGrid-cell[data-field="door_delivery"],
 .invoice-report-page .MuiDataGrid-cell[data-field="taxable_amt"],
 .invoice-report-page .MuiDataGrid-cell[data-field="cgst"],
 .invoice-report-page .MuiDataGrid-cell[data-field="sgst"],
@@ -112,6 +127,8 @@ const invoiceReportGridCss = `
 .invoice-report-page .MuiDataGrid-cell[data-field="oda_charge"] *,
 .invoice-report-page .MuiDataGrid-cell[data-field="fov"] *,
 .invoice-report-page .MuiDataGrid-cell[data-field="stationery"] *,
+.invoice-report-page .MuiDataGrid-cell[data-field="door_collection"] *,
+.invoice-report-page .MuiDataGrid-cell[data-field="door_delivery"] *,
 .invoice-report-page .MuiDataGrid-cell[data-field="taxable_amt"] *,
 .invoice-report-page .MuiDataGrid-cell[data-field="cgst"] *,
 .invoice-report-page .MuiDataGrid-cell[data-field="sgst"] *,
@@ -154,6 +171,18 @@ const invoiceReportGridCss = `
 }
 .invoice-report-page .MuiDataGrid-row.Mui-selected:hover {
   background-color: #bbf7d0 !important;
+}
+.invoice-report-page .dgt-row-y,
+.invoice-report-page .dgt-row-y:nth-of-type(even) {
+  background-color: #fecaca !important;
+}
+.invoice-report-page .dgt-row-y:hover {
+  background-color: #fca5a5 !important;
+}
+.invoice-report-page .dgt-row-y.Mui-selected,
+.invoice-report-page .dgt-row-y.Mui-selected:nth-of-type(even),
+.invoice-report-page .dgt-row-y.Mui-selected:hover {
+  background-color: #fca5a5 !important;
 }
 .invoice-report-page .MuiDataGrid-columnHeader {
   padding: 0 4px !important;
@@ -306,7 +335,7 @@ export default function InvoiceReport() {
         const lines = Array.isArray(details) ? details : [];
         const sum = {
           docket_chrwt: 0, freight: 0, handling: 0, fuel_surcharge: 0, factory_charge: 0,
-          oda_charge: 0, fov: 0, stationery: 0,
+          oda_charge: 0, fov: 0, stationery: 0, door_collection: 0, door_delivery: 0,
           taxable_amt: 0, cgst: 0, sgst: 0, igst: 0, total_amt: 0,
         };
         lines.forEach((d) => {
@@ -318,6 +347,8 @@ export default function InvoiceReport() {
           sum.oda_charge += num(d.oda_charge ?? d.additional_toll);
           sum.fov += num(d.fov ?? d.green_tax);
           sum.stationery += num(d.stationery ?? d.other_charges);
+          sum.door_collection += num(d.door_collection);
+          sum.door_delivery += num(d.door_delivery);
           sum.taxable_amt += num(d.taxable_amt);
           sum.cgst += num(d.cgst);
           sum.sgst += num(d.sgst);
@@ -343,12 +374,14 @@ export default function InvoiceReport() {
           docket_chrwt: String(sum.docket_chrwt),
           freight: fmtAmt(sum.freight), handling: fmtAmt(sum.handling), fuel_surcharge: fmtAmt(sum.fuel_surcharge),
           factory_charge: fmtAmt(sum.factory_charge), oda_charge: fmtAmt(sum.oda_charge), fov: fmtAmt(sum.fov), stationery: fmtAmt(sum.stationery),
+          door_collection: fmtAmt(sum.door_collection), door_delivery: fmtAmt(sum.door_delivery),
           taxable_amt: fmtAmt(sum.taxable_amt), cgst: fmtAmt(sum.cgst), sgst: fmtAmt(sum.sgst), igst: fmtAmt(sum.igst),
           total_amt: fmtAmt(sum.total_amt),
           total_inv_amt: fmtAmt(inv.total_inv_amt ?? sum.total_amt),
           invoice_date_iso: moment(inv.invoice_date).isValid() ? moment(inv.invoice_date).format("YYYY-MM-DD") : "",
           inv_sub_date: toDate(inv.inv_sub_date),
           is_submitted: !!inv.inv_sub_date,
+          cancel_flag: isCancelFlag(inv.cancel_flag) ? "Y" : "",
         });
       });
       rows.sort((a, b) => (Number(a.invoice_no) || 0) - (Number(b.invoice_no) || 0));
@@ -385,7 +418,7 @@ export default function InvoiceReport() {
           if (dt && rd.isAfter(dt, "day")) return false;
         }
       }
-      if (q && !["invoice_no","bp_name","bp_code","loc_label","loc_code","invoice_type","sac_label","sac_code","docket_nos","inv_sub_date"]
+      if (q && !["invoice_no","bp_name","bp_code","loc_label","loc_code","invoice_type","sac_label","sac_code","docket_nos","inv_sub_date","cancel_flag"]
         .some((k) => String(row[k] ?? "").toLowerCase().includes(q))) return false;
       return true;
     });
@@ -441,7 +474,8 @@ export default function InvoiceReport() {
       showLoading();
       const inv = selectedRow;
       const m = moment(inv.invoice_date, getDateFormat());
-      const apiDate = m.isValid() ? m.format("YYYY-MM-DD") : inv.invoice_date;
+      const apiDate = inv.invoice_date_iso
+        || (m.isValid() ? m.format("YYYY-MM-DD") : inv.invoice_date);
       const res = await fetchInvoiceDetails(inv.invoice_no, apiDate, inv.loc_code);
       const customer = resolveBillToCustomer(
         { bp_code: inv.bp_code, bp_name: inv.bp_name, loc_code: inv.loc_code },
@@ -610,14 +644,14 @@ export default function InvoiceReport() {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Button
               variant="contained"
-              startIcon={selectedRow?.inv_sub_date ? <ViewIcon /> : <EditIcon />}
+              startIcon={selectedRow?.inv_sub_date || isCancelFlag(selectedRow?.cancel_flag) ? <ViewIcon /> : <EditIcon />}
               onClick={() => openInvoiceForEdit(selectedRow)}
               sx={{
-                background: selectedRow?.inv_sub_date
+                background: selectedRow?.inv_sub_date || isCancelFlag(selectedRow?.cancel_flag)
                   ? "linear-gradient(135deg, #475569, #334155)"
                   : "linear-gradient(135deg, #7e22ce, #6b21a8)",
                 "&:hover": {
-                  background: selectedRow?.inv_sub_date
+                  background: selectedRow?.inv_sub_date || isCancelFlag(selectedRow?.cancel_flag)
                     ? "linear-gradient(135deg, #334155, #1e293b)"
                     : "linear-gradient(135deg, #6d28d9, #581c87)",
                 },
@@ -626,7 +660,7 @@ export default function InvoiceReport() {
                 borderRadius: 2,
               }}
             >
-              {selectedRow?.inv_sub_date ? "View" : "Edit"}
+              {selectedRow?.inv_sub_date || isCancelFlag(selectedRow?.cancel_flag) ? "View" : "Edit"}
             </Button>
             <Button
               variant="contained"
@@ -682,6 +716,9 @@ export default function InvoiceReport() {
             <span>{selectedRow.bp_name || "—"} → {selectedRow.loc_label || selectedRow.loc_code || "—"}</span>
             <span>{selectedRow.invoice_date}</span>
             <span style={{ background: "#dcfce7", color: "#15803d", padding: "2px 10px", borderRadius: 12, fontWeight: 600 }}>₹ {selectedRow.total_inv_amt}</span>
+            {isCancelFlag(selectedRow.cancel_flag) ? (
+              <span style={{ background: "#fecaca", color: "#991b1b", padding: "2px 10px", borderRadius: 12, fontWeight: 700 }}>Cancelled</span>
+            ) : null}
           </div>
         ) : (
           <div style={{ marginTop: 10, padding: "7px 14px", background: "#f9fafb", borderRadius: 8, border: "1.5px dashed #d1d5db", fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}>
@@ -707,6 +744,8 @@ export default function InvoiceReport() {
             checkboxSelection
             disableMultipleRowSelection
             selectedRowColor="#dcfce7"
+            statusKey="cancel_flag"
+            rowColors={{ Y: "#fecaca" }}
             onRowSelectionModelChange={onSelect} />
         </div>
         </div>

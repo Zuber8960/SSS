@@ -128,6 +128,29 @@ router.put('/:invoiceNo/:invoiceDate/:invoiceLoc', async (req, res) => {
   }
 });
 
+/* ================= CANCEL INVOICE (flag header, delete details) ================= */
+
+router.post('/:invoiceNo/:invoiceDate/:invoiceLoc/cancel', async (req, res) => {
+  try {
+    const { invoiceNo, invoiceDate, invoiceLoc } = req.params;
+    const { tenant_id } = req;
+    const userId = req.user?.user_id || req.body?.modified_by || null;
+    const data = await CustomerBillController.cancelInvoice(
+      Number(invoiceNo),
+      invoiceDate,
+      invoiceLoc,
+      tenant_id,
+      userId
+    );
+    if (!data) {
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
+    }
+    res.status(200).json({ success: true, message: 'Invoice cancelled successfully', data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 /* ================= DELETE INVOICE ================= */
 
 router.delete('/:invoiceNo/:invoiceDate/:invoiceLoc', async (req, res) => {

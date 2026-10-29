@@ -1,0 +1,4 @@
+ALTER TABLE sss.sst_mr_dtl
+  ADD COLUMN IF NOT EXISTS sgst_amt numeric(18,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS cgst_amt numeric(18,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS igst_amt numeric(18,2) NOT NULL DEFAULT 0;

@@ -47,6 +47,11 @@ const isSubmitted = (header) => {
   return v !== undefined && v !== null && String(v).trim() !== '';
 };
 
+const isCancelled = (header) => {
+  const v = String(header?.cancel_flag ?? '').trim().toUpperCase();
+  return v === 'Y' || v === 'C' || v === '1';
+};
+
 const findInvoiceHeader = (qb, invoiceNo, invoiceDate, invoiceLoc, company_code = null) => {
   const query = qb('sss.sst_invoice_hdr')
     .where({ loc_code: invoiceLoc })
@@ -67,6 +72,8 @@ const sanitizeDetail = (payload = {}) => {
   const odaCharge = normalizeNumber(payload.oda_charge ?? payload.additional_toll ?? payload.add_toll);
   const fov = normalizeNumber(payload.fov ?? payload.green_tax);
   const stationery = normalizeNumber(payload.stationery ?? payload.other_charges);
+  const doorCollection = normalizeNumber(payload.door_collection);
+  const doorDelivery = normalizeNumber(payload.door_delivery);
   return {
     company_code: payload.company_code ?? null,
     division_code: payload.division_code ?? null,
@@ -94,6 +101,8 @@ const sanitizeDetail = (payload = {}) => {
     oda_charge: odaCharge,
     fov,
     stationery,
+    door_collection: doorCollection,
+    door_delivery: doorDelivery,
     taxable_amt: normalizeNumber(payload.taxable_amt ?? payload.taxable),
     cgst: normalizeNumber(payload.cgst),
     sgst: normalizeNumber(payload.sgst),
@@ -154,12 +163,20 @@ async function getAllInvoices(filters = {}) {
 }
 
 async function getBilledDocketNos(company_code = null) {
-  const query = db('sss.sst_invoice_dtl')
-    .distinct('docket_no')
-    .whereNotNull('docket_no')
-    .whereRaw("TRIM(docket_no::text) <> ''");
+  const query = db('sss.sst_invoice_dtl as d')
+    .innerJoin('sss.sst_invoice_hdr as h', function () {
+      this.on(db.raw('CAST(h.invoice_no AS INTEGER) = CAST(d.invoice_no AS INTEGER)'))
+        .andOn(db.raw('CAST(h.invoice_date AS DATE) = CAST(d.invoice_date AS DATE)'))
+        .andOn(db.raw("UPPER(TRIM(h.loc_code::text)) = UPPER(TRIM(d.invoice_loc::text))"));
+    })
+    .distinct('d.docket_no')
+    .whereNotNull('d.docket_no')
+    .whereRaw("TRIM(d.docket_no::text) <> ''")
+    .whereRaw("COALESCE(UPPER(TRIM(h.cancel_flag::text)), '') NOT IN ('Y', 'C', '1')");
   if (company_code) {
-    query.andWhere((q) => q.where({ company_code }).orWhereNull('company_code'));
+    query.andWhere((q) =>
+      q.where('d.company_code', company_code).orWhereNull('d.company_code')
+    );
   }
   const rows = await query;
   return (rows || []).map((r) => String(r.docket_no).trim()).filter(Boolean);
@@ -244,6 +261,10 @@ async function saveInvoice(payload = {}, company_code = null) {
 
     let savedHeader;
     if (existing) {
+      if (isCancelled(existing)) {
+        await trx.rollback();
+        throw new Error('Cancelled bills cannot be edited');
+      }
       if (isSubmitted(existing)) {
         await trx.rollback();
         throw new Error('Submitted bills cannot be edited');
@@ -254,6 +275,7 @@ async function saveInvoice(payload = {}, company_code = null) {
       delete updates.created_on;
       delete updates.created_by;
       delete updates.inv_sub_date;
+      delete updates.cancel_flag;
 
       [savedHeader] = await trx('sss.sst_invoice_hdr')
         .where({ record_id: existing.record_id })
@@ -314,6 +336,10 @@ async function updateInvoice(invoiceNo, invoiceDate, invoiceLoc, payload = {}, c
       await trx.rollback();
       return null;
     }
+    if (isCancelled(existing)) {
+      await trx.rollback();
+      throw new Error('Cancelled bills cannot be edited');
+    }
     if (isSubmitted(existing)) {
       await trx.rollback();
       throw new Error('Submitted bills cannot be edited');
@@ -324,6 +350,7 @@ async function updateInvoice(invoiceNo, invoiceDate, invoiceLoc, payload = {}, c
     delete updates.created_on;
     delete updates.created_by;
     delete updates.inv_sub_date;
+    delete updates.cancel_flag;
 
     const [updatedHeader] = await trx('sss.sst_invoice_hdr')
       .where({ record_id: existing.record_id })
@@ -364,6 +391,10 @@ async function deleteInvoice(invoiceNo, invoiceDate, invoiceLoc, company_code = 
       await trx.rollback();
       return 0;
     }
+    if (isCancelled(existing)) {
+      await trx.rollback();
+      throw new Error('Cancelled bills cannot be deleted');
+    }
     if (isSubmitted(existing)) {
       await trx.rollback();
       throw new Error('Submitted bills cannot be deleted');
@@ -380,6 +411,47 @@ async function deleteInvoice(invoiceNo, invoiceDate, invoiceLoc, company_code = 
   }
 }
 
+async function cancelInvoice(invoiceNo, invoiceDate, invoiceLoc, company_code = null, userId = null) {
+  const trx = await db.transaction();
+
+  try {
+    const existing = await findInvoiceHeader(trx, invoiceNo, invoiceDate, invoiceLoc, company_code);
+    if (!existing) {
+      await trx.rollback();
+      return null;
+    }
+    if (isCancelled(existing)) {
+      await trx.rollback();
+      throw new Error('Bill is already cancelled');
+    }
+    if (isSubmitted(existing)) {
+      await trx.rollback();
+      throw new Error('Submitted bills cannot be cancelled');
+    }
+
+    await trx('sss.sst_invoice_dtl')
+      .where({ invoice_loc: invoiceLoc })
+      .andWhereRaw('CAST(invoice_no AS INTEGER) = CAST(? AS INTEGER)', [invoiceNo])
+      .andWhereRaw('CAST(invoice_date AS DATE) = CAST(? AS DATE)', [invoiceDate])
+      .del();
+
+    const [updatedHeader] = await trx('sss.sst_invoice_hdr')
+      .where({ record_id: existing.record_id })
+      .update({
+        cancel_flag: 'Y',
+        modified_by: userId || existing.modified_by || null,
+        modified_on: new Date(),
+      })
+      .returning('*');
+
+    await trx.commit();
+    return { header: updatedHeader, details: 0 };
+  } catch (error) {
+    await trx.rollback();
+    throw error;
+  }
+}
+
 module.exports = {
   getAllInvoices,
   getBilledDocketNos,
@@ -389,4 +461,5 @@ module.exports = {
   saveInvoice,
   updateInvoice,
   deleteInvoice,
+  cancelInvoice,
 };

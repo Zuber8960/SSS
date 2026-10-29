@@ -1,0 +1,3 @@
+ALTER TABLE sss.sst_invoice_dtl
+  ADD COLUMN IF NOT EXISTS door_collection NUMERIC(12,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS door_delivery NUMERIC(12,2) DEFAULT 0;

@@ -6,12 +6,12 @@ import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
-import { SaveIcon, PrintIcon, AddIcon, DeleteIcon, EditIcon } from "../../components/common/icons";
+import { SaveIcon, PrintIcon, AddIcon, DeleteIcon, EditIcon, CancelIcon } from "../../components/common/icons";
 import { fetchAllBusinessPartners } from "../../utils/businessPartner";
 import { fetchDocketsForBilling, fetchCharges, fetchChargesBulk, fetchChargeMaster, fetchDocketByDocketNo } from "../../utils/docket";
 import { fetchDeliveryNotes, fetchDeliveryNoteByDocketNo } from "../../utils/deliveryNote";
 import { fetchAllLocations } from "../../utils/locationMaster";
-import { saveInvoice, updateInvoice, deleteInvoice, fetchBilledDocketNos, fetchInvoiceByKeys, fetchInvoiceByNumber } from "../../utils/customerBill";
+import { saveInvoice, updateInvoice, deleteInvoice, cancelInvoice, fetchBilledDocketNos, fetchInvoiceByKeys, fetchInvoiceByNumber } from "../../utils/customerBill";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { getSessionLocCode } from "../../utils/authService";
 import { printInvoice } from "../../components/common/InvoicePrint";
@@ -53,6 +53,8 @@ const billingColumns = [
   { key: "add_toll", label: "ODA\nChrg", minWidth: 66, flex: 0.5 },
   { key: "green_tax", label: "FOV", minWidth: 58, flex: 0.4 },
   { key: "other_charges", label: "Stnry.", minWidth: 74 },
+  { key: "door_collection", label: "Door\nPkp", minWidth: 74 },
+  { key: "door_delivery", label: "Door\nDly", minWidth: 74 },
   { key: "taxable", label: "Taxable", minWidth: 100 },
   { key: "cgst", label: "CGST", minWidth: 60, flex: 0.4 },
   { key: "sgst", label: "SGST", minWidth: 60, flex: 0.4 },
@@ -72,7 +74,7 @@ const billingColumns = [
 
 const BILL_AMOUNT_COL_KEYS = [
   "freight", "loading", "unloading", "detention", "add_toll", "green_tax",
-  "other_charges", "taxable", "cgst", "sgst", "igst", "amount",
+  "other_charges", "door_collection", "door_delivery", "taxable", "cgst", "sgst", "igst", "amount",
 ];
 
 function BillGridTotalRow({ totals }) {
@@ -219,6 +221,8 @@ const billPageFontCss = `
 .customer-bill-page .MuiDataGrid-cell[data-field="add_toll"],
 .customer-bill-page .MuiDataGrid-cell[data-field="green_tax"],
 .customer-bill-page .MuiDataGrid-cell[data-field="other_charges"],
+.customer-bill-page .MuiDataGrid-cell[data-field="door_collection"],
+.customer-bill-page .MuiDataGrid-cell[data-field="door_delivery"],
 .customer-bill-page .MuiDataGrid-cell[data-field="taxable"],
 .customer-bill-page .MuiDataGrid-cell[data-field="cgst"],
 .customer-bill-page .MuiDataGrid-cell[data-field="sgst"],
@@ -231,6 +235,8 @@ const billPageFontCss = `
 .customer-bill-page .MuiDataGrid-cell[data-field="add_toll"] *,
 .customer-bill-page .MuiDataGrid-cell[data-field="green_tax"] *,
 .customer-bill-page .MuiDataGrid-cell[data-field="other_charges"] *,
+.customer-bill-page .MuiDataGrid-cell[data-field="door_collection"] *,
+.customer-bill-page .MuiDataGrid-cell[data-field="door_delivery"] *,
 .customer-bill-page .MuiDataGrid-cell[data-field="taxable"] *,
 .customer-bill-page .MuiDataGrid-cell[data-field="cgst"] *,
 .customer-bill-page .MuiDataGrid-cell[data-field="sgst"] *,
@@ -320,6 +326,8 @@ const billPageFontCss = `
 
 // Map ssm_charge_master.charge_desc onto billing columns (order: specific names first).
 const MASTER_DESC_RULES = [
+  { key: "door_collection", tests: ["DOOR PKP", "DOOR COLLECTION", "DOOR COLLECT", "DOOR PICKUP", "PICKUP CHARGE"] },
+  { key: "door_delivery", tests: ["DOOR DLY", "DOOR DLV", "DOOR DELIVERY"] },
   { key: "green_tax", tests: ["FREIGHT ON VALUE", "FOV"] },
   { key: "unloading", tests: ["FUEL SURCHARGE", "FSC"] },
   { key: "detention", tests: ["FACTORY CHARGE", "FACTORY"] },
@@ -386,6 +394,24 @@ const invoiceDetailToRow = (d, locCode) => {
   const oda = d.oda_charge ?? d.additional_toll;
   const fov = d.fov ?? d.green_tax;
   const stationery = d.stationery ?? d.other_charges;
+  const doorPkp = parseFloat(d.door_collection) || 0;
+  const doorDly = parseFloat(d.door_delivery) || 0;
+  const freight = parseFloat(d.freight) || 0;
+  const loadingAmt = parseFloat(handling) || 0;
+  const fuelAmt = parseFloat(fuel) || 0;
+  const factoryAmt = parseFloat(factory) || 0;
+  const odaAmt = parseFloat(oda) || 0;
+  const fovAmt = parseFloat(fov) || 0;
+  const stnryAmt = parseFloat(stationery) || 0;
+  const taxable = Math.round(
+    (freight + loadingAmt + fuelAmt + factoryAmt + odaAmt + fovAmt + stnryAmt + doorPkp + doorDly) * 100
+  ) / 100;
+  const gstAmount = Math.round(taxable * 0.18 * 100) / 100;
+  const interState = locCodeOf(d.docket_from_loc) !== locCodeOf(d.docket_to_loc);
+  const cgst = interState ? 0 : Math.round((gstAmount / 2) * 100) / 100;
+  const sgst = interState ? 0 : Math.round((gstAmount / 2) * 100) / 100;
+  const igst = interState ? gstAmount : 0;
+  const amount = Math.round((taxable + gstAmount) * 100) / 100;
   return {
     id: String(d.docket_no || "").trim(),
     docket_no: d.docket_no || "",
@@ -400,32 +426,34 @@ const invoiceDetailToRow = (d, locCode) => {
     packages: "",
     actual_wt: d.docket_actwt ?? "",
     charge_wt: d.docket_chrwt ?? "",
-    freight: (parseFloat(d.freight) || 0).toFixed(2),
-    loading: (parseFloat(handling) || 0).toFixed(2),
-    unloading: (parseFloat(fuel) || 0).toFixed(2),
-    detention: (parseFloat(factory) || 0).toFixed(2),
-    add_toll: (parseFloat(oda) || 0).toFixed(2),
-    green_tax: (parseFloat(fov) || 0).toFixed(2),
-    other_charges: (parseFloat(stationery) || 0).toFixed(2),
+    freight: freight.toFixed(2),
+    loading: loadingAmt.toFixed(2),
+    unloading: fuelAmt.toFixed(2),
+    detention: factoryAmt.toFixed(2),
+    add_toll: odaAmt.toFixed(2),
+    green_tax: fovAmt.toFixed(2),
+    other_charges: stnryAmt.toFixed(2),
+    door_collection: doorPkp.toFixed(2),
+    door_delivery: doorDly.toFixed(2),
     discount: "0.00",
-    taxable: (parseFloat(d.taxable_amt) || 0).toFixed(2),
-    cgst: (parseFloat(d.cgst) || 0).toFixed(2),
-    sgst: (parseFloat(d.sgst) || 0).toFixed(2),
-    igst: (parseFloat(d.igst) || 0).toFixed(2),
-    amount: (parseFloat(d.total_amt) || 0).toFixed(2),
+    taxable: taxable.toFixed(2),
+    cgst: cgst.toFixed(2),
+    sgst: sgst.toFixed(2),
+    igst: igst.toFixed(2),
+    amount: amount.toFixed(2),
     pod: d.pod_flag === "Y" || d.pod_flag === "YES" ? "YES" : "NO",
     delivery_status: d.delivery_status || "Delivered",
     invoice_status: "Billed",
     _chargesLoaded: true,
     _fromInvoice: true,
-    _edited: { loading: true, unloading: true, detention: true, add_toll: true, green_tax: true, other_charges: true },
+    _edited: { loading: true, unloading: true, detention: true, add_toll: true, green_tax: true, other_charges: true, door_collection: true, door_delivery: true },
   };
 };
 
 export default function CustomerBill() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { dialog, closeAlert, showError, showSuccess } = useAlert();
+  const { dialog, closeAlert, showError, showSuccess, showWarning } = useAlert();
   const { isLoading, showLoading, hideLoading } = useLoading();
   const [form, setForm] = useState(() => blankBillForm());
   const [partners, setPartners] = useState([]);
@@ -571,8 +599,7 @@ export default function CustomerBill() {
     const master = (chargeMaster || []).find(
       (m) => String(m.charge_code || "").toUpperCase().trim() === upperCode
     );
-    if (master) return columnFromMasterDesc(master.charge_desc);
-    return null;
+    return columnFromMasterDesc(master?.charge_desc || chargeDesc);
   };
 
   const getDeliveryStatus = (docket) => {
@@ -595,6 +622,8 @@ export default function CustomerBill() {
       add_toll: 0,
       green_tax: 0,
       other_charges: 0,
+      door_collection: 0,
+      door_delivery: 0,
       discount: 0,
     };
 
@@ -614,7 +643,9 @@ export default function CustomerBill() {
       chargeAmounts.detention +
       chargeAmounts.add_toll +
       chargeAmounts.green_tax +
-      chargeAmounts.other_charges -
+      chargeAmounts.other_charges +
+      chargeAmounts.door_collection +
+      chargeAmounts.door_delivery -
       chargeAmounts.discount;
     const taxableRounded = Math.round(taxable * 100) / 100;
 
@@ -653,6 +684,8 @@ export default function CustomerBill() {
       add_toll: chargeAmounts.add_toll.toFixed(2),
       green_tax: chargeAmounts.green_tax.toFixed(2),
       other_charges: chargeAmounts.other_charges.toFixed(2),
+      door_collection: chargeAmounts.door_collection.toFixed(2),
+      door_delivery: chargeAmounts.door_delivery.toFixed(2),
       discount: chargeAmounts.discount.toFixed(2),
       taxable: taxableRounded.toFixed(2),
       cgst: cgst.toFixed(2),
@@ -666,7 +699,7 @@ export default function CustomerBill() {
   };
 
   // Editable charge columns - user can modify these values in the grid
-  const editableChargeKeys = ["loading", "unloading", "detention", "add_toll", "green_tax", "other_charges"];
+  const editableChargeKeys = ["loading", "unloading", "detention", "add_toll", "green_tax", "other_charges", "door_collection", "door_delivery"];
 
   // The customer record picked in the dropdown. The dropdown stores only the
   // BP name, so we resolve the full partner row here to get its record_id.
@@ -675,9 +708,15 @@ export default function CustomerBill() {
   const editingDocketNos = useRef(new Set());
   const isDocketOnEditingInvoice = (docketNo) => editingDocketNos.current.has(String(docketNo));
 
+  const isCancelFlag = (value) => {
+    const v = String(value ?? "").trim().toUpperCase();
+    return v === "Y" || v === "C" || v === "1";
+  };
+
   const applyLoadedInvoice = (data) => {
     try {
     const submitted = !!(data.inv_sub_date);
+    const cancelled = isCancelFlag(data.cancel_flag);
     const details = Array.isArray(data.details) ? data.details : [];
     const loginLoc = getSessionLocCode();
     if (loginLoc && locCodeOf(data.loc_code) && locCodeOf(data.loc_code) !== locCodeOf(loginLoc)) {
@@ -724,11 +763,13 @@ export default function CustomerBill() {
       : DEFAULT_SAC_CODE;
     docketLoadToken.current++;
     setEditNoMode(false);
-    setIsViewOnly(submitted);
+    setIsViewOnly(submitted || cancelled);
     setEditingInvoice({
       invoice_no: data.invoice_no,
       invoice_date: isoDate,
       loc_code: data.loc_code,
+      cancel_flag: cancelled ? "Y" : data.cancel_flag || null,
+      submitted,
     });
     setBillingRows(sortDocketsByNo(overlayRows));
     setSelectedDocketNos(new Set(Object.keys(overlay)));
@@ -751,7 +792,9 @@ export default function CustomerBill() {
       to_date: detailDates.length ? detailDates[detailDates.length - 1].format("YYYY-MM-DD") : (prev.to_date || dates.to_date),
     }));
     showSuccess(
-      submitted
+      cancelled
+        ? "Invoice " + data.invoice_no + " is cancelled (view only)"
+        : submitted
         ? "Invoice " + data.invoice_no + " opened in view-only mode (already submitted)"
         : "Invoice " + data.invoice_no + " opened for edit"
     );
@@ -1020,10 +1063,12 @@ export default function CustomerBill() {
     const add_toll = parseFloat(row.add_toll) || 0;
     const green_tax = parseFloat(row.green_tax) || 0;
     const other_charges = parseFloat(row.other_charges) || 0;
+    const door_collection = parseFloat(row.door_collection) || 0;
+    const door_delivery = parseFloat(row.door_delivery) || 0;
     const discount = parseFloat(row.discount) || 0;
 
     const taxable = Math.round(
-      (freight + loading + unloading + detention + add_toll + green_tax + other_charges - discount) * 100
+      (freight + loading + unloading + detention + add_toll + green_tax + other_charges + door_collection + door_delivery - discount) * 100
     ) / 100;
 
     const fromLoc = locCodeOf(row.booking_branch || row.origin);
@@ -1051,7 +1096,7 @@ export default function CustomerBill() {
   // has already typed (manual entries win over the fetched charge).
   const applyChargesToRow = (row, charges) => {
     const merged = { ...row };
-    ["freight", "loading", "unloading", "detention", "add_toll", "green_tax", "other_charges", "discount"].forEach((k) => {
+    ["freight", "loading", "unloading", "detention", "add_toll", "green_tax", "other_charges", "door_collection", "door_delivery", "discount"].forEach((k) => {
       if (!row._edited?.[k]) merged[k] = "0.00";
     });
     (Array.isArray(charges) ? charges : []).forEach((c) => {
@@ -1151,6 +1196,8 @@ export default function CustomerBill() {
       add_toll: "",
       green_tax: "",
       other_charges: "",
+      door_collection: "",
+      door_delivery: "",
       discount: "",
       taxable: "",
       cgst: "",
@@ -1288,6 +1335,8 @@ export default function CustomerBill() {
       add_toll: acc.add_toll + (parseFloat(row.add_toll) || 0),
       green_tax: acc.green_tax + (parseFloat(row.green_tax) || 0),
       other_charges: acc.other_charges + (parseFloat(row.other_charges) || 0),
+      door_collection: acc.door_collection + (parseFloat(row.door_collection) || 0),
+      door_delivery: acc.door_delivery + (parseFloat(row.door_delivery) || 0),
       discount: acc.discount + (parseFloat(row.discount) || 0),
       taxable: acc.taxable + (parseFloat(row.taxable) || 0),
       cgst: acc.cgst + (parseFloat(row.cgst) || 0),
@@ -1295,7 +1344,7 @@ export default function CustomerBill() {
       igst: acc.igst + (parseFloat(row.igst) || 0),
       amount: acc.amount + (parseFloat(row.amount) || 0),
     }),
-    { freight: 0, loading: 0, unloading: 0, detention: 0, add_toll: 0, green_tax: 0, other_charges: 0, discount: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, amount: 0 }
+    { freight: 0, loading: 0, unloading: 0, detention: 0, add_toll: 0, green_tax: 0, other_charges: 0, door_collection: 0, door_delivery: 0, discount: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, amount: 0 }
   );
 
   // Removes the ticked dockets from the working list (nothing is sent to the server)
@@ -1320,9 +1369,51 @@ export default function CustomerBill() {
     showSuccess("Selected docket(s) removed from this bill");
   };
 
+  const handleCancelInvoice = () => {
+    if (!editingInvoice) {
+      showError("Load a saved bill with Edit before cancelling");
+      return;
+    }
+    if (isCancelFlag(editingInvoice.cancel_flag)) {
+      showError("This bill is already cancelled");
+      return;
+    }
+    if (editingInvoice.submitted || isViewOnly) {
+      showError("Submitted bills cannot be cancelled");
+      return;
+    }
+    showWarning(
+      "Cancel bill",
+      "Bill " +
+        editingInvoice.invoice_no +
+        " will be marked cancelled. Its docket lines will be removed so those dockets can be billed again. Continue?",
+      async () => {
+        try {
+          showLoading();
+          await cancelInvoice(editingInvoice.invoice_no, editingInvoice.invoice_date, editingInvoice.loc_code);
+          showSuccess("Bill " + editingInvoice.invoice_no + " cancelled. Dockets are available for another bill.");
+          setForm(blankBillForm(locations));
+          setBillingRows([]);
+          setSelectedDocketNos(new Set());
+          setEditingInvoice(null);
+          setIsViewOnly(false);
+          setEditNoMode(false);
+          editOverlayRef.current = null;
+          editingDocketNos.current = new Set();
+          editLoadedKey.current = "";
+        } catch (err) {
+          showError(err.message || "Failed to cancel bill");
+          console.error("Cancel invoice error:", err);
+        } finally {
+          hideLoading();
+        }
+      }
+    );
+  };
+
   const handleDeleteInvoice = async () => {
     if (isViewOnly) {
-      showError("Submitted bills cannot be deleted");
+      showError("Submitted or cancelled bills cannot be deleted");
       return;
     }
     if (!editingInvoice) {
@@ -1415,6 +1506,8 @@ export default function CustomerBill() {
         oda_charge: parseFloat(row.add_toll) || 0,
         fov: parseFloat(row.green_tax) || 0,
         stationery: parseFloat(row.other_charges) || 0,
+        door_collection: parseFloat(row.door_collection) || 0,
+        door_delivery: parseFloat(row.door_delivery) || 0,
         taxable_amt: parseFloat(row.taxable) || 0,
         sgst: parseFloat(row.sgst) || 0,
         cgst: parseFloat(row.cgst) || 0,
@@ -1462,14 +1555,18 @@ export default function CustomerBill() {
       total_inv_amt: totalAmt.toFixed(2),
     };
 
-    printInvoice({
-      invoice,
-      details: selectedRows,
-      company,
-      locationsMap: Object.fromEntries(locations.map((l) => [l.loc_code, l])),
-      customer,
-      partners,
-    });
+    try {
+      printInvoice({
+        invoice,
+        details: selectedRows,
+        company,
+        locationsMap: Object.fromEntries(locations.map((l) => [l.loc_code, l])),
+        customer,
+        partners,
+      });
+    } catch (err) {
+      showError(err.message || "Print failed");
+    }
   };
 
   const handleSave = async () => {
@@ -1633,6 +1730,15 @@ export default function CustomerBill() {
           <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint} sx={printHeaderButtonStyle}>
             Print
           </Button>
+          <Button
+            variant="contained"
+            startIcon={<CancelIcon />}
+            onClick={handleCancelInvoice}
+            disabled={!editingInvoice || isViewOnly}
+            sx={cancelHeaderButtonStyle}
+          >
+            Cancel Bill
+          </Button>
           <Button variant="contained" startIcon={<DeleteIcon />} onClick={handleDeleteInvoice} disabled={isViewOnly} sx={deleteHeaderButtonStyle}>
             Delete
           </Button>
@@ -1655,7 +1761,9 @@ export default function CustomerBill() {
               <Chip
                 size="small"
                 label={
-                  isViewOnly
+                  isCancelFlag(editingInvoice.cancel_flag)
+                    ? `Invoice ${editingInvoice.invoice_no} — cancelled`
+                    : isViewOnly
                     ? `Invoice ${editingInvoice.invoice_no} — submitted (view only)`
                     : `Editing Invoice ${editingInvoice.invoice_no} — add or remove dockets, then Save`
                 }
@@ -1663,8 +1771,16 @@ export default function CustomerBill() {
                   ml: 2,
                   fontSize: 11,
                   fontWeight: 700,
-                  bgcolor: isViewOnly ? "#e2e8f0" : "#f3e8ff",
-                  color: isViewOnly ? "#334155" : "#6b21a8",
+                  bgcolor: isCancelFlag(editingInvoice.cancel_flag)
+                    ? "#fee2e2"
+                    : isViewOnly
+                    ? "#e2e8f0"
+                    : "#f3e8ff",
+                  color: isCancelFlag(editingInvoice.cancel_flag)
+                    ? "#991b1b"
+                    : isViewOnly
+                    ? "#334155"
+                    : "#6b21a8",
                 }}
               />
             ) : null}
@@ -2091,6 +2207,17 @@ const clearHeaderButtonStyle = {
   padding: "8px 16px",
   boxShadow: "none",
   "&:hover": { background: "linear-gradient(135deg, #7d8898, #4d5666)" },
+};
+
+const cancelHeaderButtonStyle = {
+  background: "linear-gradient(135deg, #ea580c, #c2410c)",
+  borderRadius: "6px",
+  fontWeight: 700,
+  textTransform: "none",
+  minWidth: "120px",
+  padding: "8px 16px",
+  boxShadow: "none",
+  "&:hover": { background: "linear-gradient(135deg, #d14e0a, #9a3412)" },
 };
 
 const deleteHeaderButtonStyle = {

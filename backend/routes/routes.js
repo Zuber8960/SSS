@@ -25,6 +25,7 @@ const materialGroupRoutes = require("../modules/materialGroup/materialGroup.rout
 const deliveryNoteRoutes = require("../modules/deliveryNote/deliveryNote.routes");
 const customerBillRoutes = require("../modules/customerBill/customerBill.routes");
 const moneyReceiptRoutes = require("../modules/moneyReceipt/moneyReceipt.routes");
+const billAdjustmentRoutes = require("../modules/billAdjustment/billAdjustment.routes");
 const customerMisRoutes = require("../modules/customerMis/customerMis.routes");
 const cnsRoutes = require("../modules/manifest/cns.routes");
 const dashboardRoutes = require("../modules/dashboard/dashboard.routes");
@@ -282,6 +283,7 @@ router.use('/materialGroup', authMiddleware, materialGroupRoutes);
 router.use('/deliveryNote', authMiddleware, deliveryNoteRoutes);
 router.use('/customerBill', authMiddleware, customerBillRoutes);
 router.use('/moneyReceipt', authMiddleware, moneyReceiptRoutes);
+router.use('/billAdjustment', authMiddleware, billAdjustmentRoutes);
 router.use('/customerMis', authMiddleware, customerMisRoutes);
 router.use('/cns', authMiddleware, cnsRoutes);
 router.use('/dashboard', authMiddleware, dashboardRoutes);

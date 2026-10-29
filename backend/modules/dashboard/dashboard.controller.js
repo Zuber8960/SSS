@@ -222,7 +222,7 @@ const getDashboardOverview = async (tenant_id) => {
     db('sss.sst_invoice_hdr as ih')
       .where('ih.tenant_id', tenant_id)
       .whereNotNull('ih.inv_sub_date')
-      .whereRaw("COALESCE(ih.cancel_flag::text, '0') NOT IN ('1','true')")
+      .whereRaw("COALESCE(UPPER(TRIM(ih.cancel_flag::text)), '') NOT IN ('Y','C','1','TRUE')")
       .sum('ih.total_inv_amt as amt')
       .count('ih.invoice_no as count')
       .then(r => r[0]),
@@ -231,7 +231,7 @@ const getDashboardOverview = async (tenant_id) => {
     db('sss.sst_invoice_hdr as ih')
       .where('ih.tenant_id', tenant_id)
       .whereNull('ih.inv_sub_date')
-      .whereRaw("COALESCE(ih.cancel_flag::text, '0') NOT IN ('1','true')")
+      .whereRaw("COALESCE(UPPER(TRIM(ih.cancel_flag::text)), '') NOT IN ('Y','C','1','TRUE')")
       .sum('ih.total_inv_amt as amt')
       .then(r => r[0]),
 
@@ -333,7 +333,7 @@ const getDashboardOverview = async (tenant_id) => {
              SUM(CASE WHEN ih.inv_sub_date IS NOT NULL THEN ih.total_inv_amt ELSE 0 END) AS submitted
       FROM sss.sst_invoice_hdr ih
       WHERE ih.tenant_id = ?
-        AND COALESCE(ih.cancel_flag::text, '0') NOT IN ('1','true')
+        AND COALESCE(UPPER(TRIM(ih.cancel_flag::text)), '') NOT IN ('Y','C','1','TRUE')
       GROUP BY ih.bp_code
     ) inv ON inv.bp_code = bp.record_id
     WHERE bp.tenant_id = ?

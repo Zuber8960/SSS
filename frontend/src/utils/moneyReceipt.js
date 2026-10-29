@@ -3,7 +3,7 @@ import Api from '../services/Api';
 export const fetchMrBanks = () =>
   Api.get('/moneyReceipt/banks').then((r) => r.data.data || []);
 
-export const fetchOutstandingInvoices = (params) =>
+export const fetchOutstandingDockets = (params) =>
   Api.get('/moneyReceipt/outstanding', { params }).then((r) => r.data.data || []);
 
 export const fetchMoneyReceiptByNumber = (mrNo, locCode) =>

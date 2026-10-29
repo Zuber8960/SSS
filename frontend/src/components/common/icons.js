@@ -15,6 +15,7 @@ export { default as ViewIcon } from "@mui/icons-material/Visibility";
 export { default as AddRowIcon } from "@mui/icons-material/PlaylistAdd";
 export { default as SearchIcon } from "@mui/icons-material/Search";
 export { default as PrintIcon } from "@mui/icons-material/Print";
+export { default as CancelIcon } from "@mui/icons-material/Cancel";
 
 export function LogoutSvgIcon({ width = 16, height = 16 }) {
   return React.createElement(

@@ -155,6 +155,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/transaction/manifest-unloading", label: "Manifest Unloading", icon: <UnarchiveIcon /> },
         { path: "/transaction/customer-bill", label: "Customer Bill", icon: <ReceiptLongIcon /> },
         { path: "/transaction/money-receipt", label: "Money Receipt", icon: <RequestQuoteIcon /> },
+        { path: "/transaction/bill-adjustment", label: "Bill Adjustment", icon: <SwapHorizIcon /> },
         { path: "/transaction/delivery-update", label: "Delivery Update", icon: <SystemUpdateAltIcon /> },
         { path: "/transaction/bill-submission", label: "Bill Submission", icon: <PostAddIcon /> },
       ],

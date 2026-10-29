@@ -302,6 +302,8 @@ export default function BusinessPartnerPage() {
 
   const filteredPartners = searchText
     ? partners.filter((x) =>
+        String(x.record_id ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
+        String(x.bp_grp_code ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
         String(x.bp_name ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
         String(x.bp_pan_no ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
         String(x.bp_mobile1 ?? "").toLowerCase().includes(searchText.toLowerCase()) ||
@@ -311,7 +313,9 @@ export default function BusinessPartnerPage() {
     : partners;
 
   const partnerColumns = [
-    { key: "bp_name", label: "BP Name" },
+    { key: "record_id", label: "BP ID" },
+    { key: "bp_grp_code", label: "BP Code" },
+    { key: "bp_name", label: "BP Name", align: "left", headerAlign: "left" },
     { key: "bp_type_name", label: "BP Type" },
     { key: "bp_supplier_type", label: "Supplier Type" },
     { key: "bp_pan_no", label: "PAN No" },

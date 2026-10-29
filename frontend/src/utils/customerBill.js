@@ -29,3 +29,7 @@ export const updateInvoice = (invoiceNo, invoiceDate, invoiceLoc, payload) =>
 export const deleteInvoice = (invoiceNo, invoiceDate, invoiceLoc) =>
   Api.delete(`/customerBill/${encodeURIComponent(invoiceNo)}/${encodeURIComponent(invoiceDate)}/${encodeURIComponent(invoiceLoc)}`)
     .then((r) => r.data);
+
+export const cancelInvoice = (invoiceNo, invoiceDate, invoiceLoc) =>
+  Api.post(`/customerBill/${encodeURIComponent(invoiceNo)}/${encodeURIComponent(invoiceDate)}/${encodeURIComponent(invoiceLoc)}/cancel`)
+    .then((r) => r.data.data || r.data);

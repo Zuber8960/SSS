@@ -13,10 +13,12 @@ router.get('/banks', async (req, res) => {
 
 router.get('/outstanding', async (req, res) => {
   try {
-    const data = await ctrl.getOutstandingInvoices({
+    const data = await ctrl.getOutstandingDockets({
       loc_code: req.query.loc_code || req.loc_code,
       bp_code: req.query.bp_code,
       bp_name: req.query.bp_name,
+      bp_id: req.query.bp_id,
+      mr_reason: req.query.mr_reason,
       company_code: req.tenant_id || null,
     });
     res.json({ success: true, data });

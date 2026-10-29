@@ -16,11 +16,29 @@ export function openPrintDocument({ html, title = "Document", features = "width=
     return { handledByNative: true };
   }
 
-  const printWindow = window.open("", "_blank", features);
+  let printWindow = null;
+  try {
+    printWindow = window.open("", "_blank", features);
+  } catch {
+    printWindow = null;
+  }
   if (!printWindow) {
-    throw new Error("Popup blocked. Please allow popups for printing.");
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("title", title);
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+    printWindow = iframe.contentWindow;
+    if (!printWindow) {
+      throw new Error("Unable to open the print preview. Please allow popups and try again.");
+    }
   }
 
+  printWindow.document.open();
   printWindow.document.write(html);
   printWindow.document.close();
 
