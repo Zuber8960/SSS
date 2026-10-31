@@ -18,6 +18,7 @@ const getEwaybillDetails = async (ewbNo = process.env.ewbNo) => {
         },
         headers: {
           accept: '*/*',
+          user_name: process.env.user_name,
           ip_address: process.env.IP_ADDRESS,
           client_id: process.env.client_id,
           client_secret: process.env.client_secret,
