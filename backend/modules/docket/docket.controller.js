@@ -18,7 +18,6 @@ const getEwaybillDetails = async (ewbNo = process.env.ewbNo) => {
         },
         headers: {
           accept: '*/*',
-          user_name: process.env.user_name,
           ip_address: process.env.IP_ADDRESS,
           client_id: process.env.client_id,
           client_secret: process.env.client_secret,
@@ -38,7 +37,6 @@ const getEwaybillDetails = async (ewbNo = process.env.ewbNo) => {
         },
         headers: {
           accept: '*/*',
-          user_name: process.env.user_name,
           ip_address: process.env.IP_ADDRESS,
           client_id: process.env.client_id,
           client_secret: process.env.client_secret,
@@ -107,7 +105,6 @@ const getListEwayDetails = async (ewbLists) => {
             },
             headers: {
               accept: '*/*',
-              user_name: process.env.user_name,
               ip_address: process.env.IP_ADDRESS,
               client_id: process.env.client_id,
               client_secret: process.env.client_secret,
@@ -286,7 +283,21 @@ const getDocketByRecId = async (rec_id, tenant_id, docketNo) => {
   return query.first();
 };
 
-const getDocketByNo = async (docket_no, tenant_id) => {
+const isConnReset = (err) =>
+  err?.code === 'ECONNRESET' || /ECONNRESET/i.test(String(err?.message || ''));
+
+// A dropped database socket surfaces as ECONNRESET. Run the read once more
+// so the pool opens a fresh connection instead of failing the screen.
+const readWithRetry = async (fn) => {
+  try {
+    return await fn();
+  } catch (err) {
+    if (!isConnReset(err)) throw err;
+    return fn();
+  }
+};
+
+const getDocketByNo = async (docket_no, tenant_id) => readWithRetry(async () => {
   const query = db('sss.sst_docket as d')
     .leftJoin('sss.ssm_business_partner as cnor', 'd.cnor_id', 'cnor.record_id')
     .leftJoin('sss.ssm_business_partner as cnee', 'd.cnee_id', 'cnee.record_id')
@@ -316,7 +327,7 @@ const getDocketByNo = async (docket_no, tenant_id) => {
     );
   if (tenant_id) query.andWhere({ 'd.tenant_id': tenant_id });
   return query.first();
-};
+});
 
 const getDocketDetails = async ({ docket_no, docket_loc, docket_date }, tenant_id) => {
   const query = db('sss.sst_docket_dtl').where({ docket_no, docket_loc, docket_date, record_status: 0 });
@@ -516,15 +527,46 @@ const deleteCharge = async (chargeId, trx = db, tenant_id) => {
 // Normalise any accepted date input to YYYY-MM-DD, or null when unusable
 const normalizeInvDate = (val) => {
   if (!val) return null;
-  const m = moment(val, ['YYYY-MM-DD', 'MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DDTHH:mm:ss.SSSZ'], true);
-  return m.isValid() ? m.format('YYYY-MM-DD') : null;
+  if (val instanceof Date && !isNaN(val.getTime())) return moment(val).format('YYYY-MM-DD');
+  const m = moment(val, [
+    'YYYY-MM-DD',
+    'MM/DD/YYYY',
+    'DD/MM/YYYY',
+    'DD-MMM-YYYY',
+    'DD-MMM-YY',
+    'YYYY-MM-DDTHH:mm:ss.SSSZ',
+  ], true);
+  if (m.isValid()) return m.format('YYYY-MM-DD');
+  const loose = moment(val);
+  return loose.isValid() ? loose.format('YYYY-MM-DD') : null;
 };
 
 const getDocketInvoices = async (docketNo, tenant_id) => {
   const query = db('sss.sst_docket_inv as inv')
     .leftJoin('sss.sst_ewb_hdr as ewb', db.raw('ewb."EWB_NO"::text'), db.raw('inv.ewb_no::text'))
     .where({ 'inv.docket_no': docketNo })
-    .select('inv.*', db.raw('ewb."EWB_VALID_UPTO" as ewb_valid'));
+    .select(
+      'inv.*',
+      db.raw(`COALESCE(
+        (SELECT de.ewb_valid_upto
+           FROM sss.sst_docket_ewb de
+          WHERE de.docket_no = inv.docket_no
+            AND de.ewb_no::text = inv.ewb_no::text
+            AND (inv.tenant_id IS NULL OR de.tenant_id IS NULL OR de.tenant_id = inv.tenant_id)
+          ORDER BY de.aud_date DESC NULLS LAST
+          LIMIT 1),
+        ewb."EWB_VALID_UPTO"
+      ) as ewb_valid`),
+      db.raw(`(
+        SELECT de.ewb_date
+          FROM sss.sst_docket_ewb de
+         WHERE de.docket_no = inv.docket_no
+           AND de.ewb_no::text = inv.ewb_no::text
+           AND (inv.tenant_id IS NULL OR de.tenant_id IS NULL OR de.tenant_id = inv.tenant_id)
+         ORDER BY de.aud_date DESC NULLS LAST
+         LIMIT 1
+      ) as ewb_date`)
+    );
   if (tenant_id) query.andWhere({ 'inv.tenant_id': tenant_id });
   return query.orderBy('inv.sr_no', 'asc');
 };
@@ -616,6 +658,145 @@ const saveDocketInvoices = async (docketNo, header, rows, tenant_id, trx = db) =
   }
 
   return getDocketInvoices(docketNo, tenant_id);
+};
+
+// Invoices already on the docket, plus any e-way bill linked to the docket
+// that does not yet have an invoice row.
+const getDocketEwbUpdateRows = async (docketNo, tenant_id) => readWithRetry(async () => {
+  const invoices = await getDocketInvoices(docketNo, tenant_id);
+  const ewbQ = db('sss.sst_docket_ewb').where({ docket_no: docketNo });
+  if (tenant_id) ewbQ.andWhere({ tenant_id });
+  const ewbs = await ewbQ.orderBy('aud_date', 'asc');
+  const byNo = new Map(ewbs.map((e) => [String(e.ewb_no || '').trim(), e]));
+  const covered = new Set();
+  const invoiceRows = invoices.map((inv) => {
+    const nos = String(inv.ewb_no || '').split(/[, ]+/).map((s) => s.trim()).filter(Boolean);
+    nos.forEach((n) => covered.add(n));
+    const linked = nos.map((n) => byNo.get(n)).find(Boolean);
+    return {
+      ...inv,
+      ewb_date: inv.ewb_date || linked?.ewb_date || null,
+      ewb_valid: inv.ewb_valid || linked?.ewb_valid_upto || null,
+    };
+  });
+  const extras = ewbs
+    .filter((e) => e.ewb_no && !covered.has(String(e.ewb_no).trim()))
+    .map((e) => ({
+      ewb_no: e.ewb_no,
+      ewb_date: e.ewb_date,
+      ewb_valid: e.ewb_valid_upto,
+      inv_no: e.invoice_no || '',
+      inv_date: e.invoice_date,
+      inv_value: e.invoice_total,
+      sr_no: 1000,
+    }));
+  return [...invoiceRows, ...extras];
+});
+
+const asEwbPin = (v) => {
+  if (v == null || String(v).trim() === '') return null;
+  const n = Number(String(v).trim());
+  return Number.isFinite(n) ? n : null;
+};
+
+// Saves the Update EWB Docket grid. Invoice No + Invoice Date are required.
+// EWB No is optional, so an invoice can be stored with no e-way bill.
+const saveUpdateEwbDocket = async (docketNo, header, rows, tenant_id, division_code, trx = db) => {
+  await saveDocketInvoices(docketNo, header, rows, tenant_id, trx);
+
+  const docketDate = normalizeInvDate(header?.docket_date);
+  const docketLoc = header?.docket_loc || null;
+  const list = Array.isArray(rows) ? rows : [];
+  const ewbMap = new Map();
+
+  for (const r of list) {
+    const ewbNos = String(r.ewb_no || '').split(/[, ]+/).map((s) => s.trim()).filter(Boolean);
+    const invNo = String(r.inv_no || r.invoice_no || '').trim();
+    const invDate = normalizeInvDate(r.inv_date || r.invoice_date);
+    if (!ewbNos.length || !invNo || !invDate) continue;
+    const valid = normalizeInvDate(r.ewb_valid || r.ewb_valid_upto);
+    const ewbDate = normalizeInvDate(r.ewb_date);
+    const invValue = r.inv_value === '' || r.inv_value == null ? 0 : parseFloat(r.inv_value) || 0;
+    for (const ewbNo of ewbNos) {
+      if (!ewbMap.has(ewbNo)) {
+        ewbMap.set(ewbNo, {
+          ewb_no: ewbNo,
+          ewb_date: ewbDate,
+          ewb_valid_upto: valid,
+          invoice_no: invNo,
+          invoice_date: invDate,
+          invoice_total: invValue,
+          docket_date: docketDate,
+          docket_loc: docketLoc,
+        });
+      } else {
+        const current = ewbMap.get(ewbNo);
+        if (!current.ewb_valid_upto && valid) current.ewb_valid_upto = valid;
+        if (!current.ewb_date && ewbDate) current.ewb_date = ewbDate;
+      }
+    }
+  }
+
+  for (const row of ewbMap.values()) {
+    const existingQ = trx('sss.sst_docket_ewb').where({ ewb_no: row.ewb_no });
+    if (tenant_id) existingQ.andWhere({ tenant_id });
+    const existing = await existingQ.first();
+    if (existing && String(existing.docket_no || '') !== String(docketNo)) {
+      const err = new Error(`EWB No. ${row.ewb_no} is already associated with docket ${existing.docket_no}`);
+      err.statusCode = 409;
+      throw err;
+    }
+    const patch = {
+      ewb_no: row.ewb_no,
+      ewb_date: row.ewb_date,
+      ewb_valid_upto: row.ewb_valid_upto,
+      invoice_no: row.invoice_no,
+      invoice_date: row.invoice_date,
+      invoice_total: row.invoice_total,
+      docket_no: docketNo,
+      docket_date: row.docket_date,
+      docket_loc: row.docket_loc,
+      aud_date: new Date(),
+    };
+    if (existing) {
+      const updateQ = trx('sss.sst_docket_ewb').where({ ewb_no: row.ewb_no });
+      if (tenant_id) updateQ.andWhere({ tenant_id });
+      await updateQ.update(patch);
+    } else {
+      await trx('sss.sst_docket_ewb').insert({
+        ...patch,
+        cnor_name: header?.cnor_name || '',
+        cnor_address: header?.cnor_address || '',
+        cnor_gstin: header?.cnor_gstin || '',
+        cnor_pincode: asEwbPin(header?.cnor_pincode),
+        cnee_name: header?.cnee_name || '',
+        cnee_address: header?.cnee_address || '',
+        cnee_gstin: header?.cnee_gstin || '',
+        cnee_pincode: asEwbPin(header?.cnee_pincode),
+        cgst: 0,
+        sgst: 0,
+        igst: 0,
+        cess: 0,
+        product_name: '',
+        hsn_code: '',
+        quantity: 0,
+        tenant_id: tenant_id || null,
+        division_code: division_code || header?.division_code || null,
+      });
+    }
+  }
+
+  const linkedQ = trx('sss.sst_docket_ewb').where({ docket_no: docketNo });
+  if (tenant_id) linkedQ.andWhere({ tenant_id });
+  const linked = await linkedQ.select('ewb_no');
+  for (const row of linked) {
+    const key = row.ewb_no == null ? "" : String(row.ewb_no).trim();
+    if (!key || !ewbMap.has(key)) {
+      const delQ = trx('sss.sst_docket_ewb').where({ docket_no: docketNo, ewb_no: row.ewb_no });
+      if (tenant_id) delQ.andWhere({ tenant_id });
+      await delQ.del();
+    }
+  }
 };
 
 
@@ -1278,7 +1459,9 @@ module.exports = {
   updateCharge,
   deleteCharge,
   getDocketInvoices,
+  getDocketEwbUpdateRows,
   saveDocketInvoices,
+  saveUpdateEwbDocket,
   getDocketPackages,
   saveDocketPackages,
   getEwayBillFromDB,

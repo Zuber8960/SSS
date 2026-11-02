@@ -213,6 +213,40 @@ router.post('/:docketNo/invoices', async (req, res) => {
   }
 });
 
+// Update EWB Docket: existing invoices and linked e-way bills, then save.
+router.get('/:docketNo/ewb-update', async (req, res) => {
+  try {
+    const { docketNo } = req.params;
+    const { tenant_id } = req;
+    const data = await DocketController.getDocketEwbUpdateRows(docketNo, tenant_id);
+    res.json({ success: true, data });
+  } catch (err) {
+    const reset = err?.code === 'ECONNRESET' || /ECONNRESET/i.test(String(err?.message || ''));
+    res.status(500).json({
+      success: false,
+      message: reset ? 'Database connection was interrupted. Query the docket again.' : err.message
+    });
+  }
+});
+
+router.post('/:docketNo/ewb-update', async (req, res) => {
+  const trx = await db.transaction();
+  try {
+    const { docketNo } = req.params;
+    const { tenant_id, divisionId } = req;
+    const { header, rows } = req.body || {};
+    await DocketController.saveUpdateEwbDocket(
+      docketNo, header, rows, tenant_id, divisionId, trx
+    );
+    await trx.commit();
+    const data = await DocketController.getDocketEwbUpdateRows(docketNo, tenant_id);
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    await trx.rollback();
+    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+  }
+});
+
 /* ================= DOCKET PACKAGES ROUTES (sst_docket_pkg) ================= */
 
 router.get('/:docketNo/packages', async (req, res) => {
@@ -325,7 +359,11 @@ router.get('/:no', async (req, res) => {
     if (data) res.json({ success: true, data });
     else res.status(404).json({ success: false, message: 'Docket not found' });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    const reset = err?.code === 'ECONNRESET' || /ECONNRESET/i.test(String(err?.message || ''));
+    res.status(500).json({
+      success: false,
+      message: reset ? 'Database connection was interrupted. Query the docket again.' : err.message
+    });
   }
 });
 

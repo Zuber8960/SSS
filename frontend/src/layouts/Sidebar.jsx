@@ -148,6 +148,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
       },
       children: [
         { path: "/transaction/docket",           label: "Docket",          icon: <DescriptionIcon /> },
+        { path: "/transaction/update-ewb-docket", label: "Update EWB Docket", icon: <FactCheckIcon /> },
         { path: "/transaction/docket-pre-alloc", label: "Docket Pre Allocation", icon: <PostAddIcon /> },
         { path: "/transaction/trip-sheet",       label: "Trip Sheet",      icon: <AccountTreeSharp /> },
         { path: "/transaction/manifest-entry",   label: "Manifest Entry",  icon: <AccessTime /> },

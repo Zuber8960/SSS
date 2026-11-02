@@ -68,6 +68,13 @@ export const saveDocketInvoices = (docketNo, header, rows) =>
   Api.post(`/docket/${encodeURIComponent(docketNo)}/invoices`, { header, rows })
     .then(r => r.data.data || r.data || []);
 
+export const fetchUpdateEwbDocket = (docketNo) =>
+  Api.get(`/docket/${encodeURIComponent(docketNo)}/ewb-update`)
+    .then(r => r.data.data || r.data || []);
+export const saveUpdateEwbDocket = (docketNo, header, rows) =>
+  Api.post(`/docket/${encodeURIComponent(docketNo)}/ewb-update`, { header, rows })
+    .then(r => r.data.data || r.data || []);
+
 export const fetchDocketPackages = (docketNo) =>
   Api.get(`/docket/${encodeURIComponent(docketNo)}/packages`)
     .then(r => { const d = r.data?.data ?? r.data; return Array.isArray(d) ? d : []; });

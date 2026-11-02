@@ -23,6 +23,7 @@ import JobCardCreationPage from "./pages/fleet/JobCardCreation";
 import JobApprovalPage from "./pages/fleet/JobApproval";
 import AddTown from "./pages/transaction/AddTown";
 import Docket from "./pages/transaction/Docket";
+import UpdateEwbDocket from "./pages/transaction/UpdateEwbDocket";
 import TripSheet from "./pages/transaction/TripSheet";
 import ManifestEntry from "./pages/transaction/ManifestEntry";
 import HireVoucherPage from "./pages/transaction/Hire_voucher";
@@ -37,6 +38,7 @@ import HireVoucherReport from "./pages/reports/HireVoucherReport";
 import CustomerMIS from "./pages/reports/CustomerMIS";
 import CustomerBill from "./pages/transaction/CustomerBill";
 import MoneyReceipt from "./pages/transaction/MoneyReceipt";
+import BillAdjustment from "./pages/transaction/BillAdjustment";
 import { isAuthenticated } from "./utils/authService";
 import { useMenuAccess } from "./utils/accessControl";
 import DistanceCalculator from "./pages/dev/DistanceCalculator";
@@ -69,6 +71,7 @@ const appRoutes = [
   { path: "/masters/item-supplier", element: <ItemSuppPage />, protected: true },
   { path: "/transaction/add-town", element: <AddTown />, protected: true },
   { path: "/transaction/docket", element: <Docket />, protected: true },
+  { path: "/transaction/update-ewb-docket", element: <UpdateEwbDocket />, protected: true },
   { path: "/transaction/docket-pre-alloc", element: <DocketPreAlloc />, protected: true },
   { path: "/transaction/trip-sheet", element: <TripSheet />, protected: true },
   { path: "/transaction/manifest-entry", element: <ManifestEntry />, protected: true },
@@ -77,6 +80,7 @@ const appRoutes = [
   { path: "/reports/docket-enquiry", element: <DocketEnquiry />, protected: true },
   { path: "/transaction/customer-bill", element: <CustomerBill />, protected: true },
   { path: "/transaction/money-receipt", element: <MoneyReceipt />, protected: true },
+  { path: "/transaction/bill-adjustment", element: <BillAdjustment />, protected: true },
   { path: "/transaction/bill-submission", element: <BillSubmissionPage />, protected: true },
   { path: "/transaction/job-card-creation", element: <JobCardCreationPage />, protected: true },
   { path: "/transaction/job-approval", element: <JobApprovalPage />, protected: true },
