@@ -888,6 +888,7 @@ const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
 
 const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
   let xyz = await getListEwayDetails(ewbNumbers);
+  console.log(xyz);
 
   // Check if any EWB is already linked to a docket
   const existingEwb = await db('sss.sst_docket_ewb')
