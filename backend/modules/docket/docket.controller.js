@@ -241,6 +241,17 @@ const getAllDockets = async (tenant_id, cnor_cnee, loc_code) => {
         'cnee.bp_name as cnee_name',
       );
   }
+  // Latest delivery note carries POD Front (pod_url) and POD Back (pod_back_url).
+  query.joinRaw(`LEFT JOIN (
+      SELECT dn.docket_no, dn.pod_url, dn.pod_back_url
+        FROM sss.sst_dly_note dn
+       WHERE dn.record_id = (
+             SELECT MAX(d2.record_id)
+               FROM sss.sst_dly_note d2
+              WHERE d2.docket_no = dn.docket_no
+       )
+    ) pod ON pod.docket_no = d.docket_no`)
+    .select('pod.pod_url as pod_url', 'pod.pod_back_url as pod_back_url');
   return query;
 };
 
@@ -888,7 +899,6 @@ const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
 
 const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
   let xyz = await getListEwayDetails(ewbNumbers);
-  console.log(xyz);
 
   // Check if any EWB is already linked to a docket
   const existingEwb = await db('sss.sst_docket_ewb')

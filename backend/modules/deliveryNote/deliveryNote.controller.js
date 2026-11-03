@@ -21,6 +21,7 @@ const sanitizeDeliveryNote = (payload = {}) => ({
   delivery_remarks: payload.delivery_remarks ?? null,
   received_by: payload.received_by ?? null,
   pod_url: payload.pod_url ?? null,
+  pod_back_url: payload.pod_back_url ?? null,
   record_updated_by: payload.record_updated_by ?? null,
   record_updated_on: payload.record_updated_on ?? null,
 });

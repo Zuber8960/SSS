@@ -463,12 +463,23 @@ export default function BillSubmissionPage() {
                   label: "POD",
                   minWidth: 180,
                   render: (row) => {
-                    const href = resolvePodUrl(row.pod_url);
-                    if (!href) return "—";
+                    const front = resolvePodUrl(row.pod_url);
+                    const back = resolvePodUrl(row.pod_back_url);
+                    if (!front && !back) return "—";
+                    const linkStyle = { color: "#6d28d9", fontSize: 12, display: "block" };
                     return (
-                      <a href={href} target="_blank" rel="noreferrer" style={{ color: "#6d28d9", fontSize: 12 }}>
-                        {row.pod_url}
-                      </a>
+                      <span>
+                        {front && (
+                          <a href={front} target="_blank" rel="noreferrer" style={linkStyle}>
+                            POD Front
+                          </a>
+                        )}
+                        {back && (
+                          <a href={back} target="_blank" rel="noreferrer" style={linkStyle}>
+                            POD Back
+                          </a>
+                        )}
+                      </span>
                     );
                   },
                 },

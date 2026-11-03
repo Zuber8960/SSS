@@ -73,6 +73,15 @@ function toIstDate(value) {
   return moment(d).utcOffset(330).format("YYYY-MM-DD"); // 330 min = +05:30 IST
 }
 
+// dd-mon-rr, for example 19-SEP-26. The IST calendar date is used so a
+// date stored as midnight India time is not shown as the previous UTC day.
+function toDdMonRr(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return moment(d).utcOffset(330).format("DD-MMM-YY").toUpperCase();
+}
+
 function StatusChip({ status, size = "md" }) {
   const meta = STATUS_META[status] || STATUS_META["In Transit"];
   return (
@@ -128,7 +137,7 @@ function resolvePodUrl(url) {
 const isImageSrc = (url) =>
   /^data:image\//i.test(url) || /\.(jpe?g|png|gif|webp|bmp)(\?.*)?$/i.test(url);
 
-function PodViewer({ podUrl }) {
+function PodViewer({ podUrl, title = "Proof of Delivery (POD)" }) {
   const resolved = resolvePodUrl(podUrl);
   if (!podUrl || resolved.dead) {
     return (
@@ -154,7 +163,7 @@ function PodViewer({ podUrl }) {
       border: "1px solid #86efac",
     }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: "#15803d", marginBottom: 8 }}>
-        📄 Proof of Delivery (POD)
+        {title}
       </div>
       {isImageSrc(url) ? (
         <a href={url} target="_blank" rel="noreferrer">
@@ -184,7 +193,7 @@ function PodViewer({ podUrl }) {
 
 const manifestBaseColumns = [
   { key: "mnf_no", label: "Manifest No" },
-  { key: "mnf_date", label: "Manifest Date" },
+  { key: "mnf_date", label: "Manifest Date", render: (row) => toDdMonRr(row.mnf_date) },
   { key: "mnf_loc", label: "From Location" },
   { key: "mnf_to_loc", label: "To Location" },
   { key: "mnf_from_town", label: "From Town" },
@@ -279,7 +288,7 @@ export default function DocketEnquirySearch({ showForm = true }) {
       if (docketData?.docket_no) {
         setForm({
           docket_no: docketData.docket_no || "",
-          docket_date: docketData.docket_date ? docketData.docket_date.substring(0, 10) : "",
+          docket_date: toIstDate(docketData.docket_date),
           from_loc: docketData.docket_loc || "",
           from_town: docketData.docket_pickup_town || docketData.from_town || "",
           to_loc: docketData.docket_to_loc || docketData.to_loc || "",
@@ -435,9 +444,15 @@ export default function DocketEnquirySearch({ showForm = true }) {
           )}
         </FormPanel>
       )}
-      {/* POD image — show whenever a POD file is uploaded (not just when Delivered) */}
-      {docketFound && (deliveryNote?.pod_url || currentStatus === "Delivered") && (
-        <PodViewer podUrl={deliveryNote?.pod_url} />
+      {/* POD images — front is the original pod_url, back is pod_back_url */}
+      {docketFound && deliveryNote?.pod_url && (
+        <PodViewer title="POD Front" podUrl={deliveryNote.pod_url} />
+      )}
+      {docketFound && deliveryNote?.pod_back_url && (
+        <PodViewer title="POD Back" podUrl={deliveryNote.pod_back_url} />
+      )}
+      {docketFound && currentStatus === "Delivered" && !deliveryNote?.pod_url && !deliveryNote?.pod_back_url && (
+        <PodViewer podUrl={null} />
       )}
 
       {/* Manifests Grid */}

@@ -205,11 +205,6 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
           <td>${fmtAmt(d.stationery ?? d.other_charges)}</td>
           <td>${fmtAmt(d.door_collection)}</td>
           <td>${fmtAmt(d.door_delivery)}</td>
-          <td>${fmtAmt(lineTaxable(d))}</td>
-          <td>${fmtAmt(d.cgst)}</td>
-          <td>${fmtAmt(d.sgst)}</td>
-          <td>${fmtAmt(d.igst)}</td>
-          <td>${fmtAmt(d.amount ?? d.total_amt)}</td>
         </tr>`;
     })
     .join("");
@@ -223,7 +218,8 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
   <title>Invoice ${invoice.invoice_no || ""}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    @page { size: A4 landscape; margin: 8mm; }
+    @page { size: A4 landscape; margin: 1.5in 8mm 8mm 8mm; }
+    @page :first { margin: 8mm; }
     html, body { height: auto; }
     body { font-family: Arial, sans-serif; background: #fff; padding: 12px; }
     @media print {
@@ -251,6 +247,12 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
     th { color: #000; padding: 6px 4px; border: 1px solid #333; font-weight: 700; text-align: center; }
     td { border: 1px solid #ccc; padding: 4px; }
     .tot-row td { font-weight: 700; }
+    .tax-summary { display: flex; justify-content: flex-end; margin-top: 14px; page-break-inside: avoid; }
+    .tax-summary table { width: 280px; margin-top: 0; margin-left: auto; }
+    .tax-summary td { border: 1px solid #333; padding: 5px 8px; font-size: 12px; }
+    .tax-summary td:first-child { font-weight: 700; text-align: left; width: 58%; }
+    .tax-summary td:last-child { text-align: right; }
+    .tax-summary tr.bill-total td { font-weight: 800; background: #f5f0d6; }
     .footer { display: flex; justify-content: space-between; margin-top: 24px; padding-top: 12px; border-top: 1px solid #ccc; font-size: 11px; }
     .sign { text-align: center; }
     .btn { padding: 10px 32px; font-size: 14px; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; margin: 0 8px; }
@@ -298,7 +300,6 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
         <th>Sr</th><th>Docket No</th><th>Date</th><th>Origin</th><th>Dest</th><th>Wt</th>
         <th>Freight</th><th>Handling</th><th>Fuel Surcharge</th><th>Factory Charge</th><th>ODA Charge</th><th>FOV</th><th>Stationery</th>
         <th>Door Pkp</th><th>Door Dly</th>
-        <th>Taxable</th><th>CGST</th><th>SGST</th><th>IGST</th><th>Total</th>
       </tr>
     </thead>
     <tbody>
@@ -314,19 +315,21 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
         <td>${sums.other.toFixed(2)}</td>
         <td>${sums.doorColl.toFixed(2)}</td>
         <td>${sums.doorDly.toFixed(2)}</td>
-        <td>${sums.taxable.toFixed(2)}</td>
-        <td>${sums.cgst.toFixed(2)}</td>
-        <td>${sums.sgst.toFixed(2)}</td>
-        <td>${sums.igst.toFixed(2)}</td>
-        <td><strong>${totalAmt}</strong></td>
       </tr>
     </tbody>
-  </table>` : `
-  <table>
-    <tbody>
-      <tr><td style="text-align:center;padding:16px;font-size:13px"><strong>Invoice Amount: &#8377; ${totalAmt}</strong></td></tr>
-    </tbody>
-  </table>`}
+  </table>` : ""}
+
+  <div class="tax-summary">
+    <table>
+      <tbody>
+        <tr><td>Taxable Amount</td><td>${hasDetails ? sums.taxable.toFixed(2) : "0.00"}</td></tr>
+        <tr><td>SGST</td><td>${hasDetails ? sums.sgst.toFixed(2) : "0.00"}</td></tr>
+        <tr><td>CGST</td><td>${hasDetails ? sums.cgst.toFixed(2) : "0.00"}</td></tr>
+        <tr><td>IGST</td><td>${hasDetails ? sums.igst.toFixed(2) : "0.00"}</td></tr>
+        <tr class="bill-total"><td>Bill Total</td><td>${totalAmt}</td></tr>
+      </tbody>
+    </table>
+  </div>
 
   <div class="footer">
     <div>

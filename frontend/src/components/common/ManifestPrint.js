@@ -41,6 +41,8 @@ export function printManifest({ header, details, locationsMap }) {
   <title>Manifest ${h.mnf_no || ""}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    @page { margin: 1.5in 8mm 8mm 8mm; }
+    @page :first { margin: 8mm; }
     body { font-family: Arial, sans-serif; background: #fff; padding: 20px; }
     @media print { .no-print { display: none !important; } }
     .header { display: flex; justify-content: space-between; border-bottom: 3px solid #333; padding-bottom: 12px; margin-bottom: 16px; }

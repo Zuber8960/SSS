@@ -6,7 +6,7 @@ import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
-import { SaveIcon, PrintIcon, AddIcon, DeleteIcon, EditIcon, CancelIcon } from "../../components/common/icons";
+import { SaveIcon, PrintIcon, AddIcon, DeleteIcon, EditIcon, CancelIcon, RefreshIcon } from "../../components/common/icons";
 import { fetchAllBusinessPartners } from "../../utils/businessPartner";
 import { fetchDocketsForBilling, fetchCharges, fetchChargesBulk, fetchChargeMaster, fetchDocketByDocketNo } from "../../utils/docket";
 import { fetchDeliveryNotes, fetchDeliveryNoteByDocketNo } from "../../utils/deliveryNote";
@@ -15,11 +15,48 @@ import { saveInvoice, updateInvoice, deleteInvoice, cancelInvoice, fetchBilledDo
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { getSessionLocCode } from "../../utils/authService";
 import { printInvoice } from "../../components/common/InvoicePrint";
-import { Autocomplete, Button, Chip, FormControl, IconButton, InputLabel, MenuItem, Select, TextField, Tooltip } from "@mui/material";
+import { Autocomplete, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, IconButton, InputLabel, MenuItem, Select, TextField, Tooltip } from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
 import moment from "moment";
 import { getDateFormat } from "../../utils/tenantService";
 import { DEFAULT_SAC_CODE, LOGISTICS_SAC_CODES, formatSac, sacLabel } from "../../utils/sacCodes";
+
+const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/app\/?$/, "");
+
+function resolvePodUrl(url) {
+  if (!url) return "";
+  if (/^blob:/i.test(url)) return "";
+  if (/^(data:|https?:)/i.test(url)) {
+    const m = String(url).match(/\/uploads\/pod\/([^/?#]+)/i);
+    if (m) return `${API_BASE}/app/public/pod-file/${m[1]}`;
+    return url;
+  }
+  if (/^\/?uploads\/pod\//i.test(url)) {
+    return `${API_BASE}/app/public/pod-file/${url.replace(/^\/?uploads\/pod\//i, "")}`;
+  }
+  return `${API_BASE}/app/public/pod-file/${String(url).replace(/^\/+/, "")}`;
+}
+
+function PodLink({ url }) {
+  const href = resolvePodUrl(url);
+  if (!href) return "—";
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.open(href, "_blank", "noopener,noreferrer");
+      }}
+      style={{ color: "#6d28d9", fontSize: 12, fontWeight: 600, cursor: "pointer", position: "relative", zIndex: 2 }}
+    >
+      View
+    </a>
+  );
+}
 
 const docketNumericIndex = (no) => {
   const digits = String(no || "").replace(/\D/g, "");
@@ -70,6 +107,8 @@ const billingColumns = [
       </span>
     ),
   },
+  { key: "pod_url", label: "POD Front", minWidth: 88, render: (row) => <PodLink url={row.pod_url} /> },
+  { key: "pod_back_url", label: "POD Back", minWidth: 88, render: (row) => <PodLink url={row.pod_back_url} /> },
 ];
 
 const BILL_AMOUNT_COL_KEYS = [
@@ -77,56 +116,96 @@ const BILL_AMOUNT_COL_KEYS = [
   "other_charges", "door_collection", "door_delivery", "taxable", "cgst", "sgst", "igst", "amount",
 ];
 
-function BillGridTotalRow({ totals }) {
+function BillGridTotalRow({ totals, leadingKeys = ["__check__"] }) {
+  const clipRef = useRef(null);
   const rowRef = useRef(null);
+  const leadKey = leadingKeys.join(",");
 
   useLayoutEffect(() => {
+    let frame = 0;
     const sync = () => {
+      const clip = clipRef.current;
+      const row = rowRef.current;
+      if (!clip || !row) return;
+      const clipBox = clip.getBoundingClientRect();
       const headers = document.querySelectorAll(".customer-bill-page .MuiDataGrid-columnHeader[data-field]");
-      const cells = rowRef.current?.children;
-      if (!headers.length || !cells?.length) return;
-      const count = Math.min(headers.length, cells.length);
-      for (let i = 0; i < count; i++) {
-        const w = Math.round(headers[i].getBoundingClientRect().width);
-        cells[i].style.boxSizing = "border-box";
-        cells[i].style.width = `${w}px`;
-        cells[i].style.minWidth = `${w}px`;
-        cells[i].style.maxWidth = `${w}px`;
-        cells[i].style.flex = `0 0 ${w}px`;
+      const visibleWidth = (box) => {
+        const left = Math.max(box.left, clipBox.left);
+        const right = Math.min(box.right, clipBox.right);
+        return Math.max(0, right - left);
+      };
+      const byField = new Map();
+      headers.forEach((header) => {
+        const field = header.getAttribute("data-field");
+        if (!field) return;
+        const prev = byField.get(field);
+        if (!prev || visibleWidth(header.getBoundingClientRect()) > visibleWidth(prev.getBoundingClientRect())) {
+          byField.set(field, header);
+        }
+      });
+      const cells = row.children;
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
+        const header = byField.get(cell.getAttribute("data-field"));
+        if (!header) continue;
+        const box = header.getBoundingClientRect();
+        const left = box.left - clipBox.left;
+        const width = Math.max(0, Math.round(box.width));
+        cell.style.position = "absolute";
+        cell.style.left = `${left}px`;
+        cell.style.top = "0";
+        cell.style.height = "100%";
+        cell.style.boxSizing = "border-box";
+        cell.style.width = `${width}px`;
+        cell.style.minWidth = `${width}px`;
+        cell.style.maxWidth = `${width}px`;
       }
     };
-    sync();
-    const timer = window.setTimeout(sync, 50);
-    const grid = document.querySelector(".customer-bill-page .MuiDataGrid-root");
-    const ro = grid ? new ResizeObserver(sync) : null;
-    if (grid && ro) ro.observe(grid);
-    window.addEventListener("resize", sync);
-    return () => {
-      window.clearTimeout(timer);
-      ro?.disconnect();
-      window.removeEventListener("resize", sync);
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(sync);
     };
-  }, [totals]);
+    sync();
+    const timers = [50, 250].map((ms) => window.setTimeout(sync, ms));
+    const page = document.querySelector(".customer-bill-page");
+    const ro = page ? new ResizeObserver(schedule) : null;
+    if (page && ro) ro.observe(page);
+    page?.addEventListener("scroll", schedule, true);
+    window.addEventListener("resize", schedule);
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+      cancelAnimationFrame(frame);
+      ro?.disconnect();
+      page?.removeEventListener("scroll", schedule, true);
+      window.removeEventListener("resize", schedule);
+    };
+  }, [totals, leadKey]);
 
-  const fields = ["__check__", ...billingColumns.map((c) => c.key)];
+  const fields = [...leadingKeys, ...billingColumns.map((c) => c.key)];
   return (
-    <div ref={rowRef} style={totalRowStyle}>
-      {fields.map((key) => (
-        <div
-          key={key}
-          style={{
-            ...totalCellStyle,
-            justifyContent: key === "docket_no" ? "flex-start" : "center",
-            paddingLeft: key === "docket_no" ? 8 : 4,
-          }}
-        >
-          {key === "docket_no"
-            ? "TOTAL"
-            : BILL_AMOUNT_COL_KEYS.includes(key)
-              ? Number(totals[key] || 0).toFixed(2)
-              : ""}
-        </div>
-      ))}
+    <div ref={clipRef} style={totalClipStyle}>
+      <div ref={rowRef} style={totalRowStyle}>
+        {fields.map((key) => (
+          <div
+            key={key}
+            data-field={key}
+            style={{
+              ...totalCellStyle,
+              position: "absolute",
+              top: 0,
+              height: "100%",
+              justifyContent: key === "docket_no" ? "flex-start" : "center",
+              paddingLeft: key === "docket_no" ? 8 : 4,
+            }}
+          >
+            {key === "docket_no"
+              ? "TOTAL"
+              : BILL_AMOUNT_COL_KEYS.includes(key)
+                ? Number(totals[key] || 0).toFixed(2)
+                : ""}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -322,6 +401,17 @@ const billPageFontCss = `
   width: 0 !important;
   min-width: 0 !important;
 }
+.customer-bill-page .MuiDataGrid-row.dgt-row-changed,
+.customer-bill-page .MuiDataGrid-row.dgt-row-changed:nth-of-type(even),
+.customer-bill-page .MuiDataGrid-row.dgt-row-changed:hover,
+.customer-bill-page .MuiDataGrid-row.dgt-row-changed.Mui-selected,
+.customer-bill-page .MuiDataGrid-row.dgt-row-changed.Mui-selected:nth-of-type(even),
+.customer-bill-page .MuiDataGrid-row.dgt-row-changed.Mui-selected:hover {
+  background-color: #fef9c3 !important;
+}
+.customer-bill-page .MuiDataGrid-row.dgt-row-changed .MuiDataGrid-cell {
+  background-color: transparent !important;
+}
 `;
 
 // Map ssm_charge_master.charge_desc onto billing columns (order: specific names first).
@@ -386,6 +476,39 @@ const isDeliveredStatus = (status) => {
   if (!s || /(un|not |pending|cancel)/.test(s)) return false;
   return /deliver|dly|closed|complete|^y$|^yes$/.test(s);
 };
+
+const BILL_CHARGE_KEYS = [
+  "freight", "loading", "unloading", "detention", "add_toll", "green_tax",
+  "other_charges", "door_collection", "door_delivery",
+];
+
+const CHARGE_COMPARE_FIELDS = [
+  { key: "freight", label: "Freight" },
+  { key: "loading", label: "Handling" },
+  { key: "unloading", label: "Fuel Charge" },
+  { key: "detention", label: "Factory Charge" },
+  { key: "add_toll", label: "ODA Charge" },
+  { key: "green_tax", label: "FOV" },
+  { key: "other_charges", label: "Stationery" },
+  { key: "door_collection", label: "Door Pickup" },
+  { key: "door_delivery", label: "Door Delivery" },
+  { key: "taxable", label: "Taxable" },
+  { key: "cgst", label: "CGST" },
+  { key: "sgst", label: "SGST" },
+  { key: "igst", label: "IGST" },
+  { key: "amount", label: "Amount" },
+];
+
+const moneyCents = (value) => Math.round((parseFloat(value) || 0) * 100);
+
+const chargePick = (row) => {
+  const snap = {};
+  BILL_CHARGE_KEYS.forEach((key) => { snap[key] = row?.[key]; });
+  return snap;
+};
+
+const chargesDiffer = (live, saved) =>
+  BILL_CHARGE_KEYS.some((key) => moneyCents(live?.[key]) !== moneyCents(saved?.[key]));
 
 const invoiceDetailToRow = (d, locCode) => {
   const handling = d.handling ?? d.loading;
@@ -466,7 +589,8 @@ export default function CustomerBill() {
   const [selectedDocketNos, setSelectedDocketNos] = useState(() => new Set());
   const [loadingDockets, setLoadingDockets] = useState(false);
   const [docketsLoaded, setDocketsLoaded] = useState(false);
-  const [editingInvoice, setEditingInvoice] = useState(null); // { invoice_no, invoice_date, loc_code }
+  const [editingInvoice, setEditingInvoice] = useState(null);
+  const [chargeCompareNo, setChargeCompareNo] = useState("");
   const [isViewOnly, setIsViewOnly] = useState(false);
   const [editNoMode, setEditNoMode] = useState(false);
   // Guards against a stale customer/branch fetch resolving after a newer one
@@ -518,6 +642,23 @@ export default function CustomerBill() {
       })
       .catch((err) => console.error("Failed to load delivery notes:", err));
   }, []);
+
+  useEffect(() => {
+    if (!Object.keys(deliveryNotesMap).length) return;
+    setBillingRows((prev) => {
+      let changed = false;
+      const next = prev.map((row) => {
+        const note = deliveryNotesMap[String(row.docket_no || "").trim()];
+        if (!note) return row;
+        const podUrl = note.pod_url || "";
+        const podBack = note.pod_back_url || "";
+        if (row.pod_url === podUrl && row.pod_back_url === podBack) return row;
+        changed = true;
+        return { ...row, pod_url: podUrl, pod_back_url: podBack, pod: podUrl || podBack ? "YES" : "NO" };
+      });
+      return changed ? next : prev;
+    });
+  }, [deliveryNotesMap]);
 
   const loginBranchLabel = useMemo(() => sessionBranchLabel(locations), [locations]);
   const branchOptions = [loginBranchLabel].filter(Boolean);
@@ -609,7 +750,7 @@ export default function CustomerBill() {
 
   const getPodStatus = (docket) => {
     const note = deliveryNotesMap[docket.docket_no];
-    return note?.pod_url ? "Received" : "Pending";
+    return note?.pod_url || note?.pod_back_url ? "Received" : "Pending";
   };
 
   // Build a full billing row from a docket + its charges
@@ -662,6 +803,7 @@ export default function CustomerBill() {
 
     const deliveryStatus = getDeliveryStatus(docket);
     const pod = getPodStatus(docket);
+    const note = deliveryNotesMap[docket.docket_no];
 
     return {
       id: docket.docket_no + "_" + docket.docket_date,
@@ -693,6 +835,8 @@ export default function CustomerBill() {
       igst: igst.toFixed(2),
       amount: totalAmount.toFixed(2),
       pod: pod === "Received" ? "YES" : "NO",
+      pod_url: note?.pod_url || "",
+      pod_back_url: note?.pod_back_url || "",
       delivery_status: deliveryStatus,
       invoice_status: "Unbilled",
     };
@@ -983,14 +1127,31 @@ export default function CustomerBill() {
           return true;
         });
 
-        const chargeRows = await fetchChargesBulk(filtered.map((d) => d.docket_no)).catch(() => []);
+        const overlay = editOverlayRef.current || null;
+        const overlayNos = overlay ? Object.keys(overlay) : [];
+        const chargeNos = [...new Set([
+          ...filtered.map((d) => String(d.docket_no || "").trim()),
+          ...overlayNos,
+        ])].filter(Boolean);
+        const chargeRows = await fetchChargesBulk(chargeNos).catch(() => []);
         const chargesByDocket = {};
+        chargeNos.forEach((no) => { chargesByDocket[no] = []; });
         (Array.isArray(chargeRows) ? chargeRows : []).forEach((c) => {
           const no = String(c.docket_no || "").trim();
-          if (!no) return;
-          if (!chargesByDocket[no]) chargesByDocket[no] = [];
+          if (!no || !chargesByDocket[no]) return;
           chargesByDocket[no].push(c);
         });
+
+        const trackDrift = Boolean(editingInvoice) && !isViewOnly;
+        const driftFields = (live, saved) => {
+          const liveCharges = chargePick(live);
+          const stale = trackDrift && chargesDiffer(liveCharges, saved);
+          return {
+            _docketCharges: liveCharges,
+            _chargesStale: stale,
+            charge_sync: stale ? "changed" : "",
+          };
+        };
 
         let rows = filtered.map((d) => ({
           ...buildBillingRow(d, chargesByDocket[String(d.docket_no).trim()] || []),
@@ -999,8 +1160,7 @@ export default function CustomerBill() {
           _chargesLoaded: true,
         }));
 
-        const overlay = editOverlayRef.current;
-        if (overlay && Object.keys(overlay).length) {
+        if (overlay && overlayNos.length) {
           const have = new Set(rows.map((r) => String(r.docket_no).trim()));
           rows = rows.map((r) => {
             const saved = overlay[String(r.docket_no).trim()];
@@ -1016,10 +1176,28 @@ export default function CustomerBill() {
               invoice_status: "Billed",
               _fromInvoice: true,
               _chargesLoaded: true,
+              ...driftFields(r, saved),
             };
           });
           Object.entries(overlay).forEach(([no, saved]) => {
-            if (!have.has(no)) rows.push({ ...saved, id: no });
+            if (have.has(no)) return;
+            const docket = docketList.find((d) => String(d.docket_no || "").trim() === no);
+            const live = buildBillingRow(
+              docket || {
+                docket_no: no,
+                docket_loc: saved.booking_branch,
+                docket_to_loc: saved.delivery_branch,
+              },
+              chargesByDocket[no] || []
+            );
+            const note = deliveryNotesMap[no];
+            rows.push({
+              ...saved,
+              id: no,
+              pod_url: note?.pod_url || saved.pod_url || "",
+              pod_back_url: note?.pod_back_url || saved.pod_back_url || "",
+              ...driftFields(live, saved),
+            });
           });
           setSelectedDocketNos(new Set(Object.keys(overlay)));
         } else {
@@ -1205,6 +1383,8 @@ export default function CustomerBill() {
       igst: "",
       amount: "",
       pod: "",
+      pod_url: "",
+      pod_back_url: "",
       delivery_status: "",
       invoice_status: "Unbilled",
       _chargesLoaded: false,
@@ -1282,6 +1462,11 @@ export default function CustomerBill() {
 
         const charges = await fetchCharges(docketObj.docket_no || newRow.docket_no);
         const builtRow = buildBillingRow(docketObj, Array.isArray(charges) ? charges : []);
+        if (note) {
+          builtRow.pod_url = note.pod_url || "";
+          builtRow.pod_back_url = note.pod_back_url || "";
+          builtRow.pod = note.pod_url || note.pod_back_url ? "YES" : "NO";
+        }
         showSuccess("Docket " + newRow.docket_no + " loaded");
 
         // Update the billingRows state so the populated row persists in the grid
@@ -1306,6 +1491,72 @@ export default function CustomerBill() {
     ...col,
     editable: !isViewOnly && (col.key === "docket_no" || editableChargeKeys.includes(col.key)),
   }));
+
+  const applyDocketCharges = (targets) => {
+    const snaps = {};
+    targets.forEach((row) => {
+      const no = String(row?.docket_no || "").trim();
+      if (no && row?._docketCharges) snaps[no] = row._docketCharges;
+    });
+    const nos = Object.keys(snaps);
+    if (!nos.length) {
+      showError("Docket charges are not available to refresh");
+      return 0;
+    }
+    setBillingRows((prev) => prev.map((r) => {
+      const no = String(r.docket_no || "").trim();
+      const snap = snaps[no];
+      if (!snap) return r;
+      const next = recalculateRow({
+        ...r,
+        ...snap,
+        _chargesStale: false,
+        charge_sync: "",
+        _edited: {
+          ...(r._edited || {}),
+          ...Object.fromEntries(BILL_CHARGE_KEYS.map((key) => [key, true])),
+        },
+      });
+      if (editOverlayRef.current?.[no]) {
+        editOverlayRef.current[no] = {
+          ...editOverlayRef.current[no],
+          ...snap,
+          taxable: next.taxable,
+          cgst: next.cgst,
+          sgst: next.sgst,
+          igst: next.igst,
+          amount: next.amount,
+        };
+      }
+      return next;
+    }));
+    return nos.length;
+  };
+
+  const refreshAllChangedCharges = () => {
+    const changed = billingRows.filter((row) => row._chargesStale && row._docketCharges);
+    const count = applyDocketCharges(changed);
+    if (!count) return;
+    setChargeCompareNo("");
+    showSuccess(`${count} docket${count > 1 ? "s" : ""} refreshed from current charges`);
+  };
+
+  const chargeRefreshActions = editingInvoice && !isViewOnly && billingRows.some((r) => r._chargesStale)
+    ? [{
+        label: "Compare bill and docket charges",
+        icon: <RefreshIcon fontSize="small" />,
+        color: "#b45309",
+        hidden: (row) => !row._chargesStale,
+        onClick: (row) => setChargeCompareNo(String(row.docket_no || "").trim()),
+      }]
+    : [];
+
+  const chargeCompareRow = chargeCompareNo
+    ? billingRows.find((row) => String(row.docket_no || "").trim() === chargeCompareNo) || null
+    : null;
+  const chargeCompareDocket = chargeCompareRow?._docketCharges
+    ? recalculateRow({ ...chargeCompareRow, ...chargeCompareRow._docketCharges })
+    : null;
 
   // Stable array reference - DataTable memoises its controlled model on this,
   // so a fresh array every render would keep resetting the user's ticks
@@ -1954,6 +2205,23 @@ export default function CustomerBill() {
                 sx={{ ml: 2, fontSize: 12, fontWeight: 600, bgcolor: "#e8f5e9", color: "#1b5e20" }}
               />
             )}
+            {editingInvoice && !isViewOnly && billingRows.some((row) => row._chargesStale) && (
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<RefreshIcon />}
+                onClick={refreshAllChangedCharges}
+                sx={{
+                  ml: "auto",
+                  textTransform: "none",
+                  fontWeight: 700,
+                  background: "#b45309",
+                  "&:hover": { background: "#92400e" },
+                }}
+              >
+                Refresh charges
+              </Button>
+            )}
             {selectedRows.length > 0 && (
               <Chip
                 size="small"
@@ -2027,6 +2295,9 @@ export default function CustomerBill() {
             columns={tableColumns}
             rows={sortDocketsByNo(billingRows)}
             getKey={(row) => row.id || row.docket_no}
+            actions={chargeRefreshActions}
+            actionsPosition="left"
+            actionsHeader=""
             checkboxSelection
             dense
             rowHeight={26}
@@ -2041,7 +2312,14 @@ export default function CustomerBill() {
             onRowSelectionModelChange={handleRowSelectionModelChange}
             isRowSelectable={isViewOnly ? () => false : undefined}
             selectedRowColor="#dcfce7"
-            footer={selectedRows.length > 0 ? <BillGridTotalRow totals={totals} /> : null}
+            statusKey="charge_sync"
+            rowColors={{ changed: "#fef9c3" }}
+            footer={selectedRows.length > 0 ? (
+              <BillGridTotalRow
+                totals={totals}
+                leadingKeys={chargeRefreshActions.length ? ["__check__", "actions"] : ["__check__"]}
+              />
+            ) : null}
           />
         </div>
 
@@ -2058,6 +2336,40 @@ export default function CustomerBill() {
         </div>
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
+        <Dialog open={Boolean(chargeCompareRow)} onClose={() => setChargeCompareNo("")} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ fontWeight: 700, fontSize: 18 }}>
+            Charge comparison — {chargeCompareRow?.docket_no}
+          </DialogTitle>
+          <DialogContent>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: "#f8fafc" }}>
+                  <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "1px solid #e2e8f0" }}>Field</th>
+                  <th style={{ textAlign: "right", padding: "8px 10px", borderBottom: "1px solid #e2e8f0" }}>Bill</th>
+                  <th style={{ textAlign: "right", padding: "8px 10px", borderBottom: "1px solid #e2e8f0" }}>Docket</th>
+                </tr>
+              </thead>
+              <tbody>
+                {CHARGE_COMPARE_FIELDS.map((field) => {
+                  const billAmt = moneyCents(chargeCompareRow?.[field.key]);
+                  const docketAmt = moneyCents(chargeCompareDocket?.[field.key]);
+                  const differs = billAmt !== docketAmt;
+                  const fmt = (cents) => (cents / 100).toFixed(2);
+                  return (
+                    <tr key={field.key} style={{ background: differs ? "#fef9c3" : "#fff" }}>
+                      <td style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9", fontWeight: differs ? 700 : 500 }}>{field.label}</td>
+                      <td style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>{fmt(billAmt)}</td>
+                      <td style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9", textAlign: "right", fontWeight: differs ? 700 : 500 }}>{fmt(docketAmt)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setChargeCompareNo("")} sx={{ textTransform: "none" }}>Close</Button>
+          </DialogActions>
+        </Dialog>
         <LoadingOverlay isLoading={isLoading} message="Loading Customer Bill..." />
         </div>
       </PageBody>
@@ -2117,16 +2429,24 @@ const tableTitleStyle = {
   lineHeight: 1.3,
 };
 
-const totalRowStyle = {
-  display: "flex",
-  flexWrap: "nowrap",
-  width: "max-content",
+const totalClipStyle = {
+  overflow: "hidden",
+  width: "100%",
+  position: "relative",
   background: "#f5f0d6",
   border: "1px solid #dfeaf8",
   borderTop: "none",
+  minHeight: 30,
+  height: 30,
+  boxSizing: "border-box",
+};
+
+const totalRowStyle = {
+  position: "relative",
+  width: "100%",
+  height: "100%",
   fontWeight: 700,
   color: "#1f2937",
-  minHeight: 30,
   boxSizing: "border-box",
 };
 

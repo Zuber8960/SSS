@@ -132,7 +132,15 @@ const POD_MIME = {
 router.get('/pod-file/:filename', (req, res) => {
   const filename = path.basename(req.params.filename); // strips any path traversal
   const filePath = path.join(POD_DIR, filename);
-  if (!/^pod_.+$/i.test(filename) || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+  const onDisk = /^pod_.+$/i.test(filename) && fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+  if (!onDisk) {
+    // Dev PC uses the live database, but the image files stay on the live server.
+    const fallback = (process.env.POD_FILE_FALLBACK || "").replace(/\/$/, "");
+    let fallbackHost = "";
+    try { fallbackHost = fallback ? new URL(fallback).host : ""; } catch { fallbackHost = ""; }
+    if (fallback && fallbackHost && fallbackHost !== req.get("host") && /^pod_.+$/i.test(filename)) {
+      return res.redirect(302, `${fallback}/app/public/pod-file/${encodeURIComponent(filename)}`);
+    }
     return res.status(404).json({ success: false, message: 'POD file not found' });
   }
   res.setHeader('Content-Type', POD_MIME[path.extname(filename).toLowerCase()] || 'application/octet-stream');

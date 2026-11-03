@@ -357,6 +357,7 @@ export function DataTable({
   getKey,
   actions,
   actionsPosition = "right",
+  actionsHeader = "Act.",
   editable = false,
   singleClick = false,
   onCellChange,
@@ -597,11 +598,33 @@ export function DataTable({
       renderCell: (params) => {
         const value = col.render ? col.render(params.row) : params.value;
         const displayValue = value ?? "";
-        // Prefer the raw row string for the tooltip so custom render functions
-        // that return elements (e.g. <span>) still show a meaningful tooltip.
-        const textValue = typeof displayValue === "string"
-          ? displayValue
-          : (typeof params.value === "string" ? params.value : String(displayValue ?? ""));
+        // Custom cell content (links, badges) must receive the click itself.
+        // A tooltip on top of the cell swallows it, so the View link looks
+        // visible but does nothing.
+        if (displayValue !== null && typeof displayValue === "object") {
+          return (
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                height: "100%",
+                position: "relative",
+                zIndex: 1,
+              }}
+              onMouseDown={(e) => {
+                if (e.target.closest("a,button")) e.stopPropagation();
+              }}
+              onClick={(e) => {
+                if (e.target.closest("a,button")) e.stopPropagation();
+              }}
+            >
+              {displayValue}
+            </span>
+          );
+        }
+        const textValue = typeof displayValue === "string" ? displayValue : String(displayValue ?? "");
 
         return (
           <Tooltip title={textValue || ""} placement="top" enterDelay={200} arrow>
@@ -615,7 +638,7 @@ export function DataTable({
                 textAlign: "center",
               }}
             >
-              {value}
+              {textValue}
             </span>
           </Tooltip>
         );
@@ -639,7 +662,7 @@ export function DataTable({
     const actionsColWidth = Math.max(48, 20 + actions.length * 36);
     const actionsColumn = {
       field: "actions",
-      headerName: "Act.",
+      headerName: actionsHeader,
       headerAlign: "center",
       align: "center",
       sortable: false,
@@ -657,20 +680,29 @@ export function DataTable({
           height: "100%",
           width: "100%",
         }}>
-          {actions.map((action) => (
-            <Tooltip key={action.label} title={action.label}>
-              <IconButton
-                size="small"
-                onClick={() => action.onClick(params.row)}
-                sx={{
-                  color: action.label.toLowerCase() === "delete" ? "#dc2626" : "#7e22ce",
-                  "&:hover": { background: action.label.toLowerCase() === "delete" ? "#fee2e2" : "#f3e8ff" },
-                }}
-              >
-                {action.icon}
-              </IconButton>
-            </Tooltip>
-          ))}
+          {actions.map((action) => {
+            if (typeof action.hidden === "function" && action.hidden(params.row)) return null;
+            const isDelete = action.label.toLowerCase() === "delete";
+            const color = action.color || (isDelete ? "#dc2626" : "#7e22ce");
+            return (
+              <Tooltip key={action.label} title={action.label}>
+                <IconButton
+                  size="small"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    action.onClick(params.row);
+                  }}
+                  sx={{
+                    color,
+                    "&:hover": { background: isDelete ? "#fee2e2" : "#fef3c7" },
+                  }}
+                >
+                  {action.icon}
+                </IconButton>
+              </Tooltip>
+            );
+          })}
         </Box>
       ),
     };

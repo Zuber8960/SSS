@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 import moment from "moment";
 import MainLayout from "../../layouts/MainLayout";
 import {
@@ -11,11 +11,10 @@ import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
-import { SearchIcon, SaveIcon, ResetIcon, DeleteIcon } from "../../components/common/icons";
-import { IconButton, Tooltip, Button, Chip, Box } from "@mui/material";
+import { SearchIcon, SaveIcon, ResetIcon } from "../../components/common/icons";
+import { IconButton, Tooltip, Box } from "@mui/material";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
-import ImageIcon from "@mui/icons-material/Image";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import CloseIcon from "@mui/icons-material/Close";
 import { fetchDocketByDocketNo } from "../../utils/docket";
@@ -57,6 +56,181 @@ const formFields = [
   { label: "Delivery Remarks", name: "delivery_remarks" },
 ];
 
+const allowedFileTypes = [
+  "image/jpeg",
+  "image/png",
+  "image/jpg",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "application/pdf",
+];
+
+const emptyPodSlot = () => ({ file: null, url: "", name: "", preview: "" });
+
+const slotFromSaved = (url) => ({
+  file: null,
+  url: url || "",
+  name: url ? String(url).split("/").pop() : "",
+  preview: "",
+});
+
+const releaseSlot = (slot) => {
+  if (slot?.preview?.startsWith("blob:")) URL.revokeObjectURL(slot.preview);
+};
+
+// Mobile browsers (especially Android Chrome camera capture) often return
+// an empty file.type. Infer it from the file extension so camera shots
+// are not wrongly rejected.
+const resolveFileType = (file) => {
+  if (!file) return "";
+  if (file.type) return file.type;
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  const extTypeMap = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    gif: "image/gif",
+    heic: "image/heic",
+    heif: "image/heif",
+    pdf: "application/pdf",
+  };
+  return extTypeMap[ext] || "";
+};
+
+const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/app\/?$/, "");
+
+const displaySrc = (slot) => {
+  if (slot?.preview) return slot.preview;
+  const url = slot?.url;
+  if (!url) return "";
+  if (/^blob:|^data:|^https?:/i.test(url)) return url;
+  const file = String(url).split("/").pop();
+  if (/uploads\/pod\//i.test(url) || /^pod_/i.test(file || "")) {
+    return `${API_BASE}/app/public/pod-file/${file}`;
+  }
+  return url;
+};
+
+const isImageSrc = (url) =>
+  /^blob:/i.test(url) || /^data:image\//i.test(url) || /\.(jpe?g|png|gif|webp|bmp)(\?.*)?$/i.test(url || "");
+
+const podActionStyle = (kind) => ({
+  appearance: "none",
+  border: kind === "remove" ? "1px solid #dc2626" : "1px solid #7e22ce",
+  background: kind === "remove" ? "#dc2626" : "#ffffff",
+  color: kind === "remove" ? "#ffffff" : "#6b21a8",
+  borderRadius: 8,
+  padding: "8px 14px",
+  fontWeight: 700,
+  fontSize: 13,
+  cursor: "pointer",
+  lineHeight: 1.2,
+});
+
+function PodSlot({ title, slot, inputRef, onPick, onRemove }) {
+  const src = displaySrc(slot);
+  const type = slot.file ? resolveFileType(slot.file) : "";
+  const image = type ? type.startsWith("image/") : isImageSrc(src);
+  const pdf = type ? type === "application/pdf" : /\.pdf(\?.*)?$/i.test(slot.url || slot.name || "");
+  const attached = !!(slot.file || slot.url);
+
+  return (
+    <div style={{ flex: "1 1 280px", border: "1px solid #e2e8f0", borderRadius: 12, padding: 14, background: "#fff" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+        <div style={{ fontWeight: 700, color: "#334155" }}>{title}</div>
+        {attached && (
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            <button type="button" style={podActionStyle("upload")} onClick={() => inputRef.current?.click()}>
+              Upload new
+            </button>
+            <button type="button" style={podActionStyle("remove")} onClick={onRemove}>
+              Remove
+            </button>
+          </div>
+        )}
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*,application/pdf,.heic,.heif"
+        onChange={onPick}
+        style={{ display: "none" }}
+      />
+      {attached ? (
+        <div>
+          <div style={{ position: "relative" }}>
+            {image && src ? (
+              <img
+                src={src}
+                alt={title}
+                style={{ width: "100%", height: 180, objectFit: "contain", borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0", display: "block" }}
+              />
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 12, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                {pdf
+                  ? <PictureAsPdfIcon sx={{ fontSize: 36, color: "#dc2626" }} />
+                  : <InsertDriveFileIcon sx={{ fontSize: 36, color: "#64748b" }} />}
+                <span style={{ fontSize: 13, color: "#334155", wordBreak: "break-all" }}>{slot.name || "Attached file"}</span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={onRemove}
+              title={`Remove ${title}`}
+              style={{
+                position: "absolute",
+                top: 8,
+                right: 8,
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                border: "none",
+                background: "#dc2626",
+                color: "#ffffff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+              }}
+            >
+              <CloseIcon sx={{ fontSize: 18, color: "#ffffff" }} />
+            </button>
+          </div>
+          {slot.name && (
+            <p style={{ margin: "8px 0 0", fontSize: 12, color: "#64748b", wordBreak: "break-all" }}>{slot.name}</p>
+          )}
+          {slot.file && (
+            <p style={{ margin: "8px 0 0", fontSize: 12, color: "#b45309" }}>
+              New file selected. Click Save to store it.
+            </p>
+          )}
+        </div>
+      ) : (
+        <Box
+          onClick={() => inputRef.current?.click()}
+          sx={{
+            border: "2px dashed #cbd5e1",
+            borderRadius: 2,
+            padding: 3,
+            textAlign: "center",
+            background: "#f8fafc",
+            cursor: "pointer",
+            "&:hover": { borderColor: "#7e22ce", background: "#faf5ff" },
+          }}
+        >
+          <CloudUploadIcon sx={{ fontSize: 40, color: "#7e22ce" }} />
+          <p style={{ margin: "6px 0 0", fontWeight: 600, color: "#334155" }}>Choose {title}</p>
+          <p style={{ margin: "4px 0 0", fontSize: 12, color: "#94a3b8" }}>
+            JPG, PNG, GIF, or PDF. Camera photos are compressed on upload.
+          </p>
+        </Box>
+      )}
+    </div>
+  );
+}
+
 export default function DeliveryUpdate() {
   const { dialog, closeAlert, showError, showSuccess, showInfo } = useAlert();
   const { isLoading, showLoading, hideLoading } = useLoading();
@@ -65,45 +239,31 @@ export default function DeliveryUpdate() {
   const [form, setForm] = useState({ ...emptyForm });
   const [dlyNoteNo, setDlyNoteNo] = useState("");
   const [isDirty, setIsDirty] = useState(false);
-
-  // ── POD Upload State ──
-  const [selectedFiles, setSelectedFiles] = useState([]);
-  const [uploadedPods, setUploadedPods] = useState([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef(null);
-
-  const allowedFileTypes = [
-    "image/jpeg",
-    "image/png",
-    "image/jpg",
-    "image/gif",
-    "image/heic", // iPhone camera photos
-    "image/heif", // iPhone camera photos
-    "application/pdf",
-  ];
-
-  // Mobile browsers (especially Android Chrome camera capture) often return
-  // an empty file.type. Infer it from the file extension so camera shots
-  // are not wrongly rejected.
-  const resolveFileType = (file) => {
-    if (file.type) return file.type;
-    const ext = (file.name.split(".").pop() || "").toLowerCase();
-    const extTypeMap = {
-      jpg: "image/jpeg",
-      jpeg: "image/jpeg",
-      png: "image/png",
-      gif: "image/gif",
-      heic: "image/heic",
-      heif: "image/heif",
-      pdf: "application/pdf",
-    };
-    return extTypeMap[ext] || "";
-  };
+  const [podFront, setPodFront] = useState(emptyPodSlot);
+  const [podBack, setPodBack] = useState(emptyPodSlot);
+  const frontInputRef = useRef(null);
+  const backInputRef = useRef(null);
 
   const toDate = (val) => {
     if (!val) return "";
     const m = moment(val);
     return m.isValid() ? m.format("YYYY-MM-DD") : "";
+  };
+
+  const resetPods = () => {
+    releaseSlot(podFront);
+    releaseSlot(podBack);
+    setPodFront(emptyPodSlot());
+    setPodBack(emptyPodSlot());
+    if (frontInputRef.current) frontInputRef.current.value = "";
+    if (backInputRef.current) backInputRef.current.value = "";
+  };
+
+  const loadPods = (note) => {
+    releaseSlot(podFront);
+    releaseSlot(podBack);
+    setPodFront(slotFromSaved(note?.pod_url));
+    setPodBack(slotFromSaved(note?.pod_back_url));
   };
 
   const handleSetForm = (updatedForm) => {
@@ -123,17 +283,13 @@ export default function DeliveryUpdate() {
       const docketData = await fetchDocketByDocketNo(docketNo);
 
       if (docketData && docketData.docket_no) {
-        // Check the manifest unloading table — data can only be loaded for
-        // dockets that are present there. If the docket is not unloaded,
-        // show an error and do not load anything into the UI.
         const alreadyUnloaded = await checkDocketUnloaded(docketNo);
         if (!alreadyUnloaded) {
           setForm({ ...emptyForm });
           setDlyNoteNo("");
           setDocketNumberInput("");
           setIsDirty(false);
-          setSelectedFiles([]);
-          setUploadedPods([]);
+          resetPods();
           showError(`Docket #${docketNo} is not unloaded (not present in Manifest Unloading). Data cannot be loaded.`);
           return;
         }
@@ -141,7 +297,6 @@ export default function DeliveryUpdate() {
         const savedNote = await fetchDeliveryNoteByDocketNo(docketNo).catch(() => null);
 
         setDlyNoteNo(savedNote?.dly_note_no || "");
-
         setForm({
           docket_no:           docketData.docket_no               || "",
           docket_date:         toDate(docketData.docket_date),
@@ -159,6 +314,7 @@ export default function DeliveryUpdate() {
           delivery_remarks:    savedNote?.delivery_remarks || docketData.docket_remark || docketData.delivery_remarks || "",
           received_by:         savedNote?.received_by || docketData.received_by || "",
         });
+        loadPods(savedNote);
         setIsDirty(false);
         showSuccess(`Docket #${docketNo} loaded successfully`);
       } else {
@@ -172,15 +328,59 @@ export default function DeliveryUpdate() {
     }
   };
 
-  const handleSave = async (podsOverride) => {
+  const acceptFile = (file) => {
+    const fileType = resolveFileType(file);
+    if (!allowedFileTypes.includes(fileType)) {
+      showError(`File type not supported: ${file.name} (${fileType || "unknown type"})`);
+      return false;
+    }
+    if (fileType === "application/pdf" && file.size > 5 * 1024 * 1024) {
+      showError(`PDF too large (max 5MB): ${file.name}`);
+      return false;
+    }
+    return true;
+  };
+
+  const pickPod = (side) => (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !acceptFile(file)) return;
+    const fileType = resolveFileType(file);
+    const preview = fileType.startsWith("image/") ? URL.createObjectURL(file) : "";
+    const setter = side === "back" ? setPodBack : setPodFront;
+    setter((prev) => {
+      releaseSlot(prev);
+      return { file, url: "", name: file.name, preview };
+    });
+    setIsDirty(true);
+  };
+
+  const removePod = (side) => {
+    const setter = side === "back" ? setPodBack : setPodFront;
+    setter((prev) => {
+      releaseSlot(prev);
+      return emptyPodSlot();
+    });
+    setIsDirty(true);
+  };
+
+  const resolveSlot = async (slot, label) => {
+    if (slot.file) {
+      const url = await uploadPodFile(slot.file);
+      if (!url) throw new Error(`Failed to upload ${label}`);
+      return url;
+    }
+    return slot.url || null;
+  };
+
+  const handleSave = async () => {
     if (!docketNumberInput.trim()) {
       showError("Please enter a Docket Number");
       return;
     }
 
-    const podsList = Array.isArray(podsOverride) ? podsOverride : uploadedPods;
-    if (selectedFiles.length === 0 && podsList.length === 0) {
-      showError("Please upload one POD file before saving the delivery update");
+    if (!podFront.file && !podFront.url && !podBack.file && !podBack.url) {
+      showError("Attach POD Front or POD Back before saving");
       return;
     }
 
@@ -193,17 +393,14 @@ export default function DeliveryUpdate() {
 
     try {
       showLoading();
-      // Resolve POD as a server URL:
-      //  - prefer an already-uploaded POD (server URL)
-      //  - else upload the selected file to the backend now
-      let podUrl = podsList.find((p) => p.url && !p.url.startsWith("blob:"))?.url || null;
-      if (!podUrl && selectedFiles.length > 0) {
-        podUrl = await uploadPodFile(selectedFiles[0]);
-        if (!podUrl) throw new Error(`Failed to upload POD file: ${selectedFiles[0].name}`);
-      }
+      const podUrl = await resolveSlot(podFront, "POD Front");
+      const podBackUrl = await resolveSlot(podBack, "POD Back");
+      const currentUser = localStorage.getItem("current_user")
+        ? JSON.parse(localStorage.getItem("current_user"))
+        : null;
       const payload = {
-        company_code: localStorage.getItem("current_user") ? JSON.parse(localStorage.getItem("current_user")).company_code : null,
-        division_code: localStorage.getItem("current_user") ? JSON.parse(localStorage.getItem("current_user")).division_code : null,
+        company_code: currentUser?.company_code ?? null,
+        division_code: currentUser?.division_code ?? null,
         dly_note_no: dlyNoteNo || `${docketNumberInput}`,
         dly_date: form.delivery_date,
         docket_no: docketNumberInput.trim(),
@@ -216,7 +413,8 @@ export default function DeliveryUpdate() {
         delivery_remarks: form.delivery_remarks || "",
         received_by: form.received_by || "",
         pod_url: podUrl,
-        record_updated_by: localStorage.getItem("current_user") ? JSON.parse(localStorage.getItem("current_user")).user_id : null,
+        pod_back_url: podBackUrl,
+        record_updated_by: currentUser?.user_id ?? null,
       };
 
       if (dlyNoteNo) {
@@ -228,12 +426,10 @@ export default function DeliveryUpdate() {
 
       setIsDirty(false);
       showSuccess("Delivery note saved successfully");
-      // Clear the form after a successful save
       setDocketNumberInput("");
       setDlyNoteNo("");
       setForm({ ...emptyForm });
-      setSelectedFiles([]);
-      setUploadedPods([]);
+      resetPods();
     } catch (err) {
       showError(err.message || "Failed to save delivery update");
       console.error("Save delivery error:", err);
@@ -247,101 +443,13 @@ export default function DeliveryUpdate() {
     setDlyNoteNo("");
     setForm({ ...emptyForm });
     setIsDirty(false);
+    resetPods();
     showInfo("Form cleared");
-  };
-
-  // ── POD Handlers ──
-  const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files);
-    const validFiles = files.filter((file) => {
-      const fileType = resolveFileType(file);
-      if (!allowedFileTypes.includes(fileType)) {
-        showError(`File type not supported: ${file.name} (${fileType || "unknown type"})`);
-        return false;
-      }
-      // Images over 5MB are allowed here — they are compressed in the browser
-      // before upload (see compressImageFile in utils/deliveryNote.js).
-      if (fileType === "application/pdf" && file.size > 5 * 1024 * 1024) {
-        showError(`PDF too large (max 5MB): ${file.name}`);
-        return false;
-      }
-      return true;
-    });
-    setSelectedFiles((prev) => [...prev, ...validFiles]);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const removeSelectedFile = (index) => {
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleUploadPods = async () => {
-    if (selectedFiles.length === 0) {
-      showError("Please select at least one file to upload");
-      return;
-    }
-
-    try {
-      setIsUploading(true);
-      // Actually upload each file to the backend server (multer → backend/uploads/pod)
-      const newPods = await Promise.all(
-        selectedFiles.map(async (file, idx) => {
-          const serverUrl = await uploadPodFile(file);
-          if (!serverUrl) throw new Error(`Server did not return a URL for: ${file.name}`);
-          return {
-            id: Date.now() + idx,
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            uploadedAt: new Date().toISOString(),
-            url: serverUrl,
-            docket_no: docketNumberInput || form.docket_no || "N/A",
-          };
-        })
-      );
-
-      const allPods = [...uploadedPods, ...newPods];
-      setUploadedPods(allPods);
-      setSelectedFiles([]);
-      showSuccess(`${newPods.length} POD file(s) uploaded successfully`);
-
-      // Auto-save the delivery note so the new POD URL is persisted immediately.
-      // (Without this, the note keeps the old/dead pod_url until "Save" is clicked.)
-      if (docketNumberInput.trim()) {
-        await handleSave(allPods);
-      }
-    } catch (err) {
-      showError(err.message || "Failed to upload POD files");
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleDeletePod = async (podId) => {
-    try {
-      setUploadedPods((prev) => prev.filter((pod) => pod.id !== podId));
-      showInfo("POD file removed");
-    } catch (err) {
-      showError(err.message || "Failed to delete POD file");
-    }
-  };
-
-  const getFileIcon = (fileType) => {
-    if (fileType === "application/pdf") return <PictureAsPdfIcon sx={{ fontSize: 40, color: "#dc2626" }} />;
-    if (fileType?.startsWith("image/")) return <ImageIcon sx={{ fontSize: 40, color: "#7e22ce" }} />;
-    return <InsertDriveFileIcon sx={{ fontSize: 40, color: "#64748b" }} />;
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
   return (
     <MainLayout>
       <PageBody title="Delivery Update">
-        {/* Top Toolbar with Docket No, Search, Save, Clear */}
         <div className="pageToolbar" style={{ alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <MuiField
@@ -349,13 +457,14 @@ export default function DeliveryUpdate() {
               name="docket_no"
               value={docketNumberInput}
               onChange={(_, val) => setDocketNumberInput(val)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
               sx={{ width: 180 }}
             />
-            <Tooltip title="Search Docket">
+            <Tooltip title="Search">
               <IconButton
                 onClick={handleSearch}
                 size="small"
-                sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}
+                sx={{ color: "#1d4ed8", "&:hover": { background: "#dbeafe" } }}
               >
                 <SearchIcon />
               </IconButton>
@@ -386,7 +495,6 @@ export default function DeliveryUpdate() {
           )}
         </div>
 
-        {/* Delivery Update Form */}
         <FormPanel>
           {formFields.map((field) => {
             if (field.name === "delivery_remarks") {
@@ -411,171 +519,27 @@ export default function DeliveryUpdate() {
           })}
         </FormPanel>
 
-        {/* ── Upload POD Section ── */}
         <div style={{ marginTop: 24, borderTop: "2px solid #e2e8f0", paddingTop: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <h3 style={{ margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
-              <CloudUploadIcon sx={{ color: "#7e22ce" }} />
-              Upload POD (Proof of Delivery)
-            </h3>
-            {uploadedPods.length > 0 && (
-              <Chip
-                label={`${uploadedPods.length} POD(s) uploaded`}
-                size="small"
-                color="secondary"
-                variant="outlined"
-              />
-            )}
-          </div>
-
-          {/* File Selection Area */}
-          <Box
-            sx={{
-              border: "2px dashed #cbd5e1",
-              borderRadius: 2,
-              padding: 3,
-              textAlign: "center",
-              background: "#f8fafc",
-              cursor: "pointer",
-              "&:hover": { borderColor: "#7e22ce", background: "#faf5ff" },
-              transition: "all 0.2s ease",
-            }}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,application/pdf,.heic,.heif"
-              onChange={handleFileSelect}
-              style={{ display: "none" }}
+          <h3 style={{ margin: "0 0 12px", display: "flex", alignItems: "center", gap: 8 }}>
+            <CloudUploadIcon sx={{ color: "#7e22ce" }} />
+            POD (Proof of Delivery)
+          </h3>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <PodSlot
+              title="POD Front"
+              slot={podFront}
+              inputRef={frontInputRef}
+              onPick={pickPod("front")}
+              onRemove={() => removePod("front")}
             />
-            <CloudUploadIcon sx={{ fontSize: 48, color: "#7e22ce", mb: 1 }} />
-            <p style={{ margin: "4px 0", fontWeight: 600, color: "#334155" }}>
-              Click to select POD files
-            </p>
-            <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>
-              Supports: JPG, PNG, GIF, PDF (Max 5MB each). Camera photos are auto-compressed.
-            </p>
-          </Box>
-
-          {/* Selected Files Preview */}
-          {selectedFiles.length > 0 && (
-            <div style={{ marginTop: 12 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#475569", marginBottom: 8 }}>
-                Selected Files ({selectedFiles.length})
-              </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {selectedFiles.map((file, idx) => (
-                  <Box
-                    key={idx}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      padding: "6px 10px",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 1.5,
-                      background: "#fff",
-                    }}
-                  >
-                    {getFileIcon(file.type)}
-                    <div>
-                      <p style={{ margin: 0, fontSize: 12, fontWeight: 500, color: "#334155" }}>
-                        {file.name.length > 25 ? file.name.substring(0, 22) + "..." : file.name}
-                      </p>
-                      <p style={{ margin: 0, fontSize: 11, color: "#94a3b8" }}>
-                        {formatFileSize(file.size)}
-                      </p>
-                    </div>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => { e.stopPropagation(); removeSelectedFile(idx); }}
-                      sx={{ color: "#dc2626", padding: "2px" }}
-                    >
-                      <CloseIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                ))}
-              </div>
-              <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-                <Button
-                  variant="contained"
-                  startIcon={<CloudUploadIcon />}
-                  onClick={handleUploadPods}
-                  disabled={isUploading}
-                  sx={{
-                    background: "linear-gradient(135deg, #7e22ce, #a855f7)",
-                    "&:hover": { background: "linear-gradient(135deg, #6b21a8, #9333ea)" },
-                    textTransform: "none",
-                    fontWeight: 600,
-                    borderRadius: 2,
-                  }}
-                >
-                  {isUploading ? "Uploading..." : `Upload ${selectedFiles.length} File(s)`}
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  onClick={() => setSelectedFiles([])}
-                  disabled={isUploading}
-                  sx={{ textTransform: "none", borderRadius: 2 }}
-                >
-                  Clear All
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Uploaded PODs List */}
-          {uploadedPods.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#475569", marginBottom: 8 }}>
-                Uploaded PODs
-              </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {uploadedPods.map((pod) => (
-                  <Box
-                    key={pod.id}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1.5,
-                      padding: "8px 12px",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 1.5,
-                      background: "#fff",
-                      "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" },
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    {getFileIcon(pod.type)}
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: "#334155" }}>
-                        {pod.name}
-                      </p>
-                      <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-                        <span>{formatFileSize(pod.size)}</span>
-                        <span>•</span>
-                        <span>Docket: {pod.docket_no}</span>
-                        <span>•</span>
-                        <span>{new Date(pod.uploadedAt).toLocaleString()}</span>
-                      </div>
-                    </div>
-                    <Tooltip title="Delete POD">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeletePod(pod.id)}
-                        sx={{ color: "#94a3b8", "&:hover": { color: "#dc2626", background: "#fee2e2" } }}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                ))}
-              </div>
-            </div>
-          )}
+            <PodSlot
+              title="POD Back"
+              slot={podBack}
+              inputRef={backInputRef}
+              onPick={pickPod("back")}
+              onRemove={() => removePod("back")}
+            />
+          </div>
         </div>
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />

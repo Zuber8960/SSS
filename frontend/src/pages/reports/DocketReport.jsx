@@ -25,6 +25,43 @@ import SelectedRowInfo from "../../components/common/SelectedRowInfo";
 import moment from "moment";
 import { getDateFormat } from "../../utils/tenantService";
 
+const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/app\/?$/, "");
+
+function resolvePodUrl(url) {
+  if (!url) return "";
+  if (/^blob:/i.test(url)) return "";
+  if (/^(data:|https?:)/i.test(url)) {
+    const m = String(url).match(/\/uploads\/pod\/([^/?#]+)/i);
+    if (m) return `${API_BASE}/app/public/pod-file/${m[1]}`;
+    return url;
+  }
+  if (/^\/?uploads\/pod\//i.test(url)) {
+    return `${API_BASE}/app/public/pod-file/${url.replace(/^\/?uploads\/pod\//i, "")}`;
+  }
+  return `${API_BASE}/app/public/pod-file/${String(url).replace(/^\/+/, "")}`;
+}
+
+function PodLink({ url }) {
+  const href = resolvePodUrl(url);
+  if (!href) return "—";
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.open(href, "_blank", "noopener,noreferrer");
+      }}
+      style={{ color: "#6d28d9", fontSize: 12, fontWeight: 600, cursor: "pointer", position: "relative", zIndex: 2 }}
+    >
+      View
+    </a>
+  );
+}
+
 const docketColumns = [
   { key: "docket_no", label: "Docket No", minWidth: 160 },
   { key: "docket_date", label: "Docket Date", minWidth: 110 },
@@ -45,6 +82,8 @@ const docketColumns = [
   { key: "docket_rate_uom", label: "Rate UOM", minWidth: 90 },
   { key: "docket_tot_amt", label: "Total Amount", minWidth: 110 },
   { key: "delivery_status", label: "Delivery Status", minWidth: 130 },
+  { key: "pod_url", label: "POD Front", minWidth: 110, render: (row) => <PodLink url={row.pod_url} /> },
+  { key: "pod_back_url", label: "POD Back", minWidth: 110, render: (row) => <PodLink url={row.pod_back_url} /> },
   { key: "aud_user_name", label: "Created By", minWidth: 130 },
   { key: "aud_date", label: "Created Date", minWidth: 130 },
   { key: "ewb_valid", label: "EWB Expiry", minWidth: 120 },
@@ -53,8 +92,11 @@ const docketColumns = [
 
 const toDate = (val) => {
   if (!val) return "";
-  const m = moment(val);
-  return m.isValid() ? m.format(getDateFormat()) : val;
+  const d = new Date(val);
+  // Docket dates are calendar dates. The API sends midnight IST as the previous
+  // UTC day, so format with a fixed +05:30 offset and the tenant dd-mon-rr style.
+  const m = Number.isNaN(d.getTime()) ? moment(val) : moment(d).utcOffset(330);
+  return m.isValid() ? m.format(getDateFormat()).toUpperCase() : val;
 };
 
 export default function DocketReport() {

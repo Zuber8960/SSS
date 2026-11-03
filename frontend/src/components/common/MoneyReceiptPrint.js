@@ -150,7 +150,8 @@ export function printMoneyReceipt({ receipt, details, company, locationsMap, cus
   <title>Money Receipt ${receipt.mr_no || ""}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    @page { size: A4 landscape; margin: 8mm; }
+    @page { size: A4 landscape; margin: 1.5in 8mm 8mm 8mm; }
+    @page :first { margin: 8mm; }
     html, body { height: auto; }
     body { font-family: Arial, sans-serif; background: #fff; padding: 12px; }
     @media print {

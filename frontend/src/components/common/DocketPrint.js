@@ -244,7 +244,8 @@ const PRINT_CSS = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; overflow-x: hidden; }
   body { font-family: Arial, sans-serif; font-size: 8px; font-weight: 800; background: #fff; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-  @page { size: A4 portrait; margin: 6mm; }
+  @page { size: A4 portrait; margin: 1.5in 6mm 6mm 6mm; }
+  @page :first { margin: 6mm; }
   @media print {
     body { margin: 0; }
     .no-print { display: none; }

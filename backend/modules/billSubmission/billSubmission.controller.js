@@ -74,12 +74,22 @@ module.exports = {
     if (dockets.length) {
       const pods = await db('sss.sst_dly_note')
         .whereIn('docket_no', dockets)
-        .whereNotNull('pod_url')
-        .where('pod_url', '<>', '')
-        .select('docket_no', 'pod_url', 'record_id')
+        .where(function () {
+          this.where(function () {
+            this.whereNotNull('pod_url').andWhere('pod_url', '<>', '');
+          }).orWhere(function () {
+            this.whereNotNull('pod_back_url').andWhere('pod_back_url', '<>', '');
+          });
+        })
+        .select('docket_no', 'pod_url', 'pod_back_url', 'record_id')
         .orderBy('record_id', 'desc');
       for (const p of pods) {
-        if (!podMap[p.docket_no]) podMap[p.docket_no] = p.pod_url;
+        if (!podMap[p.docket_no]) {
+          podMap[p.docket_no] = {
+            pod_url: p.pod_url || '',
+            pod_back_url: p.pod_back_url || '',
+          };
+        }
       }
     }
     return rows.map((r, index) => ({
@@ -94,7 +104,8 @@ module.exports = {
       docket_date: toDate(r.docket_date),
       docket_from_loc: r.docket_from_loc || '',
       docket_to_loc: r.docket_to_loc || '',
-      pod_url: podMap[r.docket_no] || '',
+      pod_url: podMap[r.docket_no]?.pod_url || '',
+      pod_back_url: podMap[r.docket_no]?.pod_back_url || '',
       total_inv_amt: r.total_inv_amt,
     }));
   },

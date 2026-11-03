@@ -752,7 +752,8 @@ export default function ManifestPage() {
       <head>
         <title>Manifest #${form.manifest_no}</title>
         <style>
-          @page { margin: 8mm; }
+          @page { margin: 1.5in 8mm 8mm 8mm; }
+          @page :first { margin: 8mm; }
           * { box-sizing: border-box; }
           body {
             font-family: "Courier New", Courier, monospace;
