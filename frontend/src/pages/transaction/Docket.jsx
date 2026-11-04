@@ -1012,9 +1012,22 @@ export default function DocketPage() {
 
       // Save EWB list if withEWB is on and there are rows
       if (withEWB && ewbList.length > 0 && savedDocketNo) {
+        // Always store YYYY-MM-DD. Grid dates are YYYY-MM-DD or the screen
+        // format. MM/DD/YYYY is only the old grid value, read the same way
+        // the cell is shown so day and month are not swapped.
         const toDbDate = (val) => {
           if (!val) return null;
-          const m = moment(val, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", getDateFormat(), "DD/MM/YYYY", "MM/DD/YYYY"], true);
+          const m = moment(val, [
+            "YYYY-MM-DDTHH:mm:ss.SSSZ",
+            "YYYY-MM-DD",
+            getDateFormat(),
+            "DD-MMM-YYYY",
+            "DD-MMM-YY",
+            "DD/MM/YYYY hh:mm:ss A",
+            "DD/MM/YYYY HH:mm:ss",
+            "MM/DD/YYYY",
+            "DD/MM/YYYY",
+          ], true);
           return m.isValid() ? m.format("YYYY-MM-DD") : null;
         };
         const normalized = ewbList

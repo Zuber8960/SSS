@@ -39,6 +39,7 @@ import ZoneIcon from "@mui/icons-material/Map";
 import BuildIcon from "@mui/icons-material/Build";
 import PostAddIcon from "@mui/icons-material/PostAdd";
 import FactCheckIcon from "@mui/icons-material/FactCheck";
+import ManageSearchIcon from "@mui/icons-material/ManageSearch";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import Tooltip from "@mui/material/Tooltip";
@@ -149,6 +150,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
       children: [
         { path: "/transaction/docket",           label: "Docket",          icon: <DescriptionIcon /> },
         { path: "/transaction/update-ewb-docket", label: "Update EWB Docket", icon: <FactCheckIcon /> },
+        { path: "/transaction/ewb-status", label: "EWB Status", icon: <ManageSearchIcon /> },
         { path: "/transaction/docket-pre-alloc", label: "Docket Pre Allocation", icon: <PostAddIcon /> },
         { path: "/transaction/trip-sheet",       label: "Trip Sheet",      icon: <AccountTreeSharp /> },
         { path: "/transaction/manifest-entry",   label: "Manifest Entry",  icon: <AccessTime /> },

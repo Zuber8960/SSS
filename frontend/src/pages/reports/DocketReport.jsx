@@ -62,9 +62,46 @@ function PodLink({ url }) {
   );
 }
 
+const reportDateValue = (val) => {
+  if (val == null || String(val).trim() === "") return null;
+  const text = String(val).trim();
+  const parsed = moment(text, [
+    getDateFormat(),
+    "DD-MMM-YYYY",
+    "DD-MMM-YY",
+    "YYYY-MM-DD",
+    "YYYY-MM-DDTHH:mm:ss.SSSZ",
+  ], true);
+  if (parsed.isValid()) return parsed.valueOf();
+  const loose = moment(text);
+  return loose.isValid() ? loose.valueOf() : null;
+};
+
+const compareReportDate = (a, b) => {
+  const av = reportDateValue(a);
+  const bv = reportDateValue(b);
+  if (av == null && bv == null) return 0;
+  if (av == null) return 1;
+  if (bv == null) return -1;
+  return av - bv;
+};
+
 const docketColumns = [
+  {
+    key: "sr_no",
+    label: "Sr No",
+    minWidth: 58,
+    sortable: false,
+    render: (_row, params) => {
+      const index = params?.api?.getRowIndexRelativeToVisibleRows?.(params.id);
+      if (index == null || index < 0) return "";
+      const page = params.api.state?.pagination?.paginationModel?.page ?? 0;
+      const pageSize = params.api.state?.pagination?.paginationModel?.pageSize ?? 0;
+      return page * pageSize + index + 1;
+    },
+  },
   { key: "docket_no", label: "Docket No", minWidth: 160 },
-  { key: "docket_date", label: "Docket Date", minWidth: 110 },
+  { key: "docket_date", label: "Docket Date", minWidth: 110, sortComparator: compareReportDate },
   { key: "docket_loc", label: "From Location", minWidth: 120 },
   { key: "docket_pickup_town", label: "From Town", minWidth: 120 },
   { key: "docket_to_loc", label: "To Location", minWidth: 120 },
@@ -86,6 +123,7 @@ const docketColumns = [
   { key: "pod_back_url", label: "POD Back", minWidth: 110, render: (row) => <PodLink url={row.pod_back_url} /> },
   { key: "aud_user_name", label: "Created By", minWidth: 130 },
   { key: "aud_date", label: "Created Date", minWidth: 130 },
+  { key: "ewb_no", label: "EWB No", minWidth: 140 },
   { key: "ewb_valid", label: "EWB Expiry", minWidth: 120 },
   { key: "docket_remark", label: "Remarks", minWidth: 150 },
 ];
@@ -195,6 +233,7 @@ export default function DocketReport() {
       docket_pickup_town: d.docket_pickup_town || d.docket_from_town || "",
       docket_dly_town:    d.docket_dly_town || d.docket_to_town || "",
       delivery_status:    d.delivery_status || "Pending",
+      ewb_no:             String(d.ewb_no || d.eway_bill_no || "").split(",")[0].trim(),
       ewb_valid:          toDate(d.ewb_valid),
       aud_user_name:      userMap[d.aud_user] || d.aud_user || "",
       aud_date:           toDate(d.aud_date),
@@ -260,6 +299,14 @@ export default function DocketReport() {
         row.docket_loc, row.docket_to_loc, row.delivery_status,
       ].some((v) => String(v ?? "").toLowerCase().includes(q))) return false;
       return true;
+    }).sort((a, b) => {
+      const av = reportDateValue(a.docket_date);
+      const bv = reportDateValue(b.docket_date);
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (bv !== av) return bv - av;
+      return String(b.docket_no || "").localeCompare(String(a.docket_no || ""), undefined, { numeric: true, sensitivity: "base" });
     });
   }, [mappedDockets, searchText, fromTown, toTown, dateFrom, dateTo, audUser, audDateFrom, audDateTo, deliveryStatus]);
 
@@ -421,7 +468,7 @@ export default function DocketReport() {
   const exportCsv = () => {
     if (!gridRows.length) { showError("No data to export"); return; }
     const heads = docketColumns.map((c) => c.label);
-    const rows = gridRows.map((r) => docketColumns.map((c) => r[c.key]));
+    const rows = gridRows.map((r, index) => docketColumns.map((c) => (c.key === "sr_no" ? index + 1 : r[c.key])));
     const csv = [heads, ...rows].map((row) => row.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -527,10 +574,14 @@ export default function DocketReport() {
 
   return (
     <MainLayout>
-      <PageBody title="Docket Report">
+      <PageBody title="Docket Report" className="docket-report-page">
+        <style>{`
+          .docket-report-page.pageBody { padding: 10px 16px 8px; }
+          .docket-report-page .pageToolbar { margin-bottom: 6px; gap: 8px; }
+        `}</style>
         {/* ── Toolbar ── */}
-        <div className="pageToolbar" style={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", width: "100%" }}>
+        <div className="pageToolbar" style={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flex: "1 1 auto", minWidth: 0 }}>
             <Tooltip title="Refresh">
               <IconButton onClick={handleRefresh} size="small" sx={{ color: "#7e22ce", "&:hover": { background: "#f3e8ff" } }}>
                 <RefreshIcon />
@@ -810,7 +861,7 @@ export default function DocketReport() {
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             <Tooltip title="Print Sticker">
               <IconButton
                 onClick={handleStickerPrint}
@@ -910,16 +961,15 @@ export default function DocketReport() {
         <SelectedRowInfo row={selectedRow} emptyText="No docket selected — click a row to select" />
 
         {/* ── Docket Grid ── */}
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 6, width: "100%", maxWidth: "100%", minWidth: 0 }}>
           <DataTable
             columns={docketColumns}
             rows={gridRows}
             getKey={(row, index) => row.rec_id || row.id || (row.docket_no + (row.docket_date || "") + index)}
             actions={[]}
             compact
-            rowsPerPage={50}
-            autoHeight
-            scroll={{ afterRows: 25, horizontal: true }}
+            scroll={{ afterRows: 27, horizontal: true }}
+            isHeight={628}
             checkboxSelection
             onRowSelectionModelChange={handleRowSelection}
           />

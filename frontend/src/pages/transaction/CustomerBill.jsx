@@ -6,7 +6,7 @@ import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
-import { SaveIcon, PrintIcon, AddIcon, DeleteIcon, EditIcon, CancelIcon, RefreshIcon } from "../../components/common/icons";
+import { SaveIcon, PrintIcon, AddIcon, DeleteIcon, EditIcon, CancelIcon, RefreshIcon, ExportIcon } from "../../components/common/icons";
 import { fetchAllBusinessPartners } from "../../utils/businessPartner";
 import { fetchDocketsForBilling, fetchCharges, fetchChargesBulk, fetchChargeMaster, fetchDocketByDocketNo } from "../../utils/docket";
 import { fetchDeliveryNotes, fetchDeliveryNoteByDocketNo } from "../../utils/deliveryNote";
@@ -58,10 +58,37 @@ function PodLink({ url }) {
   );
 }
 
-const docketNumericIndex = (no) => {
-  const digits = String(no || "").replace(/\D/g, "");
-  if (!digits) return 0;
-  return parseInt(digits.slice(-6), 10) || 0;
+const compareDocketNo = (a, b) => {
+  const an = String(a ?? "").trim();
+  const bn = String(b ?? "").trim();
+  if (!an && !bn) return 0;
+  if (!an) return 1;
+  if (!bn) return -1;
+  return an.localeCompare(bn, undefined, { numeric: true, sensitivity: "base" });
+};
+
+const billDateValue = (val) => {
+  if (val == null || String(val).trim() === "") return null;
+  const text = String(val).trim();
+  const parsed = moment(text, [
+    getDateFormat(),
+    "DD-MMM-YYYY",
+    "DD-MMM-YY",
+    "YYYY-MM-DD",
+    "YYYY-MM-DDTHH:mm:ss.SSSZ",
+  ], true);
+  if (parsed.isValid()) return parsed.valueOf();
+  const loose = moment(text);
+  return loose.isValid() ? loose.valueOf() : null;
+};
+
+const compareBillDate = (a, b) => {
+  const av = billDateValue(a);
+  const bv = billDateValue(b);
+  if (av == null && bv == null) return 0;
+  if (av == null) return 1;
+  if (bv == null) return -1;
+  return av - bv;
 };
 
 const billingColumns = [
@@ -71,16 +98,15 @@ const billingColumns = [
     minWidth: 118,
     flex: 1.35,
     align: "left",
-    sortComparator: (a, b) => {
-      const diff = docketNumericIndex(a) - docketNumericIndex(b);
-      if (diff !== 0) return diff;
-      return String(a || "").localeCompare(String(b || ""), undefined, { numeric: true, sensitivity: "base" });
-    },
+    frozen: true,
+    sortComparator: compareDocketNo,
   },
-  { key: "docket_date", label: "Date", minWidth: 62 },
-  { key: "origin", label: "Origin", minWidth: 120, flex: 1.4, align: "left" },
-  { key: "destination", label: "Dest", minWidth: 120, flex: 1.4, align: "left" },
+  { key: "docket_date", label: "Date", minWidth: 62, frozen: true, sortComparator: compareBillDate },
+  { key: "origin", label: "Origin", minWidth: 120, flex: 1.4, align: "left", frozen: true },
+  { key: "destination", label: "Dest", minWidth: 120, flex: 1.4, align: "left", frozen: true },
   { key: "consignee", label: "Cnee.", minWidth: 200, flex: 2.1, align: "left" },
+  { key: "rate", label: "Rate", minWidth: 72 },
+  { key: "rate_uom", label: "Rate UOM", minWidth: 84 },
   { key: "actual_wt", label: "Act\nWt", minWidth: 36, flex: 0.45 },
   { key: "charge_wt", label: "Chg\nWt", minWidth: 36, flex: 0.45 },
   { key: "freight", label: "Frt.", minWidth: 96 },
@@ -110,6 +136,44 @@ const billingColumns = [
   { key: "pod_url", label: "POD Front", minWidth: 88, render: (row) => <PodLink url={row.pod_url} /> },
   { key: "pod_back_url", label: "POD Back", minWidth: 88, render: (row) => <PodLink url={row.pod_back_url} /> },
 ];
+
+const BILL_EXPORT_COLUMNS = [
+  { key: "sr_no", label: "Sr No" },
+  { key: "docket_no", label: "Docket" },
+  { key: "docket_date", label: "Date" },
+  { key: "origin", label: "Origin" },
+  { key: "destination", label: "Destination" },
+  { key: "consignee", label: "Consignee" },
+  { key: "rate", label: "Rate", numeric: true },
+  { key: "rate_uom", label: "Rate UOM" },
+  { key: "actual_wt", label: "Actual Wt", numeric: true },
+  { key: "charge_wt", label: "Charge Wt", numeric: true },
+  { key: "freight", label: "Freight", numeric: true, total: true },
+  { key: "loading", label: "Handling", numeric: true, total: true },
+  { key: "unloading", label: "Fuel Charge", numeric: true, total: true },
+  { key: "detention", label: "Factory Charge", numeric: true, total: true },
+  { key: "add_toll", label: "ODA Charge", numeric: true, total: true },
+  { key: "green_tax", label: "FOV", numeric: true, total: true },
+  { key: "other_charges", label: "Stationery", numeric: true, total: true },
+  { key: "door_collection", label: "Door Pickup", numeric: true, total: true },
+  { key: "door_delivery", label: "Door Delivery", numeric: true, total: true },
+  { key: "taxable", label: "Taxable", numeric: true, total: true },
+  { key: "cgst", label: "CGST", numeric: true, total: true },
+  { key: "sgst", label: "SGST", numeric: true, total: true },
+  { key: "igst", label: "IGST", numeric: true, total: true },
+  { key: "amount", label: "Amount", numeric: true, total: true },
+  { key: "pod", label: "POD" },
+];
+
+const xmlEscape = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+const excelCell = (value, styleId, type) =>
+  `<Cell ss:StyleID="${styleId}"><Data ss:Type="${type}">${type === "Number" ? value : xmlEscape(value)}</Data></Cell>`;
 
 const BILL_AMOUNT_COL_KEYS = [
   "freight", "loading", "unloading", "detention", "add_toll", "green_tax",
@@ -412,6 +476,44 @@ const billPageFontCss = `
 .customer-bill-page .MuiDataGrid-row.dgt-row-changed .MuiDataGrid-cell {
   background-color: transparent !important;
 }
+.customer-bill-page .MuiDataGrid-cell--pinnedLeft,
+.customer-bill-page .MuiDataGrid-columnHeader--pinnedLeft {
+  position: sticky;
+}
+.customer-bill-page .MuiDataGrid-cell--pinnedLeft {
+  background-color: #fff !important;
+  z-index: 3;
+}
+.customer-bill-page .MuiDataGrid-row:nth-of-type(even) .MuiDataGrid-cell--pinnedLeft {
+  background-color: #fcfbff !important;
+}
+.customer-bill-page .MuiDataGrid-row:hover .MuiDataGrid-cell--pinnedLeft {
+  background-color: #f8f5ff !important;
+}
+.customer-bill-page .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell--pinnedLeft,
+.customer-bill-page .MuiDataGrid-row.Mui-selected:nth-of-type(even) .MuiDataGrid-cell--pinnedLeft {
+  background-color: #dcfce7 !important;
+}
+.customer-bill-page .MuiDataGrid-row.Mui-selected:hover .MuiDataGrid-cell--pinnedLeft {
+  background-color: #bbf7d0 !important;
+}
+.customer-bill-page .MuiDataGrid-row.dgt-row-changed .MuiDataGrid-cell--pinnedLeft,
+.customer-bill-page .MuiDataGrid-row.dgt-row-changed:nth-of-type(even) .MuiDataGrid-cell--pinnedLeft,
+.customer-bill-page .MuiDataGrid-row.dgt-row-changed:hover .MuiDataGrid-cell--pinnedLeft,
+.customer-bill-page .MuiDataGrid-row.dgt-row-changed.Mui-selected .MuiDataGrid-cell--pinnedLeft,
+.customer-bill-page .MuiDataGrid-row.dgt-row-changed.Mui-selected:nth-of-type(even) .MuiDataGrid-cell--pinnedLeft,
+.customer-bill-page .MuiDataGrid-row.dgt-row-changed.Mui-selected:hover .MuiDataGrid-cell--pinnedLeft {
+  background-color: #fef9c3 !important;
+}
+.customer-bill-page .MuiDataGrid-columnHeader--pinnedLeft {
+  z-index: 45;
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+}
+.customer-bill-page .MuiDataGrid-cell--pinnedLeft.MuiDataGrid-cell--withRightBorder,
+.customer-bill-page .MuiDataGrid-columnHeader--pinnedLeft.MuiDataGrid-columnHeader--withRightBorder {
+  box-shadow: 4px 0 6px -2px rgba(15, 23, 42, 0.2);
+}
+.customer-bill-page.pageBody { padding: 8px 12px; }
 `;
 
 // Map ssm_charge_master.charge_desc onto billing columns (order: specific names first).
@@ -453,22 +555,19 @@ const docketMatchesSessionLoc = (d, sessionLoc) => {
 };
 
 const sortDocketsByNo = (rows) =>
-  [...(rows || [])].sort((a, b) => {
-    const an = String(a?.docket_no || "").trim();
-    const bn = String(b?.docket_no || "").trim();
-    if (!an && !bn) return 0;
-    if (!an) return 1;
-    if (!bn) return -1;
-    const diff = docketNumericIndex(an) - docketNumericIndex(bn);
-    if (diff !== 0) return diff;
-    return an.localeCompare(bn, undefined, { numeric: true, sensitivity: "base" });
-  });
+  [...(rows || [])].sort((a, b) => compareDocketNo(a?.docket_no, b?.docket_no));
 
 const locTownLabel = (loc, town) => {
   const l = String(loc || "").trim();
   const t = String(town || "").trim();
   if (l && t) return `${l} > ${t}`;
   return l || t || "";
+};
+
+const rateText = (value) => {
+  if (value === null || value === undefined || value === "") return "";
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? n.toFixed(2) : String(value);
 };
 
 const isDeliveredStatus = (status) => {
@@ -542,6 +641,8 @@ const invoiceDetailToRow = (d, locCode) => {
     origin: locTownLabel(d.docket_from_loc, d.docket_from_town),
     destination: locTownLabel(d.docket_to_loc, d.docket_to_town),
     consignee: d.consignee || "",
+    ...(d.docket_rate != null && d.docket_rate !== "" ? { rate: rateText(d.docket_rate) } : {}),
+    ...(d.docket_rate_uom ? { rate_uom: String(d.docket_rate_uom) } : {}),
     booking_branch: d.docket_from_loc || "",
     delivery_branch: d.docket_to_loc || "",
     pay_type: "",
@@ -812,6 +913,8 @@ export default function CustomerBill() {
       origin: locTownLabel(docket.docket_loc, docket.docket_pickup_town || docket.docket_from_town),
       destination: locTownLabel(docket.docket_to_loc, docket.docket_dly_town || docket.docket_to_town),
       consignee: docket.cnee_name || "",
+      rate: rateText(docket.docket_rate ?? docket.rate),
+      rate_uom: docket.docket_rate_uom || docket.rate_uom || "",
       booking_branch: docket.docket_loc || "",
       delivery_branch: docket.docket_to_loc || "",
       pay_type: docket.docket_pay_type || docket.pay_type || "",
@@ -1360,6 +1463,8 @@ export default function CustomerBill() {
       origin: "",
       destination: "",
       consignee: "",
+      rate: "",
+      rate_uom: "",
       booking_branch: "",
       delivery_branch: "",
       pay_type: "",
@@ -1742,6 +1847,8 @@ export default function CustomerBill() {
         docket_chrwt: parseFloat(row.charge_wt) || 0,
         docket_actwt: parseFloat(row.actual_wt) || 0,
         consignee: row.consignee || null,
+        docket_rate: row.rate === "" || row.rate == null ? null : parseFloat(row.rate) || 0,
+        docket_rate_uom: row.rate_uom || null,
         docket_from_town: String(row.origin || "").split(">").slice(1).join(">").trim() || null,
         docket_to_town: String(row.destination || "").split(">").slice(1).join(">").trim() || null,
         freight: parseFloat(row.freight) || 0,
@@ -1771,6 +1878,90 @@ export default function CustomerBill() {
       }));
 
     return { header, details };
+  };
+
+  const handleExportExcel = () => {
+    if (!editingInvoice) {
+      showError("Load a saved bill with Edit before exporting");
+      return;
+    }
+    const rows = sortDocketsByNo(selectedRows);
+    if (!rows.length) {
+      showError("This bill has no dockets to export");
+      return;
+    }
+    const customerCode = String(selectedCustomer?.bp_grp_code ?? selectedCustomer?.bp_code ?? "").trim();
+    const customerName = String(selectedCustomer?.bp_name || "").trim();
+    const sacCode = String(form.sac_code || DEFAULT_SAC_CODE).trim();
+    const sac = LOGISTICS_SAC_CODES.find((row) => row.code === sacCode);
+    const info = [
+      ["Bill No", form.invoice_no || editingInvoice.invoice_no || ""],
+      ["Bill Date", toDate(form.invoice_date || editingInvoice.invoice_date)],
+      ["Billing Type", form.billing_type || ""],
+      ["Billing Branch", form.billing_branch || ""],
+      ["Customer", customerCode ? `${customerCode} - ${customerName}` : customerName],
+      ["SAC Code", sac?.code || sacCode],
+      ["SAC Description", sac?.desc || ""],
+    ];
+    const headerXml = info
+      .map(([label, value]) => `<Row>${excelCell(label, "InfoLabel", "String")}${excelCell(value, "InfoValue", "String")}</Row>`)
+      .join("");
+    const colHead = `<Row>${BILL_EXPORT_COLUMNS.map((col) => excelCell(col.label, "ColHead", "String")).join("")}</Row>`;
+    const body = rows.map((row, index) => {
+      const cells = BILL_EXPORT_COLUMNS.map((col) => {
+        if (col.key === "sr_no") return excelCell(index + 1, "Int", "Number");
+        const raw = row[col.key];
+        if (col.numeric) {
+          const n = parseFloat(raw);
+          return Number.isFinite(n) ? excelCell(n, "Num", "Number") : excelCell("", "Text", "String");
+        }
+        return excelCell(raw ?? "", "Text", "String");
+      });
+      return `<Row>${cells.join("")}</Row>`;
+    }).join("");
+    const totalCells = BILL_EXPORT_COLUMNS.map((col) => {
+      if (col.key === "docket_no") return excelCell("TOTAL", "Total", "String");
+      if (col.total) return excelCell(Number(totals[col.key] || 0).toFixed(2), "TotalNum", "Number");
+      return excelCell("", "Total", "String");
+    });
+    const remark = String(form.invoice_remarks || "").trim();
+    const remarkXml = remark
+      ? `<Row></Row><Row>${excelCell("Remarks", "InfoLabel", "String")}${excelCell(remark, "InfoValue", "String")}</Row>`
+      : "";
+    const xml = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Styles>
+<Style ss:ID="InfoLabel"><Font ss:Bold="1"/></Style>
+<Style ss:ID="InfoValue"/>
+<Style ss:ID="ColHead"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#1F6FEB" ss:Pattern="Solid"/></Style>
+<Style ss:ID="Text"/>
+<Style ss:ID="Num"><NumberFormat ss:Format="0.00"/></Style>
+<Style ss:ID="Int"><NumberFormat ss:Format="0"/></Style>
+<Style ss:ID="Total"><Font ss:Bold="1"/><Interior ss:Color="#F5F0D6" ss:Pattern="Solid"/></Style>
+<Style ss:ID="TotalNum"><Font ss:Bold="1"/><Interior ss:Color="#F5F0D6" ss:Pattern="Solid"/><NumberFormat ss:Format="0.00"/></Style>
+</Styles>
+<Worksheet ss:Name="Bill">
+<Table>
+${headerXml}
+<Row></Row>
+${colHead}
+${body}
+<Row>${totalCells.join("")}</Row>
+${remarkXml}
+</Table>
+</Worksheet>
+</Workbook>`;
+    const billNo = String(form.invoice_no || editingInvoice.invoice_no || "bill").replace(/[^\w.-]+/g, "_");
+    const blob = new Blob([xml], { type: "application/vnd.ms-excel" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Bill_${billNo}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   };
 
   const handlePrint = () => {
@@ -1968,39 +2159,12 @@ export default function CustomerBill() {
 
   return (
     <MainLayout>
-      <PageBody title="Customer Invoice Generation">
+      <PageBody title="Customer Invoice Generation" className="customer-bill-page">
         <style>{billPageFontCss}</style>
-        <div className="customer-bill-page">
-        <div className="pageToolbar" style={{ alignItems: "center", justifyContent: "flex-end", gap: 12, marginBottom: 12 }}>
-          <Button variant="contained" startIcon={<EditIcon />} onClick={handleEditClick} sx={editHeaderButtonStyle}>
-            Edit
-          </Button>
-          <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} disabled={isViewOnly} sx={saveHeaderButtonStyle}>
-            Save
-          </Button>
-          <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint} sx={printHeaderButtonStyle}>
-            Print
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<CancelIcon />}
-            onClick={handleCancelInvoice}
-            disabled={!editingInvoice || isViewOnly}
-            sx={cancelHeaderButtonStyle}
-          >
-            Cancel Bill
-          </Button>
-          <Button variant="contained" startIcon={<DeleteIcon />} onClick={handleDeleteInvoice} disabled={isViewOnly} sx={deleteHeaderButtonStyle}>
-            Delete
-          </Button>
-          <Button variant="contained" startIcon={<ClearIcon />} onClick={handleClear} sx={clearHeaderButtonStyle}>
-            Clear
-          </Button>
-        </div>
-
+        <div>
         <div style={sectionWrap}>
-          <div style={{ ...sectionTitleStyle, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
-            Invoice Information
+          <div style={{ ...sectionTitleStyle, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+            <span>Invoice Information</span>
             {editNoMode ? (
               <Chip
                 size="small"
@@ -2035,12 +2199,49 @@ export default function CustomerBill() {
                 }}
               />
             ) : null}
+            <span style={{ flex: 1 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <Button variant="contained" startIcon={<EditIcon />} onClick={handleEditClick} sx={editHeaderButtonStyle}>
+                Edit
+              </Button>
+              <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} disabled={isViewOnly} sx={saveHeaderButtonStyle}>
+                Save
+              </Button>
+              <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint} sx={printHeaderButtonStyle}>
+                Print
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<ExportIcon />}
+                onClick={handleExportExcel}
+                disabled={!editingInvoice}
+                sx={exportHeaderButtonStyle}
+              >
+                Export
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<CancelIcon />}
+                onClick={handleCancelInvoice}
+                disabled={!editingInvoice || isViewOnly}
+                sx={cancelHeaderButtonStyle}
+              >
+                Cancel Bill
+              </Button>
+              <Button variant="contained" startIcon={<DeleteIcon />} onClick={handleDeleteInvoice} disabled={isViewOnly} sx={deleteHeaderButtonStyle}>
+                Delete
+              </Button>
+              <Button variant="contained" startIcon={<ClearIcon />} onClick={handleClear} sx={clearHeaderButtonStyle}>
+                Clear
+              </Button>
+            </div>
           </div>
           <div style={sectionGridStyle}>
-            {invoiceFields
-              .filter((field) => field.name !== "customer" && field.name !== "from_date" && field.name !== "to_date")
+            {["invoice_no", "invoice_date", "billing_type", "billing_branch", "from_date", "to_date"]
+              .map((name) => invoiceFields.find((field) => field.name === name))
+              .filter(Boolean)
               .map((field) => (
-                <div key={field.name} style={fieldCellStyle}>
+                <div key={field.name} style={{ ...fieldCellStyle, gridColumn: field.name === "billing_branch" ? "span 2" : "span 1" }}>
                   <FormField
                     {...field}
                     disabled={
@@ -2097,19 +2298,7 @@ export default function CustomerBill() {
                 </Select>
               </FormControl>
             </div>
-            {invoiceFields
-              .filter((field) => field.name === "from_date" || field.name === "to_date")
-              .map((field) => (
-                <div key={field.name} style={fieldCellStyle}>
-                  <FormField
-                    {...field}
-                    disabled={isViewOnly}
-                    form={form}
-                    setForm={handleSetForm}
-                  />
-                </div>
-              ))}
-            <div style={{ ...fieldCellStyle, gridColumn: "span 4" }}>
+            <div style={{ ...fieldCellStyle, gridColumn: "span 3" }}>
               <Autocomplete
                 size="small"
                 disabled={!branchSelected || !!editingInvoice}
@@ -2181,7 +2370,7 @@ export default function CustomerBill() {
           </div>
         </div>
 
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 6 }}>
           <div style={{ ...tableTitleStyle, display: "flex", alignItems: "center", gap: 8 }}>
             <span>{isDebitNote ? "Available Dockets for Debit Note" : "Available Dockets for Billing"}</span>
             {selectedCustomer && !docketsLoaded && !loadingDockets && (
@@ -2303,11 +2492,11 @@ export default function CustomerBill() {
             rowHeight={26}
             headerHeight={42}
             // autoHeight
-            scroll={{ afterRows: 10, horizontal: true }}
+            scroll={{ afterRows: 20, horizontal: true }}
             editable={!isViewOnly}
             singleClick
             onRowUpdate={isViewOnly ? undefined : handleRowUpdate}
-            isHeight={320}
+            isHeight={564}
             rowSelectionModel={selectionIds}
             onRowSelectionModelChange={handleRowSelectionModelChange}
             isRowSelectable={isViewOnly ? () => false : undefined}
@@ -2380,14 +2569,14 @@ export default function CustomerBill() {
 const sectionWrap = {
   border: "1px solid #dfeaf8",
   background: "#fff",
-  marginBottom: 14,
+  marginBottom: 6,
   overflow: "hidden",
 };
 
 const sectionTitleStyle = {
   background: "#dfeeff",
   borderBottom: "1px solid #dfeaf8",
-  padding: "10px 14px",
+  padding: "6px 10px",
   fontSize: 12,
   fontWeight: 700,
   color: "#0d6efd",
@@ -2396,9 +2585,9 @@ const sectionTitleStyle = {
 
 const sectionGridStyle = {
   display: "grid",
-  gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
-  gap: "12px 14px",
-  padding: "14px 16px 16px",
+  gridTemplateColumns: "repeat(12, minmax(0, 1fr))",
+  gap: "6px 8px",
+  padding: "8px 10px",
   alignItems: "start",
   background: "#f8fafc",
 };
@@ -2411,18 +2600,18 @@ const bottomSectionStyle = {
   display: "flex",
   alignItems: "flex-end",
   justifyContent: "space-between",
-  gap: "18px",
-  padding: "18px 14px 12px",
+  gap: "12px",
+  padding: "8px 10px",
   background: "#f9fbff",
   borderTop: "1px solid #e5edf8",
-  marginTop: 12,
+  marginTop: 6,
 };
 
 const tableTitleStyle = {
   background: "#f9fbff",
   border: "1px solid #dfeaf8",
   borderBottom: "none",
-  padding: "10px 14px",
+  padding: "6px 10px",
   fontWeight: 700,
   color: "#0d6efd",
   fontSize: 12,
@@ -2505,6 +2694,18 @@ const saveHeaderButtonStyle = {
   minWidth: "120px",
   padding: "8px 16px",
   "&:hover": { background: "linear-gradient(135deg, #169d56, #0f7c4b)" },
+};
+
+const exportHeaderButtonStyle = {
+  background: "linear-gradient(135deg, #0f766e, #115e59)",
+  borderRadius: "6px",
+  fontWeight: 700,
+  textTransform: "none",
+  boxShadow: "none",
+  minWidth: "120px",
+  padding: "8px 16px",
+  "&:hover": { background: "linear-gradient(135deg, #0d9488, #134e4a)" },
+  "&.Mui-disabled": { color: "#fff", background: "#94a3b8" },
 };
 
 const printHeaderButtonStyle = {

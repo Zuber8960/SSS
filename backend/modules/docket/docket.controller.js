@@ -3,6 +3,65 @@ const db = require('../../config/db');
 const axios = require('axios');
 const ewb = require('../../config/ewb');
 
+const envText = (value) => String(value ?? '').trim().replace(/^['"]|['"]$/g, '');
+
+// Windows defines USERNAME for the PC login, and dotenv will not replace it.
+const ewbUsername = () => envText(process.env.EWB_USERNAME);
+
+let ewbTokenCache = { token: null, expiresAt: 0 };
+
+const ewbLoginHeaders = () => ({
+  accept: '*/*',
+  ip_address: envText(process.env.IP_ADDRESS) || null,
+  client_id: envText(process.env.client_id) || null,
+  client_secret: envText(process.env.client_secret) || null,
+  gstin: envText(process.env.GSTIN) || null,
+});
+
+const getEwbToken = async () => {
+  if (ewbTokenCache.token && Date.now() < ewbTokenCache.expiresAt) return ewbTokenCache.token;
+  const username = ewbUsername();
+  if (!username) {
+    const err = new Error('EWB_USERNAME is not set');
+    err.apiBody = null;
+    throw err;
+  }
+  const response = await axios.get('https://api.whitebooks.in/ewaybillapi/v1.03/authenticate', {
+    params: {
+      email: envText(process.env.email),
+      username,
+      password: envText(process.env.password),
+    },
+    headers: ewbLoginHeaders(),
+    timeout: 45000,
+    validateStatus: () => true,
+  });
+  const body = response.data || {};
+  const token = response.headers?.uid || body?.data?.AuthToken || body?.data?.authToken || null;
+  if (String(body.status_cd) === '0' || !token) {
+    const err = new Error(body.status_desc || body.message || 'E-way bill login failed');
+    err.apiBody = body;
+    throw err;
+  }
+  ewbTokenCache = { token, expiresAt: Date.now() + 5 * 60 * 60 * 1000 };
+  return token;
+};
+
+// Whitebooks names this header username in the docs and user_name in the error text.
+const ewbAuthHeaders = ({ revealSecret = true, token = null } = {}) => {
+  const username = ewbUsername();
+  return {
+    accept: '*/*',
+    ip_address: envText(process.env.IP_ADDRESS) || null,
+    client_id: envText(process.env.client_id) || null,
+    client_secret: revealSecret ? (envText(process.env.client_secret) || null) : (process.env.client_secret ? '***' : null),
+    username: username || null,
+    user_name: username || null,
+    gstin: envText(process.env.GSTIN) || null,
+    ...(token ? { authtoken: revealSecret ? token : '***' } : {}),
+  };
+};
+
 /* ================= GET ================= */
 
 const getEwaybillDetails = async (ewbNo = process.env.ewbNo) => {
@@ -12,36 +71,25 @@ const getEwaybillDetails = async (ewbNo = process.env.ewbNo) => {
       'https://api.whitebooks.in/ewaybillapi/v1.03/ewayapi/getewaybill',
       {
         params: {
-          email: process.env.email,
-          username: process.env.username,
-          password: process.env.password,
+          email: envText(process.env.email),
+          username: ewbUsername(),
+          password: envText(process.env.password),
         },
-        headers: {
-          accept: '*/*',
-          ip_address: process.env.IP_ADDRESS,
-          client_id: process.env.client_id,
-          client_secret: process.env.client_secret,
-          gstin: process.env.GSTIN,
-        },
+        headers: ewbLoginHeaders(),
       }
     );
 
-    console.log(authGet);
+    console.log(authGet?.data?.status_desc || authGet?.status);
 
+    const token = await getEwbToken();
     const response = await axios.get(
       'https://api.whitebooks.in/ewaybillapi/v1.03/ewayapi/getewaybill',
       {
         params: {
-          email: process.env.email,
+          email: envText(process.env.email),
           ewbNo: ewbNo,
         },
-        headers: {
-          accept: '*/*',
-          ip_address: process.env.IP_ADDRESS,
-          client_id: process.env.client_id,
-          client_secret: process.env.client_secret,
-          gstin: process.env.GSTIN, // 06AADCT6685Q1ZG
-        },
+        headers: ewbAuthHeaders({ token }),
       }
     );
 
@@ -72,6 +120,112 @@ const getEwaybillDetails = async (ewbNo = process.env.ewbNo) => {
 
 
 
+const hideSecretText = (value, extraSecrets = []) => {
+  const secrets = [process.env.password, process.env.client_secret, ...extraSecrets].filter((s) => s && String(s).length > 2);
+  const mask = (text) => secrets.reduce((out, secret) => out.split(secret).join('***'), text);
+  if (typeof value === 'string') return mask(value);
+  try {
+    return JSON.parse(mask(JSON.stringify(value)));
+  } catch {
+    return value;
+  }
+};
+
+const ewbBillFromBody = (body) => {
+  if (!body || typeof body !== 'object') return null;
+  if (body.data && typeof body.data === 'object' && (body.data.ewbNo || body.data.ewb_no)) return body.data;
+  if (body.ewbNo || body.ewb_no) return body;
+  return null;
+};
+
+// Read-only check of the same Whitebooks call the Docket refresh button uses.
+// Nothing is written to the database.
+const checkEwayBillStatus = async (ewbNo, tenant_id) => {
+  const ewbNoStr = String(ewbNo || '').trim();
+  const url = 'https://api.whitebooks.in/ewaybillapi/v1.03/ewayapi/getewaybill';
+  let token = null;
+  let loginError = null;
+  try {
+    token = await getEwbToken();
+  } catch (err) {
+    loginError = err;
+  }
+  const input = {
+    method: 'GET',
+    url,
+    params: {
+      email: envText(process.env.email) || null,
+      ewbNo: ewbNoStr,
+    },
+    headers: ewbAuthHeaders({ revealSecret: false, token }),
+  };
+
+  let localDb = null;
+  let dbError = null;
+  try {
+    const query = db('sss.sst_ewb_hdr')
+      .whereRaw('"EWB_NO"::text = ?', [ewbNoStr])
+      .select('EWB_NO', 'EWB_DATE', 'EWB_VALID_UPTO', 'INV_NO', 'TOTAL_INV_VALUE', 'tenant_id')
+      .first();
+    if (tenant_id) query.andWhere({ tenant_id });
+    localDb = (await query) || null;
+  } catch (err) {
+    dbError = err.message;
+  }
+
+  let httpStatus = null;
+  let output = null;
+  let apiError = null;
+  if (loginError) {
+    httpStatus = 200;
+    output = hideSecretText(loginError.apiBody || { message: loginError.message });
+    apiError = loginError.message;
+  } else try {
+    const response = await axios.get(url, {
+      params: input.params,
+      headers: ewbAuthHeaders({ token }),
+      timeout: 45000,
+      validateStatus: () => true,
+    });
+    httpStatus = response.status;
+    output = hideSecretText(response.data, [token]);
+    if (output && typeof output === 'object' && /token/i.test(String(output.status_desc || ''))) {
+      ewbTokenCache = { token: null, expiresAt: 0 };
+    }
+  } catch (err) {
+    httpStatus = err.response?.status || null;
+    output = hideSecretText(err.response?.data || null);
+    apiError = err.response ? null : err.message;
+  }
+
+  const bill = ewbBillFromBody(output);
+  const found = Boolean(bill) || Boolean(localDb);
+  let source = null;
+  if (bill) source = 'API';
+  else if (localDb) source = 'Local database';
+
+  let reason = 'The e-way bill API did not return this number, and it is not stored locally.';
+  if (bill) reason = 'The e-way bill API returned this number.';
+  else if (localDb) reason = 'The live API did not return this number. A copy is already stored in the local e-way bill table.';
+  else if (apiError) reason = apiError;
+  else if (output && typeof output === 'object') {
+    reason = output.status_desc || output.message || output.error?.message || reason;
+  }
+
+  return {
+    ewbNo: ewbNoStr,
+    result: found ? 'Data found' : 'Data not found',
+    found,
+    source,
+    reason: String(reason),
+    httpStatus,
+    input,
+    output,
+    localDb,
+    dbError,
+  };
+};
+
 const getListEwayDetails = async (ewbLists) => {
   try {
     // const authGet = await axios.get(
@@ -94,22 +248,17 @@ const getListEwayDetails = async (ewbLists) => {
 
     // console.log(authGet);
     console.log(ewbLists);
+    const token = await getEwbToken();
     const responses = await Promise.all(
       ewbLists.map((ewbNo) =>
         axios.get(
           'https://api.whitebooks.in/ewaybillapi/v1.03/ewayapi/getewaybill',
           {
             params: {
-              email: process.env.email,
+              email: envText(process.env.email),
               ewbNo,
             },
-            headers: {
-              accept: '*/*',
-              ip_address: process.env.IP_ADDRESS,
-              client_id: process.env.client_id,
-              client_secret: process.env.client_secret,
-              gstin: process.env.GSTIN,
-            },
+            headers: ewbAuthHeaders({ token }),
           }
         )
       )
@@ -252,6 +401,21 @@ const getAllDockets = async (tenant_id, cnor_cnee, loc_code) => {
        )
     ) pod ON pod.docket_no = d.docket_no`)
     .select('pod.pod_url as pod_url', 'pod.pod_back_url as pod_back_url');
+  // First e-way bill on the docket. Later bills stay off this report.
+  query.joinRaw(`LEFT JOIN LATERAL (
+      SELECT e.ewb_no::text AS ewb_no,
+             e.ewb_valid_upto AS ewb_valid
+        FROM sss.sst_docket_ewb e
+       WHERE e.docket_no = d.docket_no
+         AND (d.tenant_id IS NULL OR e.tenant_id IS NULL OR e.tenant_id = d.tenant_id)
+         AND NULLIF(TRIM(e.ewb_no::text), '') IS NOT NULL
+       ORDER BY e.aud_date ASC NULLS LAST, e.rec_id ASC
+       LIMIT 1
+    ) ewb ON true`)
+    .select(
+      db.raw(`SPLIT_PART(TRIM(ewb.ewb_no), ',', 1) as ewb_no`),
+      'ewb.ewb_valid as ewb_valid'
+    );
   return query;
 };
 
@@ -534,6 +698,23 @@ const deleteCharge = async (chargeId, trx = db, tenant_id) => {
 };
 
 /* ================= DOCKET INVOICES (sst_docket_inv) ================= */
+
+// Calendar date written to sst_docket_ewb. API dates are DD/MM/YYYY.
+const EWB_SAVE_DATE_FORMATS = [
+  'YYYY-MM-DD',
+  'YYYY-MM-DDTHH:mm:ss.SSSZ',
+  'DD/MM/YYYY hh:mm:ss A',
+  'DD/MM/YYYY HH:mm:ss',
+  'DD/MM/YYYY',
+  'DD-MMM-YYYY',
+  'DD-MMM-YY',
+];
+
+const toEwbIsoDate = (val) => {
+  if (!val) return null;
+  const m = moment(val, EWB_SAVE_DATE_FORMATS, true);
+  return m.isValid() ? m.format('YYYY-MM-DD') : null;
+};
 
 // Normalise any accepted date input to YYYY-MM-DD, or null when unusable
 const normalizeInvDate = (val) => {
@@ -857,9 +1038,9 @@ const saveDocketPackages = async (docketNo, header, rows) => {
 /* ================= EWAY BILL DB OPERATIONS ================= */
 
 const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
-  const ewb_date = data.ewb_date ? moment(data.ewb_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : undefined;
-  const ewb_valid_upto = data.ewb_valid ? moment(data.ewb_valid, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : undefined;
-  const invoice_date = data.inv_date ? moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : undefined;
+  const ewb_date = toEwbIsoDate(data.ewb_date);
+  const ewb_valid_upto = toEwbIsoDate(data.ewb_valid);
+  const invoice_date = toEwbIsoDate(data.inv_date);
   const { tenant_id, docket_no } = data;
   const parseDate2 = (val) => {
     if (!val) return undefined;
@@ -868,9 +1049,9 @@ const updateEwayBillByRecId = async (rec_id, data, trx = db) => {
   };
   const update = {
     ...(data.ewb_no !== undefined && { ewb_no: String(data.ewb_no) }),
-    ...(ewb_date !== undefined && { ewb_date }),
-    ...(ewb_valid_upto !== undefined && { ewb_valid_upto }),
-    ...(invoice_date !== undefined && { invoice_date }),
+    ...(ewb_date && { ewb_date }),
+    ...(ewb_valid_upto && { ewb_valid_upto }),
+    ...(invoice_date && { invoice_date }),
     ...(data.inv_no !== undefined && { invoice_no: data.inv_no }),
     ...(data.docket_date !== undefined && { docket_date: parseDate2(data.docket_date) }),
     ...(data.docket_loc !== undefined && { docket_loc: data.docket_loc }),
@@ -1023,11 +1204,9 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
     if (apiResults.find(d => d.data)) {
       results = apiResults.map(({ data }) => ({
         ...data,
-        ewb_date: data.ewb_date ? moment(data.ewb_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
-        ewb_valid_upto: data.ewb_valid_upto ? moment(data.ewb_valid_upto, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
-        invoice_date: data.inv_date ?
-          moment(data.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') :
-          data.invoice_date ? moment(data.invoice_date, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true).format('YYYY-MM-DD') : null
+        ewb_date: toEwbIsoDate(data.ewb_date || data.ewayBillDate),
+        ewb_valid_upto: toEwbIsoDate(data.ewb_valid_upto || data.validUpto),
+        invoice_date: toEwbIsoDate(data.inv_date || data.invoice_date || data.docDate),
       }));
     } else {
       apiResults = ewb.ewb_dummy_data;
@@ -1036,9 +1215,9 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
         .filter(d => d.ewbNo && ewbNumbers.includes(d.ewbNo))
         .map((ewbRes) => ({
           ...ewbRes,
-          ewb_date: ewbRes.ewb_date ? moment(ewbRes.ewb_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
-          ewb_valid_upto: ewbRes.ewb_valid_upto ? moment(ewbRes.ewb_valid_upto, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
-          invoice_date: ewbRes.inv_date ? moment(ewbRes.inv_date, ['YYYY-MM-DD', 'DD/MM/YYYY'], true).format('YYYY-MM-DD') : null,
+          ewb_date: toEwbIsoDate(ewbRes.ewb_date || ewbRes.ewayBillDate),
+          ewb_valid_upto: toEwbIsoDate(ewbRes.ewb_valid_upto || ewbRes.validUpto),
+          invoice_date: toEwbIsoDate(ewbRes.inv_date || ewbRes.invoice_date || ewbRes.docDate),
         }));
     }
     docketData = null;
@@ -1306,11 +1485,7 @@ const saveDataEwb = async (apiResResult, tenant_id) => {
 };
 
 const saveEwayBillToDB = async (ewbDataArray, tenant_id, division_code) => {
-  const parseDate = (val) => {
-    if (!val) return null;
-    const m = moment(val, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD/MM/YYYY hh:mm:ss A'], true);
-    return m.isValid() ? m.format('YYYY-MM-DD') : null;
-  };
+  const parseDate = (val) => toEwbIsoDate(val);
 
   const rows = ewbDataArray.map(item => {
     const data = item.data || item;
@@ -1463,6 +1638,7 @@ module.exports = {
   deleteDocketDetails,
   getEwaybillDetails,
   getListEwayDetails,
+  checkEwayBillStatus,
   getChargeMaster,
   getChargesByDocketId,
   getChargesByDocketNos,
