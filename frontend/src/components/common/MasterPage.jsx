@@ -376,6 +376,7 @@ export function DataTable({
   rowsPerPage,
   rowHeight: rowHeightProp,
   headerHeight: headerHeightProp,
+  actionsWidth,
   // Row-click behaviour: when true, clicking a row toggles its selection
   // (an already-selected row can be unchecked by clicking it again).
   toggleRowSelectionOnClick = false,
@@ -567,8 +568,12 @@ export function DataTable({
       field: col.key,
       headerName: col.label,
       ...(scroll?.horizontal
-        ? { width: col.minWidth ?? 120 }
-        : { flex: col.flex ?? 1, minWidth: col.minWidth ?? 100 }),
+        ? { width: col.width ?? col.minWidth ?? 120 }
+        : {
+            flex: col.flex ?? 1,
+            minWidth: col.minWidth ?? 100,
+            ...(col.width != null ? { width: col.width } : {}),
+          }),
       sortable: col.sortable !== false,
       sortComparator: (v1, v2, c1, c2) => {
         const r1 = c1.api.getRow(c1.id);
@@ -659,7 +664,7 @@ export function DataTable({
   // given it is spliced in at that index instead (clamped to the column range).
   const addActionsColumn = (cols) => {
     if (!actions?.length) return cols;
-    const actionsColWidth = Math.max(48, 20 + actions.length * 36);
+    const actionsColWidth = actionsWidth ?? Math.max(48, 20 + actions.length * 36);
     const actionsColumn = {
       field: "actions",
       headerName: actionsHeader,

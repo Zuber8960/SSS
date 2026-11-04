@@ -197,6 +197,7 @@ const formSections = [
     fields: ["cnor_name", "cnor_address", "cnor_city", "cnor_state", "cnor_pincode", "cnor_gstin", "cnor_mob"],
     half: true,
     columns: 2,
+    gridColumn: "1 / 2",
   },
   {
     title: "Consignee Details",
@@ -204,6 +205,7 @@ const formSections = [
     fields: ["cnee_name", "cnee_address", "cnee_city", "cnee_state", "cnee_pincode", "cnee_gstin", "cnee_mob"],
     half: true,
     columns: 2,
+    gridColumn: "2 / 3",
   },
   {
     title: "Package Details",
@@ -219,9 +221,10 @@ const formSections = [
       "tot_pkgs",
       "dim_unit",
     ],
-    half: true,
     columns: 4,
     pkgDim: true,
+    half: true,
+    gridColumn: "3 / 4",
   },
   {
     title: "PO & Invoice",
@@ -1411,10 +1414,10 @@ export default function DocketPage() {
   ];
 
   const packageDimColumns = [
-    { key: "no_of_pkg",   label: "Pkg",     minWidth: 56, editable: isFormEditMode, type: "number" },
-    { key: "dim_length",  label: "L",       minWidth: 48, editable: isFormEditMode, type: "number" },
-    { key: "dim_breadth", label: "B",       minWidth: 48, editable: isFormEditMode, type: "number" },
-    { key: "dim_height",  label: "H",       minWidth: 48, editable: isFormEditMode, type: "number" },
+    { key: "no_of_pkg",   label: "Pkgs",    width: 96, minWidth: 96, flex: 0, editable: isFormEditMode, type: "number", sortable: false },
+    { key: "dim_length",  label: "Length",  width: 104, minWidth: 104, flex: 0, editable: isFormEditMode, type: "number", sortable: false },
+    { key: "dim_breadth", label: "Breadth", width: 112, minWidth: 112, flex: 0, editable: isFormEditMode, type: "number", sortable: false },
+    { key: "dim_height",  label: "Height",  width: 104, minWidth: 104, flex: 0, editable: isFormEditMode, type: "number", sortable: false },
   ];
 
   const handleAddPkgRow = () => setPackageRows((prev) => [...prev, emptyPkgRow()]);
@@ -1777,13 +1780,16 @@ export default function DocketPage() {
         key={section.title}
         style={{
           ...sectionCardStyles.sectionCard,
-          gridColumn: section.stackLeft
-            ? "auto"
-            : section.span
-              ? "1 / -1"
-              : section.half
-                ? undefined
-                : "1 / -1",
+          ...(isPackageDetails ? { minWidth: 0 } : {}),
+          gridColumn: section.gridColumn
+            ? section.gridColumn
+            : section.stackLeft
+              ? "auto"
+              : section.span
+                ? "1 / -1"
+                : section.half
+                  ? undefined
+                  : "1 / -1",
         }}
       >
         <div style={{
@@ -1901,17 +1907,20 @@ export default function DocketPage() {
               >
                 {packageScalarFields.map((field) => renderFieldInput(field))}
               </div>
-              <div style={{ gridColumn: "1 / -1" }}>
+              <div style={{ gridColumn: "1 / -1", minWidth: 0, width: "100%", maxWidth: "100%" }}>
                 <DataTable
                   columns={packageDimColumns}
                   rows={packageRows}
                   getKey={(row) => row.rowId}
                   actions={packageDimActions}
+                  actionsWidth={48}
                   editable={isFormEditMode}
                   singleClick={isFormEditMode}
-                  dense
-                  scroll={{ afterRows: 3 }}
-                  isHeight={158}
+                  compact
+                  rowHeight={34}
+                  headerHeight={28}
+                  scroll={{ afterRows: 4 }}
+                  isHeight={166}
                   onCellChange={handlePkgCellChange}
                 />
               </div>
