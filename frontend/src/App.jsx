@@ -24,6 +24,7 @@ import JobApprovalPage from "./pages/fleet/JobApproval";
 import AddTown from "./pages/transaction/AddTown";
 import Docket from "./pages/transaction/Docket";
 import UpdateEwbDocket from "./pages/transaction/UpdateEwbDocket";
+import EwbStatus from "./pages/transaction/EwbStatus";
 import TripSheet from "./pages/transaction/TripSheet";
 import ManifestEntry from "./pages/transaction/ManifestEntry";
 import HireVoucherPage from "./pages/transaction/Hire_voucher";
@@ -72,6 +73,7 @@ const appRoutes = [
   { path: "/transaction/add-town", element: <AddTown />, protected: true },
   { path: "/transaction/docket", element: <Docket />, protected: true },
   { path: "/transaction/update-ewb-docket", element: <UpdateEwbDocket />, protected: true },
+  { path: "/transaction/ewb-status", element: <EwbStatus />, protected: true },
   { path: "/transaction/docket-pre-alloc", element: <DocketPreAlloc />, protected: true },
   { path: "/transaction/trip-sheet", element: <TripSheet />, protected: true },
   { path: "/transaction/manifest-entry", element: <ManifestEntry />, protected: true },

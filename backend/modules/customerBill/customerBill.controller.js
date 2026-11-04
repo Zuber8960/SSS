@@ -91,6 +91,10 @@ const sanitizeDetail = (payload = {}) => {
     docket_chrwt: normalizeNumber(payload.docket_chrwt ?? payload.charge_wt),
     docket_actwt: normalizeNumber(payload.docket_actwt ?? payload.actual_wt),
     consignee: payload.consignee ?? payload.cnee_name ?? null,
+    docket_rate: payload.docket_rate === undefined || payload.docket_rate === null || payload.docket_rate === ''
+      ? null
+      : normalizeNumber(payload.docket_rate),
+    docket_rate_uom: payload.docket_rate_uom || payload.rate_uom || null,
     ref_inv_no: payload.ref_inv_no ?? null,
     ref_inv_date: normalizeDate(payload.ref_inv_date),
     ref_inv_loc: payload.ref_inv_loc ?? null,

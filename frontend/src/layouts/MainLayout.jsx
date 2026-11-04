@@ -32,6 +32,7 @@ export default function MainLayout({ children }) {
             flexDirection: "column",
             overflow: "hidden",
             width: "100%",
+            minWidth: 0,
           }}
         >
           <Header
@@ -39,7 +40,7 @@ export default function MainLayout({ children }) {
             isMobileSidebarOpen={mobileSidebarOpen}
           />
 
-          <div style={{ flex: 1, overflow: "auto", scrollbarWidth: "none", msOverflowStyle: "none" }} className="mainContent">
+          <div style={{ flex: 1, overflow: "auto", minWidth: 0, scrollbarWidth: "none", msOverflowStyle: "none" }} className="mainContent">
             <div style={{ padding: "0px" }}>
               {children}
             </div>

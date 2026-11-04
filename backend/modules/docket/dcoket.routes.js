@@ -8,6 +8,19 @@ const moment = require('moment');
 
 /* ================= EWAYBILL EXTERNAL API ================= */
 
+router.get('/ewaybill-status', async (req, res) => {
+  try {
+    const ewbNo = String(req.query.ewbNo || '').trim();
+    if (!ewbNo) {
+      return res.status(400).json({ success: false, message: 'Enter an e-way bill number' });
+    }
+    const data = await DocketController.checkEwayBillStatus(ewbNo, req.tenant_id);
+    res.json({ success: true, ...data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message || 'Unable to check e-way bill' });
+  }
+});
+
 router.get('/ewayBill', async (req, res) => {
   try {
     const { ewbNo } = req.query;

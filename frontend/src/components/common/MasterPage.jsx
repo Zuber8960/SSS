@@ -107,13 +107,13 @@ function InstantSelectEditCell({ id, field, value, colDef }) {
   );
 }
 
-export function PageBody({ title, children }) {
+export function PageBody({ title, children, className }) {
   const { setPageTitle } = usePageTitle();
   useEffect(() => {
     if (title) setPageTitle(title);
   }, [title, setPageTitle]);
   return (
-    <div className="pageBody">
+    <div className={className ? `pageBody ${className}` : "pageBody"}>
       {children}
     </div>
   );
@@ -569,7 +569,7 @@ export function DataTable({
       ...(scroll?.horizontal
         ? { width: col.minWidth ?? 120 }
         : { flex: col.flex ?? 1, minWidth: col.minWidth ?? 100 }),
-      sortable: true,
+      sortable: col.sortable !== false,
       sortComparator: (v1, v2, c1, c2) => {
         const r1 = c1.api.getRow(c1.id);
         const r2 = c2.api.getRow(c2.id);
@@ -596,7 +596,7 @@ export function DataTable({
       align: col.align || "center",
 
       renderCell: (params) => {
-        const value = col.render ? col.render(params.row) : params.value;
+        const value = col.render ? col.render(params.row, params) : params.value;
         const displayValue = value ?? "";
         // Custom cell content (links, badges) must receive the click itself.
         // A tooltip on top of the cell swallows it, so the View link looks
@@ -784,8 +784,13 @@ export function DataTable({
       transform: "none !important",
     },
     ...(resolvedAutoHeight ? {} : { height: resolvedHeight ?? 320 }),
-    width: scroll?.horizontal ? "max-content" : "100%",
-    minWidth: scroll?.horizontal ? undefined : "100%",
+    // A fixed-height grid stays the width of the screen so its vertical
+    // scrollbar remains on the right while the columns scroll sideways.
+    // max-content is only for a horizontal-only table, where there is no
+    // vertical bar to keep in view.
+    width: scroll?.horizontal && resolvedAutoHeight && frozenModel.left.length === 0 && frozenModel.right.length === 0 ? "max-content" : "100%",
+    maxWidth: scroll?.horizontal && resolvedAutoHeight && frozenModel.left.length === 0 && frozenModel.right.length === 0 ? undefined : "100%",
+    minWidth: scroll?.horizontal && resolvedAutoHeight && frozenModel.left.length === 0 && frozenModel.right.length === 0 ? undefined : "100%",
     "& .MuiDataGrid-columnHeaders": {
       background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
       borderBottom: "none",
@@ -816,6 +821,20 @@ export function DataTable({
     },
     "& .MuiDataGrid-columnHeader:hover .MuiDataGrid-columnSeparator": {
       display: "flex",
+    },
+    "& .MuiDataGrid-cell--pinnedLeft, & .MuiDataGrid-cell--pinnedRight": {
+      backgroundColor: "#ffffff",
+      zIndex: 3,
+    },
+    "& .MuiDataGrid-row:nth-of-type(even) .MuiDataGrid-cell--pinnedLeft, & .MuiDataGrid-row:nth-of-type(even) .MuiDataGrid-cell--pinnedRight": {
+      backgroundColor: "#fcfbff",
+    },
+    "& .MuiDataGrid-row:hover .MuiDataGrid-cell--pinnedLeft, & .MuiDataGrid-row:hover .MuiDataGrid-cell--pinnedRight": {
+      backgroundColor: "#f8f5ff",
+    },
+    "& .MuiDataGrid-columnHeader--pinnedLeft, & .MuiDataGrid-columnHeader--pinnedRight": {
+      zIndex: 45,
+      background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
     },
     "& .MuiDataGrid-cell": {
       borderBottom: "1px solid #f3e8ff",
@@ -860,6 +879,9 @@ export function DataTable({
           },
           "& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell": {
             backgroundColor: "transparent !important",
+          },
+          "& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell--pinnedLeft, & .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell--pinnedRight": {
+            backgroundColor: `${selectedRowColor} !important`,
           },
         }
       : {}),
@@ -933,8 +955,10 @@ export function DataTable({
       className="dataTableWrapper"
       style={{
         width: "100%",
-        overflowX: scroll?.horizontal ? "auto" : "visible",
-        overflowY: resolvedAutoHeight ? "visible" : "auto",
+        maxWidth: "100%",
+        minWidth: 0,
+        overflowX: scroll?.horizontal && resolvedAutoHeight ? "auto" : "hidden",
+        overflowY: "hidden",
       }}
     >
       {hasRowColors && <style>{rowColorCss}</style>}

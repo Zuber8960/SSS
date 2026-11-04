@@ -47,10 +47,23 @@ const parseEwbNumbers = (value) =>
     .map((n) => n.trim())
     .filter(Boolean);
 
-const toDate = (val) =>
-  val
-    ? moment(val, ["DD/MM/YYYY HH:mm:ss A", "YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD"]).format("MM/DD/YYYY")
-    : "";
+// Keep the grid value as YYYY-MM-DD. The e-way bill API sends DD/MM/YYYY.
+const toDate = (val) => {
+  if (!val) return "";
+  if (val instanceof Date && !isNaN(val.getTime())) return moment(val).format("YYYY-MM-DD");
+  const text = String(val).trim();
+  if (!text) return "";
+  const m = moment(text, [
+    "DD/MM/YYYY hh:mm:ss A",
+    "DD/MM/YYYY HH:mm:ss",
+    "YYYY-MM-DDTHH:mm:ss.SSSZ",
+    "YYYY-MM-DD",
+    "DD/MM/YYYY",
+  ], true);
+  if (m.isValid()) return m.format("YYYY-MM-DD");
+  const loose = moment(text);
+  return loose.isValid() ? loose.format("YYYY-MM-DD") : "";
+};
 
 const getRecordEwbNo = (rec) => String(rec?.EWB_NO || rec?.ewb_no || "").trim();
 
@@ -92,8 +105,8 @@ const buildRowFromRecord = (rec, baseRow = {}, ewbNoLabel) => {
     ...baseRow,
     rec_id: rec?.rec_id ?? null,
     ewb_no: ewbNoLabel || rec?.EWB_NO || rec?.ewb_no || baseRow.ewb_no || "",
-    ewb_date: toDate(rec?.EWB_DATE || rec?.ewb_date),
-    ewb_valid: toDate(rec?.EWB_VALID_UPTO || rec?.ewb_valid_upto),
+    ewb_date: toDate(rec?.EWB_DATE || rec?.ewb_date || rec?.ewayBillDate),
+    ewb_valid: toDate(rec?.EWB_VALID_UPTO || rec?.ewb_valid_upto || rec?.validUpto),
     inv_no: getRecordInvNo(rec),
     inv_date: toDate(getRecordInvDateRaw(rec)),
     cnor_name: dtl?.FROM_CUST_NAME || rec?.FROM_CUST_NAME || rec?.cnor_name || "",

@@ -2,7 +2,7 @@ export default function SelectedRowInfo({ row, emptyText = "No row selected — 
   if (!row) {
     return (
       <div style={{
-        marginTop: 10, padding: "7px 14px",
+        marginTop: 6, padding: "4px 12px",
         background: "#f9fafb", borderRadius: 8,
         border: "1.5px dashed #d1d5db",
         fontSize: 13, color: "#9ca3af", fontStyle: "italic",
@@ -15,7 +15,7 @@ export default function SelectedRowInfo({ row, emptyText = "No row selected — 
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
-      marginTop: 10, padding: "8px 14px",
+      marginTop: 6, padding: "4px 12px",
       background: "#f3e8ff", borderRadius: 8,
       border: "1.5px solid #d8b4fe",
       fontSize: 13,
