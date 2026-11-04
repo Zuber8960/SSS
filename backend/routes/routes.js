@@ -50,7 +50,7 @@ const db = require('../config/db');
 /* ================= PUBLIC ROUTES ================= */
 router.use('/public', publicRoutes);
 
-/* ================= LOGIN ================= */
+/* ================= LOGIN =================   */
 
 router.post('/login', async (req, res) => {
   try {
