@@ -1,4 +1,4 @@
-import { Fragment, useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { ToggleSwitch } from "../../components/common/MasterPage";
 import { IconButton, Tooltip, Menu, MenuItem, ListItemIcon, ListItemText, Box } from "@mui/material";
 import PrintIcon from "@mui/icons-material/Print";
@@ -118,15 +118,15 @@ const headerFields = [
     ]
   },
 
-  { label: "Act Wt", name: "act_wt", type: "number", compact: true },
-  { label: "Chrg WT", name: "chrg_wt", type: "number", compact: true },
+  { label: "Actual Wt", name: "act_wt", type: "number", compact: true },
+  { label: "Charge Wt", name: "chrg_wt", type: "number", compact: true },
 
   { label: "CB", name: "no_cb", type: "number", compact: true },
-  { label: "w/Crate", name: "no_w_crate", type: "number", compact: true },
-  { label: "Wbox", name: "no_w_cbox", type: "number", compact: true },
+  { label: "W.Crate", name: "no_w_crate", type: "number", compact: true },
+  { label: "W.CBox", name: "no_w_cbox", type: "number", compact: true },
   { label: "Loose", name: "no_loose", type: "number", compact: true },
   { label: "Others", name: "no_others", type: "number", compact: true },
-  { label: "Total Pkgs", name: "tot_pkgs", type: "number", required: true, compact: true },
+  { label: "Tot Pkgs", name: "tot_pkgs", type: "number", required: true, compact: true },
 
   {
     label: "Dim Unit", name: "dim_unit", compact: true, options: [
@@ -150,7 +150,6 @@ const headerFields = [
       { label: "Per KG", value: "Per KG" },
       { label: "Per Unit", value: "Per Unit" },
       { label: "Per Tonne", value: "Per Tonne" },
-      { label: "MIN", value: "MIN" },
     ],
   },
 
@@ -198,8 +197,6 @@ const formSections = [
     fields: ["cnor_name", "cnor_address", "cnor_city", "cnor_state", "cnor_pincode", "cnor_gstin", "cnor_mob"],
     half: true,
     columns: 2,
-    gridColumn: "1 / 2",
-    gridColumn: "1 / 2",
   },
   {
     title: "Consignee Details",
@@ -207,7 +204,6 @@ const formSections = [
     fields: ["cnee_name", "cnee_address", "cnee_city", "cnee_state", "cnee_pincode", "cnee_gstin", "cnee_mob"],
     half: true,
     columns: 2,
-    gridColumn: "2 / 3",
   },
   {
     title: "Package Details",
@@ -223,10 +219,9 @@ const formSections = [
       "tot_pkgs",
       "dim_unit",
     ],
+    half: true,
     columns: 4,
     pkgDim: true,
-    half: true,
-    gridColumn: "3 / 4",
   },
   {
     title: "PO & Invoice",
@@ -719,7 +714,6 @@ export default function DocketPage() {
     if (k === "PERTRIP" || k === "TRIP") return "Per Trip";
     if (k === "PERUNIT" || k === "UNIT" || k === "PERPKG") return "Per Unit";
     if (k === "PERTONNE" || k === "PERTON" || k === "TONNE") return "Per Tonne";
-    if (k === "MIN" || k === "MINIMUM") return "MIN";
     return uom || "";
   };
 
@@ -758,7 +752,6 @@ export default function DocketPage() {
       showLoading();
       const res = await fetchCustRate({
         cnor_id: form.cnor_id,
-        cnee_id: form.cnee_id,
         docket_loc: form.docket_loc,
         load_type: form.load_type,
         from_loc: form.docket_loc,
@@ -782,19 +775,9 @@ export default function DocketPage() {
       }
       const items = payload.items || [];
       const freight = items.find((it) => String(it.rate_type || "").toUpperCase() === "FREIGHT");
-      const contractRate = freight ? (parseFloat(freight.rate) || 0) : parseFloat(form.rate) || 0;
-      const contractUom = freight ? mapCustUom(freight.uom) : form.rate_uom;
-      const contractMin = freight ? (parseFloat(freight.min_rate) || 0) : 0;
-      const chargeWeight = parseFloat(form.chrg_wt) || 0;
-      const totalPkgs = parseFloat(form.tot_pkgs) || 0;
-      let computedFreight = contractRate;
-      if (contractUom === "Per KG") computedFreight = chargeWeight * contractRate;
-      else if (contractUom === "Per Unit") computedFreight = totalPkgs * contractRate;
-      else if (contractUom === "Per Tonne") computedFreight = (chargeWeight / 1000) * contractRate;
-      const minApplies = Boolean(freight) && contractMin > 0 && computedFreight < contractMin;
-      const nextRate = freight ? contractRate : form.rate;
-      const nextUom = minApplies ? "MIN" : contractUom;
-      const nextMin = contractMin;
+      const nextRate = freight ? freight.rate : form.rate;
+      const nextUom = freight ? mapCustUom(freight.uom) : form.rate_uom;
+      const nextMin = freight ? (parseFloat(freight.min_rate) || 0) : 0;
       setRateMode("contract");
       setFreightMinRate(nextMin);
       setForm((prev) => ({
@@ -1029,22 +1012,9 @@ export default function DocketPage() {
 
       // Save EWB list if withEWB is on and there are rows
       if (withEWB && ewbList.length > 0 && savedDocketNo) {
-        // Always store YYYY-MM-DD. Grid dates are YYYY-MM-DD or the screen
-        // format. MM/DD/YYYY is only the old grid value, read the same way
-        // the cell is shown so day and month are not swapped.
         const toDbDate = (val) => {
           if (!val) return null;
-          const m = moment(val, [
-            "YYYY-MM-DDTHH:mm:ss.SSSZ",
-            "YYYY-MM-DD",
-            getDateFormat(),
-            "DD-MMM-YYYY",
-            "DD-MMM-YY",
-            "DD/MM/YYYY hh:mm:ss A",
-            "DD/MM/YYYY HH:mm:ss",
-            "MM/DD/YYYY",
-            "DD/MM/YYYY",
-          ], true);
+          const m = moment(val, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", getDateFormat(), "DD/MM/YYYY", "MM/DD/YYYY"], true);
           return m.isValid() ? m.format("YYYY-MM-DD") : null;
         };
         const normalized = ewbList
@@ -1428,10 +1398,10 @@ export default function DocketPage() {
   ];
 
   const packageDimColumns = [
-    { key: "no_of_pkg",   label: "Pkgs",    width: 96, minWidth: 96, flex: 0, editable: isFormEditMode, type: "number", sortable: false },
-    { key: "dim_length",  label: "Length",  width: 104, minWidth: 104, flex: 0, editable: isFormEditMode, type: "number", sortable: false },
-    { key: "dim_breadth", label: "Breadth", width: 112, minWidth: 112, flex: 0, editable: isFormEditMode, type: "number", sortable: false },
-    { key: "dim_height",  label: "Height",  width: 104, minWidth: 104, flex: 0, editable: isFormEditMode, type: "number", sortable: false },
+    { key: "no_of_pkg",   label: "Pkg",     minWidth: 56, editable: isFormEditMode, type: "number" },
+    { key: "dim_length",  label: "L",       minWidth: 48, editable: isFormEditMode, type: "number" },
+    { key: "dim_breadth", label: "B",       minWidth: 48, editable: isFormEditMode, type: "number" },
+    { key: "dim_height",  label: "H",       minWidth: 48, editable: isFormEditMode, type: "number" },
   ];
 
   const handleAddPkgRow = () => setPackageRows((prev) => [...prev, emptyPkgRow()]);
@@ -1782,41 +1752,25 @@ export default function DocketPage() {
       );
     };
 
-    const pkgField = (name) => filteredFields.find((field) => field.name === name);
-    const pkgGroupTitle = {
-      fontSize: 12,
-      fontWeight: 700,
-      letterSpacing: 0.4,
-      textTransform: "uppercase",
-      color: "#4a3466",
-      background: "linear-gradient(135deg, #f6f3ff 0%, #f0ecf9 100%)",
-      border: "1px solid #e9e5f0",
-      borderRadius: 6,
-      padding: "6px 10px",
-      marginBottom: 8,
-    };
-    const pkgPairs = [
-      ["no_cb", "no_w_crate"],
-      ["no_loose", "no_others"],
-      ["no_w_cbox", "tot_pkgs"],
-      ["chrg_wt", "dim_unit"],
-    ];
+    const packageScalarFields = isPackageDetails
+      ? filteredFields.filter((field) => field.name !== "chrg_wt")
+      : [];
+    const packageChargeFields = isPackageDetails
+      ? filteredFields.filter((field) => field.name === "chrg_wt")
+      : [];
 
     return (
       <div
         key={section.title}
         style={{
           ...sectionCardStyles.sectionCard,
-          ...(isPackageDetails ? { minWidth: 0 } : {}),
-          gridColumn: section.gridColumn
-            ? section.gridColumn
-            : section.stackLeft
-              ? "auto"
-              : section.span
-                ? "1 / -1"
-                : section.half
-                  ? undefined
-                  : "1 / -1",
+          gridColumn: section.stackLeft
+            ? "auto"
+            : section.span
+              ? "1 / -1"
+              : section.half
+                ? undefined
+                : "1 / -1",
         }}
       >
         <div style={{
@@ -1923,54 +1877,42 @@ export default function DocketPage() {
           } : {}),
         }}>
           {isPackageDetails ? (
-            <div
-              style={{
-                gridColumn: "1 / -1",
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 12,
-                alignItems: "flex-start",
-              }}
-            >
-              <div style={{ flex: "1 1 300px", minWidth: 0 }}>
-                <div style={pkgGroupTitle}>Pkgs and Weight</div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 8,
-                  }}
-                >
-                  {pkgField("act_wt") && (
-                    <div style={{ gridColumn: "1 / -1" }}>{renderFieldInput(pkgField("act_wt"))}</div>
-                  )}
-                  {pkgPairs.map(([left, right]) => (
-                    <Fragment key={left}>
-                      {pkgField(left) && renderFieldInput(pkgField(left))}
-                      {pkgField(right) && renderFieldInput(pkgField(right))}
-                    </Fragment>
-                  ))}
-                </div>
+            <>
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(78px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {packageScalarFields.map((field) => renderFieldInput(field))}
               </div>
-              <div style={{ flex: "1.4 1 420px", minWidth: 0, minWidth: 0, width: "100%", maxWidth: "100%" }}>
-                <div style={pkgGroupTitle}>Dimension</div>
+              <div style={{ gridColumn: "1 / -1" }}>
                 <DataTable
                   columns={packageDimColumns}
                   rows={packageRows}
                   getKey={(row) => row.rowId}
                   actions={packageDimActions}
-                  actionsWidth={48}
                   editable={isFormEditMode}
                   singleClick={isFormEditMode}
-                  compact
-                  rowHeight={34}
-                  headerHeight={28}
-                  scroll={{ afterRows: 4 }}
-                  isHeight={166}
+                  dense
+                  scroll={{ afterRows: 3 }}
+                  isHeight={158}
                   onCellChange={handlePkgCellChange}
                 />
               </div>
-            </div>
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(78px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {packageChargeFields.map((field) => renderFieldInput(field))}
+              </div>
+            </>
           ) : isPoInvoice ? (
             <div style={{ gridColumn: "1 / -1" }}>
               <DataTable
@@ -2380,7 +2322,7 @@ export default function DocketPage() {
                 padding: "1px",
                 boxShadow: "0 2px 12px rgba(126, 34, 206, 0.06)",
                 display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
                 gap: 8,
               }}
             >
