@@ -197,6 +197,7 @@ const formSections = [
     fields: ["cnor_name", "cnor_address", "cnor_city", "cnor_state", "cnor_pincode", "cnor_gstin", "cnor_mob"],
     half: true,
     columns: 2,
+    gridColumn: "1 / 2",
   },
   {
     title: "Consignee Details",
@@ -204,6 +205,7 @@ const formSections = [
     fields: ["cnee_name", "cnee_address", "cnee_city", "cnee_state", "cnee_pincode", "cnee_gstin", "cnee_mob"],
     half: true,
     columns: 2,
+    gridColumn: "2 / 3",
   },
   {
     title: "Package Details",
@@ -222,6 +224,8 @@ const formSections = [
     half: true,
     columns: 4,
     pkgDim: true,
+    half: true,
+    gridColumn: "3 / 4",
   },
   {
     title: "PO & Invoice",
@@ -1012,9 +1016,22 @@ export default function DocketPage() {
 
       // Save EWB list if withEWB is on and there are rows
       if (withEWB && ewbList.length > 0 && savedDocketNo) {
+        // Always store YYYY-MM-DD. Grid dates are YYYY-MM-DD or the screen
+        // format. MM/DD/YYYY is only the old grid value, read the same way
+        // the cell is shown so day and month are not swapped.
         const toDbDate = (val) => {
           if (!val) return null;
-          const m = moment(val, ["YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD", getDateFormat(), "DD/MM/YYYY", "MM/DD/YYYY"], true);
+          const m = moment(val, [
+            "YYYY-MM-DDTHH:mm:ss.SSSZ",
+            "YYYY-MM-DD",
+            getDateFormat(),
+            "DD-MMM-YYYY",
+            "DD-MMM-YY",
+            "DD/MM/YYYY hh:mm:ss A",
+            "DD/MM/YYYY HH:mm:ss",
+            "MM/DD/YYYY",
+            "DD/MM/YYYY",
+          ], true);
           return m.isValid() ? m.format("YYYY-MM-DD") : null;
         };
         const normalized = ewbList
@@ -1398,10 +1415,10 @@ export default function DocketPage() {
   ];
 
   const packageDimColumns = [
-    { key: "no_of_pkg",   label: "Pkg",     minWidth: 56, editable: isFormEditMode, type: "number" },
-    { key: "dim_length",  label: "L",       minWidth: 48, editable: isFormEditMode, type: "number" },
-    { key: "dim_breadth", label: "B",       minWidth: 48, editable: isFormEditMode, type: "number" },
-    { key: "dim_height",  label: "H",       minWidth: 48, editable: isFormEditMode, type: "number" },
+    { key: "no_of_pkg",   label: "Pkgs",    width: 96, minWidth: 96, flex: 0, editable: isFormEditMode, type: "number", sortable: false },
+    { key: "dim_length",  label: "Length",  width: 104, minWidth: 104, flex: 0, editable: isFormEditMode, type: "number", sortable: false },
+    { key: "dim_breadth", label: "Breadth", width: 112, minWidth: 112, flex: 0, editable: isFormEditMode, type: "number", sortable: false },
+    { key: "dim_height",  label: "Height",  width: 104, minWidth: 104, flex: 0, editable: isFormEditMode, type: "number", sortable: false },
   ];
 
   const handleAddPkgRow = () => setPackageRows((prev) => [...prev, emptyPkgRow()]);
@@ -1765,12 +1782,12 @@ export default function DocketPage() {
         style={{
           ...sectionCardStyles.sectionCard,
           gridColumn: section.stackLeft
-            ? "auto"
-            : section.span
-              ? "1 / -1"
-              : section.half
-                ? undefined
-                : "1 / -1",
+              ? "auto"
+              : section.span
+                ? "1 / -1"
+                : section.half
+                  ? undefined
+                  : "1 / -1",
         }}
       >
         <div style={{
@@ -1894,9 +1911,12 @@ export default function DocketPage() {
                   rows={packageRows}
                   getKey={(row) => row.rowId}
                   actions={packageDimActions}
+                  // actionsWidth={48}
                   editable={isFormEditMode}
                   singleClick={isFormEditMode}
-                  dense
+                  compact
+                  // rowHeight={34}
+                  // headerHeight={28}
                   scroll={{ afterRows: 3 }}
                   isHeight={158}
                   onCellChange={handlePkgCellChange}
