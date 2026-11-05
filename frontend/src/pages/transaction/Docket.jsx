@@ -1917,7 +1917,7 @@ export default function DocketPage() {
                   compact
                   // rowHeight={34}
                   // headerHeight={28}
-                  scroll={{ afterRows: 3 }}
+                  scroll={{ afterRows: 3, horizontal: true }}
                   isHeight={158}
                   onCellChange={handlePkgCellChange}
                 />

@@ -962,8 +962,8 @@ export function DataTable({
         width: "100%",
         maxWidth: "100%",
         minWidth: 0,
-        overflowX: scroll?.horizontal && resolvedAutoHeight ? "auto" : "hidden",
-        overflowY: "hidden",
+        overflowX: scroll?.horizontal ? "auto" : "hidden",
+        overflowY: "auto",
       }}
     >
       {hasRowColors && <style>{rowColorCss}</style>}
