@@ -1183,19 +1183,21 @@
     margin-bottom: 16px;
   }
 
-  /* Outer wrapper: keep scrollable but hide its own scrollbar — MUI inner one is enough */
+  /* Outer wrapper: keep scrollable with visible scrollbar on mobile */
   .dataTableWrapper {
     overflow-x: auto;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    scrollbar-width: thin;
+    -ms-overflow-style: auto;
   }
 
   .dataTableWrapper::-webkit-scrollbar {
-    display: none;
+    height: 6px;
+    width: 6px;
   }
 
-  /* Re-enable only MUI DataGrid's internal scrollbar on mobile */
+  /* MUI DataGrid's internal horizontal scrollbar on mobile */
   .dataTableWrapper .MuiDataGrid-scrollbar--horizontal {
     display: block;
   }
