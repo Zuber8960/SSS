@@ -44,6 +44,7 @@ const BASIC_FIELDS = [
   { name: "bp_mobile1",         label: "Mobile No 1",     type: "text" },
   { name: "bp_mobile2",         label: "Mobile No 2",     type: "text" },
   { name: "loc_code",           label: "Location",        type: "select",  options: "locationOptions" },
+  { name: "factory_charge_yn",  label: "Factory Charge",  type: "select",  options: [{ value: "Y", label: "Y" }, { value: "N", label: "N" }] },
 ];
 
 const BANK_FIELDS = [
@@ -86,6 +87,7 @@ const emptyForm = {
   bp_status: "1",
   bp_closed_on: "",
   cmf_flag: "N",
+  factory_charge_yn: "N",
 };
 
 const OTHER_FIELDS = [
@@ -121,12 +123,12 @@ function SectionHeader({ title }) {
   );
 }
 
-function MuiSelect({ label, name, value, onChange, options }) {
+function MuiSelect({ label, name, value, onChange, options, disabled = false }) {
   return (
-    <FormControl fullWidth size="small" sx={fieldSx}>
+    <FormControl fullWidth size="small" sx={fieldSx} disabled={disabled}>
       <InputLabel>{label}</InputLabel>
       <Select label={label} value={value ?? ""} onChange={e => onChange(name, e.target.value)}
-        sx={{ fontSize: 13 }}>
+        sx={{ fontSize: 13 }} disabled={disabled}>
         {options.map((opt) => (
           <MenuItem key={typeof opt === "object" ? opt.value : opt} value={typeof opt === "object" ? opt.value : opt}
             sx={{ fontSize: 13 }}>
@@ -195,11 +197,15 @@ export default function BusinessPartnerPage() {
       if (name === "bp_type" && isCustomerType(value)) {
         next.bp_supplier_type = "";
       }
+      if (name === "bp_type" && !isCustomerType(value)) {
+        next.factory_charge_yn = "N";
+      }
       return next;
     });
     setDirtyFields((prev) => {
       const next = new Set(prev).add(name);
       if (name === "bp_type" && isCustomerType(value)) next.add("bp_supplier_type");
+      if (name === "bp_type" && !isCustomerType(value)) next.add("factory_charge_yn");
       return next;
     });
     if (name === "bp_type") {
@@ -226,6 +232,10 @@ export default function BusinessPartnerPage() {
       if (k === "record_id" || k === "company_code") continue;
       if (k === "bp_supplier_type" && customer) {
         payload[k] = null;
+        continue;
+      }
+      if (k === "factory_charge_yn" && !customer) {
+        payload[k] = "N";
         continue;
       }
       const val = form[k];
@@ -320,11 +330,10 @@ export default function BusinessPartnerPage() {
     { key: "bp_supplier_type", label: "Supplier Type" },
     { key: "bp_pan_no", label: "PAN No" },
     { key: "bp_mobile1", label: "Mobile No 1" },
-    { key: "bp_mobile2", label: "Mobile No 2" },
-    { key: "bp_bank_name", label: "Bank" },
     { key: "loc_code", label: "Location", render: (row) => { const loc = locations.find((l) => String(l.loc_code) === String(row.loc_code)); return loc ? `${loc.loc_code} - ${loc.loc_name}` : (row.loc_code ?? ""); } },
     { key: "bp_status", label: "Status", render: (row) => row.bp_status === "1" || row.bp_status === 1 ? "Active" : row.bp_status === "0" || row.bp_status === 0 ? "Inactive" : "" },
     { key: "cmf_flag", label: "CMF Flag", render: (row) => (row.cmf_flag === "Y" || row.cmf_flag === "y" || row.cmf_flag === 1 || row.cmf_flag === "1" ? "Y" : "N") },
+    { key: "factory_charge_yn", label: "Factory Charge", render: (row) => (row.factory_charge_yn === "Y" || row.factory_charge_yn === "y" ? "Y" : "N") },
   ];
 
   const partnerActions = [
@@ -370,7 +379,7 @@ export default function BusinessPartnerPage() {
   // Generic field renderer — driven by field config objects
   const renderField = (f) => {
     if (f.name === "bp_supplier_type" && isCustomer) return null;
-    const disabled = f.disabledWhenNew ? !isEditing : false;
+    const disabled = (f.disabledWhenNew ? !isEditing : false) || (f.name === "factory_charge_yn" && !isCustomer);
 
     switch (f.type) {
       case "select":
@@ -382,6 +391,7 @@ export default function BusinessPartnerPage() {
             value={form[f.name]}
             onChange={setField}
             options={resolveOptions(f.options)}
+            disabled={disabled}
           />
         );
       case "date":
@@ -539,6 +549,7 @@ export default function BusinessPartnerPage() {
           rows={filteredPartners}
           getKey={(row) => row.record_id}
           actions={partnerActions}
+          actionsPosition="left"
           isHeight={420}
         />
       </PageBody>

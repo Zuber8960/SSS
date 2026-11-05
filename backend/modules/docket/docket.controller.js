@@ -6,7 +6,13 @@ const ewb = require('../../config/ewb');
 const envText = (value) => String(value ?? '').trim().replace(/^['"]|['"]$/g, '');
 
 // Windows defines USERNAME for the PC login, and dotenv will not replace it.
-const ewbUsername = () => envText(process.env.EWB_USERNAME);
+// The server .env still uses `username`, so use that only when it is not the OS login.
+const ewbUsername = () => {
+  const dedicated = envText(process.env.EWB_USERNAME);
+  if (dedicated) return dedicated;
+  if (process.platform === 'win32') return '';
+  return envText(process.env.username);
+};
 
 let ewbTokenCache = { token: null, expiresAt: 0 };
 
@@ -1606,7 +1612,7 @@ const getCustRate = async (params = {}) => {
 
   const styp = String(params.load_type || params.service_type || '').trim().toUpperCase();
   const result = await db.raw(
-    `SELECT sss.get_cust_rate(?, ?, ?, ?, ?, ?, ?, ?::numeric, ?, ?::date) AS rate`,
+    `SELECT sss.get_cust_rate(?, ?, ?, ?, ?, ?, ?, ?::numeric, ?, ?::date, ?::bigint, ?::bigint) AS rate`,
     [
       String(ccode),
       String(loccode),
@@ -1618,6 +1624,8 @@ const getCustRate = async (params = {}) => {
       params.chrg_wt ?? 0,
       params.veh_type || '',
       params.docket_date || null,
+      params.cnor_id || null,
+      params.cnee_id || null,
     ]
   );
   return parseCustRateString(result.rows?.[0]?.rate);

@@ -46,6 +46,10 @@ const calculateChargeRow = (row, rows, invValue, docketRate = 0, rateUom = "", c
       chargeAmount = toNumber(chargeWeight) * rate;
     } else if (rateUom === "Fixed" || rateUom === "Per Trip") {
       chargeAmount = rate;
+    } else if (rateUom === "MIN") {
+      const floor = toNumber(minFreightRate);
+      const saved = toNumber(row.charge_amt);
+      chargeAmount = floor > 0 ? floor : Math.max(rate, saved);
     } else if (rateUom === "Per Unit") {
       chargeAmount = toNumber(totalPkgs) * rate;
     } else if (rateUom === "Per Tonne") {
@@ -57,15 +61,23 @@ const calculateChargeRow = (row, rows, invValue, docketRate = 0, rateUom = "", c
       chargeAmount = Math.max(chargeAmount, toNumber(minFreightRate));
     }
   } else if (row.charge_code === "DK02") {
-    // Surcharge: user-entered rate % of DK01 charge amount
     const userValue = toNumber(row.user_code);
-    const dk01Row = rows.find((r) => r.charge_code === "DK01");
-    const dk01ChargeAmt = dk01Row ? toNumber(dk01Row.charge_amt) : 0;
-    chargeAmount = (dk01ChargeAmt * userValue) / 100;
+    if (row.fixed_amt) {
+      // Fixed rupee amount from get_cust_rate (Rs 50 when consignor factory charge is Y).
+      chargeAmount = userValue;
+    } else {
+      // Surcharge: user-entered rate % of DK01 charge amount
+      const dk01Row = rows.find((r) => r.charge_code === "DK01");
+      const dk01ChargeAmt = dk01Row ? toNumber(dk01Row.charge_amt) : 0;
+      chargeAmount = (dk01ChargeAmt * userValue) / 100;
+    }
   } else if (row.charge_code === "DK03") {
     chargeAmount = (inv * toNumber(row.user_code)) / 100;
   } else if (row.charge_code === "DK04") {
-    chargeAmount = (inv * toNumber(row.user_code))/100;
+    const userValue = toNumber(row.user_code);
+    // Below 1 is the existing percentage of invoice value (for example 0.20).
+    // 1 or more is a fixed rupee amount, including the 500 factory charge from get_cust_rate.
+    chargeAmount = userValue >= 1 ? userValue : (inv * userValue) / 100;
   } else {
     chargeAmount = toNumber(row.user_code);
   }
@@ -149,7 +161,14 @@ const ChargesSection = forwardRef(function ChargesSection({
     const rows = masters.map((m) => {
       used.add(m.charge_code);
       const existing = byCode[m.charge_code];
-      if (existing) return existing;
+      if (existing) {
+        const savedRate = toNumber(existing.user_code);
+        const savedAmt = toNumber(existing.charge_amt);
+        if (existing.charge_code === "DK02" && savedRate === 50 && savedAmt === 50) {
+          return { ...existing, fixed_amt: true };
+        }
+        return existing;
+      }
       return {
         rec_id: tempIdCounter.current--,
         charge_code: m.charge_code,
@@ -223,14 +242,23 @@ const ChargesSection = forwardRef(function ChargesSection({
       setChargeList((prev) => {
         const source = mergeSavedWithMaster(prev, master);
         const next = source.map((row) => {
-          const item = items.find((it) => matchChargeCode(it.rate_type, master) === row.charge_code);
-          if (!item) return row;
+          const matched = items.filter((it) => matchChargeCode(it.rate_type, master) === row.charge_code);
+          const item = matched.length ? matched[matched.length - 1] : null;
+          if (!item) {
+            if (row.charge_code === "DK02" && row.fixed_amt) {
+              return { ...row, fixed_amt: false, user_code: 0 };
+            }
+            return row;
+          }
           const mappedUom = String(item.uom || "").toUpperCase();
           const isFixed = mappedUom.includes("FIX");
-          const value = isFixed
-            ? Math.max(toNumber(item.rate), toNumber(item.min_rate))
-            : toNumber(item.rate);
-          return { ...row, user_code: value };
+          // Minimum applies to freight only. Other charges use the rate.
+          const value = toNumber(item.rate);
+          return {
+            ...row,
+            user_code: value,
+            fixed_amt: row.charge_code === "DK02" && isFixed,
+          };
         });
         const recalculated = recalculateChargeList(
           next,
@@ -364,7 +392,7 @@ const ChargesSection = forwardRef(function ChargesSection({
     const updated = [...chargeList];
     const existingRow = updated[idx];
 
-    let patch = { [field]: value };
+    let patch = { [field]: value, ...(field === "user_code" ? { fixed_amt: false } : {}) };
 
     // When charge_code (shown as charge_desc) changes, look up the matching master
     // record and populate charge_code (actual code) + default user_code
