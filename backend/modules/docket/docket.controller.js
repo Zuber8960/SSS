@@ -1115,13 +1115,15 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
 
       const cnorGstin = ewbDtl?.CNOR_GSTIN || null;
       const cnorName = ewbDtl?.FROM_CUST_NAME || null;
+      const cnorPincode = ewbDtl?.FROM_PINCODE ? String(ewbDtl.FROM_PINCODE) : null;
       let cnorBp = null;
       if (cnorGstin || cnorName) {
         if (cnorGstin) {
-          cnorBp = await db('sss.ssm_business_partner')
+          const cnorQuery = db('sss.ssm_business_partner')
             .where({ bp_gstin: cnorGstin, tenant_id })
-            .select('record_id')
-            .first();
+            .select('record_id');
+          if (cnorPincode) cnorQuery.andWhere({ bp_pincode: cnorPincode });
+          cnorBp = await cnorQuery.first();
         }
         if (!cnorBp && cnorName) {
           cnorBp = await db('sss.ssm_business_partner')
@@ -1148,13 +1150,15 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
 
       const cneeGstin = ewbDtl?.CNEE_GSTIN || null;
       const cneeName = ewbDtl?.TO_CUST_NAME || null;
+      const cneePincode = ewbDtl?.TO_PINCODE ? String(ewbDtl.TO_PINCODE) : null;
       let cneeBp = null;
       if (cneeGstin || cneeName) {
         if (cneeGstin) {
-          cneeBp = await db('sss.ssm_business_partner')
+          const cneeQuery = db('sss.ssm_business_partner')
             .where({ bp_gstin: cneeGstin, tenant_id })
-            .select('record_id')
-            .first();
+            .select('record_id');
+          if (cneePincode) cneeQuery.andWhere({ bp_pincode: cneePincode });
+          cneeBp = await cneeQuery.first();
         }
         if (!cneeBp && cneeName) {
           cneeBp = await db('sss.ssm_business_partner')
@@ -1234,10 +1238,11 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
         // Resolve consignor BP — find by GSTIN then name, create if missing
         let cnorBp = null;
         if (rawFirst.fromGstin) {
-          cnorBp = await db('sss.ssm_business_partner')
+          const cnorQuery = db('sss.ssm_business_partner')
             .where({ bp_gstin: rawFirst.fromGstin, tenant_id })
-            .select('record_id', 'bp_name')
-            .first();
+            .select('record_id', 'bp_name');
+          if (rawFirst.fromPincode) cnorQuery.andWhere({ bp_pincode: String(rawFirst.fromPincode) });
+          cnorBp = await cnorQuery.first();
         }
         // if (!cnorBp && rawFirst.fromTrdName) {
         //   cnorBp = await db('sss.ssm_business_partner')
@@ -1261,10 +1266,11 @@ const getEwayBillFromDB = async (ewbNumbers, tenant_id, division_code) => {
         // Resolve consignee BP — find by GSTIN then name, create if missing
         let cneeBp = null;
         if (rawFirst.toGstin) {
-          cneeBp = await db('sss.ssm_business_partner')
+          const cneeQuery = db('sss.ssm_business_partner')
             .where({ bp_gstin: rawFirst.toGstin, tenant_id })
-            .select('record_id', 'bp_name')
-            .first();
+            .select('record_id', 'bp_name');
+          if (rawFirst.toPincode) cneeQuery.andWhere({ bp_pincode: String(rawFirst.toPincode) });
+          cneeBp = await cneeQuery.first();
         }
         // if (!cneeBp && rawFirst.toTrdName) {
         //   cneeBp = await db('sss.ssm_business_partner')
