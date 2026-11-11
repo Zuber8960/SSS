@@ -65,11 +65,90 @@ const ZERO_PERF = {
   market: { title: "Market / Vendor Vehicles", rows: [["In Transit", 0, 0], ["Arrived", 0, 0], ["Engaged", 0, 0]] },
 };
 
+const D = (kind) => ({ source: "docket", kind });
+const INV = (kind) => ({ source: "invoice", kind });
 
-function SectionHead({ title, note, icon: Icon }) {
+const LABEL_SPEC = {
+  "orders placed": D("all"),
+  "pickup pending": D("pickupPending"),
+  "pending": D("pickupPending"),
+  "pickup done": D("pickupDone"),
+  "in transit": { source: "inTransit", kind: "inTransit" },
+  "in transit (vehicle)": { source: "inTransit", kind: "inTransit" },
+  "delivered": D("delivered"),
+  "booked": D("all"),
+  "waiting for dispatch": D("waiting"),
+  "undelivered dockets": D("undelivered"),
+  "undelivered": D("undelivered"),
+  "ewb expiring today": D("ewbToday"),
+  "delivered not billed": D("deliveredNotBilled"),
+  "delivery rate": D("all"),
+  "billing submitted": INV("submitted"),
+  "submitted": INV("submitted"),
+  "unsubmitted": INV("unsubmitted"),
+  "realised": INV("submitted"),
+};
+
+const CARD_SPEC = {
+  Pickup: D("all"),
+  Dockets: D("all"),
+  Undelivered: D("undelivered"),
+  Delivered: D("delivered"),
+  "Billing & Realisation": INV("all"),
+};
+
+const SECTION_SPEC = {
+  "Executive Overview": D("all"),
+  Operations: D("all"),
+  "Manifest & Vehicle Performance": { source: "vehicle", kind: "all", fleet: "all" },
+  "Customer Wise Analysis": D("all"),
+  "Vendor Wise Analysis": { source: "hire", kind: "all" },
+};
+
+const CUSTOMER_SPEC = {
+  name: D("all"), total: D("all"), delivered: D("delivered"), undelivered: D("undelivered"),
+  billed: INV("all"), submitted: INV("submitted"), realised: INV("submitted"),
+  belowCd: D("delivered"), aboveCd: D("delivered"), osDays: D("all"), cn: D("all"), dn: D("all"),
+};
+
+const VENDOR_SPEC = {
+  name: { source: "hire", kind: "all" }, engaged: { source: "hire", kind: "all" },
+  totalHire: { source: "hire", kind: "all" }, onTime: { source: "hire", kind: "all" },
+  delayed: { source: "hire", kind: "all" }, safe: { source: "hire", kind: "all" },
+  remarked: { source: "hire", kind: "all" }, paid: { source: "hire", kind: "all" },
+  balance: { source: "hire", kind: "all" }, deductions: { source: "hire", kind: "all" },
+  rating: { source: "hire", kind: "all" },
+};
+
+const specForLabel = (label) => LABEL_SPEC[String(label || "").trim().toLowerCase()] || D("all");
+
+const perfSpec = (title, status) => {
+  const fleet = /market|vendor/i.test(title) ? "market" : /own/i.test(title) ? "own" : "all";
+  if (!status) return { source: "vehicle", kind: "all", fleet };
+  if (/total fleet/i.test(status)) return { source: "fleet", kind: "fleet", fleet: "own" };
+  if (/engaged/i.test(status)) return { source: "vehicle", kind: "engaged", fleet: "all" };
+  if (/arrived/i.test(status)) return { source: "vehicle", kind: "arrived", fleet };
+  return { source: "vehicle", kind: "transit", fleet };
+};
+
+function Drill({ children, onClick }) {
+  return (
+    <button type="button" className="ovDrillLink" title="View details" onClick={(e) => { e.stopPropagation(); onClick(); }}>
+      {children}
+    </button>
+  );
+}
+
+function SectionHead({ title, note, icon: Icon, onClick }) {
   return (
     <div className="ovSectionHead">
-      <div className="ovSectionHead__title">
+      <div
+        className={`ovSectionHead__title${onClick ? " ovClickRow" : ""}`}
+        role={onClick ? "button" : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        onClick={onClick}
+        onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
+      >
         <span className="ovSectionHead__bar" />
         {Icon && <Icon style={{ fontSize: 20, color: "#7c3aed" }} />}
         <h3>{title}</h3>
@@ -96,10 +175,32 @@ function LoadingBar({ width = "60%" }) {
 
 export default function DashboardOverview({ data, loading = false }) {
   const overview = data || {};
-  // Clicking a KPI card opens the drill-down popup with its full detail grid
-  const [activeKpi, setActiveKpi] = useState(null);
-  const openKpi = (k) => setActiveKpi(k);
-  const closeKpi = () => setActiveKpi(null);
+  const [detail, setDetail] = useState(null);
+  const openDetail = (d) => setDetail(d);
+  const closeDetail = () => setDetail(null);
+
+  const openMetric = ({ section, label, value, accent, Icon, spec, preset }) => openDetail({
+    section, label, value, accent: accent || "purple", Icon: Icon || "Insights",
+    ...(spec || specForLabel(label)), preset,
+  });
+
+  const openSection = (title, Icon) => openMetric({
+    section: title, label: title, value: "", accent: "purple", Icon, spec: SECTION_SPEC[title],
+  });
+
+  const openParty = (section, row, field, pretty) => {
+    const vendor = section.startsWith("Vendor");
+    const spec = vendor ? (VENDOR_SPEC[field] || VENDOR_SPEC.name) : (CUSTOMER_SPEC[field] || CUSTOMER_SPEC.name);
+    openDetail({
+      section,
+      label: `${row.name} · ${pretty}`,
+      value: row[field],
+      accent: vendor ? "green" : "purple",
+      Icon: vendor ? "Factory" : "Group",
+      ...spec,
+      preset: vendor ? { vendor: row.name } : { consignor: row.name },
+    });
+  };
   // While loading show skeletons; once loaded, always render cards —
   // falling back to zero-value cards when the DB has no data.
   const hasKpis = (overview.kpis || []).length > 0;
@@ -116,7 +217,7 @@ export default function DashboardOverview({ data, loading = false }) {
   return (
     <div>
       {/* Executive Overview */}
-      <SectionHead title="Executive Overview" note="Operational snapshot" icon={Insights} />
+      <SectionHead title="Executive Overview" note="Operational snapshot" icon={Insights} onClick={() => openSection("Executive Overview", "Insights")} />
       <div className="ovKpiGrid">
         {loading && !kpis.length
           ? Array.from({ length: 6 }).map((_, i) => (
@@ -139,8 +240,8 @@ export default function DashboardOverview({ data, loading = false }) {
               role="button"
               tabIndex={0}
               aria-label={`View details for ${k.label}`}
-              onClick={() => openKpi(k)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openKpi(k); } }}
+              onClick={() => openMetric({ section: "Executive Overview", label: k.label, value: k.value, accent: k.accent, Icon: k.Icon })}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openMetric({ section: "Executive Overview", label: k.label, value: k.value, accent: k.accent, Icon: k.Icon }); } }}
               style={{ animationDelay: `${i * 60}ms`, "--ov-accent": grad, "--ov-accent-soft": soft, "--ov-accent-strong": strong }}
             >
               {/* soft accent glow behind the card */}
@@ -170,7 +271,7 @@ export default function DashboardOverview({ data, loading = false }) {
       </div>
 
       {/* Operations */}
-      <SectionHead title="Operations" note="Shipment lifecycle" icon={Route} />
+      <SectionHead title="Operations" note="Shipment lifecycle" icon={Route} onClick={() => openSection("Operations", "Route")} />
       <div className="ovOpsGrid">
         {loading && !ops.length
           ? Array.from({ length: 5 }).map((_, i) => (
@@ -189,12 +290,25 @@ export default function DashboardOverview({ data, loading = false }) {
               className="ovOpsCard"
               style={{ animationDelay: `${i * 60}ms`, "--ov-accent-soft": soft, "--ov-accent-strong": strong }}
             >
-              <div className="ovOpsCard__title">
+              <div
+                className="ovOpsCard__title ovClickRow"
+                role="button"
+                tabIndex={0}
+                onClick={() => openMetric({ section: "Operations", label: card.title, value: "", accent: card.accent, Icon: card.Icon, spec: CARD_SPEC[card.title] })}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openMetric({ section: "Operations", label: card.title, value: "", accent: card.accent, Icon: card.Icon, spec: CARD_SPEC[card.title] }); } }}
+              >
                 {Icon && <Icon className="ovOpsCard__icon" style={{ fontSize: 17 }} />}
                 {card.title}
               </div>
               {card.rows.map(([label, value, color]) => (
-                <div key={label} className="ovOpsRow">
+                <div
+                  key={label}
+                  className="ovOpsRow ovClickRow"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openMetric({ section: "Operations", label: `${card.title} · ${label}`, value, accent: card.accent, Icon: card.Icon, spec: specForLabel(label) })}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openMetric({ section: "Operations", label: `${card.title} · ${label}`, value, accent: card.accent, Icon: card.Icon, spec: specForLabel(label) }); } }}
+                >
                   <span>{label}</span>
                   <span style={color ? { color } : undefined}>{value}</span>
                 </div>
@@ -205,7 +319,7 @@ export default function DashboardOverview({ data, loading = false }) {
       </div>
 
       {/* Manifest & Vehicle Performance */}
-      <SectionHead title="Manifest & Vehicle Performance" note="Own fleet vs market / vendor vehicles" icon={AirportShuttle} />
+      <SectionHead title="Manifest & Vehicle Performance" note="Own fleet vs market / vendor vehicles" icon={AirportShuttle} onClick={() => openSection("Manifest & Vehicle Performance", "AirportShuttle")} />
       <div className="ovPerfGrid">
         {[perf.own, perf.market].filter(Boolean).map((p, i) => {
           const totOnTime = p.rows.reduce((a, r) => a + Number(r[1] || 0), 0);
@@ -214,7 +328,13 @@ export default function DashboardOverview({ data, loading = false }) {
           return (
             <div key={p.title} className="ovPerfCard" style={{ animationDelay: `${i * 80}ms` }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <div className="ovOpsCard__title" style={{ background: "transparent", border: "none", margin: 0, padding: 0 }}>
+                <div
+                  className="ovOpsCard__title ovClickRow"
+                  role="button"
+                  tabIndex={0}
+                  style={{ background: "transparent", border: "none", margin: 0, padding: 0 }}
+                  onClick={() => openMetric({ section: "Manifest & Vehicle Performance", label: p.title, value: `${share}% on time`, accent: "purple", Icon: "LocalShipping", spec: perfSpec(p.title) })}
+                >
                   <LocalShipping style={{ fontSize: 18, color: "#7c3aed" }} />
                   {p.title}
                 </div>
@@ -232,7 +352,11 @@ export default function DashboardOverview({ data, loading = false }) {
                 </thead>
                 <tbody>
                   {p.rows.map(([status, onTime, delayed]) => (
-                    <tr key={status}>
+                    <tr
+                      key={status}
+                      className="ovClickRow"
+                      onClick={() => openMetric({ section: "Manifest & Vehicle Performance", label: `${p.title} · ${status}`, value: onTime, accent: "purple", Icon: "AirportShuttle", spec: perfSpec(p.title, status) })}
+                    >
                       <td style={{ fontWeight: 500, color: "#374151" }}>{status}</td>
                       <td style={{ color: "#059669", fontWeight: 700 }}>{onTime}</td>
                       <td style={{ color: "#dc2626", fontWeight: 700 }}>{delayed ?? "—"}</td>
@@ -251,7 +375,7 @@ export default function DashboardOverview({ data, loading = false }) {
       {/* Customer Wise Analysis */}
       <div className="ovTableCard">
         <div className="ovTableCard__head">
-          <h3><Group className="ovTableCard__icon" /> Customer Wise Analysis</h3>
+          <h3 className="ovClickRow" onClick={() => openSection("Customer Wise Analysis", "Group")}><Group className="ovTableCard__icon" /> Customer Wise Analysis</h3>
           <span className="ovPill"><TrendingUp style={{ fontSize: 13 }} /> Top accounts</span>
         </div>
         <div style={{ padding: "4px 14px 10px" }}>
@@ -259,23 +383,24 @@ export default function DashboardOverview({ data, loading = false }) {
             columns={[
               { key: "name", label: "Name", minWidth: 200, render: (r) => (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                  <span className="ovAvatar">{initials(r.name)}</span>{r.name}
+                  <span className="ovAvatar">{initials(r.name)}</span>
+                  <Drill onClick={() => openParty("Customer Wise Analysis", r, "name", "Bookings")}>{r.name}</Drill>
                 </span>
               ) },
               { key: "pan", label: "PAN", minWidth: 120 },
               { key: "gstin", label: "GSTIN", minWidth: 160 },
               { key: "location", label: "Location", minWidth: 110 },
-              { key: "total", label: "Total Bkg", minWidth: 90 },
-              { key: "delivered", label: "Delivered", minWidth: 95 },
-              { key: "undelivered", label: "Undelivered", minWidth: 100 },
-              { key: "billed", label: "Billed", minWidth: 90 },
-              { key: "submitted", label: "Submitted", minWidth: 95 },
-              { key: "realised", label: "Realised", minWidth: 90 },
-              { key: "belowCd", label: "Below CD", minWidth: 90 },
-              { key: "aboveCd", label: "Above CD", minWidth: 90 },
-              { key: "osDays", label: "OS Days", minWidth: 85 },
-              { key: "cn", label: "CN", minWidth: 70 },
-              { key: "dn", label: "DN", minWidth: 70 },
+              { key: "total", label: "Total Bkg", minWidth: 90, render: (r) => <Drill onClick={() => openParty("Customer Wise Analysis", r, "total", "Total Bkg")}>{r.total}</Drill> },
+              { key: "delivered", label: "Delivered", minWidth: 95, render: (r) => <Drill onClick={() => openParty("Customer Wise Analysis", r, "delivered", "Delivered")}>{r.delivered}</Drill> },
+              { key: "undelivered", label: "Undelivered", minWidth: 100, render: (r) => <Drill onClick={() => openParty("Customer Wise Analysis", r, "undelivered", "Undelivered")}>{r.undelivered}</Drill> },
+              { key: "billed", label: "Billed", minWidth: 90, render: (r) => <Drill onClick={() => openParty("Customer Wise Analysis", r, "billed", "Billed")}>{r.billed}</Drill> },
+              { key: "submitted", label: "Submitted", minWidth: 95, render: (r) => <Drill onClick={() => openParty("Customer Wise Analysis", r, "submitted", "Submitted")}>{r.submitted}</Drill> },
+              { key: "realised", label: "Realised", minWidth: 90, render: (r) => <Drill onClick={() => openParty("Customer Wise Analysis", r, "realised", "Realised")}>{r.realised}</Drill> },
+              { key: "belowCd", label: "Below CD", minWidth: 90, render: (r) => <Drill onClick={() => openParty("Customer Wise Analysis", r, "belowCd", "Below CD")}>{r.belowCd}</Drill> },
+              { key: "aboveCd", label: "Above CD", minWidth: 90, render: (r) => <Drill onClick={() => openParty("Customer Wise Analysis", r, "aboveCd", "Above CD")}>{r.aboveCd}</Drill> },
+              { key: "osDays", label: "OS Days", minWidth: 85, render: (r) => <Drill onClick={() => openParty("Customer Wise Analysis", r, "osDays", "OS Days")}>{r.osDays}</Drill> },
+              { key: "cn", label: "CN", minWidth: 70, render: (r) => <Drill onClick={() => openParty("Customer Wise Analysis", r, "cn", "CN")}>{r.cn}</Drill> },
+              { key: "dn", label: "DN", minWidth: 70, render: (r) => <Drill onClick={() => openParty("Customer Wise Analysis", r, "dn", "DN")}>{r.dn}</Drill> },
             ]}
             rows={customers}
             getKey={(r) => r.name}
@@ -288,7 +413,7 @@ export default function DashboardOverview({ data, loading = false }) {
       {/* Vendor Wise Analysis */}
       <div className="ovTableCard">
         <div className="ovTableCard__head">
-          <h3><Factory className="ovTableCard__icon" /> Vendor Wise Analysis</h3>
+          <h3 className="ovClickRow" onClick={() => openSection("Vendor Wise Analysis", "Factory")}><Factory className="ovTableCard__icon" /> Vendor Wise Analysis</h3>
           <span className="ovPill" style={{ background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }}>Fleet performance</span>
         </div>
         <div style={{ padding: "4px 14px 10px" }}>
@@ -296,26 +421,25 @@ export default function DashboardOverview({ data, loading = false }) {
             columns={[
               { key: "name", label: "Name", minWidth: 200, render: (r) => (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                  <span className="ovAvatar">{initials(r.name)}</span>{r.name}
+                  <span className="ovAvatar">{initials(r.name)}</span>
+                  <Drill onClick={() => openParty("Vendor Wise Analysis", r, "name", "Hire")}>{r.name}</Drill>
                 </span>
               ) },
               { key: "type", label: "Type", minWidth: 90 },
               { key: "pan", label: "PAN", minWidth: 120 },
               { key: "gstin", label: "GSTIN", minWidth: 160 },
               { key: "location", label: "Location", minWidth: 110 },
-              { key: "engaged", label: "Veh Engaged", minWidth: 105 },
-              { key: "totalHire", label: "Total Hire", minWidth: 95 },
-              { key: "onTime", label: "On Time Trips", minWidth: 110 },
-              { key: "delayed", label: "Delayed Trips", minWidth: 110, render: (r) => (
-                <span style={{ color: "#dc2626" }}>{r.delayed}</span>
-              ) },
-              { key: "safe", label: "Safe Trips", minWidth: 95 },
-              { key: "remarked", label: "Remarked Trips", minWidth: 120 },
-              { key: "paid", label: "Paid", minWidth: 90 },
-              { key: "balance", label: "Balance", minWidth: 90 },
-              { key: "deductions", label: "Deductions", minWidth: 100 },
+              { key: "engaged", label: "Veh Engaged", minWidth: 105, render: (r) => <Drill onClick={() => openParty("Vendor Wise Analysis", r, "engaged", "Veh Engaged")}>{r.engaged}</Drill> },
+              { key: "totalHire", label: "Total Hire", minWidth: 95, render: (r) => <Drill onClick={() => openParty("Vendor Wise Analysis", r, "totalHire", "Total Hire")}>{r.totalHire}</Drill> },
+              { key: "onTime", label: "On Time Trips", minWidth: 110, render: (r) => <Drill onClick={() => openParty("Vendor Wise Analysis", r, "onTime", "On Time Trips")}>{r.onTime}</Drill> },
+              { key: "delayed", label: "Delayed Trips", minWidth: 110, render: (r) => <Drill onClick={() => openParty("Vendor Wise Analysis", r, "delayed", "Delayed Trips")}><span style={{ color: "#dc2626" }}>{r.delayed}</span></Drill> },
+              { key: "safe", label: "Safe Trips", minWidth: 95, render: (r) => <Drill onClick={() => openParty("Vendor Wise Analysis", r, "safe", "Safe Trips")}>{r.safe}</Drill> },
+              { key: "remarked", label: "Remarked Trips", minWidth: 120, render: (r) => <Drill onClick={() => openParty("Vendor Wise Analysis", r, "remarked", "Remarked Trips")}>{r.remarked}</Drill> },
+              { key: "paid", label: "Paid", minWidth: 90, render: (r) => <Drill onClick={() => openParty("Vendor Wise Analysis", r, "paid", "Paid")}>{r.paid}</Drill> },
+              { key: "balance", label: "Balance", minWidth: 90, render: (r) => <Drill onClick={() => openParty("Vendor Wise Analysis", r, "balance", "Balance")}>{r.balance}</Drill> },
+              { key: "deductions", label: "Deductions", minWidth: 100, render: (r) => <Drill onClick={() => openParty("Vendor Wise Analysis", r, "deductions", "Deductions")}>{r.deductions}</Drill> },
               { key: "rating", label: "Rating", minWidth: 90, render: (r) => (
-                <span className="ovRating">{r.rating}</span>
+                <Drill onClick={() => openParty("Vendor Wise Analysis", r, "rating", "Rating")}><span className="ovRating">{r.rating}</span></Drill>
               ) },
             ]}
             rows={vendors}
@@ -329,10 +453,10 @@ export default function DashboardOverview({ data, loading = false }) {
       {/* Drill-down popup — full detail grid for the clicked Executive KPI card.
           `key` remounts on KPI change so search/error/loading state starts fresh. */}
       <ExecutiveKpiPopup
-        key={activeKpi?.label || "closed"}
-        open={Boolean(activeKpi)}
-        kpi={activeKpi}
-        onClose={closeKpi}
+        key={`${detail?.section || ""}|${detail?.label || "closed"}`}
+        open={Boolean(detail)}
+        detail={detail}
+        onClose={closeDetail}
       />
     </div>
   );

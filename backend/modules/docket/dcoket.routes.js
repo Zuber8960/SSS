@@ -311,6 +311,8 @@ router.get('/for-billing', async (req, res) => {
       customer_ids: req.query.customer_ids || "",
       customer_name: req.query.customer_name || "",
       billed_mode: req.query.billed_mode || "unbilled",
+      pay_type: req.query.pay_type || "",
+      require_delivery_note: req.query.require_delivery_note,
       from_date: req.query.from_date || null,
       to_date: req.query.to_date || null,
     });

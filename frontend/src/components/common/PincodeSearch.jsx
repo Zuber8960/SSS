@@ -108,7 +108,7 @@ export default function PincodeSearch({ tableHeight = 320, accent = "#7c3aed" })
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 0 }}>
       {/* Search bar */}
-      <Box sx={{ display: "flex", gap: 2, alignItems: "center", marginBottom: 2 }}>
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", marginBottom: 1 }}>
         <TextField
           size="small"
           fullWidth
@@ -118,13 +118,14 @@ export default function PincodeSearch({ tableHeight = 320, accent = "#7c3aed" })
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <SearchIcon sx={{ color: accent, fontSize: 20 }} />
+                <SearchIcon sx={{ color: accent, fontSize: 16 }} />
               </InputAdornment>
             ),
           }}
           sx={{
-            "& .MuiInputBase-input": { fontSize: 14 },
-            "& .MuiOutlinedInput-notchedOutline": { borderColor: "#c4b5fd", borderWidth: 1.5 },
+            "& .MuiOutlinedInput-root": { height: 28, fontSize: 11 },
+            "& .MuiInputBase-input": { fontSize: 11, paddingTop: 0, paddingBottom: 0 },
+            "& .MuiOutlinedInput-notchedOutline": { borderColor: "#c4b5fd", borderWidth: 1 },
             "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: accent },
             "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: accent },
           }}
@@ -132,8 +133,9 @@ export default function PincodeSearch({ tableHeight = 320, accent = "#7c3aed" })
         <Chip
           label={`${rows.length} result${rows.length !== 1 ? "s" : ""}`}
           sx={{
-            background: "#f3e8ff", color: accent, fontWeight: 600,
-            border: "1.5px solid #d8b4fe", fontSize: 13, height: 32, flexShrink: 0,
+            background: "#f3e8ff", color: accent, fontWeight: 700,
+            border: "1px solid #d8b4fe", fontSize: 11, height: 24, flexShrink: 0,
+            "& .MuiChip-label": { fontSize: 11, px: 1 },
           }}
         />
       </Box>
@@ -157,6 +159,9 @@ export default function PincodeSearch({ tableHeight = 320, accent = "#7c3aed" })
           rows={rows}
           getKey={(row, i) => row.id || i}
           actions={[]}
+          compact
+          rowHeight={24}
+          headerHeight={26}
           isHeight={tableHeight}
         />
       )}

@@ -11,7 +11,7 @@ export const fetchAllDockets = (cnor_cnee, extra = {}) =>
       ...(extra && typeof extra === "object" ? extra : {}),
     },
   }).then((r) => r.data.data || r.data || []);
-export const fetchDocketsForBilling = ({ locCode, customerIds = [], customerName = "", billedMode = "unbilled", fromDate = "", toDate = "" } = {}) =>
+export const fetchDocketsForBilling = ({ locCode, customerIds = [], customerName = "", billedMode = "unbilled", payType = "", requireDeliveryNote = true, fromDate = "", toDate = "" } = {}) =>
   Api.get("/docket/for-billing", {
     timeout: 120000,
     params: {
@@ -19,6 +19,8 @@ export const fetchDocketsForBilling = ({ locCode, customerIds = [], customerName
       customer_ids: (Array.isArray(customerIds) ? customerIds : [customerIds]).filter(Boolean).join(","),
       customer_name: customerName || "",
       billed_mode: billedMode || "unbilled",
+      pay_type: payType || "",
+      require_delivery_note: requireDeliveryNote ? "1" : "0",
       from_date: fromDate || "",
       to_date: toDate || "",
     },

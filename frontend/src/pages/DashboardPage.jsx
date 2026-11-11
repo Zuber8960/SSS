@@ -181,7 +181,7 @@ const toDate = (v) => {
 
 
 const inTransitDocketColumns = [
-  { key: "docket_no",         label: "Docket No",    minWidth: 120 },
+  { key: "docket_no",         label: "Docket No",    minWidth: 190, width: 190, align: "left" },
   { key: "docket_date",       label: "Date",         minWidth: 100 },
   { key: "cnor_name",         label: "Consignor",    minWidth: 150 },
   { key: "cnee_name",         label: "Consignee",    minWidth: 150 },
@@ -270,7 +270,7 @@ function InTransitDocketsPopup({ open, onClose }) {
       </DialogTitle>
 
       <DialogContent sx={{ padding: "20px 24px", overflow: "hidden" }}>
-        <Box sx={{ display: "flex", gap: 2, alignItems: "center", margin: 2 }}>
+        <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 1 }}>
           <TextField
             size="small"
             fullWidth
@@ -280,13 +280,14 @@ function InTransitDocketsPopup({ open, onClose }) {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon sx={{ color: "#ea580c", fontSize: 20 }} />
+                  <SearchIcon sx={{ color: "#ea580c", fontSize: 16 }} />
                 </InputAdornment>
               ),
             }}
             sx={{
-              "& .MuiInputBase-input": { fontSize: 14 },
-              "& .MuiOutlinedInput-notchedOutline": { borderColor: "#fed7aa", borderWidth: 1.5 },
+              "& .MuiOutlinedInput-root": { height: 28, fontSize: 11 },
+              "& .MuiInputBase-input": { fontSize: 11, paddingTop: 0, paddingBottom: 0 },
+              "& .MuiOutlinedInput-notchedOutline": { borderColor: "#fed7aa", borderWidth: 1 },
               "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#ea580c" },
               "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#ea580c" },
             }}
@@ -294,8 +295,9 @@ function InTransitDocketsPopup({ open, onClose }) {
           <Chip
             label={`${rows.length} docket${rows.length !== 1 ? "s" : ""}`}
             sx={{
-              background: "#fff7ed", color: "#ea580c", fontWeight: 600,
-              border: "1.5px solid #fed7aa", fontSize: 13, height: 32,
+              background: "#fff7ed", color: "#ea580c", fontWeight: 700,
+              border: "1px solid #fed7aa", fontSize: 11, height: 24,
+              "& .MuiChip-label": { fontSize: 11, px: 1 },
             }}
           />
         </Box>
@@ -311,6 +313,9 @@ function InTransitDocketsPopup({ open, onClose }) {
             rows={rows}
             getKey={(row, i) => row.id || i}
             actions={[]}
+            compact
+            rowHeight={24}
+            headerHeight={26}
             isHeight={320}
           />
         )}
@@ -415,7 +420,7 @@ function InTransitVehiclesPopup({ open, onClose }) {
           </Box>
         ) : (
           <>
-            <Box sx={{ display: "flex", gap: 2, alignItems: "center", margin: 2 }}>
+            <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 1 }}>
               <TextField
                 size="small"
                 fullWidth
@@ -425,20 +430,21 @@ function InTransitVehiclesPopup({ open, onClose }) {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <SearchIcon sx={{ color: "#ea580c", fontSize: 20 }} />
+                      <SearchIcon sx={{ color: "#ea580c", fontSize: 16 }} />
                     </InputAdornment>
                   ),
                 }}
                 sx={{
-                  "& .MuiInputBase-input": { fontSize: 14 },
-                  "& .MuiOutlinedInput-notchedOutline": { borderColor: "#fed7aa", borderWidth: 1.5 },
+                  "& .MuiOutlinedInput-root": { height: 28, fontSize: 11 },
+                  "& .MuiInputBase-input": { fontSize: 11, paddingTop: 0, paddingBottom: 0 },
+                  "& .MuiOutlinedInput-notchedOutline": { borderColor: "#fed7aa", borderWidth: 1 },
                   "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#ea580c" },
                   "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#ea580c" },
                 }}
               />
               <Chip
                 label={`${rows.length} vehicle${rows.length !== 1 ? "s" : ""}`}
-                sx={{ background: "#fff7ed", color: "#ea580c", fontWeight: 600, border: "1.5px solid #fed7aa", fontSize: 13, height: 32, flexShrink: 0 }}
+                sx={{ background: "#fff7ed", color: "#ea580c", fontWeight: 700, border: "1px solid #fed7aa", fontSize: 11, height: 24, flexShrink: 0, "& .MuiChip-label": { fontSize: 11, px: 1 } }}
               />
             </Box>
             <DataTable
@@ -446,6 +452,9 @@ function InTransitVehiclesPopup({ open, onClose }) {
               rows={rows}
               getKey={(row, i) => row.id || i}
               actions={[]}
+              compact
+              rowHeight={24}
+              headerHeight={26}
               isHeight={320}
             />
           </>

@@ -303,6 +303,8 @@ const getDocketsForBilling = async ({
   customer_ids = [],
   customer_name = "",
   billed_mode = "unbilled",
+  pay_type = "",
+  require_delivery_note = true,
   from_date = null,
   to_date = null,
 }) => {
@@ -316,7 +318,12 @@ const getDocketsForBilling = async ({
   const query = db("sss.sst_docket as d")
     .leftJoin("sss.ssm_business_partner as cnor", "d.cnor_id", "cnor.record_id")
     .leftJoin("sss.ssm_business_partner as cnee", "d.cnee_id", "cnee.record_id")
-    .select("d.*", "cnor.bp_name as cnor_name", "cnee.bp_name as cnee_name")
+    .select(
+      "d.*",
+      "cnor.bp_name as cnor_name",
+      "cnor.bp_grp_code as cnor_grp_code",
+      "cnee.bp_name as cnee_name"
+    )
     .where({ "d.record_status": 0 });
 
   if (tenant_id) {
@@ -343,6 +350,11 @@ const getDocketsForBilling = async ({
     });
   }
 
+  const payType = String(pay_type || "").trim().toUpperCase();
+  if (payType) {
+    query.andWhereRaw("UPPER(TRIM(COALESCE(d.docket_pay_type, ''))) = ?", [payType]);
+  }
+
   if (from_date) {
     query.andWhereRaw("d.docket_date::date >= ?::date", [from_date]);
   }
@@ -350,11 +362,16 @@ const getDocketsForBilling = async ({
     query.andWhereRaw("d.docket_date::date <= ?::date", [to_date]);
   }
 
-  query.whereExists(function () {
-    this.select(db.raw("1"))
-      .from("sss.sst_dly_note as n")
-      .whereRaw("n.docket_no = d.docket_no");
-  });
+  const requireNote = require_delivery_note !== false
+    && String(require_delivery_note).toLowerCase() !== "false"
+    && String(require_delivery_note) !== "0";
+  if (requireNote) {
+    query.whereExists(function () {
+      this.select(db.raw("1"))
+        .from("sss.sst_dly_note as n")
+        .whereRaw("n.docket_no = d.docket_no");
+    });
+  }
 
   if (billed_mode === "unbilled") {
     query.whereNotExists(function () {

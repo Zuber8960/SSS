@@ -15,7 +15,7 @@ import { saveInvoice, updateInvoice, deleteInvoice, cancelInvoice, fetchBilledDo
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { getSessionLocCode } from "../../utils/authService";
 import { printInvoice } from "../../components/common/InvoicePrint";
-import { Autocomplete, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, IconButton, InputLabel, MenuItem, Select, TextField, Tooltip } from "@mui/material";
+import { Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, IconButton, InputLabel, MenuItem, Select, TextField, Tooltip } from "@mui/material";
 import ClearIcon from "@mui/icons-material/Clear";
 import moment from "moment";
 import { getDateFormat } from "../../utils/tenantService";
@@ -175,6 +175,85 @@ const xmlEscape = (value) =>
 const excelCell = (value, styleId, type) =>
   `<Cell ss:StyleID="${styleId}"><Data ss:Type="${type}">${type === "Number" ? value : xmlEscape(value)}</Data></Cell>`;
 
+const excelFileName = (name) => String(name || "export").replace(/[^\w.-]+/g, "_");
+
+const downloadExcelSheet = ({ sheetName, filename, info = [], columns, rows }) => {
+  const headerXml = info
+    .map(([label, value]) => `<Row>${excelCell(label, "InfoLabel", "String")}${excelCell(value, "InfoValue", "String")}</Row>`)
+    .join("");
+  const colHead = `<Row>${columns.map((col) => excelCell(col.label, "ColHead", "String")).join("")}</Row>`;
+  const body = rows.map((row, index) => {
+    const cells = columns.map((col) => {
+      if (col.key === "sr_no") return excelCell(index + 1, "Int", "Number");
+      const raw = row[col.key];
+      if (col.numeric) {
+        const n = parseFloat(raw);
+        return Number.isFinite(n) ? excelCell(n, "Num", "Number") : excelCell("", "Text", "String");
+      }
+      return excelCell(raw ?? "", "Text", "String");
+    });
+    return `<Row>${cells.join("")}</Row>`;
+  }).join("");
+  const totals = {};
+  columns.forEach((col) => {
+    if (!col.total) return;
+    totals[col.key] = rows.reduce((sum, row) => sum + (parseFloat(row[col.key]) || 0), 0);
+  });
+  const totalXml = columns.some((col) => col.total)
+    ? `<Row>${columns.map((col) => {
+        if (col.key === "docket_no") return excelCell("TOTAL", "Total", "String");
+        if (col.total) return excelCell(totals[col.key].toFixed(2), "TotalNum", "Number");
+        return excelCell("", "Total", "String");
+      }).join("")}</Row>`
+    : "";
+  const xml = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Styles>
+<Style ss:ID="InfoLabel"><Font ss:Bold="1"/></Style>
+<Style ss:ID="InfoValue"/>
+<Style ss:ID="ColHead"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#1F6FEB" ss:Pattern="Solid"/></Style>
+<Style ss:ID="Text"/>
+<Style ss:ID="Num"><NumberFormat ss:Format="0.00"/></Style>
+<Style ss:ID="Int"><NumberFormat ss:Format="0"/></Style>
+<Style ss:ID="Total"><Font ss:Bold="1"/><Interior ss:Color="#F5F0D6" ss:Pattern="Solid"/></Style>
+<Style ss:ID="TotalNum"><Font ss:Bold="1"/><Interior ss:Color="#F5F0D6" ss:Pattern="Solid"/><NumberFormat ss:Format="0.00"/></Style>
+</Styles>
+<Worksheet ss:Name="${xmlEscape(sheetName || "Sheet1")}">
+<Table>
+${headerXml}
+${info.length ? "<Row></Row>" : ""}
+${colHead}
+${body}
+${totalXml}
+</Table>
+</Worksheet>
+</Workbook>`;
+  const blob = new Blob([xml], { type: "application/vnd.ms-excel" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = excelFileName(filename).endsWith(".xls") ? excelFileName(filename) : `${excelFileName(filename)}.xls`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+const DELIVERY_EXPORT_COLUMNS = [
+  { key: "sr_no", label: "Sr No" },
+  { key: "docket_no", label: "Docket" },
+  { key: "docket_date", label: "Date" },
+  { key: "origin", label: "Origin" },
+  { key: "destination", label: "Destination" },
+  { key: "consignee", label: "Consignee" },
+  { key: "type", label: "Type" },
+  { key: "packages", label: "Pkgs", numeric: true },
+  { key: "actual_wt", label: "Act Wt", numeric: true },
+  { key: "charge_wt", label: "Chg Wt", numeric: true },
+  { key: "status", label: "Status" },
+];
+
 const BILL_AMOUNT_COL_KEYS = [
   "freight", "loading", "unloading", "detention", "add_toll", "green_tax",
   "other_charges", "door_collection", "door_delivery", "taxable", "cgst", "sgst", "igst", "amount",
@@ -333,6 +412,44 @@ const emptyForm = {
   ...defaultBillDates(),
 };
 
+const tbbLoadGroup = (docket) => {
+  const load = String(docket?.docket_load_type || docket?.load_type || "").trim().toUpperCase();
+  return load === "FTL" ? "FTL" : "PTL";
+};
+
+const tbbCustomerKey = (docket) => {
+  const id = String(docket?.cnor_id ?? "").trim();
+  if (id && id !== "0") return id;
+  const name = String(docket?.cnor_name || "").trim().toLowerCase();
+  return name ? `name:${name}` : "";
+};
+
+const findPartnerForKey = (partners, key) => {
+  const list = Array.isArray(partners) ? partners : [];
+  if (!key) return null;
+  if (String(key).startsWith("name:")) {
+    const name = String(key).slice(5);
+    return list.find((p) => String(p.bp_name || "").trim().toLowerCase() === name) || null;
+  }
+  return list.find((p) =>
+    [p.record_id, p.bp_id, p.bp_grp_code, p.bp_code].some((v) => String(v ?? "").trim() === String(key))
+  ) || null;
+};
+
+const docketMatchesTbbCustomer = (docket, customerId, partners) => {
+  const partner = (partners || []).find((p) => String(p.record_id ?? p.bp_id ?? "") === String(customerId));
+  if (!partner) return tbbCustomerKey(docket) === String(customerId);
+  const ids = new Set(
+    [partner.record_id, partner.bp_id, partner.bp_grp_code, partner.bp_code]
+      .map((v) => String(v ?? "").trim())
+      .filter((v) => v && v !== "0")
+  );
+  const cnor = String(docket.cnor_id ?? "").trim();
+  if (cnor && ids.has(cnor)) return true;
+  const name = String(partner.bp_name || "").trim().toLowerCase();
+  return !!name && String(docket.cnor_name || "").trim().toLowerCase() === name;
+};
+
 const blankBillForm = (locations = []) => ({
   ...emptyForm,
   billing_branch: sessionBranchLabel(locations),
@@ -345,6 +462,259 @@ const customerFieldSx = {
 };
 
 const billPageFontCss = `
+.customer-bill-page .bill-header-fields .MuiOutlinedInput-root {
+  font-size: 11px !important;
+  height: calc(1.4375em + 17px) !important;
+  min-height: calc(1.4375em + 17px) !important;
+  max-height: calc(1.4375em + 17px) !important;
+  box-sizing: border-box !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  align-items: center;
+}
+.customer-bill-page .bill-header-fields .MuiOutlinedInput-input,
+.customer-bill-page .bill-header-fields .MuiSelect-select,
+.customer-bill-page .bill-header-fields .MuiAutocomplete-input {
+  font-size: 11px !important;
+  height: 1.4375em !important;
+  min-height: 0 !important;
+  max-height: 1.4375em !important;
+  padding-top: 8.5px !important;
+  padding-bottom: 8.5px !important;
+  line-height: 1.4375em !important;
+  box-sizing: content-box !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.customer-bill-page .tbb-summary {
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid #e7e5f4;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(76, 29, 149, 0.06);
+  overflow: hidden;
+}
+.customer-bill-page .tbb-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 10px;
+  min-height: 24px;
+  background: #faf8ff;
+  border-bottom: 1px solid #efeafc;
+}
+.customer-bill-page .tbb-summary-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #1e1b4b;
+  line-height: 1;
+  white-space: nowrap;
+}
+.customer-bill-page .tbb-summary-kicker span {
+  margin-right: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #7c3aed;
+}
+.customer-bill-page .tbb-summary-title {
+  display: none;
+}
+.customer-bill-page .tbb-summary-note {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.customer-bill-page .tbb-summary-scroll {
+  height: 192px;
+  max-height: 192px;
+  overflow: auto;
+}
+.customer-bill-page .tbb-summary th,
+.customer-bill-page .tbb-summary td {
+  box-sizing: border-box;
+}
+.customer-bill-page .tbb-summary table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 11px;
+  font-weight: 700;
+}
+.customer-bill-page .tbb-summary th,
+.customer-bill-page .tbb-summary td {
+  padding: 1px 8px;
+  height: 22px;
+  line-height: 20px;
+  text-align: center;
+  white-space: nowrap;
+  border-bottom: 1px solid #f1f0f7;
+  background: #fff;
+}
+.customer-bill-page .tbb-summary th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 20px;
+  padding: 0 8px;
+  line-height: 20px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #4338ca;
+  background: #f5f3ff;
+  border-bottom: 1px solid #e4e0f5;
+}
+.customer-bill-page .tbb-summary th.tbb-sub {
+  top: 20px;
+  z-index: 2;
+  height: 18px;
+  line-height: 18px;
+  font-size: 10px;
+}
+.customer-bill-page .tbb-summary th.tbb-h-del,
+.customer-bill-page .tbb-summary td.tbb-c-del {
+  background: #f0fdf4;
+  color: #166534;
+}
+.customer-bill-page .tbb-summary th.tbb-h-undel,
+.customer-bill-page .tbb-summary td.tbb-c-undel {
+  background: #fff7ed;
+  color: #9a3412;
+}
+.customer-bill-page .tbb-summary th.tbb-h-billed,
+.customer-bill-page .tbb-summary th.tbb-sub-billed,
+.customer-bill-page .tbb-summary td.tbb-c-billed {
+  background: #eff6ff;
+  color: #1e40af;
+}
+.customer-bill-page .tbb-summary th.tbb-h-unbilled,
+.customer-bill-page .tbb-summary th.tbb-sub-unbilled,
+.customer-bill-page .tbb-summary td.tbb-c-unbilled {
+  background: #faf5ff;
+  color: #6b21a8;
+}
+.customer-bill-page .tbb-summary tbody tr:not(.tbb-foot):hover td {
+  filter: brightness(0.98);
+}
+.customer-bill-page .tbb-summary td.tbb-customer {
+  text-align: left;
+  color: #1f2937;
+  font-weight: 700;
+  min-width: 180px;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-shadow: 4px 0 8px rgba(15, 23, 42, 0.04);
+}
+.customer-bill-page .tbb-summary th.tbb-customer {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  min-width: 180px;
+}
+.customer-bill-page .tbb-summary td.tbb-total {
+  color: #111827;
+  font-variant-numeric: tabular-nums;
+}
+.customer-bill-page .tbb-summary button.tbb-fig {
+  min-width: 24px;
+  height: 16px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid #ddd6fe;
+  background: #fff;
+  color: #5b21b6;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.customer-bill-page .tbb-summary button.tbb-fig:hover {
+  background: #ede9fe;
+}
+.customer-bill-page .tbb-summary button.tbb-fig.tbb-fig-del {
+  border-color: #86efac;
+  background: #fff;
+  color: #15803d;
+}
+.customer-bill-page .tbb-summary button.tbb-fig.tbb-fig-del:hover {
+  background: #dcfce7;
+}
+.customer-bill-page .tbb-summary button.tbb-fig.tbb-fig-undel {
+  border-color: #fdba74;
+  background: #fff;
+  color: #c2410c;
+}
+.customer-bill-page .tbb-summary button.tbb-fig.tbb-fig-undel:hover {
+  background: #ffedd5;
+}
+.customer-bill-page .tbb-summary button.tbb-fig.is-active,
+.customer-bill-page .tbb-summary button.tbb-fig.tbb-fig-del.is-active,
+.customer-bill-page .tbb-summary button.tbb-fig.tbb-fig-undel.is-active {
+  background: #4c1d95;
+  border-color: #4c1d95;
+  color: #fff;
+}
+.customer-bill-page .tbb-summary .tbb-zero {
+  color: #c4c4ce;
+  font-weight: 600;
+}
+.customer-bill-page .tbb-summary tr.tbb-foot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: #1e1b4b;
+  color: #fff;
+  border-bottom: 0;
+  font-size: 11px;
+}
+.customer-bill-page .tbb-summary tr.tbb-foot td.tbb-customer {
+  background: #1e1b4b;
+  color: #fff;
+  z-index: 3;
+}
+.tbb-docket-popup {
+  max-height: 460px;
+  overflow: auto;
+}
+.tbb-docket-popup table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-weight: 700;
+}
+.tbb-docket-popup th,
+.tbb-docket-popup td {
+  border-bottom: 1px solid #e5edf8;
+  padding: 4px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+.tbb-docket-popup th {
+  position: sticky;
+  top: 0;
+  background: #f5f3ff;
+  color: #5b21b6;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.tbb-docket-popup td.tbb-type-ftl {
+  color: #1d4ed8;
+}
+.tbb-docket-popup td.tbb-type-ptl {
+  color: #7c3aed;
+}
 .customer-bill-page .MuiInputBase-input,
 .customer-bill-page .MuiInputLabel-root,
 .customer-bill-page .MuiSelect-select,
@@ -576,6 +946,14 @@ const isDeliveredStatus = (status) => {
   return /deliver|dly|closed|complete|^y$|^yes$/.test(s);
 };
 
+const docketIsDelivered = (docket, deliveredSet, notesMap) => {
+  const no = String(docket?.docket_no || "").trim();
+  if (!no) return false;
+  if (deliveredSet?.has?.(no)) return true;
+  const note = notesMap?.[no];
+  return isDeliveredStatus(note?.delivery_status || docket?.delivery_status);
+};
+
 const BILL_CHARGE_KEYS = [
   "freight", "loading", "unloading", "detention", "add_toll", "green_tax",
   "other_charges", "door_collection", "door_delivery",
@@ -690,12 +1068,20 @@ export default function CustomerBill() {
   const [selectedDocketNos, setSelectedDocketNos] = useState(() => new Set());
   const [loadingDockets, setLoadingDockets] = useState(false);
   const [docketsLoaded, setDocketsLoaded] = useState(false);
+  const [tbbSummary, setTbbSummary] = useState([]);
+  const [tbbSummaryOpen, setTbbSummaryOpen] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryDrill, setSummaryDrill] = useState(null);
+  const [deliveryPopup, setDeliveryPopup] = useState(null);
   const [editingInvoice, setEditingInvoice] = useState(null);
   const [chargeCompareNo, setChargeCompareNo] = useState("");
   const [isViewOnly, setIsViewOnly] = useState(false);
   const [editNoMode, setEditNoMode] = useState(false);
   // Guards against a stale customer/branch fetch resolving after a newer one
   const docketLoadToken = useRef(0);
+  const tbbCacheRef = useRef([]);
+  const tbbBilledRef = useRef(new Set());
+  const summaryToken = useRef(0);
   const editOverlayRef = useRef(null);
   const editLoadedKey = useRef("");
 
@@ -777,32 +1163,36 @@ export default function CustomerBill() {
     [form.billing_branch]
   );
 
-  // Customers of the selected billing branch only (BP loc_code). Searchable by code and name.
-  const customerOptions = useMemo(() => {
-    if (!selectedLocCode) return [];
-    const loc = selectedLocCode.toUpperCase();
-    return partners
-      .filter((p) => {
-        const bpLoc = String(p.loc_code || "").split(" - ")[0].trim().toUpperCase();
-        return bpLoc === loc && (p.bp_name || p.bp_grp_code || p.bp_code);
-      })
-      .map((p) => {
-        const name = String(p.bp_name || "").trim();
-        const code = String(p.bp_grp_code ?? p.bp_code ?? "").trim();
-        return {
-          value: String(p.record_id ?? p.bp_id ?? ""),
-          code,
-          name,
-          label: code ? `${code} - ${name}` : name,
-        };
-      })
-      .filter((o) => o.value);
-  }, [partners, selectedLocCode]);
+  const clearTbbSummary = () => {
+    summaryToken.current += 1;
+    setTbbSummary([]);
+    setTbbSummaryOpen(false);
+    setSummaryDrill(null);
+    setDeliveryPopup(null);
+    setSummaryLoading(false);
+    tbbCacheRef.current = [];
+    tbbBilledRef.current = new Set();
+  };
 
   const handleSetForm = (updatedForm) => {
     const next = typeof updatedForm === "function" ? updatedForm(form) : updatedForm;
     const lockedBranch = loginBranchLabel || form.billing_branch;
     const capped = capBillDateRange({ ...next, billing_branch: lockedBranch });
+    const prevLoc = (form.billing_branch || "").split(" - ")[0].trim();
+    const nextLoc = (capped.billing_branch || "").split(" - ")[0].trim();
+    const filtersChanged = !editingInvoice && (
+      prevLoc !== nextLoc
+      || isoDateOnly(form.from_date) !== isoDateOnly(capped.from_date)
+      || isoDateOnly(form.to_date) !== isoDateOnly(capped.to_date)
+    );
+    if (filtersChanged) {
+      clearTbbSummary();
+      docketLoadToken.current += 1;
+      setBillingRows([]);
+      setSelectedDocketNos(new Set());
+      setDocketsLoaded(false);
+      setLoadingDockets(false);
+    }
     const bill = isoDateOnly(capped.invoice_date);
     const wantedTo = isoDateOnly(next.to_date);
     if (
@@ -1161,6 +1551,7 @@ export default function CustomerBill() {
   useEffect(() => {
     const customerName = selectedCustomer?.bp_name;
     if (isViewOnly) return;
+    if (!editingInvoice) return;
     if (!form.customer || !selectedCustomerId) {
       if (editingInvoice) return;
       docketLoadToken.current++;
@@ -1334,6 +1725,189 @@ export default function CustomerBill() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.customer, form.billing_branch, form.billing_type, form.from_date, form.to_date, selectedCustomerId, chargeMaster, isDebitNote, isViewOnly, editingInvoice]);
+
+  const handleShowTbbSummary = async () => {
+    if (editingInvoice || isViewOnly) return;
+    if (!branchSelected || !selectedLocCode) {
+      showError("Billing branch is required");
+      return;
+    }
+    if (!form.from_date || !form.to_date) {
+      showError("From Date and To Date are required");
+      return;
+    }
+    const token = ++summaryToken.current;
+    setSummaryLoading(true);
+    setSummaryDrill(null);
+    setDeliveryPopup(null);
+    docketLoadToken.current += 1;
+    setBillingRows([]);
+    setSelectedDocketNos(new Set());
+    setDocketsLoaded(false);
+    try {
+      const [dockets, billedList] = await Promise.all([
+        fetchDocketsForBilling({
+          locCode: selectedLocCode,
+          billedMode: "all",
+          payType: "TBB",
+          requireDeliveryNote: false,
+          fromDate: form.from_date,
+          toDate: form.to_date,
+        }),
+        fetchBilledDocketNos().catch(() => []),
+      ]);
+      if (token !== summaryToken.current) return;
+      const billedSet = new Set(
+        (Array.isArray(billedList) ? billedList : []).map((no) => String(no || "").trim()).filter(Boolean)
+      );
+      const list = (Array.isArray(dockets) ? dockets : []).filter((d) => d?.docket_no);
+      tbbCacheRef.current = list;
+      tbbBilledRef.current = billedSet;
+      const groups = new Map();
+      list.forEach((docket) => {
+        const key = tbbCustomerKey(docket);
+        if (!key) return;
+        const partner = findPartnerForKey(partners, key);
+        const customerId = partner ? String(partner.record_id ?? partner.bp_id ?? key) : key;
+        const name = String(partner?.bp_name || docket.cnor_name || "Unknown").trim() || "Unknown";
+        const code = String(partner?.bp_grp_code ?? partner?.bp_code ?? docket.cnor_grp_code ?? docket.cnor_bp_code ?? "").trim();
+        if (!groups.has(customerId)) {
+          groups.set(customerId, {
+            id: customerId,
+            customerId,
+            customer: code ? `${code} - ${name}` : name,
+            total: 0,
+            delivered: 0,
+            undelivered: 0,
+            billedFtl: 0,
+            billedPtl: 0,
+            unbilledFtl: 0,
+            unbilledPtl: 0,
+          });
+        }
+        const row = groups.get(customerId);
+        const docketNo = String(docket.docket_no).trim();
+        const delivered = docketIsDelivered(docket, deliveredDocketNos, deliveryNotesMap);
+        const billed = billedSet.has(docketNo);
+        const group = tbbLoadGroup(docket);
+        row.total += 1;
+        if (delivered) {
+          row.delivered += 1;
+          const field = `${billed ? "billed" : "unbilled"}${group === "FTL" ? "Ftl" : "Ptl"}`;
+          row[field] += 1;
+        } else {
+          row.undelivered += 1;
+        }
+      });
+      setTbbSummary([...groups.values()].sort((a, b) => a.customer.localeCompare(b.customer)));
+      setTbbSummaryOpen(true);
+    } catch (err) {
+      if (token !== summaryToken.current) return;
+      showError(err.message || "Failed to load the TBB summary");
+      setTbbSummary([]);
+      setTbbSummaryOpen(false);
+    } finally {
+      if (token === summaryToken.current) setSummaryLoading(false);
+    }
+  };
+
+  const handleSummaryFigure = (row, mode, group) => {
+    const count = row[mode === "billed" ? (group === "FTL" ? "billedFtl" : "billedPtl") : (group === "FTL" ? "unbilledFtl" : "unbilledPtl")];
+    if (!count) return;
+    const partner = findPartnerForKey(partners, row.customerId)
+      || (partners || []).find((p) => String(p.record_id ?? p.bp_id ?? "") === String(row.customerId));
+    if (!partner) {
+      showError("This customer is not in the business partner master");
+      return;
+    }
+    const customerId = String(partner.record_id ?? partner.bp_id ?? "");
+    handleSetForm({ ...form, customer: customerId });
+    setSummaryDrill({ customerId, mode, group });
+  };
+
+  const handleOpenDeliveryPopup = (row, kind) => {
+    const count = kind === "delivered" ? row.delivered : row.undelivered;
+    if (!count) return;
+    setDeliveryPopup({ customerId: row.customerId, customer: row.customer, kind });
+  };
+
+  const deliveryPopupRows = !deliveryPopup
+    ? []
+    : sortDocketsByNo(
+        (tbbCacheRef.current || []).filter((docket) => {
+          if (!docket?.docket_no) return false;
+          if (!docketMatchesTbbCustomer(docket, deliveryPopup.customerId, partners)) return false;
+          const delivered = docketIsDelivered(docket, deliveredDocketNos, deliveryNotesMap);
+          return deliveryPopup.kind === "delivered" ? delivered : !delivered;
+        })
+      ).map((docket) => {
+        const docketNo = String(docket.docket_no).trim();
+        const note = deliveryNotesMap[docketNo];
+        return {
+          docket_no: docketNo,
+          docket_date: toDate(docket.docket_date),
+          origin: locTownLabel(docket.docket_loc, docket.docket_pickup_town || docket.docket_from_town),
+          destination: locTownLabel(docket.docket_to_loc, docket.docket_dly_town || docket.docket_to_town),
+          consignee: docket.cnee_name || "",
+          type: tbbLoadGroup(docket),
+          packages: docket.docket_tot_pkgs ?? "",
+          actual_wt: docket.docket_act_wt ?? "",
+          charge_wt: docket.docket_chrg_wt ?? "",
+          status: note?.delivery_status || (deliveryPopup.kind === "delivered" ? "Delivered" : "Undelivered"),
+        };
+      });
+
+  useEffect(() => {
+    if (editingInvoice || isViewOnly || !summaryDrill) return undefined;
+    const token = ++docketLoadToken.current;
+    const { customerId, mode, group } = summaryDrill;
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingDockets(true);
+        const billedSet = tbbBilledRef.current;
+        const filtered = (tbbCacheRef.current || []).filter((docket) => {
+          if (!docket?.docket_no) return false;
+          if (!docketMatchesTbbCustomer(docket, customerId, partners)) return false;
+          const docketNo = String(docket.docket_no).trim();
+          const delivered = docketIsDelivered(docket, deliveredDocketNos, deliveryNotesMap);
+          if (!delivered) return false;
+          const billed = billedSet.has(docketNo);
+          if (mode === "billed" ? !billed : billed) return false;
+          return tbbLoadGroup(docket) === group;
+        });
+        const chargeNos = [...new Set(filtered.map((d) => String(d.docket_no || "").trim()).filter(Boolean))];
+        const chargeRows = await fetchChargesBulk(chargeNos).catch(() => []);
+        if (cancelled || token !== docketLoadToken.current) return;
+        const chargesByDocket = {};
+        chargeNos.forEach((no) => { chargesByDocket[no] = []; });
+        (Array.isArray(chargeRows) ? chargeRows : []).forEach((c) => {
+          const no = String(c.docket_no || "").trim();
+          if (chargesByDocket[no]) chargesByDocket[no].push(c);
+        });
+        const rows = filtered.map((docket) => ({
+          ...buildBillingRow(docket, chargesByDocket[String(docket.docket_no).trim()] || []),
+          id: docket.docket_no,
+          invoice_status: billedSet.has(String(docket.docket_no).trim()) ? "Billed" : "Unbilled",
+          _chargesLoaded: true,
+        }));
+        setBillingRows(sortDocketsByNo(rows));
+        setSelectedDocketNos(new Set());
+        setDocketsLoaded(true);
+      } catch (err) {
+        if (cancelled || token !== docketLoadToken.current) return;
+        showError(err.message || "Failed to load dockets");
+        setBillingRows([]);
+        setDocketsLoaded(false);
+      } finally {
+        if (!cancelled && token === docketLoadToken.current) setLoadingDockets(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summaryDrill, editingInvoice, isViewOnly, chargeMaster, partners]);
 
   // Recalculate derived fields (taxable, GST, amount) when charge values change
   const recalculateRow = (row) => {
@@ -1751,6 +2325,7 @@ export default function CustomerBill() {
           setForm(blankBillForm(locations));
           setBillingRows([]);
           setSelectedDocketNos(new Set());
+          clearTbbSummary();
           setEditingInvoice(null);
           setIsViewOnly(false);
           setEditNoMode(false);
@@ -1783,6 +2358,7 @@ export default function CustomerBill() {
       setForm(blankBillForm(locations));
       setBillingRows([]);
       setSelectedDocketNos(new Set());
+      clearTbbSummary();
       setEditingInvoice(null);
       setIsViewOnly(false);
       setEditNoMode(false);
@@ -1804,6 +2380,7 @@ export default function CustomerBill() {
     setSelectedDocketNos(new Set());
     setDocketsLoaded(false);
     setLoadingDockets(false);
+    clearTbbSummary();
     setEditingInvoice(null);
     setIsViewOnly(false);
     setEditNoMode(false);
@@ -1962,6 +2539,55 @@ ${remarkXml}
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportBillingGrid = () => {
+    const rows = sortDocketsByNo(billingRows);
+    if (!rows.length) {
+      showError("No dockets in the billing grid to export");
+      return;
+    }
+    const customerCode = String(selectedCustomer?.bp_grp_code ?? selectedCustomer?.bp_code ?? "").trim();
+    const customerName = String(selectedCustomer?.bp_name || "").trim();
+    const slice = summaryDrill
+      ? `${summaryDrill.mode === "billed" ? "Billed" : "Unbilled"} ${summaryDrill.group}`
+      : "Billing dockets";
+    downloadExcelSheet({
+      sheetName: "Billing",
+      filename: `Billing_${slice}_${customerName || "dockets"}`,
+      info: [
+        ["Billing Branch", form.billing_branch || ""],
+        ["From Date", toDate(form.from_date)],
+        ["To Date", toDate(form.to_date)],
+        ["Customer", customerCode ? `${customerCode} - ${customerName}` : customerName],
+        ["List", slice],
+      ],
+      columns: BILL_EXPORT_COLUMNS,
+      rows,
+    });
+  };
+
+  const handleExportDeliveryPopup = () => {
+    if (!deliveryPopupRows.length) {
+      showError("No dockets in this list to export");
+      return;
+    }
+    const kind = deliveryPopup?.kind === "undelivered" ? "Undelivered" : "Delivered";
+    downloadExcelSheet({
+      sheetName: kind,
+      filename: `${kind}_${deliveryPopup?.customer || "dockets"}`,
+      info: [
+        ["Customer", deliveryPopup?.customer || ""],
+        ["List", kind],
+        ["Billing Branch", form.billing_branch || ""],
+        ["From Date", toDate(form.from_date)],
+        ["To Date", toDate(form.to_date)],
+        ["FTL", deliveryPopupRows.filter((row) => row.type === "FTL").length],
+        ["PTL", deliveryPopupRows.filter((row) => row.type === "PTL").length],
+      ],
+      columns: DELIVERY_EXPORT_COLUMNS,
+      rows: deliveryPopupRows,
+    });
   };
 
   const handlePrint = () => {
@@ -2236,7 +2862,7 @@ ${remarkXml}
               </Button>
             </div>
           </div>
-          <div style={sectionGridStyle}>
+          <div className="bill-header-fields" style={sectionGridStyle}>
             {["invoice_no", "invoice_date", "billing_type", "billing_branch", "from_date", "to_date"]
               .map((name) => invoiceFields.find((field) => field.name === name))
               .filter(Boolean)
@@ -2272,6 +2898,7 @@ ${remarkXml}
               <FormControl size="small" fullWidth>
                 <InputLabel sx={{ fontSize: 11, fontWeight: 700 }}>SAC Code</InputLabel>
                 <Select
+                  size="small"
                   label="SAC Code"
                   value={
                     LOGISTICS_SAC_CODES.some((s) => s.code === form.sac_code)
@@ -2280,10 +2907,7 @@ ${remarkXml}
                   }
                   disabled={isViewOnly}
                   onChange={(e) => handleSetForm({ ...form, sac_code: e.target.value })}
-                  sx={{
-                    ...customerFieldSx,
-                    "& .MuiSelect-select": { fontSize: 11, fontWeight: 700 },
-                  }}
+                  sx={customerFieldSx}
                   MenuProps={{
                     PaperProps: {
                       sx: { "& .MuiMenuItem-root": { fontSize: 11, fontWeight: 700, minHeight: 28, py: 0.5 } },
@@ -2298,82 +2922,173 @@ ${remarkXml}
                 </Select>
               </FormControl>
             </div>
-            <div style={{ ...fieldCellStyle, gridColumn: "span 3" }}>
-              <Autocomplete
-                size="small"
-                disabled={!branchSelected || !!editingInvoice}
-                options={
-                  (() => {
-                    const current = customerOptions.find((o) => String(o.value) === String(form.customer));
-                    if (current || !selectedCustomer) return customerOptions;
-                    const name = String(selectedCustomer.bp_name || "").trim();
-                    const code = String(selectedCustomer.bp_grp_code ?? selectedCustomer.bp_code ?? "").trim();
-                    return [
-                      {
-                        value: String(selectedCustomer.record_id ?? selectedCustomer.bp_id ?? form.customer),
-                        code,
-                        name,
-                        label: code ? `${code} - ${name}` : name,
-                      },
-                      ...customerOptions,
-                    ];
-                  })()
-                }
-                value={
-                  customerOptions.find((o) => String(o.value) === String(form.customer))
-                  || (selectedCustomer
-                    ? {
-                        value: String(selectedCustomer.record_id ?? selectedCustomer.bp_id ?? form.customer),
-                        code: String(selectedCustomer.bp_grp_code ?? selectedCustomer.bp_code ?? "").trim(),
-                        name: String(selectedCustomer.bp_name || "").trim(),
-                        label: String(selectedCustomer.bp_grp_code ?? selectedCustomer.bp_code ?? "").trim()
-                          ? `${String(selectedCustomer.bp_grp_code ?? selectedCustomer.bp_code ?? "").trim()} - ${String(selectedCustomer.bp_name || "").trim()}`
-                          : String(selectedCustomer.bp_name || "").trim(),
-                      }
-                    : null)
-                }
-                getOptionLabel={(opt) => {
-                  if (!opt) return "";
-                  if (typeof opt === "string") return opt;
-                  return opt.label || (opt.code ? `${opt.code} - ${opt.name}` : opt.name || "");
-                }}
-                isOptionEqualToValue={(a, b) => String(a?.value) === String(b?.value)}
-                filterOptions={(opts, state) => {
-                  const q = String(state.inputValue || "").trim().toLowerCase();
-                  if (!q) return opts;
-                  return opts.filter((o) => {
-                    const code = String(o.code || "").toLowerCase();
-                    const name = String(o.name || "").toLowerCase();
-                    const label = String(o.label || "").toLowerCase();
-                    return code.includes(q) || name.includes(q) || label.includes(q);
-                  });
-                }}
-                onChange={(_, v) => handleSetForm({ ...form, customer: v?.value || "" })}
-                slotProps={{
-                  paper: {
-                    sx: {
-                      "& .MuiAutocomplete-option": { fontSize: 11, fontWeight: 700, minHeight: 28, py: 0.5 },
-                    },
-                  },
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Customer"
-                    size="small"
-                    sx={customerFieldSx}
-                    placeholder={branchSelected ? "Search code or name" : "Select billing branch first"}
-                  />
-                )}
-              />
+            <div style={{ ...fieldCellStyle, gridColumn: "span 3", display: "flex", alignItems: "center", gap: 8 }}>
+              {editingInvoice ? (
+                <TextField
+                  size="small"
+                  label="Customer"
+                  value={
+                    selectedCustomer
+                      ? (() => {
+                          const name = String(selectedCustomer.bp_name || "").trim();
+                          const code = String(selectedCustomer.bp_grp_code ?? selectedCustomer.bp_code ?? "").trim();
+                          return code ? `${code} - ${name}` : name;
+                        })()
+                      : ""
+                  }
+                  disabled
+                  fullWidth
+                  sx={customerFieldSx}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+              ) : (
+                <>
+                  <Button
+                    variant="contained"
+                    disabled={!branchSelected || summaryLoading || !form.from_date || !form.to_date}
+                    onClick={handleShowTbbSummary}
+                    sx={{
+                      height: "calc(1.4375em + 17px)",
+                      minHeight: "calc(1.4375em + 17px)",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      textTransform: "none",
+                      boxShadow: "none",
+                      px: 2,
+                      background: "#5b21b6",
+                      "&:hover": { background: "#4c1d95" },
+                    }}
+                  >
+                    {summaryLoading ? "Loading..." : "Show"}
+                  </Button>
+                  {summaryDrill && selectedCustomer ? (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#1f2937", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {(() => {
+                        const name = String(selectedCustomer.bp_name || "").trim();
+                        const code = String(selectedCustomer.bp_grp_code ?? selectedCustomer.bp_code ?? "").trim();
+                        return code ? `${code} - ${name}` : name;
+                      })()}
+                    </span>
+                  ) : null}
+                </>
+              )}
             </div>
           </div>
         </div>
 
-        <div style={{ marginTop: 6 }}>
+        {!editingInvoice && tbbSummaryOpen ? (
+          <div className="tbb-summary">
+            <div className="tbb-summary-head">
+              <div>
+                <div className="tbb-summary-kicker"><span>TBB consignments</span>Customer wise summary</div>
+              </div>
+              <div className="tbb-summary-note">PTL includes LTL and Sundry. Click Delivered or Undelivered for docket details. Click a billed or unbilled figure to fill the docket grid.</div>
+            </div>
+            {tbbSummary.length === 0 ? (
+              <div style={{ padding: "18px 14px", fontSize: 12, fontWeight: 700, color: "#6b7280" }}>
+                No TBB consignments for this branch and date range.
+              </div>
+            ) : (
+              <div className="tbb-summary-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th rowSpan={2} className="tbb-customer">Customer</th>
+                      <th rowSpan={2}>Total</th>
+                      <th rowSpan={2} className="tbb-h-del">Delivered</th>
+                      <th rowSpan={2} className="tbb-h-undel">Undelivered</th>
+                      <th colSpan={2} className="tbb-h-billed">Billed</th>
+                      <th colSpan={2} className="tbb-h-unbilled">Unbilled</th>
+                    </tr>
+                    <tr>
+                      <th className="tbb-sub tbb-sub-billed">FTL</th>
+                      <th className="tbb-sub tbb-sub-billed" title="LTL and Sundry">PTL</th>
+                      <th className="tbb-sub tbb-sub-unbilled">FTL</th>
+                      <th className="tbb-sub tbb-sub-unbilled" title="LTL and Sundry">PTL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tbbSummary.map((row) => {
+                      const figure = (mode, group, count) => {
+                        const active = summaryDrill
+                          && summaryDrill.customerId === row.customerId
+                          && summaryDrill.mode === mode
+                          && summaryDrill.group === group;
+                        if (!count) return <span className="tbb-zero">0</span>;
+                        return (
+                          <button
+                            type="button"
+                            className={active ? "tbb-fig is-active" : "tbb-fig"}
+                            onClick={() => handleSummaryFigure(row, mode, group)}
+                          >
+                            {count}
+                          </button>
+                        );
+                      };
+                      const statusFigure = (kind, count) => {
+                        const active = deliveryPopup
+                          && deliveryPopup.customerId === row.customerId
+                          && deliveryPopup.kind === kind;
+                        if (!count) return <span className="tbb-zero">0</span>;
+                        return (
+                          <button
+                            type="button"
+                            className={`tbb-fig ${kind === "delivered" ? "tbb-fig-del" : "tbb-fig-undel"}${active ? " is-active" : ""}`}
+                            onClick={() => handleOpenDeliveryPopup(row, kind)}
+                          >
+                            {count}
+                          </button>
+                        );
+                      };
+                      return (
+                        <tr key={row.id}>
+                          <td className="tbb-customer">{row.customer}</td>
+                          <td className="tbb-total">{row.total}</td>
+                          <td className="tbb-c-del">{statusFigure("delivered", row.delivered)}</td>
+                          <td className="tbb-c-undel">{statusFigure("undelivered", row.undelivered)}</td>
+                          <td className="tbb-c-billed">{figure("billed", "FTL", row.billedFtl)}</td>
+                          <td className="tbb-c-billed">{figure("billed", "PTL", row.billedPtl)}</td>
+                          <td className="tbb-c-unbilled">{figure("unbilled", "FTL", row.unbilledFtl)}</td>
+                          <td className="tbb-c-unbilled">{figure("unbilled", "PTL", row.unbilledPtl)}</td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="tbb-foot">
+                      <td className="tbb-customer">Total</td>
+                      <td>{tbbSummary.reduce((n, row) => n + row.total, 0)}</td>
+                      <td>{tbbSummary.reduce((n, row) => n + row.delivered, 0)}</td>
+                      <td>{tbbSummary.reduce((n, row) => n + row.undelivered, 0)}</td>
+                      <td>{tbbSummary.reduce((n, row) => n + row.billedFtl, 0)}</td>
+                      <td>{tbbSummary.reduce((n, row) => n + row.billedPtl, 0)}</td>
+                      <td>{tbbSummary.reduce((n, row) => n + row.unbilledFtl, 0)}</td>
+                      <td>{tbbSummary.reduce((n, row) => n + row.unbilledPtl, 0)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        <div style={{ marginTop: 2 }}>
           <div style={{ ...tableTitleStyle, display: "flex", alignItems: "center", gap: 8 }}>
             <span>{isDebitNote ? "Available Dockets for Debit Note" : "Available Dockets for Billing"}</span>
-            {selectedCustomer && !docketsLoaded && !loadingDockets && (
+            {!editingInvoice && !summaryDrill && !loadingDockets && !summaryLoading && (
+              <Chip
+                size="small"
+                label="Click Show, then a billed or unbilled FTL / PTL figure"
+                sx={{ ml: 2, fontSize: 12, fontWeight: 600, bgcolor: "#fff8e1", color: "#b45309" }}
+              />
+            )}
+            {!editingInvoice && summaryDrill && (
+              <Chip
+                size="small"
+                label={`${summaryDrill.mode === "billed" ? "Billed" : "Unbilled"} ${summaryDrill.group}${selectedCustomer?.bp_name ? ` — ${selectedCustomer.bp_name}` : ""}`}
+                sx={{ ml: 2, fontSize: 12, fontWeight: 700, bgcolor: "#ede9fe", color: "#5b21b6" }}
+              />
+            )}
+            {editingInvoice && selectedCustomer && !docketsLoaded && !loadingDockets && (
               <Chip
                 size="small"
                 label="Set From/To dates and customer to load dockets"
@@ -2419,6 +3134,26 @@ ${remarkXml}
               />
             )}
             <span style={{ flex: 1 }} />
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<ExportIcon />}
+              disabled={!billingRows.length}
+              onClick={handleExportBillingGrid}
+              sx={{
+                textTransform: "none",
+                fontWeight: 700,
+                fontSize: 11,
+                height: 26,
+                minHeight: 26,
+                mr: 1,
+                boxShadow: "none",
+                background: "#0f766e",
+                "&:hover": { background: "#115e59" },
+              }}
+            >
+              Export
+            </Button>
             <Tooltip title="Remove Selected Rows">
               <span>
                 <IconButton
@@ -2471,11 +3206,15 @@ ${remarkXml}
                 borderTop: "none",
               }}
             >
-              {isDebitNote
+              {summaryDrill && !editingInvoice
+                ? `No ${summaryDrill.mode} ${summaryDrill.group} TBB dockets for ${selectedCustomer.bp_name}.`
+                : isDebitNote
                 ? `No billed delivered dockets found for ${selectedCustomer.bp_name}`
                 : `No unbilled delivered dockets found for ${selectedCustomer.bp_name}`}
-              {selectedLocCode ? ` with payment location ${selectedLocCode}` : ""}.
-              {isDebitNote
+              {summaryDrill && !editingInvoice ? "" : selectedLocCode ? ` with payment location ${selectedLocCode}.` : "."}
+              {summaryDrill && !editingInvoice
+                ? ""
+                : isDebitNote
                 ? " Debit Note lists dockets that already have a bill prepared."
                 : " Regular billing lists dockets that are delivered and not yet billed."}
             </div>
@@ -2525,6 +3264,69 @@ ${remarkXml}
         </div>
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
+        <Dialog open={Boolean(deliveryPopup)} onClose={() => setDeliveryPopup(null)} maxWidth="lg" fullWidth>
+          <DialogTitle sx={{ fontWeight: 700, fontSize: 16, pb: 0.5 }}>
+            {deliveryPopup?.kind === "undelivered" ? "Undelivered" : "Delivered"} dockets — {deliveryPopup?.customer}
+          </DialogTitle>
+          <DialogContent>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", marginBottom: 8 }}>
+              {deliveryPopupRows.length} docket{deliveryPopupRows.length === 1 ? "" : "s"}
+              {" · "}
+              FTL {deliveryPopupRows.filter((r) => r.type === "FTL").length}
+              {" · "}
+              PTL {deliveryPopupRows.filter((r) => r.type === "PTL").length}
+              <span style={{ marginLeft: 8 }}>PTL includes LTL and Sundry</span>
+            </div>
+            <div className="tbb-docket-popup">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Docket</th>
+                    <th>Date</th>
+                    <th>Origin</th>
+                    <th>Destination</th>
+                    <th>Consignee</th>
+                    <th>Type</th>
+                    <th>Pkgs</th>
+                    <th>Act Wt</th>
+                    <th>Chg Wt</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deliveryPopupRows.map((docket) => (
+                    <tr key={docket.docket_no}>
+                      <td>{docket.docket_no}</td>
+                      <td>{docket.docket_date}</td>
+                      <td>{docket.origin}</td>
+                      <td>{docket.destination}</td>
+                      <td>{docket.consignee}</td>
+                      <td className={docket.type === "FTL" ? "tbb-type-ftl" : "tbb-type-ptl"} title={docket.type === "PTL" ? "LTL and Sundry" : "FTL"}>
+                        {docket.type}
+                      </td>
+                      <td>{docket.packages}</td>
+                      <td>{docket.actual_wt}</td>
+                      <td>{docket.charge_wt}</td>
+                      <td>{docket.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              variant="contained"
+              startIcon={<ExportIcon />}
+              disabled={!deliveryPopupRows.length}
+              onClick={handleExportDeliveryPopup}
+              sx={{ textTransform: "none", fontWeight: 700, boxShadow: "none", background: "#0f766e", "&:hover": { background: "#115e59" } }}
+            >
+              Export to Excel
+            </Button>
+            <Button onClick={() => setDeliveryPopup(null)} sx={{ textTransform: "none", fontWeight: 700 }}>Close</Button>
+          </DialogActions>
+        </Dialog>
         <Dialog open={Boolean(chargeCompareRow)} onClose={() => setChargeCompareNo("")} maxWidth="sm" fullWidth>
           <DialogTitle sx={{ fontWeight: 700, fontSize: 18 }}>
             Charge comparison — {chargeCompareRow?.docket_no}
@@ -2674,80 +3476,60 @@ const noBadge = {
   border: "1px solid #f7b5b5",
 };
 
-const editHeaderButtonStyle = {
-  background: "linear-gradient(135deg, #7e22ce, #6b21a8)",
+const headerButtonSize = {
   borderRadius: "6px",
   fontWeight: 700,
+  fontSize: 12,
+  lineHeight: 1.1,
   textTransform: "none",
   boxShadow: "none",
-  minWidth: "120px",
-  padding: "8px 16px",
+  minWidth: "84px",
+  height: 26,
+  minHeight: 26,
+  padding: "0 10px",
+  "& .MuiButton-startIcon": { marginRight: "4px", marginLeft: 0 },
+  "& .MuiButton-startIcon svg": { fontSize: 15 },
+};
+
+const editHeaderButtonStyle = {
+  ...headerButtonSize,
+  background: "linear-gradient(135deg, #7e22ce, #6b21a8)",
   "&:hover": { background: "linear-gradient(135deg, #6d28d9, #581c87)" },
 };
 
 const saveHeaderButtonStyle = {
+  ...headerButtonSize,
   background: "linear-gradient(135deg, #1ca562, #119154)",
-  borderRadius: "6px",
-  fontWeight: 700,
-  textTransform: "none",
-  boxShadow: "none",
-  minWidth: "120px",
-  padding: "8px 16px",
   "&:hover": { background: "linear-gradient(135deg, #169d56, #0f7c4b)" },
 };
 
 const exportHeaderButtonStyle = {
+  ...headerButtonSize,
   background: "linear-gradient(135deg, #0f766e, #115e59)",
-  borderRadius: "6px",
-  fontWeight: 700,
-  textTransform: "none",
-  boxShadow: "none",
-  minWidth: "120px",
-  padding: "8px 16px",
   "&:hover": { background: "linear-gradient(135deg, #0d9488, #134e4a)" },
   "&.Mui-disabled": { color: "#fff", background: "#94a3b8" },
 };
 
 const printHeaderButtonStyle = {
+  ...headerButtonSize,
   background: "linear-gradient(135deg, #1f6feb, #1d4ed8)",
-  borderRadius: "6px",
-  fontWeight: 700,
-  textTransform: "none",
-  boxShadow: "none",
-  minWidth: "120px",
-  padding: "8px 16px",
   "&:hover": { background: "linear-gradient(135deg, #1d5ec9, #1e40af)" },
 };
 
 const clearHeaderButtonStyle = {
+  ...headerButtonSize,
   background: "linear-gradient(135deg, #8c98ab, #6a7280)",
-  borderRadius: "6px",
-  fontWeight: 700,
-  textTransform: "none",
-  minWidth: "120px",
-  padding: "8px 16px",
-  boxShadow: "none",
   "&:hover": { background: "linear-gradient(135deg, #7d8898, #4d5666)" },
 };
 
 const cancelHeaderButtonStyle = {
+  ...headerButtonSize,
   background: "linear-gradient(135deg, #ea580c, #c2410c)",
-  borderRadius: "6px",
-  fontWeight: 700,
-  textTransform: "none",
-  minWidth: "120px",
-  padding: "8px 16px",
-  boxShadow: "none",
   "&:hover": { background: "linear-gradient(135deg, #d14e0a, #9a3412)" },
 };
 
 const deleteHeaderButtonStyle = {
+  ...headerButtonSize,
   background: "linear-gradient(135deg, #dc2626, #b91c1c)",
-  borderRadius: "6px",
-  fontWeight: 700,
-  textTransform: "none",
-  minWidth: "120px",
-  padding: "8px 16px",
-  boxShadow: "none",
   "&:hover": { background: "linear-gradient(135deg, #c81e1e, #991b1b)" },
 };

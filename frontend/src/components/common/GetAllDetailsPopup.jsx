@@ -34,7 +34,7 @@ const fmtAmt = (v) => {
 
 // ── Column definitions per tab ──────────────────────────────────────────────
 const docketColumns = [
-  { key: "docket_no", label: "Docket No", minWidth: 140 },
+  { key: "docket_no", label: "Docket No", minWidth: 190, width: 190, align: "left" },
   { key: "docket_date", label: "Date", minWidth: 100 },
   { key: "docket_loc", label: "From Loc", minWidth: 100 },
   { key: "docket_pickup_town", label: "From Town", minWidth: 110 },
@@ -66,7 +66,7 @@ const manifestColumns = [
     render: (r) => (
       <span style={{
         display: "inline-flex", alignItems: "center", justifyContent: "center",
-        minWidth: "60px", height: "22px", borderRadius: "4px", fontSize: 11, fontWeight: 700, padding: "0 8px",
+        minWidth: "52px", height: "16px", borderRadius: "4px", fontSize: 10, fontWeight: 700, padding: "0 6px", lineHeight: "16px",
         ...(r.manifest_status === "Arrived"
           ? { background: "#e8f5e9", color: "#1b5e20", border: "1px solid #a5d6a7" }
           : { background: "#fff7ed", color: "#ea580c", border: "1px solid #fed7aa" }),
@@ -290,7 +290,7 @@ export default function GetAllDetailsPopup({ open, onClose }) {
       <DialogContent sx={{ padding: "20px 24px", overflow: "hidden" }}>
         {/* ── Search bar (hidden on pincode tab — PincodeSearch has its own) ── */}
         {tab !== "pincode" && (
-          <Box sx={{ display: "flex", gap: 2, alignItems: "center", margin: 2 }}>
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 1 }}>
             <TextField
               size="small"
               fullWidth
@@ -300,13 +300,14 @@ export default function GetAllDetailsPopup({ open, onClose }) {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon sx={{ color: "#7c3aed", fontSize: 20 }} />
+                    <SearchIcon sx={{ color: "#7c3aed", fontSize: 16 }} />
                   </InputAdornment>
                 ),
               }}
               sx={{
-                "& .MuiInputBase-input": { fontSize: 14 },
-                "& .MuiOutlinedInput-notchedOutline": { borderColor: "#c4b5fd", borderWidth: 1.5 },
+                "& .MuiOutlinedInput-root": { height: 28, fontSize: 11 },
+                "& .MuiInputBase-input": { fontSize: 11, paddingTop: 0, paddingBottom: 0 },
+                "& .MuiOutlinedInput-notchedOutline": { borderColor: "#c4b5fd", borderWidth: 1 },
                 "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#7c3aed" },
                 "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#7c3aed" },
               }}
@@ -314,8 +315,9 @@ export default function GetAllDetailsPopup({ open, onClose }) {
             <Chip
               label={`${currentCount} result${currentCount !== 1 ? "s" : ""}`}
               sx={{
-                background: "#f3e8ff", color: "#7c3aed", fontWeight: 600,
-                border: "1.5px solid #d8b4fe", fontSize: 13, height: 32,
+                background: "#f3e8ff", color: "#7c3aed", fontWeight: 700,
+                border: "1px solid #d8b4fe", fontSize: 11, height: 24,
+                "& .MuiChip-label": { fontSize: 11, px: 1 },
               }}
             />
           </Box>
@@ -330,8 +332,8 @@ export default function GetAllDetailsPopup({ open, onClose }) {
           sx={{
             marginBottom: 2,
             "& .MuiTab-root": {
-              fontSize: 13, fontWeight: 600, textTransform: "none",
-              minHeight: 40, padding: "6px 16px",
+              fontSize: 11, fontWeight: 600, textTransform: "none",
+              minHeight: 30, padding: "4px 12px",
             },
             "& .Mui-selected": { color: "#7c3aed" },
             "& .MuiTabs-indicator": { background: "#7c3aed" },
@@ -356,6 +358,9 @@ export default function GetAllDetailsPopup({ open, onClose }) {
           <DataTable
             columns={columns}
             rows={rows}
+            compact
+            rowHeight={24}
+            headerHeight={26}
             getKey={(row, i) => row.id || i}
             actions={[]}
             isHeight={320}

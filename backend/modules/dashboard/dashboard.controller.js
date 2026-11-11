@@ -473,6 +473,8 @@ const getInTransitDockets = async (tenant_id) => {
       'd.docket_act_wt',
       'd.docket_chrg_wt',
       'd.docket_tot_amt',
+      'd.docket_load_type',
+      'd.desp_pkgs',
       'd.docket_goods_desc',
       'cnor.bp_name as cnor_name',
       'cnee.bp_name as cnee_name',
