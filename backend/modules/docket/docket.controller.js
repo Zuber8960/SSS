@@ -315,6 +315,18 @@ const getDocketsForBilling = async ({
     .filter((v) => v && v !== "0");
   const numIds = rawIds.map((v) => Number(v)).filter((n) => Number.isFinite(n));
 
+  // Same from and to, TBB: bill the consignee only when that consignee's CMF is Y
+  // and the consignor's CMF is not. Both Y stays with the consignor.
+  // Pay location can be another branch; it does not change the billing customer.
+  const billConsignee = `
+    UPPER(TRIM(COALESCE(d.docket_pay_type, ''))) IN ('', 'TBB')
+    AND UPPER(TRIM(SPLIT_PART(COALESCE(d.docket_loc::text, ''), ' - ', 1))) <> ''
+    AND UPPER(TRIM(SPLIT_PART(COALESCE(d.docket_loc::text, ''), ' - ', 1)))
+        = UPPER(TRIM(SPLIT_PART(COALESCE(d.docket_to_loc::text, ''), ' - ', 1)))
+    AND UPPER(TRIM(COALESCE(cnee.cmf_flag, ''))) IN ('Y', 'YES', '1')
+    AND UPPER(TRIM(COALESCE(cnor.cmf_flag, ''))) NOT IN ('Y', 'YES', '1')
+  `;
+
   const query = db("sss.sst_docket as d")
     .leftJoin("sss.ssm_business_partner as cnor", "d.cnor_id", "cnor.record_id")
     .leftJoin("sss.ssm_business_partner as cnee", "d.cnee_id", "cnee.record_id")
@@ -322,9 +334,24 @@ const getDocketsForBilling = async ({
       "d.*",
       "cnor.bp_name as cnor_name",
       "cnor.bp_grp_code as cnor_grp_code",
-      "cnee.bp_name as cnee_name"
+      "cnor.cmf_flag as cnor_cmf_flag",
+      "cnee.bp_name as cnee_name",
+      "cnee.bp_grp_code as cnee_grp_code",
+      "cnee.cmf_flag as cnee_cmf_flag",
+      db.raw(`CASE WHEN ${billConsignee} THEN cnee.record_id ELSE cnor.record_id END as bill_customer_id`),
+      db.raw(`CASE WHEN ${billConsignee} THEN cnee.bp_name ELSE cnor.bp_name END as bill_customer_name`),
+      db.raw(`CASE WHEN ${billConsignee} THEN cnee.bp_grp_code ELSE cnor.bp_grp_code END as bill_customer_code`)
     )
     .where({ "d.record_status": 0 });
+
+  query.joinRaw(`LEFT JOIN LATERAL (
+      SELECT dn.delivery_status
+        FROM sss.sst_dly_note dn
+       WHERE dn.docket_no = d.docket_no
+       ORDER BY dn.record_id DESC
+       LIMIT 1
+    ) bill_dly ON TRUE`)
+    .select("bill_dly.delivery_status as delivery_status");
 
   if (tenant_id) {
     query.andWhere((q) => q.where("d.tenant_id", tenant_id).orWhereNull("d.tenant_id"));
