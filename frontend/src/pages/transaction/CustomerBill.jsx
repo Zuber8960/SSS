@@ -425,38 +425,15 @@ const tbbLoadGroup = (docket) => {
   return load === "FTL" ? "FTL" : "PTL";
 };
 
-<<<<<<< Updated upstream
-const tbbCustomerKey = (docket) => {
-  const id = String(docket?.cnor_id ?? "").trim();
-  if (id && id !== "0") return id;
-  const name = String(docket?.cnor_name || "").trim().toLowerCase();
-  return name ? `name:${name}` : "";
-=======
 const locHead = (val) => String(val || "").split(" - ")[0].split(">")[0].trim().toUpperCase();
 
 const cmfYes = (value) => {
   const flag = String(value ?? "").trim().toUpperCase();
   return flag === "Y" || flag === "YES" || flag === "1";
->>>>>>> Stashed changes
 };
 
 const findPartnerForKey = (partners, key) => {
   const list = Array.isArray(partners) ? partners : [];
-<<<<<<< Updated upstream
-  if (!key) return null;
-  if (String(key).startsWith("name:")) {
-    const name = String(key).slice(5);
-    return list.find((p) => String(p.bp_name || "").trim().toLowerCase() === name) || null;
-  }
-  return list.find((p) =>
-    [p.record_id, p.bp_id, p.bp_grp_code, p.bp_code].some((v) => String(v ?? "").trim() === String(key))
-  ) || null;
-};
-
-const docketMatchesTbbCustomer = (docket, customerId, partners) => {
-  const partner = (partners || []).find((p) => String(p.record_id ?? p.bp_id ?? "") === String(customerId));
-  if (!partner) return tbbCustomerKey(docket) === String(customerId);
-=======
   const id = String(key ?? "").trim();
   if (!id) return null;
   if (id.startsWith("name:")) {
@@ -525,18 +502,11 @@ const docketMatchesTbbCustomer = (docket, customerId, partners) => {
   const partner = findPartnerForKey(partners, customerId)
     || (partners || []).find((p) => String(p.record_id ?? p.bp_id ?? "") === String(customerId));
   if (!partner) return false;
->>>>>>> Stashed changes
   const ids = new Set(
     [partner.record_id, partner.bp_id, partner.bp_grp_code, partner.bp_code]
       .map((v) => String(v ?? "").trim())
       .filter((v) => v && v !== "0")
   );
-<<<<<<< Updated upstream
-  const cnor = String(docket.cnor_id ?? "").trim();
-  if (cnor && ids.has(cnor)) return true;
-  const name = String(partner.bp_name || "").trim().toLowerCase();
-  return !!name && String(docket.cnor_name || "").trim().toLowerCase() === name;
-=======
   return !!party.id && ids.has(String(party.id));
 };
 
@@ -546,7 +516,6 @@ const listedForTbbCustomer = (docket, customerId, partners) => {
   const stamped = docket?._tbbCustomerId;
   if (stamped && String(stamped) === String(customerId)) return true;
   return docketMatchesTbbCustomer(docket, customerId, partners);
->>>>>>> Stashed changes
 };
 
 const blankBillForm = (locations = []) => ({
@@ -679,9 +648,6 @@ const billPageFontCss = `
   line-height: 18px;
   font-size: 10px;
 }
-<<<<<<< Updated upstream
-.customer-bill-page .tbb-summary th.tbb-h-del,
-=======
 .customer-bill-page .tbb-summary th.tbb-h-total,
 .customer-bill-page .tbb-summary th.tbb-sub-total,
 .customer-bill-page .tbb-summary td.tbb-c-total {
@@ -690,16 +656,12 @@ const billPageFontCss = `
 }
 .customer-bill-page .tbb-summary th.tbb-h-del,
 .customer-bill-page .tbb-summary th.tbb-sub-del,
->>>>>>> Stashed changes
 .customer-bill-page .tbb-summary td.tbb-c-del {
   background: #f0fdf4;
   color: #166534;
 }
 .customer-bill-page .tbb-summary th.tbb-h-undel,
-<<<<<<< Updated upstream
-=======
 .customer-bill-page .tbb-summary th.tbb-sub-undel,
->>>>>>> Stashed changes
 .customer-bill-page .tbb-summary td.tbb-c-undel {
   background: #fff7ed;
   color: #9a3412;
@@ -1063,15 +1025,9 @@ const isDeliveredStatus = (status) => {
 const docketIsDelivered = (docket, deliveredSet, notesMap) => {
   const no = String(docket?.docket_no || "").trim();
   if (!no) return false;
-<<<<<<< Updated upstream
-  if (deliveredSet?.has?.(no)) return true;
-  const note = notesMap?.[no];
-  return isDeliveredStatus(note?.delivery_status || docket?.delivery_status);
-=======
   const status = docket?.delivery_status || notesMap?.[no]?.delivery_status;
   if (status) return isDeliveredStatus(status);
   return !!deliveredSet?.has?.(no);
->>>>>>> Stashed changes
 };
 
 const BILL_CHARGE_KEYS = [
@@ -1217,11 +1173,8 @@ export default function CustomerBill() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryDrill, setSummaryDrill] = useState(null);
   const [deliveryPopup, setDeliveryPopup] = useState(null);
-<<<<<<< Updated upstream
-=======
   const [findDocketNo, setFindDocketNo] = useState("");
   const [highlightDocket, setHighlightDocket] = useState("");
->>>>>>> Stashed changes
   const [editingInvoice, setEditingInvoice] = useState(null);
   const [chargeCompareNo, setChargeCompareNo] = useState("");
   const [isViewOnly, setIsViewOnly] = useState(false);
@@ -1329,10 +1282,7 @@ export default function CustomerBill() {
     setTbbSummaryOpen(false);
     setSummaryDrill(null);
     setDeliveryPopup(null);
-<<<<<<< Updated upstream
-=======
     setHighlightDocket("");
->>>>>>> Stashed changes
     setSummaryLoading(false);
     tbbCacheRef.current = [];
     tbbBilledRef.current = new Set();
@@ -1903,17 +1853,12 @@ export default function CustomerBill() {
     setSummaryLoading(true);
     setSummaryDrill(null);
     setDeliveryPopup(null);
-<<<<<<< Updated upstream
-=======
     setHighlightDocket("");
->>>>>>> Stashed changes
     docketLoadToken.current += 1;
     setBillingRows([]);
     setSelectedDocketNos(new Set());
     setDocketsLoaded(false);
     try {
-<<<<<<< Updated upstream
-=======
       let partyList = Array.isArray(partners) ? partners : [];
       if (!partyList.length) {
         const fresh = await fetchAllBusinessPartners().catch(() => []);
@@ -1922,20 +1867,14 @@ export default function CustomerBill() {
           setPartners(fresh);
         }
       }
->>>>>>> Stashed changes
       const [dockets, billedList] = await Promise.all([
         fetchDocketsForBilling({
           locCode: selectedLocCode,
           billedMode: "all",
           payType: "TBB",
           requireDeliveryNote: false,
-<<<<<<< Updated upstream
-          fromDate: form.from_date,
-          toDate: form.to_date,
-=======
           fromDate: isoDateOnly(form.from_date) || form.from_date,
           toDate: isoDateOnly(form.to_date) || form.to_date,
->>>>>>> Stashed changes
         }),
         fetchBilledDocketNos().catch(() => []),
       ]);
@@ -1943,9 +1882,6 @@ export default function CustomerBill() {
       const billedSet = new Set(
         (Array.isArray(billedList) ? billedList : []).map((no) => String(no || "").trim()).filter(Boolean)
       );
-<<<<<<< Updated upstream
-      const list = (Array.isArray(dockets) ? dockets : []).filter((d) => d?.docket_no);
-=======
       const wanted = String(findDocketNo || "").trim().toUpperCase();
       const sameNo = (docket) => String(docket?.docket_no || "").trim().toUpperCase() === wanted;
       const list = (Array.isArray(dockets) ? dockets : []).filter((d) => d?.docket_no);
@@ -1957,35 +1893,19 @@ export default function CustomerBill() {
         else showError(`${wanted} is dated ${toDate(docketObj.docket_date)} and is outside From Date and To Date`);
       }
       if (token !== summaryToken.current) return;
->>>>>>> Stashed changes
       tbbCacheRef.current = list;
       tbbBilledRef.current = billedSet;
       const groups = new Map();
       list.forEach((docket) => {
-<<<<<<< Updated upstream
-        const key = tbbCustomerKey(docket);
-        if (!key) return;
-        const partner = findPartnerForKey(partners, key);
-        const customerId = partner ? String(partner.record_id ?? partner.bp_id ?? key) : key;
-        const name = String(partner?.bp_name || docket.cnor_name || "Unknown").trim() || "Unknown";
-        const code = String(partner?.bp_grp_code ?? partner?.bp_code ?? docket.cnor_grp_code ?? docket.cnor_bp_code ?? "").trim();
-=======
         const party = tbbBillingParty(docket, partyList);
         const key = party.id;
         if (!key) return;
         docket._tbbCustomerId = key;
         const customerId = party.id;
->>>>>>> Stashed changes
         if (!groups.has(customerId)) {
           groups.set(customerId, {
             id: customerId,
             customerId,
-<<<<<<< Updated upstream
-            customer: code ? `${code} - ${name}` : name,
-            total: 0,
-            delivered: 0,
-            undelivered: 0,
-=======
             customer: tbbCustomerLabel(party),
             total: 0,
             totalFtl: 0,
@@ -1996,7 +1916,6 @@ export default function CustomerBill() {
             undelivered: 0,
             undeliveredFtl: 0,
             undeliveredPtl: 0,
->>>>>>> Stashed changes
             billedFtl: 0,
             billedPtl: 0,
             unbilledFtl: 0,
@@ -2008,15 +1927,6 @@ export default function CustomerBill() {
         const delivered = docketIsDelivered(docket, deliveredDocketNos, deliveryNotesMap);
         const billed = billedSet.has(docketNo);
         const group = tbbLoadGroup(docket);
-<<<<<<< Updated upstream
-        row.total += 1;
-        if (delivered) {
-          row.delivered += 1;
-          const field = `${billed ? "billed" : "unbilled"}${group === "FTL" ? "Ftl" : "Ptl"}`;
-          row[field] += 1;
-        } else {
-          row.undelivered += 1;
-=======
         const bucket = group === "FTL" ? "Ftl" : "Ptl";
         row.total += 1;
         row[`total${bucket}`] += 1;
@@ -2027,13 +1937,10 @@ export default function CustomerBill() {
         } else {
           row.undelivered += 1;
           row[`undelivered${bucket}`] += 1;
->>>>>>> Stashed changes
         }
       });
       setTbbSummary([...groups.values()].sort((a, b) => a.customer.localeCompare(b.customer)));
       setTbbSummaryOpen(true);
-<<<<<<< Updated upstream
-=======
       if (wanted) {
         const hit = list.find(sameNo);
         const row = hit?._tbbCustomerId ? groups.get(hit._tbbCustomerId) : null;
@@ -2047,7 +1954,6 @@ export default function CustomerBill() {
           });
         }
       }
->>>>>>> Stashed changes
     } catch (err) {
       if (token !== summaryToken.current) return;
       showError(err.message || "Failed to load the TBB summary");
@@ -2067,17 +1973,6 @@ export default function CustomerBill() {
       showError("This customer is not in the business partner master");
       return;
     }
-<<<<<<< Updated upstream
-    const customerId = String(partner.record_id ?? partner.bp_id ?? "");
-    handleSetForm({ ...form, customer: customerId });
-    setSummaryDrill({ customerId, mode, group });
-  };
-
-  const handleOpenDeliveryPopup = (row, kind) => {
-    const count = kind === "delivered" ? row.delivered : row.undelivered;
-    if (!count) return;
-    setDeliveryPopup({ customerId: row.customerId, customer: row.customer, kind });
-=======
     const customerId = String(partner.record_id ?? partner.bp_id ?? row.customerId);
     handleSetForm({ ...form, customer: customerId });
     setSummaryDrill({ customerId: String(row.customerId), mode, group });
@@ -2088,7 +1983,6 @@ export default function CustomerBill() {
     const field = kind === "total" ? `total${bucket}` : kind === "delivered" ? `delivered${bucket}` : `undelivered${bucket}`;
     if (!row[field]) return;
     setDeliveryPopup({ customerId: row.customerId, customer: row.customer, kind, group });
->>>>>>> Stashed changes
   };
 
   const deliveryPopupRows = !deliveryPopup
@@ -2096,13 +1990,9 @@ export default function CustomerBill() {
     : sortDocketsByNo(
         (tbbCacheRef.current || []).filter((docket) => {
           if (!docket?.docket_no) return false;
-<<<<<<< Updated upstream
-          if (!docketMatchesTbbCustomer(docket, deliveryPopup.customerId, partners)) return false;
-=======
           if (!listedForTbbCustomer(docket, deliveryPopup.customerId, partners)) return false;
           if (deliveryPopup.group && tbbLoadGroup(docket) !== deliveryPopup.group) return false;
           if (deliveryPopup.kind === "total") return true;
->>>>>>> Stashed changes
           const delivered = docketIsDelivered(docket, deliveredDocketNos, deliveryNotesMap);
           return deliveryPopup.kind === "delivered" ? delivered : !delivered;
         })
@@ -2119,15 +2009,11 @@ export default function CustomerBill() {
           packages: docket.docket_tot_pkgs ?? "",
           actual_wt: docket.docket_act_wt ?? "",
           charge_wt: docket.docket_chrg_wt ?? "",
-<<<<<<< Updated upstream
-          status: note?.delivery_status || (deliveryPopup.kind === "delivered" ? "Delivered" : "Undelivered"),
-=======
           status: docket.delivery_status || note?.delivery_status || (
             deliveryPopup.kind === "total"
               ? (docketIsDelivered(docket, deliveredDocketNos, deliveryNotesMap) ? "Delivered" : "Undelivered")
               : (deliveryPopup.kind === "delivered" ? "Delivered" : "Undelivered")
           ),
->>>>>>> Stashed changes
         };
       });
 
@@ -2142,11 +2028,7 @@ export default function CustomerBill() {
         const billedSet = tbbBilledRef.current;
         const filtered = (tbbCacheRef.current || []).filter((docket) => {
           if (!docket?.docket_no) return false;
-<<<<<<< Updated upstream
-          if (!docketMatchesTbbCustomer(docket, customerId, partners)) return false;
-=======
           if (!listedForTbbCustomer(docket, customerId, partners)) return false;
->>>>>>> Stashed changes
           const docketNo = String(docket.docket_no).trim();
           const delivered = docketIsDelivered(docket, deliveredDocketNos, deliveryNotesMap);
           if (!delivered) return false;
@@ -2843,15 +2725,6 @@ ${remarkXml}
       showError("No dockets in this list to export");
       return;
     }
-<<<<<<< Updated upstream
-    const kind = deliveryPopup?.kind === "undelivered" ? "Undelivered" : "Delivered";
-    downloadExcelSheet({
-      sheetName: kind,
-      filename: `${kind}_${deliveryPopup?.customer || "dockets"}`,
-      info: [
-        ["Customer", deliveryPopup?.customer || ""],
-        ["List", kind],
-=======
     const kind = deliveryPopup?.kind === "undelivered"
       ? "Undelivered"
       : deliveryPopup?.kind === "total"
@@ -2864,7 +2737,6 @@ ${remarkXml}
       info: [
         ["Customer", deliveryPopup?.customer || ""],
         ["List", `${kind}${typeLabel}`],
->>>>>>> Stashed changes
         ["Billing Branch", form.billing_branch || ""],
         ["From Date", toDate(form.from_date)],
         ["To Date", toDate(form.to_date)],
@@ -3230,8 +3102,6 @@ ${remarkXml}
                 />
               ) : (
                 <>
-<<<<<<< Updated upstream
-=======
                   <TextField
                     size="small"
                     label="Docket"
@@ -3247,7 +3117,6 @@ ${remarkXml}
                     sx={{ ...customerFieldSx, width: 150, flex: "0 0 150px" }}
                     slotProps={{ inputLabel: { shrink: true } }}
                   />
->>>>>>> Stashed changes
                   <Button
                     variant="contained"
                     disabled={!branchSelected || summaryLoading || !form.from_date || !form.to_date}
@@ -3288,11 +3157,7 @@ ${remarkXml}
               <div>
                 <div className="tbb-summary-kicker"><span>TBB consignments</span>Customer wise summary</div>
               </div>
-<<<<<<< Updated upstream
-              <div className="tbb-summary-note">PTL includes LTL and Sundry. Click Delivered or Undelivered for docket details. Click a billed or unbilled figure to fill the docket grid.</div>
-=======
               <div className="tbb-summary-note">{toDate(form.from_date)} to {toDate(form.to_date)}. PTL includes LTL and Sundry. Click an FTL or PTL figure for that list.</div>
->>>>>>> Stashed changes
             </div>
             {tbbSummary.length === 0 ? (
               <div style={{ padding: "18px 14px", fontSize: 12, fontWeight: 700, color: "#6b7280" }}>
@@ -3304,28 +3169,19 @@ ${remarkXml}
                   <thead>
                     <tr>
                       <th rowSpan={2} className="tbb-customer">Customer</th>
-<<<<<<< Updated upstream
-                      <th rowSpan={2}>Total</th>
-                      <th rowSpan={2} className="tbb-h-del">Delivered</th>
-                      <th rowSpan={2} className="tbb-h-undel">Undelivered</th>
-=======
                       <th colSpan={2} className="tbb-h-total">Total CNs</th>
                       <th colSpan={2} className="tbb-h-del">Delivered</th>
                       <th colSpan={2} className="tbb-h-undel">Undelivered</th>
->>>>>>> Stashed changes
                       <th colSpan={2} className="tbb-h-billed">Billed</th>
                       <th colSpan={2} className="tbb-h-unbilled">Unbilled</th>
                     </tr>
                     <tr>
-<<<<<<< Updated upstream
-=======
                       <th className="tbb-sub tbb-sub-total">FTL</th>
                       <th className="tbb-sub tbb-sub-total" title="LTL and Sundry">PTL</th>
                       <th className="tbb-sub tbb-sub-del">FTL</th>
                       <th className="tbb-sub tbb-sub-del" title="LTL and Sundry">PTL</th>
                       <th className="tbb-sub tbb-sub-undel">FTL</th>
                       <th className="tbb-sub tbb-sub-undel" title="LTL and Sundry">PTL</th>
->>>>>>> Stashed changes
                       <th className="tbb-sub tbb-sub-billed">FTL</th>
                       <th className="tbb-sub tbb-sub-billed" title="LTL and Sundry">PTL</th>
                       <th className="tbb-sub tbb-sub-unbilled">FTL</th>
@@ -3350,18 +3206,6 @@ ${remarkXml}
                           </button>
                         );
                       };
-<<<<<<< Updated upstream
-                      const statusFigure = (kind, count) => {
-                        const active = deliveryPopup
-                          && deliveryPopup.customerId === row.customerId
-                          && deliveryPopup.kind === kind;
-                        if (!count) return <span className="tbb-zero">0</span>;
-                        return (
-                          <button
-                            type="button"
-                            className={`tbb-fig ${kind === "delivered" ? "tbb-fig-del" : "tbb-fig-undel"}${active ? " is-active" : ""}`}
-                            onClick={() => handleOpenDeliveryPopup(row, kind)}
-=======
                       const statusFigure = (kind, group, count) => {
                         const active = deliveryPopup
                           && deliveryPopup.customerId === row.customerId
@@ -3374,20 +3218,12 @@ ${remarkXml}
                             type="button"
                             className={`tbb-fig ${tone}${active ? " is-active" : ""}`}
                             onClick={() => handleOpenDeliveryPopup(row, kind, group)}
->>>>>>> Stashed changes
                           >
                             {count}
                           </button>
                         );
                       };
                       return (
-<<<<<<< Updated upstream
-                        <tr key={row.id}>
-                          <td className="tbb-customer">{row.customer}</td>
-                          <td className="tbb-total">{row.total}</td>
-                          <td className="tbb-c-del">{statusFigure("delivered", row.delivered)}</td>
-                          <td className="tbb-c-undel">{statusFigure("undelivered", row.undelivered)}</td>
-=======
                         <tr key={row.id} data-customer-id={row.customerId}>
                           <td className="tbb-customer" title={row.customerId ? `BP ID ${row.customerId}` : undefined}>{row.customer}</td>
                           <td className="tbb-c-total">{statusFigure("total", "FTL", row.totalFtl)}</td>
@@ -3396,7 +3232,6 @@ ${remarkXml}
                           <td className="tbb-c-del">{statusFigure("delivered", "PTL", row.deliveredPtl)}</td>
                           <td className="tbb-c-undel">{statusFigure("undelivered", "FTL", row.undeliveredFtl)}</td>
                           <td className="tbb-c-undel">{statusFigure("undelivered", "PTL", row.undeliveredPtl)}</td>
->>>>>>> Stashed changes
                           <td className="tbb-c-billed">{figure("billed", "FTL", row.billedFtl)}</td>
                           <td className="tbb-c-billed">{figure("billed", "PTL", row.billedPtl)}</td>
                           <td className="tbb-c-unbilled">{figure("unbilled", "FTL", row.unbilledFtl)}</td>
@@ -3406,18 +3241,12 @@ ${remarkXml}
                     })}
                     <tr className="tbb-foot">
                       <td className="tbb-customer">Total</td>
-<<<<<<< Updated upstream
-                      <td>{tbbSummary.reduce((n, row) => n + row.total, 0)}</td>
-                      <td>{tbbSummary.reduce((n, row) => n + row.delivered, 0)}</td>
-                      <td>{tbbSummary.reduce((n, row) => n + row.undelivered, 0)}</td>
-=======
                       <td>{tbbSummary.reduce((n, row) => n + row.totalFtl, 0)}</td>
                       <td>{tbbSummary.reduce((n, row) => n + row.totalPtl, 0)}</td>
                       <td>{tbbSummary.reduce((n, row) => n + row.deliveredFtl, 0)}</td>
                       <td>{tbbSummary.reduce((n, row) => n + row.deliveredPtl, 0)}</td>
                       <td>{tbbSummary.reduce((n, row) => n + row.undeliveredFtl, 0)}</td>
                       <td>{tbbSummary.reduce((n, row) => n + row.undeliveredPtl, 0)}</td>
->>>>>>> Stashed changes
                       <td>{tbbSummary.reduce((n, row) => n + row.billedFtl, 0)}</td>
                       <td>{tbbSummary.reduce((n, row) => n + row.billedPtl, 0)}</td>
                       <td>{tbbSummary.reduce((n, row) => n + row.unbilledFtl, 0)}</td>
@@ -3625,12 +3454,8 @@ ${remarkXml}
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
         <Dialog open={Boolean(deliveryPopup)} onClose={() => setDeliveryPopup(null)} maxWidth="lg" fullWidth>
           <DialogTitle sx={{ fontWeight: 700, fontSize: 16, pb: 0.5 }}>
-<<<<<<< Updated upstream
-            {deliveryPopup?.kind === "undelivered" ? "Undelivered" : "Delivered"} dockets — {deliveryPopup?.customer}
-=======
             {deliveryPopup?.kind === "undelivered" ? "Undelivered" : deliveryPopup?.kind === "total" ? "Total" : "Delivered"}
             {deliveryPopup?.group ? ` ${deliveryPopup.group}` : ""} dockets — {deliveryPopup?.customer}
->>>>>>> Stashed changes
           </DialogTitle>
           <DialogContent>
             <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", marginBottom: 8 }}>
@@ -3659,9 +3484,6 @@ ${remarkXml}
                 </thead>
                 <tbody>
                   {deliveryPopupRows.map((docket) => (
-<<<<<<< Updated upstream
-                    <tr key={docket.docket_no}>
-=======
                     <tr
                       key={docket.docket_no}
                       data-docket-no={String(docket.docket_no || "").trim().toUpperCase()}
@@ -3669,7 +3491,6 @@ ${remarkXml}
                         ? { background: "#fef3c7" }
                         : undefined}
                     >
->>>>>>> Stashed changes
                       <td>{docket.docket_no}</td>
                       <td>{docket.docket_date}</td>
                       <td>{docket.origin}</td>
