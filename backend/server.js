@@ -5,7 +5,7 @@ const cors = require('cors');
 const app = express();
 const path = require('path');
 const fs = require('fs');
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // ✅ Serve static uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

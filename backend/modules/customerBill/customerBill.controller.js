@@ -13,6 +13,11 @@ const normalizeNumber = (value) => {
   return isNaN(n) ? 0 : n;
 };
 
+const normalizeGstin = (value) => {
+  const v = String(value ?? "").replace(/\s/g, "").trim();
+  return v || null;
+};
+
 const sanitizeHeader = (payload = {}) => ({
   company_code: payload.company_code ?? null,
   tenant_id: payload.tenant_id ?? null,
@@ -25,8 +30,8 @@ const sanitizeHeader = (payload = {}) => ({
   invoice_date: normalizeDate(payload.invoice_date),
   write_off_flag: payload.write_off_flag ?? null,
   write_off_date: normalizeDate(payload.write_off_date),
-  loc_gstin: payload.loc_gstin ?? null,
-  bp_gstin: payload.bp_gstin ?? null,
+  loc_gstin: normalizeGstin(payload.loc_gstin),
+  bp_gstin: normalizeGstin(payload.bp_gstin),
   sac_code: String(payload.sac_code || '').split(' - ')[0].trim() || null,
   irn_status: payload.irn_status ?? null,
   irn_ackno: payload.irn_ackno ?? null,
@@ -187,10 +192,10 @@ async function getBilledDocketNos(company_code = null) {
 }
 
 async function getInvoiceDetail(invoiceNo, invoiceDate, invoiceLoc, company_code = null) {
+  const no = parseInt(String(invoiceNo ?? '').trim(), 10);
   const query = db('sss.sst_invoice_dtl')
-    .where({ invoice_loc: invoiceLoc })
-    .andWhereRaw('CAST(invoice_no AS INTEGER) = CAST(? AS INTEGER)', [invoiceNo])
-    .andWhereRaw('CAST(invoice_date AS DATE) = CAST(? AS DATE)', [invoiceDate]);
+    .where({ invoice_loc: invoiceLoc, invoice_no: no })
+    .whereRaw('invoice_date = ?::date', [invoiceDate]);
   if (company_code) query.andWhere((q) => q.where({ company_code }).orWhereNull('company_code'));
   return query.orderBy('inv_sr_no', 'asc');
 }
@@ -199,7 +204,7 @@ async function getInvoiceByNumber(invoiceNo, loc_code = null, company_code = nul
   const no = parseInt(String(invoiceNo ?? '').trim(), 10);
   if (!Number.isFinite(no)) return null;
 
-  const query = db('sss.sst_invoice_hdr').whereRaw('CAST(invoice_no AS INTEGER) = ?', [no]);
+  const query = db('sss.sst_invoice_hdr').where({ invoice_no: no });
   if (loc_code) query.andWhere({ loc_code });
   if (company_code) {
     query.andWhere((q) =>
@@ -224,9 +229,8 @@ async function getInvoiceByNumber(invoiceNo, loc_code = null, company_code = nul
 
 async function getFullInvoice(invoiceNo, invoiceDate, invoiceLoc, company_code = null) {
   const headerQuery = db('sss.sst_invoice_hdr')
-    .where({ loc_code: invoiceLoc })
-    .andWhereRaw('CAST(invoice_no AS INTEGER) = CAST(? AS INTEGER)', [invoiceNo])
-    .andWhereRaw('CAST(invoice_date AS DATE) = CAST(? AS DATE)', [invoiceDate]);
+    .where({ loc_code: invoiceLoc, invoice_no: parseInt(String(invoiceNo ?? '').trim(), 10) })
+    .whereRaw('invoice_date = ?::date', [invoiceDate]);
   if (company_code) {
     headerQuery.andWhere((q) =>
       q.where({ company_code }).orWhereNull('company_code').orWhereNull('tenant_id')

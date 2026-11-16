@@ -1504,7 +1504,7 @@ export default function CustomerBill() {
     });
     editOverlayRef.current = overlay;
     editingDocketNos.current = new Set(Object.keys(overlay));
-    const overlayRows = Object.keys(overlay).map((no) => ({ ...overlay[no], id: no }));
+    const overlayRows = Object.keys(overlay).map((no) => ({ ...overlay[no], id: no, _fromInvoice: true }));
     const invDate = moment(data.invoice_date);
     const isoDate = invDate.isValid() ? invDate.format("YYYY-MM-DD") : "";
     const sacFromBill = String(data.sac_code || "").trim();
@@ -1657,187 +1657,49 @@ export default function CustomerBill() {
     );
   };
 
-  // Load every docket belonging to the selected customer: resolve the partner's
-  // record_id, then keep only dockets whose cnor_id or cnee_id equals it.
-  // Optionally narrowed to the selected billing branch. Dockets already attached
-  // to a saved invoice are flagged as Billed so the user never bills them twice.
+  // A saved bill opens from its own lines. Do not scan the customer's other
+  // dockets into this grid — that scan was slow and added dockets that are not
+  // on the bill. Charge drift is checked in the background for these lines only.
   useEffect(() => {
-    const customerName = selectedCustomer?.bp_name;
-    if (isViewOnly) return;
-    if (!editingInvoice) return;
-    if (!form.customer || !selectedCustomerId) {
-      if (editingInvoice) return;
-      docketLoadToken.current++;
-      setBillingRows([]);
-      setSelectedDocketNos(new Set());
-      setDocketsLoaded(false);
-      setLoadingDockets(false);
-      return;
-    }
-    if (!form.from_date || !form.to_date) {
-      if (editingInvoice) return;
-      docketLoadToken.current++;
-      setBillingRows([]);
-      setSelectedDocketNos(new Set());
-      setDocketsLoaded(false);
-      setLoadingDockets(false);
-      return;
-    }
+    if (isViewOnly || !editingInvoice) return undefined;
+    const overlay = editOverlayRef.current;
+    const nos = overlay ? Object.keys(overlay) : [];
+    if (!nos.length) return undefined;
 
     const token = ++docketLoadToken.current;
-    const customerId = selectedCustomerId;
-    const locCode = selectedLocCode;
     let cancelled = false;
 
     (async () => {
-      try {
-        setLoadingDockets(true);
-        const customerIds = [
-          customerId,
-          selectedCustomer?.record_id,
-          selectedCustomer?.bp_id,
-          selectedCustomer?.bp_grp_code,
-          selectedCustomer?.bp_code,
-        ].filter((v) => v != null && String(v).trim() && String(v).trim() !== "0");
-        const dockets = await fetchDocketsForBilling({
-          locCode,
-          customerIds,
-          customerName: selectedCustomer?.bp_name || customerName || "",
-          billedMode: isDebitNote ? "billed" : "unbilled",
-          fromDate: form.from_date,
-          toDate: form.to_date,
-        });
-        const billedList = await fetchBilledDocketNos().catch(() => []);
-
-        const billedMap = {};
-        (Array.isArray(billedList) ? billedList : []).forEach((no) => {
-          if (no) billedMap[String(no).trim()] = true;
-        });
-
-        if (cancelled || token !== docketLoadToken.current) return;
-
-        const docketList = Array.isArray(dockets) ? dockets : [];
-
-        // Dockets already attached to a saved invoice are not billable again.
-        // Ones belonging to the invoice currently being edited stay visible so
-        // an existing invoice can be re-opened and updated.
-        const isBilled = (docketNo) =>
-          !!billedMap[String(docketNo).trim()] || isDocketOnEditingInvoice(docketNo);
-
-        const filtered = docketList.filter((d) => {
-          if (!d.docket_no) return false;
-          if (isDebitNote) {
-            if (!isBilled(d.docket_no) && !isDocketOnEditingInvoice(d.docket_no)) return false;
-          } else if (isBilled(d.docket_no) && !isDocketOnEditingInvoice(d.docket_no)) {
-            return false;
-          }
-          return true;
-        });
-
-        const overlay = editOverlayRef.current || null;
-        const overlayNos = overlay ? Object.keys(overlay) : [];
-        const chargeNos = [...new Set([
-          ...filtered.map((d) => String(d.docket_no || "").trim()),
-          ...overlayNos,
-        ])].filter(Boolean);
-        const chargeRows = await fetchChargesBulk(chargeNos).catch(() => []);
-        const chargesByDocket = {};
-        chargeNos.forEach((no) => { chargesByDocket[no] = []; });
-        (Array.isArray(chargeRows) ? chargeRows : []).forEach((c) => {
-          const no = String(c.docket_no || "").trim();
-          if (!no || !chargesByDocket[no]) return;
-          chargesByDocket[no].push(c);
-        });
-
-        const trackDrift = Boolean(editingInvoice) && !isViewOnly;
-        const driftFields = (live, saved) => {
-          const liveCharges = chargePick(live);
-          const stale = trackDrift && chargesDiffer(liveCharges, saved);
-          return {
-            _docketCharges: liveCharges,
-            _chargesStale: stale,
-            charge_sync: stale ? "changed" : "",
-          };
-        };
-
-        let rows = filtered.map((d) => ({
-          ...buildBillingRow(d, chargesByDocket[String(d.docket_no).trim()] || []),
-          id: d.docket_no,
-          invoice_status: billedMap[String(d.docket_no).trim()] ? "Billed" : "Unbilled",
+      const chargeRows = await fetchChargesBulk(nos).catch(() => []);
+      if (cancelled || token !== docketLoadToken.current) return;
+      const chargesByDocket = {};
+      nos.forEach((no) => { chargesByDocket[no] = []; });
+      (Array.isArray(chargeRows) ? chargeRows : []).forEach((c) => {
+        const no = String(c.docket_no || "").trim();
+        if (!chargesByDocket[no]) return;
+        chargesByDocket[no].push(c);
+      });
+      setBillingRows((prev) => prev.map((row) => {
+        const no = String(row.docket_no || "").trim();
+        if (!overlay[no]) return row;
+        const live = buildBillingRow({ docket_no: no }, chargesByDocket[no] || []);
+        const liveCharges = chargePick(live);
+        const stale = chargesDiffer(liveCharges, row);
+        return {
+          ...row,
+          _docketCharges: liveCharges,
+          _chargesStale: stale,
+          charge_sync: stale ? "changed" : "",
           _chargesLoaded: true,
-        }));
-
-        if (overlay && overlayNos.length) {
-          const have = new Set(rows.map((r) => String(r.docket_no).trim()));
-          rows = rows.map((r) => {
-            const saved = overlay[String(r.docket_no).trim()];
-            if (!saved) return r;
-            return {
-              ...r,
-              ...saved,
-              id: String(r.docket_no).trim(),
-              pay_loc: r.pay_loc || saved.pay_loc,
-              origin: r.origin || saved.origin,
-              destination: r.destination || saved.destination,
-              consignee: r.consignee || saved.consignee,
-              invoice_status: "Billed",
-              _fromInvoice: true,
-              _chargesLoaded: true,
-              ...driftFields(r, saved),
-            };
-          });
-          Object.entries(overlay).forEach(([no, saved]) => {
-            if (have.has(no)) return;
-            const docket = docketList.find((d) => String(d.docket_no || "").trim() === no);
-            const live = buildBillingRow(
-              docket || {
-                docket_no: no,
-                docket_loc: saved.booking_branch,
-                docket_to_loc: saved.delivery_branch,
-              },
-              chargesByDocket[no] || []
-            );
-            const note = deliveryNotesMap[no];
-            rows.push({
-              ...saved,
-              id: no,
-              pod_url: note?.pod_url || saved.pod_url || "",
-              pod_back_url: note?.pod_back_url || saved.pod_back_url || "",
-              ...driftFields(live, saved),
-            });
-          });
-          setSelectedDocketNos(new Set(Object.keys(overlay)));
-        } else {
-          setSelectedDocketNos(new Set());
-        }
-
-        setBillingRows(sortDocketsByNo(rows));
-        setDocketsLoaded(true);
-
-        // Helpful when a customer unexpectedly shows no dockets
-        if (filtered.length === 0) {
-          console.info(
-            `[CustomerBill] No dockets for "${selectedCustomer?.bp_name}" (record_id=${customerId}). ` +
-            `Scanned ${docketList.length} dockets; sample cnor_id/cnee_id:`,
-            docketList.slice(0, 5).map((d) => ({ docket_no: d.docket_no, cnor_id: d.cnor_id, cnee_id: d.cnee_id }))
-          );
-        }
-      } catch (err) {
-        if (cancelled || token !== docketLoadToken.current) return;
-        showError(err.message || "Failed to load dockets for the selected customer");
-        console.error("Load customer dockets error:", err);
-        setBillingRows([]);
-        setDocketsLoaded(false);
-      } finally {
-        if (!cancelled && token === docketLoadToken.current) setLoadingDockets(false);
-      }
+        };
+      }));
     })();
 
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.customer, form.billing_branch, form.billing_type, form.from_date, form.to_date, selectedCustomerId, chargeMaster, isDebitNote, isViewOnly, editingInvoice]);
+  }, [editingInvoice, isViewOnly, chargeMaster]);
 
   const handleShowTbbSummary = async () => {
     if (editingInvoice || isViewOnly) return;
@@ -2615,7 +2477,7 @@ export default function CustomerBill() {
       showError("Load a saved bill with Edit before exporting");
       return;
     }
-    const rows = sortDocketsByNo(selectedRows);
+    const rows = sortDocketsByNo(selectedRows.filter((row) => isDocketOnEditingInvoice(row.docket_no) || row._fromInvoice));
     if (!rows.length) {
       showError("This bill has no dockets to export");
       return;
@@ -2695,7 +2557,10 @@ ${remarkXml}
   };
 
   const handleExportBillingGrid = () => {
-    const rows = sortDocketsByNo(billingRows);
+    const source = editingInvoice
+      ? billingRows.filter((row) => isDocketOnEditingInvoice(row.docket_no) || row._fromInvoice)
+      : billingRows;
+    const rows = sortDocketsByNo(source);
     if (!rows.length) {
       showError("No dockets in the billing grid to export");
       return;
@@ -3418,8 +3283,7 @@ ${remarkXml}
             dense
             rowHeight={26}
             headerHeight={42}
-            // autoHeight
-            scroll={{ afterRows: 20, horizontal: true }}
+            scroll={{ afterRows: 15, horizontal: true, unpaged: true }}
             editable={!isViewOnly}
             singleClick
             onRowUpdate={isViewOnly ? undefined : handleRowUpdate}

@@ -63,13 +63,14 @@ const calculateChargeRow = (row, rows, invValue, docketRate = 0, rateUom = "", c
   } else if (row.charge_code === "DK02") {
     const userValue = toNumber(row.user_code);
     if (row.fixed_amt) {
-      // Fixed rupee amount from get_cust_rate (Rs 50 when consignor factory charge is Y).
+      // Fixed rupee amount from get_cust_rate.
       chargeAmount = userValue;
     } else {
-      // Surcharge: user-entered rate % of DK01 charge amount
-      const dk01Row = rows.find((r) => r.charge_code === "DK01");
-      const dk01ChargeAmt = dk01Row ? toNumber(dk01Row.charge_amt) : 0;
-      chargeAmount = (dk01ChargeAmt * userValue) / 100;
+      // Surcharge percent applies to every other charge, not to fuel itself.
+      const base = rows
+        .filter((r) => r.charge_code !== "DK02")
+        .reduce((sum, r) => sum + toNumber(r.charge_amt), 0);
+      chargeAmount = (base * userValue) / 100;
     }
   } else if (row.charge_code === "DK03") {
     chargeAmount = (inv * toNumber(row.user_code)) / 100;
@@ -85,16 +86,16 @@ const calculateChargeRow = (row, rows, invValue, docketRate = 0, rateUom = "", c
   return { ...row, user_code: newUserCode, charge_amt: formatAmount(chargeAmount) };
 };
 
-// Two-pass: DK01 first so its charge_amt is ready when DK02 is calculated
+// Other charges first, then fuel as a percent of that total.
 const recalculateChargeList = (rows, invValue, docketRate = 0, rateUom = "", chargeWeight = 0, totalPkgs = 0, minFreightRate = 0) => {
-  const pass1 = rows.map((row) =>
-    row.charge_code === "DK01"
-      ? calculateChargeRow(row, rows, invValue, docketRate, rateUom, chargeWeight, totalPkgs, minFreightRate)
-      : row
+  const others = rows.map((row) =>
+    row.charge_code === "DK02"
+      ? row
+      : calculateChargeRow(row, rows, invValue, docketRate, rateUom, chargeWeight, totalPkgs, minFreightRate)
   );
-  return pass1.map((row) =>
-    row.charge_code !== "DK01"
-      ? calculateChargeRow(row, pass1, invValue, docketRate, rateUom, chargeWeight, totalPkgs, minFreightRate)
+  return others.map((row) =>
+    row.charge_code === "DK02"
+      ? calculateChargeRow(row, others, invValue, docketRate, rateUom, chargeWeight, totalPkgs, minFreightRate)
       : row
   );
 };

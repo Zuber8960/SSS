@@ -150,44 +150,62 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
   const rows = Array.isArray(details) ? details : [];
   const hasDetails = rows.length > 0;
 
-  // Compute totals
-  const lineTaxable = (d) => {
-    const freight = parseFloat(d.freight) || 0;
-    const loading = parseFloat(d.handling ?? d.loading) || 0;
-    const unloading = parseFloat(d.fuel_surcharge ?? d.unloading) || 0;
-    const detention = parseFloat(d.factory_charge ?? d.detention) || 0;
-    const toll = parseFloat(d.oda_charge ?? d.add_toll ?? d.additional_toll) || 0;
-    const greenTax = parseFloat(d.fov ?? d.green_tax) || 0;
-    const other = parseFloat(d.stationery ?? d.other_charges) || 0;
-    const doorColl = parseFloat(d.door_collection) || 0;
-    const doorDly = parseFloat(d.door_delivery) || 0;
-    return freight + loading + unloading + detention + toll + greenTax + other + doorColl + doorDly;
+  const num = (v) => {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const rateText = (d) => {
+    const v = d.rate ?? d.docket_rate;
+    if (v == null || String(v).trim() === "") return "";
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n.toFixed(2) : esc(v);
+  };
+
+  const rateUomText = (d) => esc(d.rate_uom || d.docket_rate_uom || "");
+
+  // Subtotal is every docket charge except fuel. Total is that subtotal plus fuel.
+  const lineParts = (d) => {
+    const freight = num(d.freight);
+    const handling = num(d.handling ?? d.loading);
+    const factory = num(d.factory_charge ?? d.detention);
+    const oda = num(d.oda_charge ?? d.add_toll ?? d.additional_toll);
+    const fov = num(d.fov ?? d.green_tax);
+    const stationery = num(d.stationery ?? d.other_charges);
+    const doorColl = num(d.door_collection);
+    const doorDly = num(d.door_delivery);
+    const fuel = num(d.fuel_surcharge ?? d.unloading);
+    const subtotal = freight + handling + factory + oda + fov + stationery + doorColl + doorDly;
+    return { freight, handling, factory, oda, fov, stationery, doorColl, doorDly, fuel, subtotal, total: subtotal + fuel };
   };
 
   const sums = rows.reduce(
     (a, d) => {
-      a.freight += parseFloat(d.freight) || 0;
-      a.loading += parseFloat(d.handling ?? d.loading) || 0;
-      a.unloading += parseFloat(d.fuel_surcharge ?? d.unloading) || 0;
-      a.detention += parseFloat(d.factory_charge ?? d.detention) || 0;
-      a.toll += parseFloat(d.oda_charge ?? d.add_toll ?? d.additional_toll) || 0;
-      a.greenTax += parseFloat(d.fov ?? d.green_tax) || 0;
-      a.other += parseFloat(d.stationery ?? d.other_charges) || 0;
-      a.doorColl += parseFloat(d.door_collection) || 0;
-      a.doorDly += parseFloat(d.door_delivery) || 0;
-      a.taxable += lineTaxable(d);
-      a.cgst += parseFloat(d.cgst) || 0;
-      a.sgst += parseFloat(d.sgst) || 0;
-      a.igst += parseFloat(d.igst) || 0;
-      a.total += parseFloat(d.amount ?? d.total_amt) || 0;
+      const line = lineParts(d);
+      a.freight += line.freight;
+      a.loading += line.handling;
+      a.detention += line.factory;
+      a.toll += line.oda;
+      a.greenTax += line.fov;
+      a.other += line.stationery;
+      a.doorColl += line.doorColl;
+      a.doorDly += line.doorDly;
+      a.subtotal += line.subtotal;
+      a.fuel += line.fuel;
+      a.taxable += line.total;
+      a.cgst += num(d.cgst);
+      a.sgst += num(d.sgst);
+      a.igst += num(d.igst);
+      a.total += num(d.amount ?? d.total_amt);
       return a;
     },
-    { freight: 0, loading: 0, unloading: 0, detention: 0, toll: 0, greenTax: 0, other: 0, doorColl: 0, doorDly: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0 }
+    { freight: 0, loading: 0, detention: 0, toll: 0, greenTax: 0, other: 0, doorColl: 0, doorDly: 0, subtotal: 0, fuel: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0 }
   );
 
   // Detail rows table HTML (supports both CustomerBill row shape and API detail shape)
   const rowsHtml = rows
     .map((d, i) => {
+      const line = lineParts(d);
       return `
         <tr>
           <td>${i + 1}</td>
@@ -195,16 +213,20 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
           <td>${esc(toDate(d.docket_date || d.docket_date))}</td>
           <td>${esc(d.origin || d.docket_from_loc || "")}</td>
           <td>${esc(d.destination || d.docket_to_loc || "")}</td>
-          <td>${esc(d.charge_wt ?? d.docket_chrwt ?? "")}</td>
-          <td>${fmtAmt(d.freight)}</td>
-          <td>${fmtAmt(d.handling ?? d.loading)}</td>
-          <td>${fmtAmt(d.fuel_surcharge ?? d.unloading)}</td>
-          <td>${fmtAmt(d.factory_charge ?? d.detention)}</td>
-          <td>${fmtAmt(d.oda_charge ?? d.add_toll ?? d.additional_toll)}</td>
-          <td>${fmtAmt(d.fov ?? d.green_tax)}</td>
-          <td>${fmtAmt(d.stationery ?? d.other_charges)}</td>
-          <td>${fmtAmt(d.door_collection)}</td>
-          <td>${fmtAmt(d.door_delivery)}</td>
+          <td class="num">${esc(d.charge_wt ?? d.docket_chrwt ?? "")}</td>
+          <td class="num">${rateText(d)}</td>
+          <td class="uom">${rateUomText(d)}</td>
+          <td class="num">${line.freight.toFixed(2)}</td>
+          <td class="num">${line.handling.toFixed(2)}</td>
+          <td class="num">${line.factory.toFixed(2)}</td>
+          <td class="num">${line.oda.toFixed(2)}</td>
+          <td class="num">${line.fov.toFixed(2)}</td>
+          <td class="num col-stat">${line.stationery.toFixed(2)}</td>
+          <td class="num">${line.doorColl.toFixed(2)}</td>
+          <td class="num">${line.doorDly.toFixed(2)}</td>
+          <td class="num">${line.subtotal.toFixed(2)}</td>
+          <td class="num">${line.fuel.toFixed(2)}</td>
+          <td class="num">${line.total.toFixed(2)}</td>
         </tr>`;
     })
     .join("");
@@ -243,9 +265,13 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
     .info-row { display: flex; gap: 16px; margin-bottom: 16px; }
     .info-box { flex: 1; border: 1px solid #ccc; padding: 10px; }
     .info-box h4 { background: #eee; margin: -10px -10px 8px; padding: 4px 8px; font-size: 11px; }
-    table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 10px; }
-    th { color: #000; padding: 6px 4px; border: 1px solid #333; font-weight: 700; text-align: center; }
-    td { border: 1px solid #ccc; padding: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 9px; margin-top: 10px; }
+    th { color: #000; padding: 3px 2px; border: 1px solid #333; font-weight: 700; text-align: center; line-height: 1.15; vertical-align: top; }
+    table.lines td.num, table.lines th.num { text-align: right; }
+    table.lines td.uom, table.lines th.uom { text-align: center; white-space: nowrap; }
+    table.lines .col-stat { width: 1%; padding-left: 1px; padding-right: 1px; white-space: nowrap; }
+    table.lines th.col-stat { font-size: 8px; letter-spacing: -0.4px; padding-top: 3px; padding-bottom: 3px; }
+    td { border: 1px solid #ccc; padding: 3px 2px; }
     .tot-row td { font-weight: 700; }
     .tax-summary { display: flex; justify-content: flex-end; margin-top: 14px; page-break-inside: avoid; }
     .tax-summary table { width: 280px; margin-top: 0; margin-left: auto; }
@@ -294,27 +320,31 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
   </div>
 
   ${hasDetails ? `
-  <table>
+  <table class="lines">
     <thead>
       <tr>
-        <th>Sr</th><th>Docket No</th><th>Date</th><th>Origin</th><th>Dest</th><th>Wt</th>
-        <th>Freight</th><th>Handling</th><th>Fuel Surcharge</th><th>Factory Charge</th><th>ODA Charge</th><th>FOV</th><th>Stationery</th>
-        <th>Door Pkp</th><th>Door Dly</th>
+        <th>Sr</th><th>Docket<br/>No</th><th>Date</th><th>Origin</th><th>Dest</th><th class="num">Wt</th>
+        <th class="num">Rate</th><th class="uom">Rate<br/>UOM</th>
+        <th class="num">Freight</th><th class="num">Handling</th><th class="num">Factory<br/>Charge</th><th class="num">ODA<br/>Charge</th><th class="num">FOV</th><th class="num col-stat">Stationery</th>
+        <th class="num">Door<br/>Pkp</th><th class="num">Door<br/>Dly</th>
+        <th class="num">Subtotal<br/>Excl. Fuel</th><th class="num">Fuel<br/>Surcharge</th><th class="num">Total<br/>Amt</th>
       </tr>
     </thead>
     <tbody>
       ${rowsHtml}
       <tr class="tot-row">
-        <td colspan="6" style="text-align:right">TOTAL</td>
-        <td>${sums.freight.toFixed(2)}</td>
-        <td>${sums.loading.toFixed(2)}</td>
-        <td>${sums.unloading.toFixed(2)}</td>
-        <td>${sums.detention.toFixed(2)}</td>
-        <td>${sums.toll.toFixed(2)}</td>
-        <td>${sums.greenTax.toFixed(2)}</td>
-        <td>${sums.other.toFixed(2)}</td>
-        <td>${sums.doorColl.toFixed(2)}</td>
-        <td>${sums.doorDly.toFixed(2)}</td>
+        <td colspan="8" style="text-align:right">TOTAL</td>
+        <td class="num">${sums.freight.toFixed(2)}</td>
+        <td class="num">${sums.loading.toFixed(2)}</td>
+        <td class="num">${sums.detention.toFixed(2)}</td>
+        <td class="num">${sums.toll.toFixed(2)}</td>
+        <td class="num">${sums.greenTax.toFixed(2)}</td>
+        <td class="num col-stat">${sums.other.toFixed(2)}</td>
+        <td class="num">${sums.doorColl.toFixed(2)}</td>
+        <td class="num">${sums.doorDly.toFixed(2)}</td>
+        <td class="num">${sums.subtotal.toFixed(2)}</td>
+        <td class="num">${sums.fuel.toFixed(2)}</td>
+        <td class="num">${sums.taxable.toFixed(2)}</td>
       </tr>
     </tbody>
   </table>` : ""}

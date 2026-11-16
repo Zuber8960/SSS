@@ -469,11 +469,17 @@ export function DataTable({
   const ROW_HEIGHT = rowHeightProp ?? (compact ? 22 : dense ? 40 : 55);
   const HEADER_HEIGHT = headerHeightProp ?? (compact ? 32 : dense ? 36 : 42);
   const maxRows = scroll?.afterRows ?? null;
-  const useScrollHeight = maxRows != null && rows.length > maxRows;
-  const resolvedAutoHeight = autoHeight && !useScrollHeight;
-  const resolvedHeight = useScrollHeight
+  const unpaged = Boolean(scroll?.unpaged);
+  const useScrollHeight = !unpaged && maxRows != null && rows.length > maxRows;
+  const resolvedAutoHeight = !unpaged && autoHeight && !useScrollHeight;
+  const viewportRows = maxRows ?? 15;
+  const viewportHeight = viewportRows * ROW_HEIGHT + HEADER_HEIGHT + 2;
+  const resolvedHeight = unpaged
+    ? viewportHeight
+    : useScrollHeight
     ? maxRows * ROW_HEIGHT + HEADER_HEIGHT + 2
     : isHeight;
+  const leftScrollRef = useRef(null);
   // MIT DataGrid throws if pageSize > 100. Small lists still use pageSize = all
   // rows so hideFooter does not clip later records. Reports request 50 per page.
   const COMMUNITY_MAX_PAGE_SIZE = 100;
@@ -482,17 +488,18 @@ export function DataTable({
     COMMUNITY_MAX_PAGE_SIZE
   );
   const cappedPageSize = Math.min(Math.max(rows.length, 1), COMMUNITY_MAX_PAGE_SIZE);
-  const showPager = rows.length > MIN_PAGE_SIZE;
+  const showPager = !unpaged && rows.length > MIN_PAGE_SIZE;
+  const pageSize = unpaged ? -1 : (showPager ? MIN_PAGE_SIZE : cappedPageSize);
   const [paginationModel, setPaginationModel] = useState({
     page: 0,
-    pageSize: showPager ? MIN_PAGE_SIZE : cappedPageSize,
+    pageSize,
   });
   useEffect(() => {
     setPaginationModel({
       page: 0,
-      pageSize: showPager ? MIN_PAGE_SIZE : cappedPageSize,
+      pageSize,
     });
-  }, [rows.length, cappedPageSize, showPager, MIN_PAGE_SIZE]);
+  }, [rows.length, pageSize]);
   // Community grid never shows more than 100 rows at once. Keep virtualization
   // off so the first data row is not painted under the sticky header.
   const disableVirtual = true;
@@ -906,6 +913,42 @@ export function DataTable({
     },
   };
 
+  useEffect(() => {
+    if (!unpaged) return undefined;
+    const root = wrapperRef.current;
+    const bar = leftScrollRef.current;
+    if (!root || !bar) return undefined;
+    let lock = false;
+    const scroller = () => root.querySelector(".MuiDataGrid-virtualScroller");
+    const syncFromGrid = () => {
+      const el = scroller();
+      if (!el || lock) return;
+      const spacer = bar.firstElementChild;
+      if (spacer) spacer.style.height = `${el.scrollHeight}px`;
+      lock = true;
+      bar.scrollTop = el.scrollTop;
+      lock = false;
+    };
+    const syncFromBar = () => {
+      const el = scroller();
+      if (!el || lock) return;
+      lock = true;
+      el.scrollTop = bar.scrollTop;
+      lock = false;
+    };
+    root.addEventListener("scroll", syncFromGrid, true);
+    bar.addEventListener("scroll", syncFromBar);
+    const timers = [0, 50, 250].map((ms) => window.setTimeout(syncFromGrid, ms));
+    const ro = new ResizeObserver(syncFromGrid);
+    ro.observe(root);
+    return () => {
+      root.removeEventListener("scroll", syncFromGrid, true);
+      bar.removeEventListener("scroll", syncFromBar);
+      timers.forEach((id) => window.clearTimeout(id));
+      ro.disconnect();
+    };
+  }, [unpaged, rows.length, columns.length, viewportHeight]);
+
   const totalMinWidth = columns.reduce((sum, col) => sum + (col.minWidth ?? 120), 0)
     + (actions?.length ? Math.max(48, 20 + actions.length * 36) : 0)
     + (checkboxSelection ? 50 : 0);
@@ -955,15 +998,37 @@ export function DataTable({
           </Tooltip>
         </div>
       )}
+      <div style={{ display: "flex", width: "100%", height: unpaged ? viewportHeight : undefined, alignItems: "stretch" }}>
+      {unpaged && (
+        <div style={{ width: 16, flex: "0 0 16px", height: "100%", display: "flex", flexDirection: "column" }}>
+          <div style={{ height: HEADER_HEIGHT, flex: `0 0 ${HEADER_HEIGHT}px` }} />
+          <div
+            ref={leftScrollRef}
+            className="dataTableLeftScroll"
+            aria-hidden="true"
+            style={{ flex: 1, minHeight: 0, overflowY: "scroll", overflowX: "hidden" }}
+          >
+            <div style={{ width: 1, height: 1 }} />
+          </div>
+        </div>
+      )}
+      {unpaged && (
+        <style>{`
+          .dataTableUnpaged .MuiDataGrid-virtualScroller::-webkit-scrollbar { width: 0; height: 12px; }
+          .dataTableUnpaged .MuiDataGrid-scrollbar--vertical { display: none; }
+        `}</style>
+      )}
       <div
       ref={wrapperRef}
-      className="dataTableWrapper"
+      className={unpaged ? "dataTableWrapper dataTableUnpaged" : "dataTableWrapper"}
       style={{
-        width: "100%",
+        width: unpaged ? undefined : "100%",
+        flex: unpaged ? 1 : undefined,
         maxWidth: "100%",
         minWidth: 0,
-        overflowX: scroll?.horizontal ? "auto" : "hidden",
-        overflowY: "auto",
+        height: unpaged ? "100%" : undefined,
+        overflowX: unpaged ? "hidden" : (scroll?.horizontal ? "auto" : "hidden"),
+        overflowY: unpaged ? "hidden" : "auto",
       }}
     >
       {hasRowColors && <style>{rowColorCss}</style>}
@@ -1044,6 +1109,7 @@ export function DataTable({
 
         sx={tableSx}
       />
+      </div>
       </div>
       {footer}
     </div>
