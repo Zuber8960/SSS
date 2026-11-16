@@ -210,23 +210,24 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
         <tr>
           <td>${i + 1}</td>
           <td>${esc(d.docket_no || "")}</td>
-          <td>${esc(toDate(d.docket_date || d.docket_date))}</td>
-          <td>${esc(d.origin || d.docket_from_loc || "")}</td>
-          <td>${esc(d.destination || d.docket_to_loc || "")}</td>
-          <td class="num">${esc(d.charge_wt ?? d.docket_chrwt ?? "")}</td>
-          <td class="num">${rateText(d)}</td>
-          <td class="uom">${rateUomText(d)}</td>
-          <td class="num">${line.freight.toFixed(2)}</td>
-          <td class="num">${line.handling.toFixed(2)}</td>
-          <td class="num">${line.factory.toFixed(2)}</td>
-          <td class="num">${line.oda.toFixed(2)}</td>
-          <td class="num">${line.fov.toFixed(2)}</td>
-          <td class="num col-stat">${line.stationery.toFixed(2)}</td>
-          <td class="num">${line.doorColl.toFixed(2)}</td>
-          <td class="num">${line.doorDly.toFixed(2)}</td>
-          <td class="num">${line.subtotal.toFixed(2)}</td>
-          <td class="num">${line.fuel.toFixed(2)}</td>
-          <td class="num">${line.total.toFixed(2)}</td>
+          <td class="lane">${esc(toDate(d.docket_date || d.docket_date))}</td>
+          <td class="lane">${esc(d.origin || d.docket_from_loc || "")}</td>
+          <td class="lane">${esc(d.destination || d.docket_to_loc || "")}</td>
+          <td class="lane cnee">${esc(d.consignee || d.cnee_name || "")}</td>
+          <td class="num amt">${esc(d.charge_wt ?? d.docket_chrwt ?? "")}</td>
+          <td class="num amt">${rateText(d)}</td>
+          <td class="uom amt">${rateUomText(d)}</td>
+          <td class="num amt">${line.freight.toFixed(2)}</td>
+          <td class="num amt">${line.handling.toFixed(2)}</td>
+          <td class="num amt">${line.factory.toFixed(2)}</td>
+          <td class="num amt">${line.oda.toFixed(2)}</td>
+          <td class="num amt">${line.fov.toFixed(2)}</td>
+          <td class="num amt col-stat">${line.stationery.toFixed(2)}</td>
+          <td class="num amt">${line.doorColl.toFixed(2)}</td>
+          <td class="num amt">${line.doorDly.toFixed(2)}</td>
+          <td class="num amt">${line.subtotal.toFixed(2)}</td>
+          <td class="num amt">${line.fuel.toFixed(2)}</td>
+          <td class="num amt">${line.total.toFixed(2)}</td>
         </tr>`;
     })
     .join("");
@@ -269,8 +270,11 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
     th { color: #000; padding: 3px 2px; border: 1px solid #333; font-weight: 700; text-align: center; line-height: 1.15; vertical-align: top; }
     table.lines td.num, table.lines th.num { text-align: right; }
     table.lines td.uom, table.lines th.uom { text-align: center; white-space: nowrap; }
+    table.lines th.lane, table.lines td.lane { font-size: 7.5px; font-weight: 700; line-height: 1.1; }
+    table.lines td.cnee { text-align: left; word-break: break-word; }
     table.lines .col-stat { width: 1%; padding-left: 1px; padding-right: 1px; white-space: nowrap; }
-    table.lines th.col-stat { font-size: 8px; letter-spacing: -0.4px; padding-top: 3px; padding-bottom: 3px; }
+    table.lines th.col-stat { letter-spacing: -0.4px; padding-top: 3px; padding-bottom: 3px; }
+    table.lines th.amt, table.lines td.amt { font-size: 7.5px; font-weight: 700; line-height: 1.1; }
     td { border: 1px solid #ccc; padding: 3px 2px; }
     .tot-row td { font-weight: 700; }
     .tax-summary { display: flex; justify-content: flex-end; margin-top: 14px; page-break-inside: avoid; }
@@ -323,28 +327,28 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
   <table class="lines">
     <thead>
       <tr>
-        <th>Sr</th><th>Docket<br/>No</th><th>Date</th><th>Origin</th><th>Dest</th><th class="num">Wt</th>
-        <th class="num">Rate</th><th class="uom">Rate<br/>UOM</th>
-        <th class="num">Freight</th><th class="num">Handling</th><th class="num">Factory<br/>Charge</th><th class="num">ODA<br/>Charge</th><th class="num">FOV</th><th class="num col-stat">Stationery</th>
-        <th class="num">Door<br/>Pkp</th><th class="num">Door<br/>Dly</th>
-        <th class="num">Subtotal<br/>Excl. Fuel</th><th class="num">Fuel<br/>Surcharge</th><th class="num">Total<br/>Amt</th>
+        <th>Sr</th><th>Docket<br/>No</th><th class="lane">Date</th><th class="lane">From</th><th class="lane">To</th><th class="lane">Consignee</th><th class="num amt">Wt</th>
+        <th class="num amt">Rate</th><th class="uom amt">Rate<br/>UOM</th>
+        <th class="num amt">Freight</th><th class="num amt">Handling</th><th class="num amt">Factory<br/>Charge</th><th class="num amt">ODA<br/>Charge</th><th class="num amt">FOV</th><th class="num amt col-stat">Stationery</th>
+        <th class="num amt">Door<br/>Pkp</th><th class="num amt">Door<br/>Dly</th>
+        <th class="num amt">Subtotal<br/>Excl. Fuel</th><th class="num amt">Fuel<br/>Surcharge</th><th class="num amt">Total<br/>Amt</th>
       </tr>
     </thead>
     <tbody>
       ${rowsHtml}
       <tr class="tot-row">
-        <td colspan="8" style="text-align:right">TOTAL</td>
-        <td class="num">${sums.freight.toFixed(2)}</td>
-        <td class="num">${sums.loading.toFixed(2)}</td>
-        <td class="num">${sums.detention.toFixed(2)}</td>
-        <td class="num">${sums.toll.toFixed(2)}</td>
-        <td class="num">${sums.greenTax.toFixed(2)}</td>
-        <td class="num col-stat">${sums.other.toFixed(2)}</td>
-        <td class="num">${sums.doorColl.toFixed(2)}</td>
-        <td class="num">${sums.doorDly.toFixed(2)}</td>
-        <td class="num">${sums.subtotal.toFixed(2)}</td>
-        <td class="num">${sums.fuel.toFixed(2)}</td>
-        <td class="num">${sums.taxable.toFixed(2)}</td>
+        <td colspan="9" style="text-align:right">TOTAL</td>
+        <td class="num amt">${sums.freight.toFixed(2)}</td>
+        <td class="num amt">${sums.loading.toFixed(2)}</td>
+        <td class="num amt">${sums.detention.toFixed(2)}</td>
+        <td class="num amt">${sums.toll.toFixed(2)}</td>
+        <td class="num amt">${sums.greenTax.toFixed(2)}</td>
+        <td class="num amt col-stat">${sums.other.toFixed(2)}</td>
+        <td class="num amt">${sums.doorColl.toFixed(2)}</td>
+        <td class="num amt">${sums.doorDly.toFixed(2)}</td>
+        <td class="num amt">${sums.subtotal.toFixed(2)}</td>
+        <td class="num amt">${sums.fuel.toFixed(2)}</td>
+        <td class="num amt">${sums.taxable.toFixed(2)}</td>
       </tr>
     </tbody>
   </table>` : ""}

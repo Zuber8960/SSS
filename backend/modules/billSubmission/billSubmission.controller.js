@@ -3,15 +3,31 @@ const db = require('../../config/db');
 const toDate = (v) => (v ? String(v).slice(0, 10) : '');
 
 module.exports = {
-  async listPendingBills({ loc_code, bp_code, submit_type, annexure_no }) {
+  async listPendingBills({ loc_code, from_date, to_date, status }) {
+    if (!loc_code) {
+      const err = new Error('Please select Billing Branch');
+      err.status = 400;
+      throw err;
+    }
+    const fromDate = toDate(from_date);
+    const toDateValue = toDate(to_date);
+    if (!fromDate || !toDateValue) {
+      const err = new Error('Please select From Date and To Date');
+      err.status = 400;
+      throw err;
+    }
+    if (fromDate > toDateValue) {
+      const err = new Error('From Date cannot be after To Date');
+      err.status = 400;
+      throw err;
+    }
+
+    const submitted = String(status || 'U').toUpperCase() === 'S';
     const query = db('sss.sst_invoice_hdr as h')
-      .innerJoin('sss.sst_invoice_dtl as d', function () {
-        this.on(db.raw('CAST(h.invoice_no AS INTEGER) = CAST(d.invoice_no AS INTEGER)'))
-          .andOn(db.raw('CAST(h.invoice_date AS DATE) = CAST(d.invoice_date AS DATE)'))
-          .andOn(db.raw("UPPER(TRIM(h.loc_code::text)) = UPPER(TRIM(d.invoice_loc::text))"));
-      })
-      .whereNull('h.inv_sub_date')
+      .where('h.loc_code', loc_code)
       .whereRaw("COALESCE(UPPER(TRIM(h.cancel_flag::text)), '') NOT IN ('Y', 'C', '1', 'TRUE')")
+      .whereRaw('h.invoice_date::date >= ?::date', [fromDate])
+      .whereRaw('h.invoice_date::date <= ?::date', [toDateValue])
       .select(
         'h.invoice_no',
         db.raw("to_char(h.invoice_date::date, 'YYYY-MM-DD') as invoice_date"),
@@ -19,95 +35,57 @@ module.exports = {
         'h.bp_code',
         'h.bp_name',
         'h.total_inv_amt',
-        'd.inv_sr_no as sr_no',
-        'd.docket_no',
-        db.raw("to_char(d.docket_date::date, 'YYYY-MM-DD') as docket_date"),
-        'd.docket_from_loc',
-        'd.docket_to_loc'
+        db.raw("to_char(h.inv_sub_date::date, 'YYYY-MM-DD') as inv_sub_date")
       )
-      .orderBy('h.invoice_no', 'asc')
-      .orderBy('d.inv_sr_no', 'asc');
+      .orderByRaw('h.invoice_date::date asc')
+      .orderBy('h.invoice_no', 'asc');
 
-    if (loc_code) query.andWhere('h.loc_code', loc_code);
-    if (bp_code) {
-      const partners = await db('sss.ssm_business_partner')
-        .where({ bp_grp_code: bp_code })
-        .select('bp_grp_code', 'bp_name', 'record_id');
-      const names = partners.map((p) => p.bp_name).filter(Boolean);
-      query.andWhere(function () {
-        this.where('h.bp_code', bp_code);
-        if (names.length) this.orWhereIn('h.bp_name', names);
-      });
-    }
-
-    /*
-     * Annexure submissions cover only the bills belonging to that annexure.
-     * Without this filter the endpoint ignored `annexure_no` entirely and
-     * returned the customer's ENTIRE pending-bill list for that station.
-     */
-    if (submit_type === 'A' && annexure_no) {
-      const annexure = await db('sss.sst_bill_annexure')
-        .where({ annexure_no: String(annexure_no) })
-        .select('annexure_no', 'from_date', 'loc_code', 'customer_code')
-        .first();
-
-      if (!annexure) return [];
-
-      // An annexure is a date-range statement: it covers this customer's bills
-      // raised on/after its from_date, within the annexure's own station.
-      if (annexure.loc_code) query.andWhere('h.loc_code', annexure.loc_code);
-      if (annexure.from_date) {
-        query.andWhereRaw('h.invoice_date::date >= ?::date', [toDate(annexure.from_date)]);
-      }
-      if (annexure.customer_code) {
-        const customer = String(annexure.customer_code);
-        query.andWhere(function () {
-          this.whereRaw('h.bp_code = ?', [customer]);
-          this.orWhereRaw('h.bp_grp_code = ?', [customer]).orWhereRaw('h.bp_name = ?', [customer]);
-        });
-      }
-    }
+    if (submitted) query.whereNotNull('h.inv_sub_date');
+    else query.whereNull('h.inv_sub_date');
 
     const rows = await query;
-    const dockets = [...new Set(rows.map((r) => r.docket_no).filter(Boolean))];
-    const podMap = {};
-    if (dockets.length) {
-      const pods = await db('sss.sst_dly_note')
-        .whereIn('docket_no', dockets)
-        .where(function () {
-          this.where(function () {
-            this.whereNotNull('pod_url').andWhere('pod_url', '<>', '');
-          }).orWhere(function () {
-            this.whereNotNull('pod_back_url').andWhere('pod_back_url', '<>', '');
-          });
-        })
-        .select('docket_no', 'pod_url', 'pod_back_url', 'record_id')
+    const subMap = {};
+    if (submitted && rows.length) {
+      const subs = await db('sss.sst_bill_submission')
+        .where('loc_code', loc_code)
+        .whereIn('invoice_no', rows.map((r) => String(r.invoice_no)))
+        .select(
+          'record_id',
+          'invoice_no',
+          'loc_code',
+          'submit_to',
+          'email_id',
+          'contact_no',
+          db.raw("to_char(invoice_date::date, 'YYYY-MM-DD') as invoice_date"),
+          db.raw("to_char(submission_date::date, 'YYYY-MM-DD') as submission_date")
+        )
         .orderBy('record_id', 'desc');
-      for (const p of pods) {
-        if (!podMap[p.docket_no]) {
-          podMap[p.docket_no] = {
-            pod_url: p.pod_url || '',
-            pod_back_url: p.pod_back_url || '',
-          };
-        }
+      for (const s of subs) {
+        const key = `${s.invoice_no}|${toDate(s.invoice_date)}|${s.loc_code}`;
+        if (!subMap[key]) subMap[key] = s;
       }
     }
-    return rows.map((r, index) => ({
-      id: `${r.invoice_no}|${toDate(r.invoice_date)}|${r.loc_code}|${r.docket_no || index}`,
-      invoice_no: r.invoice_no,
-      invoice_date: toDate(r.invoice_date),
-      loc_code: r.loc_code,
-      bp_code: r.bp_code,
-      bp_name: r.bp_name,
-      sr_no: r.sr_no || '',
-      docket_no: r.docket_no || '',
-      docket_date: toDate(r.docket_date),
-      docket_from_loc: r.docket_from_loc || '',
-      docket_to_loc: r.docket_to_loc || '',
-      pod_url: podMap[r.docket_no]?.pod_url || '',
-      pod_back_url: podMap[r.docket_no]?.pod_back_url || '',
-      total_inv_amt: r.total_inv_amt,
-    }));
+
+    return rows.map((r) => {
+      const invoiceDate = toDate(r.invoice_date);
+      const key = `${r.invoice_no}|${invoiceDate}|${r.loc_code}`;
+      const sub = subMap[key] || {};
+      const amount = Number(r.total_inv_amt);
+      return {
+        id: key,
+        invoice_no: r.invoice_no,
+        invoice_date: invoiceDate,
+        loc_code: r.loc_code,
+        bp_code: r.bp_code,
+        bp_name: r.bp_name || '',
+        total_inv_amt: Number.isFinite(amount) ? amount.toFixed(2) : '',
+        submitted,
+        submission_date: submitted ? (toDate(sub.submission_date) || toDate(r.inv_sub_date)) : '',
+        submit_to: submitted ? (sub.submit_to || '') : '',
+        email_id: submitted ? (sub.email_id || '') : '',
+        contact_no: submitted ? (sub.contact_no || '') : '',
+      };
+    });
   },
 
   async listAnnexures({ loc_code, bp_code }) {
@@ -125,24 +103,9 @@ module.exports = {
     }));
   },
 
-  async saveSubmission({ bills, submission_date, submit_to, email_id, contact_no, submit_type, annexure_no, aud_user }) {
+  async saveSubmission({ bills, aud_user }) {
     if (!Array.isArray(bills) || bills.length === 0) {
       const err = new Error('Please select at least one bill');
-      err.status = 400;
-      throw err;
-    }
-    if (!submission_date) {
-      const err = new Error('Please enter Submission Date');
-      err.status = 400;
-      throw err;
-    }
-    if (!submit_to) {
-      const err = new Error('Please enter Submit To');
-      err.status = 400;
-      throw err;
-    }
-    if (!email_id || !String(email_id).includes('@')) {
-      const err = new Error('Please enter a valid Email ID');
       err.status = 400;
       throw err;
     }
@@ -155,14 +118,30 @@ module.exports = {
         const invoice_no = bill.invoice_no;
         const invoice_date = toDate(bill.invoice_date);
         const loc_code = bill.loc_code;
+        const submission_date = toDate(bill.submission_date);
+        const submit_to = String(bill.submit_to || '').trim();
+        const email_id = String(bill.email_id || '').trim();
+        const contact_no = String(bill.contact_no || '').trim();
         if (!invoice_no || !invoice_date || !loc_code) continue;
         const key = `${invoice_no}|${invoice_date}|${loc_code}`;
         if (seen.has(key)) continue;
         seen.add(key);
 
-        if (new Date(submission_date) < new Date(invoice_date)) {
+        if (!submission_date) {
           throw Object.assign(
-            new Error(`Bill Submission Date can not be less then Bill Date (${invoice_date})`),
+            new Error(`Please select Submission Date for bill ${invoice_no}`),
+            { status: 400 }
+          );
+        }
+        if (email_id && !email_id.includes('@')) {
+          throw Object.assign(
+            new Error(`Please enter a valid Email ID for bill ${invoice_no}`),
+            { status: 400 }
+          );
+        }
+        if (submission_date < invoice_date) {
+          throw Object.assign(
+            new Error(`Submission Date cannot be before Bill Date for bill ${invoice_no}`),
             { status: 400 }
           );
         }
@@ -178,27 +157,26 @@ module.exports = {
             modified_by: aud_user || null,
           });
 
-        if (updated) {
-          await trx('sss.sst_bill_submission').insert({
-            loc_code,
-            invoice_no: String(invoice_no),
-            invoice_date,
-            submit_to,
-            email_id,
-            contact_no: contact_no || null,
-            submission_date,
-            submit_type: submit_type || 'B',
-            annexure_no: annexure_no || null,
-            aud_user: aud_user || null,
-          });
-          saved += 1;
+        if (!updated) {
+          throw Object.assign(
+            new Error(`Bill ${invoice_no} is already submitted`),
+            { status: 400 }
+          );
         }
-      }
 
-      if (submit_type === 'A' && annexure_no) {
-        await trx('sss.sst_bill_annexure')
-          .where({ annexure_no })
-          .update({ is_submitted: 'Y' });
+        await trx('sss.sst_bill_submission').insert({
+          loc_code,
+          invoice_no: String(invoice_no),
+          invoice_date,
+          submit_to: submit_to || null,
+          email_id: email_id || null,
+          contact_no: contact_no || null,
+          submission_date,
+          submit_type: 'B',
+          annexure_no: null,
+          aud_user: aud_user || null,
+        });
+        saved += 1;
       }
 
       await trx.commit();

@@ -6,14 +6,15 @@ router.get('/pending', async (req, res) => {
   try {
     const data = await BillSubmission.listPendingBills({
       loc_code: req.query.loc_code,
-      bp_code: req.query.bp_code,
-      submit_type: req.query.submit_type,
-      annexure_no: req.query.annexure_no,
+      from_date: req.query.from_date,
+      to_date: req.query.to_date,
+      status: req.query.status,
     });
     res.status(200).json({ success: true, data });
   } catch (error) {
     console.error('Bill Submission pending error:', error);
-    res.status(500).json({ success: false, message: error.message || 'Error loading bills' });
+    const status = error.status || 500;
+    res.status(status).json({ success: false, message: error.message || 'Error loading bills' });
   }
 });
 

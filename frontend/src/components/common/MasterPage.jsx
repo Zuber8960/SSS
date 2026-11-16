@@ -574,6 +574,20 @@ export function DataTable({
     ...orderedColumns.map((col) => ({
       field: col.key,
       headerName: col.label,
+      ...(col.mark === "required" || col.mark === "optional"
+        ? {
+            renderHeader: () => (
+              <span style={{ fontWeight: 700, lineHeight: 1.15 }}>
+                {col.label}
+                {col.mark === "required" ? (
+                  <span style={{ color: "#d32f2f" }}> *</span>
+                ) : (
+                  <span style={{ color: "#6b7280", fontWeight: 500, fontSize: 10 }}> (Optional)</span>
+                )}
+              </span>
+            ),
+          }
+        : {}),
       ...(scroll?.horizontal
         ? { width: col.width ?? col.minWidth ?? 120 }
         : {
