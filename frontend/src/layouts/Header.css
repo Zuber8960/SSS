@@ -112,6 +112,19 @@
   line-height: 1.6;
 }
 
+.appHeaderBranchSelect {
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e293b;
+  width: 180px;
+  max-width: 34vw;
+  cursor: pointer;
+  outline: none;
+  padding: 0;
+}
+
 .appHeaderBranchShort {
   display: none;
 }

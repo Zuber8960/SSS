@@ -364,6 +364,28 @@ router.put('/rec/:recId', async (req, res) => {
   }
 });
 
+router.get('/invoice-nos', async (req, res) => {
+  try {
+    const raw = req.query.docket_nos || '';
+    const nos = Array.isArray(raw) ? raw : String(raw).split(',');
+    const data = await DocketController.listDocketInvoiceNos(nos);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/ftl-vehicles', async (req, res) => {
+  try {
+    const raw = req.query.docket_nos || '';
+    const nos = Array.isArray(raw) ? raw : String(raw).split(',');
+    const data = await DocketController.listDocketVehicles(nos);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 /* ================= GET BY SINGLE DOCKET NUMBER ================= */
 
 router.get('/:no', async (req, res) => {

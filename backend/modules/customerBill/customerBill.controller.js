@@ -57,6 +57,30 @@ const isCancelled = (header) => {
   return v === 'Y' || v === 'C' || v === '1';
 };
 
+const billDateKey = (value) => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, '0');
+    const d = String(value.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  const text = String(value ?? '').trim();
+  const iso = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  return '9999-99-99';
+};
+
+const compareBillDocketNo = (a, b) =>
+  String(a ?? '').trim().localeCompare(String(b ?? '').trim(), undefined, { numeric: true, sensitivity: 'base' });
+
+// Serials are rebuilt from docket date, then docket number, whenever lines are saved.
+const sortBillDetails = (details) =>
+  [...(details || [])].sort((a, b) => {
+    const byDate = billDateKey(a?.docket_date).localeCompare(billDateKey(b?.docket_date));
+    if (byDate) return byDate;
+    return compareBillDocketNo(a?.docket_no, b?.docket_no);
+  });
+
 const findInvoiceHeader = (qb, invoiceNo, invoiceDate, invoiceLoc, company_code = null) => {
   const query = qb('sss.sst_invoice_hdr')
     .where({ loc_code: invoiceLoc })
@@ -311,12 +335,12 @@ async function saveInvoice(payload = {}, company_code = null) {
     if (Array.isArray(details) && details.length > 0) {
       if (company_code) details.forEach(d => d.company_code = company_code);
       const invoiceType = savedHeader.invoice_type ?? headerWithNo.invoice_type ?? 'R';
-      const detailRows = details.map((d, index) =>
+      const detailRows = sortBillDetails(details).map((d, index) =>
         sanitizeDetail({
           ...d,
           ...detailKeys,
           invoice_type: invoiceType,
-          inv_sr_no: d.inv_sr_no || index + 1,
+          inv_sr_no: index + 1,
         })
       );
       await trx('sss.sst_invoice_dtl').insert(detailRows);
@@ -371,12 +395,12 @@ async function updateInvoice(invoiceNo, invoiceDate, invoiceLoc, payload = {}, c
 
     if (Array.isArray(details) && details.length > 0) {
       const invoiceType = updatedHeader.invoice_type ?? header.invoice_type ?? existing.invoice_type ?? 'R';
-      const detailRows = details.map((d, index) =>
+      const detailRows = sortBillDetails(details).map((d, index) =>
         sanitizeDetail({
           ...d,
           ...detailKeys,
           invoice_type: invoiceType,
-          inv_sr_no: d.inv_sr_no || index + 1,
+          inv_sr_no: index + 1,
         })
       );
       await trx('sss.sst_invoice_dtl').insert(detailRows);

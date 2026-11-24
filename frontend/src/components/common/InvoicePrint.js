@@ -2,6 +2,7 @@ import moment from "moment";
 import { getTenantConfig, getDateFormat } from "../../utils/tenantService";
 import { openPrintDocument } from "../../utils/printBridge";
 import { formatSac } from "../../utils/sacCodes";
+import { fetchDocketInvoiceNos, fetchDocketVehicles } from "../../utils/docket";
 
 const fmtAmt = (v) => {
   const n = parseFloat(v);
@@ -127,7 +128,60 @@ const branchLines = (invoice = {}, loc = {}) => {
  * @param {object} props.company      - Company master record
  * @param {object} props.locationsMap - Map of loc_code -> location record
  */
-export function printInvoice({ invoice = {}, details = [], company = {}, locationsMap = {}, customer, partners } = {}) {
+const invoiceNosFor = (docketNo, byNo) => {
+  const key = String(docketNo || "").trim().toUpperCase();
+  const list = byNo[key] || [];
+  const seen = new Set();
+  const clean = [];
+  list.forEach((no) => {
+    const text = String(no || "").trim();
+    const id = text.toUpperCase();
+    if (!text || seen.has(id)) return;
+    seen.add(id);
+    clean.push(text);
+  });
+  if (!clean.length) return [""];
+  const joined = clean.join(", ");
+  if (joined.length <= 20 || clean.length === 1) return [joined];
+  let cut = 1;
+  let best = Infinity;
+  for (let i = 1; i < clean.length; i += 1) {
+    const diff = Math.abs(clean.slice(0, i).join(", ").length - clean.slice(i).join(", ").length);
+    if (diff < best) {
+      best = diff;
+      cut = i;
+    }
+  }
+  return [clean.slice(0, cut).join(", "), clean.slice(cut).join(", ")];
+};
+
+const loadInvoiceNos = async (rows) => {
+  const nos = [...new Set(rows.map((d) => String(d.docket_no || "").trim()).filter(Boolean))];
+  const byNo = {};
+  if (!nos.length) return byNo;
+  const list = await fetchDocketInvoiceNos(nos);
+  (Array.isArray(list) ? list : []).forEach((row) => {
+    const key = String(row.docket_no || "").trim().toUpperCase();
+    if (!key) return;
+    if (!byNo[key]) byNo[key] = [];
+    byNo[key].push(row.inv_no);
+  });
+  return byNo;
+};
+
+const loadVehicles = async (rows) => {
+  const nos = [...new Set(rows.map((d) => String(d.docket_no || "").trim()).filter(Boolean))];
+  const byNo = {};
+  if (!nos.length) return byNo;
+  const list = await fetchDocketVehicles(nos);
+  (Array.isArray(list) ? list : []).forEach((row) => {
+    const key = String(row.docket_no || "").trim().toUpperCase();
+    if (key) byNo[key] = row;
+  });
+  return byNo;
+};
+
+export async function printInvoice({ invoice = {}, details = [], company = {}, locationsMap = {}, customer, partners } = {}) {
   const co = company || {};
   const tc = getTenantConfig();
   const logoUrl = tc?.logo_url || "";
@@ -149,6 +203,19 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
 
   const rows = Array.isArray(details) ? details : [];
   const hasDetails = rows.length > 0;
+  const invoiceNos = await loadInvoiceNos(rows);
+  const vehicles = await loadVehicles(rows);
+  const vehicleOf = (d) => {
+    const key = String(d.docket_no || "").trim().toUpperCase();
+    const info = vehicles[key] || {};
+    return {
+      no: String(d.veh_no || info.veh_no || "").trim(),
+      type: String(d.veh_type || info.veh_type || "").trim(),
+      ftl: String(d.docket_load_type || d.load_type || info.docket_load_type || "").trim().toUpperCase() === "FTL",
+    };
+  };
+  const showVehicle = rows.some((d) => vehicleOf(d).ftl);
+  const docketType = (d) => (vehicleOf(d).ftl ? "FTL" : "PTL");
 
   const num = (v) => {
     const n = parseFloat(v);
@@ -203,31 +270,59 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
   );
 
   // Detail rows table HTML (supports both CustomerBill row shape and API detail shape)
+  const td = (html, cls, span) =>
+    `<td${cls ? ` class="${cls}"` : ""}${span > 1 ? ` rowspan="${span}"` : ""}>${html}</td>`;
+
+  const laneText = (loc, town, combined) => {
+    const parts = String(combined || "").split(">").map((s) => s.trim()).filter(Boolean);
+    const code = String(loc || parts[0] || "").trim();
+    const name = String(town || (parts.length > 1 ? parts.slice(1).join(" > ") : "") || "").trim();
+    if (code && name && code.toUpperCase() !== name.toUpperCase()) {
+      return `${esc(code)} &gt;<br/>${esc(name)}`;
+    }
+    return esc(code || name);
+  };
+
   const rowsHtml = rows
     .map((d, i) => {
       const line = lineParts(d);
-      return `
+      const invLines = invoiceNosFor(d.docket_no, invoiceNos);
+      const span = invLines.length > 1 ? 2 : 1;
+      const vehicle = vehicleOf(d);
+      const ftlCells = showVehicle
+        ? `${td(esc(vehicle.ftl ? vehicle.no : ""), "veh", span)}
+          ${td(esc(vehicle.ftl ? vehicle.type : ""), "vehtype", span)}`
+        : "";
+      const first = `
         <tr>
-          <td>${i + 1}</td>
-          <td>${esc(d.docket_no || "")}</td>
-          <td class="lane">${esc(toDate(d.docket_date || d.docket_date))}</td>
-          <td class="lane">${esc(d.origin || d.docket_from_loc || "")}</td>
-          <td class="lane">${esc(d.destination || d.docket_to_loc || "")}</td>
-          <td class="lane cnee">${esc(d.consignee || d.cnee_name || "")}</td>
-          <td class="num amt">${esc(d.charge_wt ?? d.docket_chrwt ?? "")}</td>
-          <td class="num amt">${rateText(d)}</td>
-          <td class="uom amt">${rateUomText(d)}</td>
-          <td class="num amt">${line.freight.toFixed(2)}</td>
-          <td class="num amt">${line.handling.toFixed(2)}</td>
-          <td class="num amt">${line.factory.toFixed(2)}</td>
-          <td class="num amt">${line.oda.toFixed(2)}</td>
-          <td class="num amt">${line.fov.toFixed(2)}</td>
-          <td class="num amt col-stat">${line.stationery.toFixed(2)}</td>
-          <td class="num amt">${line.doorColl.toFixed(2)}</td>
-          <td class="num amt">${line.doorDly.toFixed(2)}</td>
-          <td class="num amt">${line.subtotal.toFixed(2)}</td>
-          <td class="num amt">${line.fuel.toFixed(2)}</td>
-          <td class="num amt">${line.total.toFixed(2)}</td>
+          ${td(i + 1, "", span)}
+          ${td(esc(d.docket_no || ""), "dkno", span)}
+          ${td(docketType(d), "dtype", span)}
+          ${td(esc(invLines[0]), "invno")}
+          ${td(esc(toDate(d.docket_date || d.docket_date)), "lane", span)}
+          ${td(laneText(d.docket_from_loc, d.docket_from_town || d.docket_pickup_town, d.origin), "place", span)}
+          ${td(laneText(d.docket_to_loc, d.docket_to_town || d.docket_dly_town, d.destination), "place", span)}
+          ${td(esc(d.consignee || d.cnee_name || ""), "lane cnee", span)}
+          ${ftlCells}
+          ${td(esc(d.charge_wt ?? d.docket_chrwt ?? ""), "num amt", span)}
+          ${td(rateText(d), "num amt", span)}
+          ${td(rateUomText(d), "uom amt", span)}
+          ${td(line.freight.toFixed(2), "num amt", span)}
+          ${td(line.handling.toFixed(2), "num amt", span)}
+          ${td(line.factory.toFixed(2), "num amt", span)}
+          ${td(line.oda.toFixed(2), "num amt", span)}
+          ${td(line.fov.toFixed(2), "num amt", span)}
+          ${td(line.stationery.toFixed(2), "num amt col-stat", span)}
+          ${td(line.doorColl.toFixed(2), "num amt", span)}
+          ${td(line.doorDly.toFixed(2), "num amt", span)}
+          ${td(line.subtotal.toFixed(2), "num amt", span)}
+          ${td(line.fuel.toFixed(2), "num amt", span)}
+          ${td(line.total.toFixed(2), "num amt", span)}
+        </tr>`;
+      if (span === 1) return first;
+      return `${first}
+        <tr class="inv-cont">
+          <td class="invno">${esc(invLines[1])}</td>
         </tr>`;
     })
     .join("");
@@ -271,7 +366,14 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
     table.lines td.num, table.lines th.num { text-align: right; }
     table.lines td.uom, table.lines th.uom { text-align: center; white-space: nowrap; }
     table.lines th.lane, table.lines td.lane { font-size: 7.5px; font-weight: 700; line-height: 1.1; }
-    table.lines td.cnee { text-align: left; word-break: break-word; }
+    table.lines th.place, table.lines td.place { font-size: 7px; font-weight: 700; line-height: 1.15; text-align: left; white-space: normal; word-break: break-word; min-width: 58px; }
+    table.lines th.dkno, table.lines td.dkno { font-size: 7px; font-weight: 700; line-height: 1.05; white-space: nowrap; word-break: normal; text-align: left; padding-left: 2px; padding-right: 2px; }
+    table.lines th.dtype, table.lines td.dtype { text-align: center; font-size: 7px; font-weight: 700; white-space: nowrap; }
+    table.lines th.cnee, table.lines td.cnee { text-align: left; font-size: 6px; font-weight: 700; line-height: 1.05; width: 62px; max-width: 62px; word-break: break-word; }
+    table.lines th.veh, table.lines td.veh { text-align: left; font-size: 7px; font-weight: 700; line-height: 1.05; white-space: nowrap; }
+    table.lines th.vehtype, table.lines td.vehtype { text-align: left; font-size: 6.5px; font-weight: 700; line-height: 1.05; width: 58px; max-width: 58px; word-break: break-word; }
+    table.lines th.invno, table.lines td.invno { text-align: left; font-size: 7px; font-weight: 700; line-height: 1.15; width: 78px; max-width: 78px; word-break: break-word; }
+    table.lines tr.inv-cont td.invno { border-top: none; }
     table.lines .col-stat { width: 1%; padding-left: 1px; padding-right: 1px; white-space: nowrap; }
     table.lines th.col-stat { letter-spacing: -0.4px; padding-top: 3px; padding-bottom: 3px; }
     table.lines th.amt, table.lines td.amt { font-size: 7.5px; font-weight: 700; line-height: 1.1; }
@@ -327,7 +429,7 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
   <table class="lines">
     <thead>
       <tr>
-        <th>Sr</th><th>Docket<br/>No</th><th class="lane">Date</th><th class="lane">From</th><th class="lane">To</th><th class="lane">Consignee</th><th class="num amt">Wt</th>
+        <th>Sr</th><th class="dkno">Docket<br/>No</th><th class="dtype">Docket<br/>Type</th><th class="invno">Invoice<br/>No</th><th class="lane">Date</th><th class="place">From</th><th class="place">To</th><th class="cnee">Cnee</th>${showVehicle ? `<th class="veh">Vehicle<br/>No</th><th class="vehtype">Vehicle<br/>Type</th>` : ""}<th class="num amt">Wt</th>
         <th class="num amt">Rate</th><th class="uom amt">Rate<br/>UOM</th>
         <th class="num amt">Freight</th><th class="num amt">Handling</th><th class="num amt">Factory<br/>Charge</th><th class="num amt">ODA<br/>Charge</th><th class="num amt">FOV</th><th class="num amt col-stat">Stationery</th>
         <th class="num amt">Door<br/>Pkp</th><th class="num amt">Door<br/>Dly</th>
@@ -337,7 +439,7 @@ export function printInvoice({ invoice = {}, details = [], company = {}, locatio
     <tbody>
       ${rowsHtml}
       <tr class="tot-row">
-        <td colspan="9" style="text-align:right">TOTAL</td>
+        <td colspan="${showVehicle ? 13 : 11}" style="text-align:right">TOTAL</td>
         <td class="num amt">${sums.freight.toFixed(2)}</td>
         <td class="num amt">${sums.loading.toFixed(2)}</td>
         <td class="num amt">${sums.detention.toFixed(2)}</td>

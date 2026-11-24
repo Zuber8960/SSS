@@ -39,6 +39,7 @@ const mapVoucherHeader = (header) => {
     ...header,
     vha_date: formatDateOnly(header.vha_date) || header.vha_date,
     vha_final_pay_date: header.vha_final_pay_date ? formatDateOnly(header.vha_final_pay_date) : header.vha_final_pay_date,
+    vha_adv_paid_on: header.vha_adv_paid_on ? formatDateOnly(header.vha_adv_paid_on) : header.vha_adv_paid_on,
     vha_rate_uom: header.vha_rate_uom == null || header.vha_rate_uom === '' ? 1 : Number(header.vha_rate_uom) || 1,
   };
 };
@@ -323,12 +324,22 @@ const updateHireVoucherDetails = async (keys, detailsData) => {
   }
 };
 
-/* ================= DELETE HIRE VOUCHER (soft) ================= */
+/* ================= DELETE HIRE VOUCHER (header and manifest lines) ================= */
 
 const deleteHireVoucher = async (keys, trx = db) => {
-  return trx('sss.sst_vha_hdr')
-    .where(keys)
-    .update({ record_status: 1 });
+  const header = await trx('sss.sst_vha_hdr')
+    .where({ vha_no: keys.vha_no, vha_loc: keys.vha_loc, record_status: 0 })
+    .whereRaw('vha_date::date = ?::date', [keys.vha_date])
+    .first();
+  if (!header) return null;
+  const match = {
+    vha_no: header.vha_no,
+    vha_loc: header.vha_loc,
+    vha_date: header.vha_date,
+  };
+  await trx('sss.sst_vha_dtl').where(match).del();
+  await trx('sss.sst_vha_hdr').where(match).del();
+  return header;
 };
 
 /* ================= GET HIRE VOUCHER BY VHV NO ================= */

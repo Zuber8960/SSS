@@ -813,6 +813,82 @@ const getDocketInvoices = async (docketNo, tenant_id) => {
   return query.orderBy('inv.sr_no', 'asc');
 };
 
+const listDocketInvoiceNos = async (docketNos = []) => {
+  const nos = [...new Set(
+    (Array.isArray(docketNos) ? docketNos : String(docketNos || '').split(','))
+      .map((n) => String(n || '').trim())
+      .filter(Boolean)
+  )];
+  if (!nos.length) return [];
+  return db('sss.sst_docket_inv')
+    .whereIn('docket_no', nos)
+    .whereNotNull('inv_no')
+    .select('docket_no', 'inv_no', 'sr_no')
+    .orderBy('docket_no', 'asc')
+    .orderBy('sr_no', 'asc');
+};
+
+const listDocketVehicles = async (docketNos = []) => {
+  const nos = [...new Set(
+    (Array.isArray(docketNos) ? docketNos : String(docketNos || '').split(','))
+      .map((n) => String(n || '').trim())
+      .filter(Boolean)
+  )];
+  if (!nos.length) return [];
+  // FTL dockets store the truck on the docket. Other dockets take the
+  // earliest non-delivery manifest vehicle, then a local delivery if that
+  // is the only truck on the docket.
+  const result = await db.raw(`
+    SELECT d.docket_no,
+           d.docket_load_type,
+           COALESCE(NULLIF(TRIM(d.veh_no), ''), m.desp_veh_no, '') AS veh_no,
+           COALESCE(
+             NULLIF(TRIM(d.veh_type), ''),
+             NULLIF(TRIM(vm.lry_vehicle_type), ''),
+             NULLIF(TRIM(typed.veh_type), ''),
+             ''
+           ) AS veh_type
+      FROM sss.sst_docket d
+      LEFT JOIN LATERAL (
+        SELECT h.desp_veh_no
+          FROM sss.sst_mnf_dtl dt
+          JOIN sss.sst_mnf_hdr h
+            ON h.mnf_no = dt.mnf_no
+           AND h.mnf_loc = dt.mnf_loc
+           AND h.mnf_date = dt.mnf_date
+         WHERE dt.dwb_no = d.docket_no
+           AND COALESCE(h.record_status, 0) = 0
+           AND NULLIF(TRIM(COALESCE(h.desp_veh_no, '')), '') IS NOT NULL
+         ORDER BY CASE WHEN LOWER(TRIM(COALESCE(h.mnf_type, ''))) = 'ld' THEN 1 ELSE 0 END,
+                  h.mnf_date ASC, h.mnf_no ASC
+         LIMIT 1
+      ) m ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT v.lry_vehicle_type
+          FROM sss.ssm_vehicle_master v
+         WHERE REPLACE(UPPER(TRIM(COALESCE(v.lry_regis_no, ''))), ' ', '')
+             = REPLACE(UPPER(TRIM(COALESCE(NULLIF(TRIM(d.veh_no), ''), m.desp_veh_no, ''))), ' ', '')
+           AND NULLIF(TRIM(COALESCE(v.lry_vehicle_type, '')), '') IS NOT NULL
+         ORDER BY v.rec_id DESC
+         LIMIT 1
+      ) vm ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT dk.veh_type
+          FROM sss.sst_docket dk
+         WHERE dk.record_status = 0
+           AND REPLACE(UPPER(TRIM(COALESCE(dk.veh_no, ''))), ' ', '')
+             = REPLACE(UPPER(TRIM(COALESCE(NULLIF(TRIM(d.veh_no), ''), m.desp_veh_no, ''))), ' ', '')
+           AND NULLIF(TRIM(COALESCE(dk.veh_type, '')), '') IS NOT NULL
+         GROUP BY dk.veh_type
+         ORDER BY COUNT(*) DESC, dk.veh_type
+         LIMIT 1
+      ) typed ON TRUE
+     WHERE d.docket_no = ANY(?)
+       AND d.record_status = 0
+  `, [nos]);
+  return result.rows || [];
+};
+
 // sst_docket_inv has a composite PK (docket_no, docket_loc, docket_date,
 // inv_no, inv_date) and no record_status column, so this upserts on that key
 // and hard-deletes any invoice no longer present for the docket.
@@ -1704,6 +1780,8 @@ module.exports = {
   updateCharge,
   deleteCharge,
   getDocketInvoices,
+  listDocketInvoiceNos,
+  listDocketVehicles,
   getDocketEwbUpdateRows,
   saveDocketInvoices,
   saveUpdateEwbDocket,

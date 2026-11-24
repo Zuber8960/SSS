@@ -37,7 +37,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 30px 0 14px;
+  margin: 18px 0 10px;
 }
 .ovSectionHead__title {
   display: flex;
@@ -48,8 +48,7 @@
   width: 5px;
   height: 22px;
   border-radius: 3px;
-  background: linear-gradient(180deg, #a855f7, #6d28d9);
-  box-shadow: 0 2px 6px rgba(168, 85, 247, 0.35);
+  background: #1e293b;
 }
 .ovSectionHead h3 {
   margin: 0;
@@ -64,7 +63,7 @@
 .ovSectionHead__title.ovClickRow:hover h3,
 .ovOpsCard__title.ovClickRow:hover,
 .ovTableCard__head h3.ovClickRow:hover {
-  color: #6d28d9;
+  color: #0f172a;
 }
 .ovOpsRow.ovClickRow:hover {
   background: #f6f1ff;
@@ -79,14 +78,14 @@
   margin: 0;
   font: inherit;
   font-weight: 700;
-  color: #6d28d9;
+  color: #1e293b;
   cursor: pointer;
   text-align: left;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 .ovDrillLink:hover {
-  color: #5b21b6;
+  color: #0f172a;
 }
 .ovSectionHead span {
   font-size: 12px;
@@ -97,24 +96,20 @@
 }
 .ovKpiGrid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
 }
 .ovKpiCard {
   position: relative;
-  /* Layered gradient surface: a soft accent wash over white, plus a subtle
-     diagonal sheen. Each card picks up its own tint from --ov-accent-soft. */
-  background:
-    linear-gradient(160deg, var(--ov-accent-soft, #f3e8ff) 0%, rgba(255, 255, 255, 0) 58%),
-    linear-gradient(200deg, #ffffff 0%, #fbfaff 100%);
-  border: 1px solid #ece9f4;
-  border-radius: 18px;
-  padding: 16px 16px 14px;
-  box-shadow: 0 2px 10px rgba(80, 60, 140, 0.06);
+  background: #fff;
+  border: 1px solid #e6e8ee;
+  border-radius: 10px;
+  padding: 10px 12px 10px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   overflow: hidden;
   opacity: 0;
   animation: ovFadeUp 0.5s ease forwards;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 /* Accent bar along the top edge */
 .ovKpiCard::before {
@@ -141,9 +136,8 @@
   transition: opacity 0.3s ease;
 }
 .ovKpiCard:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 16px 34px rgba(80, 60, 140, 0.18);
-  border-color: var(--ov-accent-strong, #7c3aed);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  border-color: #cbd5e1;
 }
 .ovKpiCard:hover .ovKpiCard__glow {
   opacity: 0.75;
@@ -151,10 +145,12 @@
 .ovKpiCard__top {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 .ovKpiCard__label {
+  flex: 1;
+  min-width: 0;
   font-size: 12px;
   font-weight: 700;
   color: #6b7280;
@@ -162,9 +158,9 @@
   line-height: 1.25;
 }
 .ovKpiCard__icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -195,7 +191,7 @@
   transform: translateX(0);
 }
 .ovKpiCard__value {
-  font-size: 30px;
+  font-size: 22px;
   font-weight: 800;
   line-height: 1.1;
   letter-spacing: -0.02em;
@@ -206,8 +202,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 6px;
+  margin-top: 6px;
   position: relative;
   z-index: 1;
 }
@@ -247,36 +243,41 @@
 .ovOpsGrid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 14px;
+  gap: 10px;
 }
 .ovOpsCard {
   background: #fff;
-  border: 1px solid #ece9f4;
-  border-radius: 12px;
-  padding: 0 16px 12px;
-  box-shadow: 0 2px 10px rgba(80, 60, 140, 0.06);
+  border: 1px solid #e6e8ee;
+  border-radius: 10px;
+  padding: 0 12px 8px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   overflow: hidden;
   opacity: 0;
   animation: ovFadeUp 0.5s ease forwards;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .ovOpsCard:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 24px rgba(80, 60, 140, 0.14);
+  border-color: #cbd5e1;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
 }
 .ovOpsCard__title {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  font-size: 13.5px;
+  font-size: 12.5px;
   font-weight: 700;
   color: #111827;
-  padding: 13px 0 10px;
-  border-bottom: 1px solid #f1eef8;
-  margin: 0 -16px 4px;
-  padding-left: 16px;
-  padding-right: 16px;
-  background: var(--ov-accent-soft, #f9f7fe);
+  padding: 8px 0 8px;
+  border-bottom: 1px solid #eef0f4;
+  margin: 0 -12px 6px;
+  padding-left: 12px;
+  padding-right: 12px;
+  background: #f8fafc;
+}
+.ovOpsCard__title .ovClickRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 .ovOpsCard__title .ovOpsCard__icon {
   display: flex;
@@ -310,13 +311,13 @@
 .ovPerfGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 10px;
 }
 .ovPerfCard {
   background: #fff;
   border: 1px solid #ece9f4;
-  border-radius: 12px;
-  padding: 14px 16px 16px;
+  border-radius: 10px;
+  padding: 10px 12px 12px;
   box-shadow: 0 2px 10px rgba(80, 60, 140, 0.06);
   opacity: 0;
   animation: ovFadeUp 0.5s ease forwards;
@@ -329,8 +330,8 @@
 .ovTableCard {
   background: #fff;
   border: 1px solid #ece9f4;
-  border-radius: 12px;
-  padding: 0 0 8px;
+  border-radius: 10px;
+  padding: 0 0 6px;
   box-shadow: 0 2px 10px rgba(80, 60, 140, 0.06);
   margin-bottom: 18px;
   overflow: hidden;
@@ -345,10 +346,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px;
+  padding: 10px 14px;
   margin-bottom: 4px;
-  background: linear-gradient(90deg, #f9f6fe 0%, #ffffff 70%);
-  border-bottom: 1px solid #f1eef8;
+  background: #f8fafc;
+  border-bottom: 1px solid #e6e8ee;
 }
 .ovTableCard__head h3 {
   margin: 0;
@@ -366,7 +367,7 @@
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: linear-gradient(135deg, #a855f7, #6d28d9);
+  background: #1e293b;
   color: #fff;
   box-shadow: 0 3px 8px rgba(124, 58, 237, 0.35);
   font-size: 16px;
@@ -469,15 +470,852 @@
 .ovPerfBar {
   height: 6px;
   border-radius: 4px;
-  background: #f1edf9;
+  background: #e8edf3;
   overflow: hidden;
   margin-top: 6px;
 }
 .ovPerfBar__fill {
   height: 100%;
   border-radius: 4px;
-  background: linear-gradient(90deg, #34d399, #059669);
-  transition: width 0.6s ease;
+  background: #0f766e;
+}
+.ovViewToggle {
+  display: inline-flex;
+  border: 1px solid #d7dbe3;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  flex-shrink: 0;
+}
+.ovViewToggle button {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 4px 7px;
+  cursor: pointer;
+}
+.ovViewToggle button.is-on {
+  background: #1e293b;
+  color: #fff;
+}
+.ovMiniTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.ovMiniTable th,
+.ovMiniTable td {
+  text-align: left;
+  padding: 4px 2px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.ovMiniTable th {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+.ovMiniTable td:last-child,
+.ovMiniTable th:last-child {
+  text-align: right;
+  font-weight: 700;
+  color: #0f172a;
+}
+.ovMiniTable tr.ovClickRow {
+  cursor: pointer;
+}
+.ovBars__empty {
+  color: #94a3b8;
+  font-size: 12px;
+  padding: 12px 0;
+}
+.ovCharts {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.9fr) minmax(180px, 1.1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 2px 0 8px;
+}
+.ovCharts--single {
+  grid-template-columns: 1fr;
+}
+.ovKpiCard .ovCharts,
+.ovOpsCard .ovCharts {
+  grid-template-columns: 1fr;
+}
+.ovChart__cap {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+.ovPie {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+}
+.ovPie svg {
+  width: 88px;
+  height: 88px;
+}
+.ovLegend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.ovLegend button {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font-size: 11px;
+  color: #475569;
+}
+.ovLegend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  display: block;
+}
+.ovLegend span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ovLegend b {
+  color: #0f172a;
+  font-size: 11px;
+}
+.ovCol {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.ovCol__axis,
+.ovCol__tick {
+  fill: #64748b;
+  font-size: 9px;
+  font-family: inherit;
+}
+.ovSlice {
+  cursor: pointer;
+}
+.ordCardTable th,
+.ordCardTable td:first-child {
+  font-weight: 600;
+  color: #64748b;
+}
+.ovMgmtRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.2fr);
+  gap: 10px;
+  margin-bottom: 10px;
+  align-items: stretch;
+}
+.ovMgmtRow .ovOrderPanel {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: auto;
+  align-self: stretch;
+  margin-bottom: 0;
+  padding: 8px 8px 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+.ovMgmtRow:not(.ovMgmtRow--half):not(.ovMgmtRow--full):not(.ovMgmtRow--rev) > .ovOrderPanel > .ordMgmt,
+.ovMgmtRow:not(.ovMgmtRow--half):not(.ovMgmtRow--full):not(.ovMgmtRow--rev) > .ovOrderPanel > .ordPair,
+.ovMgmtRow:not(.ovMgmtRow--half):not(.ovMgmtRow--full):not(.ovMgmtRow--rev) > .ovOrderPanel > .ovCharts {
+  flex: 1 1 auto;
+}
+.ovMgmtRow .ovOrderPanel__foot {
+  margin-top: auto;
+  padding-top: 8px;
+}
+.ovMgmtRow .ovOrderPanel--pair { grid-column: auto; }
+.ovMgmtRow--half { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.ovMgmtRow--full { grid-template-columns: minmax(0, 1fr); }
+.ovMgmtRow--rev { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: stretch; }
+.ovMgmtRow--tail { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr) minmax(0, 0.95fr); }
+.ovMgmtRow--tail .ovOrderPanel { overflow-x: auto; }
+.ovMgmtRow--tail .ovOrderPanel__title h3 { overflow: hidden; text-overflow: ellipsis; }
+.ovRevStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  align-self: stretch;
+}
+.ovRevStack > .ovOrderPanel:last-child {
+  flex: 1 1 auto;
+}
+.ovRevStack > .ovOrderPanel {
+  width: 100%;
+  max-width: 100%;
+}
+.ovMgmtRow--rev > .ovMonthCard {
+  width: 100%;
+  max-width: 100%;
+  justify-self: stretch;
+  align-self: stretch;
+  height: auto;
+  min-height: 100%;
+}
+.ovMonthCard .ordMgmt--months {
+  flex: 1 1 auto;
+  height: 100%;
+}
+.ovMgmtRow .ordMgmt--months {
+  width: 100%;
+  table-layout: auto;
+}
+.ordMgmt--months thead tr:nth-child(2) th:first-child,
+.ordMgmt--hire thead tr:nth-child(2) th:first-child {
+  width: auto;
+  text-align: right;
+  font-weight: 700;
+}
+.ordPair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: start;
+}
+.ordPair--3 { grid-template-columns: 1fr 1fr 1fr; }
+.ordPair--rev {
+  grid-template-columns: max-content max-content max-content;
+  justify-content: start;
+  align-items: stretch;
+}
+.ordPair--rev .ordSourceBlock {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.ordPair--rev .ordSourceBlock .ordMgmt {
+  margin-top: auto;
+}
+.ovMgmtRow--rev .ordPair--rev {
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.35fr);
+}
+.ovMgmtRow .ordPair--rev .ordSourceBlock {
+  width: 100%;
+}
+.ovMgmtRow .ordPair--rev .ordSourceBlock .ordMgmt {
+  width: 100%;
+  table-layout: auto;
+}
+.vehStack { display: grid; gap: 8px; }
+.ordPair .ordMgmt { width: 100%; }
+.ovMgmtRow .ordPair { gap: 10px; min-width: 0; }
+.ovMgmtRow .ordSourceBlock { min-width: 0; width: 100%; }
+.ovMgmtRow .ordSourceBlock .ordMgmt {
+  width: 100%;
+  table-layout: fixed;
+}
+.ovMgmtRow .ordSourceBlock .ordMgmt th:first-child,
+.ovMgmtRow .ordSourceBlock .ordMgmt td:first-child {
+  width: 76px;
+}
+.ovMgmtRow .ordSource { font-size: 11px; margin: 0 0 4px; }
+.ovMgmtRow .ordMgmt {
+  width: 100%;
+  font-size: 11px;
+}
+.ovMgmtRow .ordMgmt th,
+.ovMgmtRow .ordMgmt td {
+  padding: 3px 3px;
+}
+.ovMgmtRow .ordMgmt tbody td {
+  padding: 2px 4px;
+  line-height: 1.3;
+}
+.ovMgmtRow .ordMgmt tbody .ordFig {
+  line-height: 1.3;
+}
+.ovMgmtRow .ordMgmt th {
+  white-space: nowrap;
+  letter-spacing: 0;
+  line-height: 1.15;
+  font-size: 8px;
+  vertical-align: bottom;
+}
+.ovMgmtRow .ordMgmt td:first-child {
+  white-space: nowrap;
+  font-size: 9px;
+}
+.ovMgmtRow .ordFig {
+  font-size: 12px;
+}
+.ovMgmtRow--half .ovOrderPanel {
+  padding: 6px 8px 4px;
+}
+.ovMgmtRow--half .ovOrderPanel__top {
+  flex-wrap: nowrap;
+  margin-bottom: 4px;
+}
+.ovMgmtRow--half .ovOrderPanel__title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.ovMgmtRow--half .ovOrderPanel__title h3,
+.ovMgmtRow--half .ovOrderPanel__title p {
+  white-space: nowrap;
+}
+.ovMgmtRow--half .ovOrderPanel__title p {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ovMgmtRow--rev .ovOrderPanel__top {
+  flex-wrap: nowrap;
+}
+.ovMgmtRow--rev .ovOrderPanel__title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.ovMgmtRow--rev .ovOrderPanel__title h3,
+.ovMgmtRow--rev .ovOrderPanel__title p {
+  white-space: nowrap;
+}
+.ovMgmtRow--rev .ovOrderPanel__title p {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ovMgmtRow--half .ordSource {
+  margin-bottom: 2px;
+}
+.ovMgmtRow--half .ordMgmt th,
+.ovMgmtRow--half .ordMgmt td {
+  padding: 2px 3px;
+  line-height: 1.25;
+}
+.ovMgmtRow--half .ovCol {
+  max-height: 140px;
+}
+.ovMgmtRow--half .ovPie svg {
+  width: 80px;
+  height: 80px;
+}
+.ovOrderPanel {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  background: #fff;
+  border: 1px solid #e6e8ee;
+  border-radius: 12px;
+  padding: 10px 12px 8px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow-x: auto;
+}
+.ovOrderPanel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #1e293b;
+}
+.ovOrderPanel__top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ordLanePick {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #d7dbe3;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  flex-shrink: 0;
+}
+.ordLanePick label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+}
+.ordLanePick label + label {
+  border-left: 1px solid #e6e8ee;
+}
+.ordLanePick input {
+  margin: 0;
+  accent-color: #1e293b;
+}
+.ordLanePick label.is-on {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+.ovOrderPanel__title {
+  flex: 1;
+  min-width: 0;
+}
+.ovOrderPanel__title h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+}
+.ovOrderPanel__title p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+.ovOrderPanel__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 0;
+  min-width: 100%;
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #64748b;
+}
+.ovOrderPanel .ordMgmt {
+  width: auto;
+  min-width: 0;
+}
+.ovCustCard.ovOrderPanel {
+  width: 100%;
+  overflow: visible;
+}
+.ovCustCard .ovOrderPanel__top {
+  flex-wrap: nowrap;
+}
+.ovCustCard .ovOrderPanel__title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.ovCustCard .ovOrderPanel__title h3,
+.ovCustCard .ovOrderPanel__title p {
+  white-space: nowrap;
+}
+.ovCustCard .ovOrderPanel__title h3 {
+  cursor: pointer;
+}
+.ovCustCard .ovOrderPanel__title p {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ovCustScroll {
+  direction: rtl;
+  height: 440px;
+  max-height: 440px;
+  overflow: scroll;
+  scrollbar-width: thin;
+  scrollbar-color: #64748b #e2e8f0;
+}
+.ovCustScroll > .ordMgmt {
+  direction: ltr;
+  margin-right: auto;
+}
+.ovCustScroll::-webkit-scrollbar {
+  width: 14px;
+  height: 12px;
+}
+.ovCustScroll::-webkit-scrollbar-track {
+  background: #e2e8f0;
+}
+.ovCustScroll::-webkit-scrollbar-thumb {
+  background: #64748b;
+  border-radius: 7px;
+}
+.ovCustCard .ordMgmt {
+  width: max-content;
+  max-width: none;
+  table-layout: auto;
+}
+.ordMgmt--cust col.ovCustCol { width: 472px; }
+.ordMgmt--vend col.ovCustCol { width: 240px; }
+.ordMgmt--vend col.ovCustFig { width: 76px; }
+.ordMgmt--vend thead th { white-space: nowrap; }
+.ordMgmt--vend thead tr:nth-child(3) th { text-align: center; }
+.ordMgmt--cust col.ovCustFig { width: 58px; }
+.ordMgmt--cust thead tr:first-child th:first-child,
+.ordMgmt--cust tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 472px;
+  max-width: 472px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 2px 0 0 #e6e8ee;
+}
+.ordMgmt--cust thead tr:first-child th:first-child {
+  top: 0;
+  z-index: 5;
+  background: #f8fafc;
+}
+.ordMgmt--vend col.ovCustCol,
+.ordMgmt--vend thead tr:first-child th:first-child,
+.ordMgmt--vend tbody td:first-child {
+  width: 240px;
+  max-width: 240px;
+}
+.ordMgmt--cust tbody td:not(:first-child),
+.ordMgmt--cust thead th:not(:first-child) {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+.ordMgmt--cust thead th {
+  position: sticky;
+  z-index: 1;
+  text-align: center;
+  background: #f8fafc;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  line-height: 1.25;
+}
+.ordMgmt--cust thead tr:first-child th:first-child {
+  text-align: left;
+}
+.ordMgmt--cust thead tr:first-child th {
+  top: 0;
+  z-index: 3;
+}
+.ordMgmt--cust thead tr:nth-child(2) th {
+  top: 18px;
+  text-align: center;
+}
+.ordMgmt--cust thead tr:nth-child(3) th {
+  top: 36px;
+  text-align: right;
+  z-index: 2;
+}
+.ordMgmt--cust thead th.is-last { color: #1d4ed8; background: #eff6ff; }
+.ordMgmt--cust thead th.is-month { color: #0f766e; background: #f0fdfa; }
+.ordMgmt--cust thead th.is-fy { color: #1e3a5f; background: #f1f5f9; }
+.ordMgmt--cust thead th.is-open { color: #b91c1c; background: #fef2f2; }
+.ordMgmt--cust thead th.is-bill { color: #047857; background: #ecfdf5; }
+.ordMgmt--cust thead th.is-sub { color: #0f766e; background: #f0fdfa; }
+.ordMgmt--cust thead th.is-receipt { color: #1d4ed8; background: #eff6ff; }
+.ordMgmt--cust thead th.is-os { color: #c2410c; background: #fff7ed; }
+.ordMgmt--cust tbody td {
+  padding: 5px 10px;
+  line-height: 1.4;
+}
+.ordMgmt--cust tbody tr:hover td {
+  background: #f8fafc;
+}
+.ovNameSort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ovNameSort__arrows {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1;
+}
+.ovNameSort__arrows button {
+  border: 0;
+  background: transparent;
+  padding: 1px 2px;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ovNameSort__arrows button.is-on {
+  color: #0f172a;
+}
+.ovCustName {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ovCustName .ovDrillLink {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
+.ovCustName .ovAvatar {
+  width: 18px;
+  height: 18px;
+  margin-right: 0;
+  border-radius: 5px;
+  font-size: 9px;
+  flex-shrink: 0;
+}
+.ovCustName__meta {
+  display: inline;
+  flex-shrink: 0;
+  margin-top: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.ovMgmtRow--rev .ovOrderPanel .ordMgmt {
+  width: 100%;
+}
+.ordMgmt {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.ordMgmt th,
+.ordMgmt td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #eef2f6;
+  text-align: right;
+  white-space: nowrap;
+}
+.ordMgmt th:first-child,
+.ordMgmt td:first-child {
+  text-align: left;
+  font-weight: 700;
+  color: #0f172a;
+}
+.ovMgmtRow .ordPair--rev .ordSourceBlock .ordMgmt thead tr:nth-child(2) th:first-child,
+.ordPair--rev .ordMgmt thead tr:nth-child(2) th:first-child {
+  width: auto;
+  text-align: right;
+  font-weight: 700;
+}
+.ordMgmt thead th {
+  background: #f8fafc;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 700;
+}
+.ordMgmt__placed {
+  color: #047857 !important;
+  text-align: center !important;
+}
+.ordMgmt__pending {
+  color: #c2410c !important;
+  text-align: center !important;
+}
+.ordMgmt .is-hot,
+.ordMgmt__sum {
+  background: #f8fafc;
+}
+.ordMgmt .is-hot {
+  background: #fff7ed;
+}
+.ordHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px 8px;
+  border-bottom: 1px solid #e6e8ee;
+}
+.ordHead__kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.ordHead h2 {
+  margin: 2px 0 4px;
+  font-size: 18px;
+  color: #0f172a;
+}
+.ordHead p {
+  margin: 0;
+  max-width: 760px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #64748b;
+}
+.ordHead__actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.ordBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+  cursor: pointer;
+}
+.ordBody {
+  padding: 14px 16px 18px !important;
+}
+.ordState {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+  font-size: 13px;
+  padding: 18px 4px;
+}
+.ordGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.ordCol {
+  border: 1px solid #e6e8ee;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+}
+.ordCol > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.ordLane {
+  border-top: 1px solid #eef2f6;
+  padding-top: 8px;
+  margin-top: 8px;
+}
+.ordLane__head,
+.ordPending__title,
+.ordSplit,
+.ordAges {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.ordLane__head {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 6px;
+}
+.ordSplit,
+.ordAges {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+  margin-top: 4px;
+}
+.ordAges {
+  grid-template-columns: 1fr;
+}
+.ordSplit div,
+.ordAges div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 11px;
+  color: #64748b;
+}
+.ordPending {
+  margin-top: 6px;
+}
+.ordPending__title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9a3412;
+}
+.ordFig {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+  cursor: pointer;
+}
+.ordFig:hover { text-decoration: underline; }
+.ordFig--ok { color: #047857; }
+.ordFig--late { color: #b91c1c; }
+.ordFig--wait { color: #c2410c; }
+.ordFig--move { color: #1d4ed8; }
+.ordMgmt__sent {
+  color: #1d4ed8 !important;
+  text-align: center !important;
+}
+.ordList .is-move { color: #1d4ed8; font-weight: 700; }
+.ordSource { margin: 8px 0 4px; font-size: 11px; font-weight: 800; color: #0f172a; }
+.ordSource:first-child { margin-top: 0; }
+.ordListWrap { overflow: auto; max-height: 62vh; }
+.ordListBar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.ordListMeta { font-size: 12px; color: #64748b; }
+.ordListBar .ordBack:disabled { opacity: 0.45; cursor: default; }
+.ordList { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ordList th, .ordList td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #eef2f6; white-space: nowrap; }
+.ordList th { font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: #94a3b8; position: sticky; top: 0; background: #fff; }
+.ordList .is-ok { color: #047857; font-weight: 700; }
+.ordList .is-late { color: #b91c1c; font-weight: 700; }
+.ordList .is-wait { color: #c2410c; font-weight: 700; }
+.ordEmpty { color: #94a3b8; text-align: center !important; padding: 18px !important; }
+@media (max-width: 1100px) {
+  .ordGrid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 900px) {
+  .ovMgmtRow { grid-template-columns: 1fr; }
+  .ovMgmtRow--rev > .ovMonthCard { min-height: 0; }
+  .ovMonthCard .ordMgmt--months { height: auto; }
+  .ovMgmtRow .ovOrderPanel--pair { grid-column: auto; }
+  .ordPair, .ordPair--3, .ordPair--rev { grid-template-columns: 1fr; }
+  .ovMgmtRow .ordPair--rev .ordSourceBlock,
+  .ovMgmtRow .ordPair--rev .ordSourceBlock .ordMgmt { width: 100%; }
+}
+@media (max-width: 640px) {
+  .ordGrid { grid-template-columns: 1fr; }
 }
 .ovRating {
   display: inline-flex;
@@ -523,6 +1361,12 @@
   box-shadow: inset 0 0 80px rgba(168, 85, 247, 0.06);
   position: relative;
   overflow: visible;
+}
+.pageBody--dash {
+  padding: 0 12px 12px;
+}
+.pageBody--dash .ovSectionHead:first-child {
+  display: none;
 }
 
 .pageBody::before {

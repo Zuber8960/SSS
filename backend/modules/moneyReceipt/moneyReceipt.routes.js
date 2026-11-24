@@ -19,6 +19,7 @@ router.get('/outstanding', async (req, res) => {
       bp_name: req.query.bp_name,
       bp_id: req.query.bp_id,
       mr_reason: req.query.mr_reason,
+      mr_date: req.query.mr_date,
       company_code: req.tenant_id || null,
     });
     res.json({ success: true, data });

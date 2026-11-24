@@ -68,6 +68,22 @@ export const deleteCharge = (chargeId) => Api.delete(`/docket/charges/${chargeId
 // (docket_no, docket_loc, docket_date, inv_no, inv_date)
 export const fetchDocketInvoices = (docketNo) =>
   Api.get(`/docket/${encodeURIComponent(docketNo)}/invoices`).then(r => r.data.data || r.data || []);
+export const fetchDocketInvoiceNos = (docketNos) => {
+  const nos = (Array.isArray(docketNos) ? docketNos : [])
+    .map((n) => String(n || "").trim())
+    .filter(Boolean);
+  if (!nos.length) return Promise.resolve([]);
+  return Api.get("/docket/invoice-nos", { params: { docket_nos: nos.join(",") } })
+    .then((r) => r.data.data || []);
+};
+export const fetchDocketVehicles = (docketNos) => {
+  const nos = (Array.isArray(docketNos) ? docketNos : [])
+    .map((n) => String(n || "").trim())
+    .filter(Boolean);
+  if (!nos.length) return Promise.resolve([]);
+  return Api.get("/docket/ftl-vehicles", { params: { docket_nos: nos.join(",") } })
+    .then((r) => r.data.data || []);
+};
 export const saveDocketInvoices = (docketNo, header, rows) =>
   Api.post(`/docket/${encodeURIComponent(docketNo)}/invoices`, { header, rows })
     .then(r => r.data.data || r.data || []);

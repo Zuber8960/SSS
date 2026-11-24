@@ -92,6 +92,7 @@ const compareBillDate = (a, b) => {
 };
 
 const billingColumns = [
+  { key: "sr_no", label: "Sr", minWidth: 36, frozen: true },
   {
     key: "docket_no",
     label: "Docket",
@@ -1003,6 +1004,17 @@ const docketMatchesSessionLoc = (d, sessionLoc) => {
 const sortDocketsByNo = (rows) =>
   [...(rows || [])].sort((a, b) => compareDocketNo(a?.docket_no, b?.docket_no));
 
+// Bill serials follow docket date, then docket number.
+const sortBillLines = (rows) =>
+  [...(rows || [])].sort((a, b) => {
+    const byDate = compareBillDate(a?.docket_date, b?.docket_date);
+    if (byDate) return byDate;
+    return compareDocketNo(a?.docket_no, b?.docket_no);
+  });
+
+const withBillSerial = (rows) =>
+  sortBillLines(rows).map((row, index) => ({ ...row, sr_no: index + 1 }));
+
 const locTownLabel = (loc, town) => {
   const l = String(loc || "").trim();
   const t = String(town || "").trim();
@@ -1521,7 +1533,7 @@ export default function CustomerBill() {
       cancel_flag: cancelled ? "Y" : data.cancel_flag || null,
       submitted,
     });
-    setBillingRows(sortDocketsByNo(overlayRows));
+    setBillingRows(sortBillLines(overlayRows));
     setSelectedDocketNos(new Set(Object.keys(overlay)));
     setDocketsLoaded(true);
     setLoadingDockets(false);
@@ -1913,7 +1925,7 @@ export default function CustomerBill() {
           invoice_status: billedSet.has(String(docket.docket_no).trim()) ? "Billed" : "Unbilled",
           _chargesLoaded: true,
         }));
-        setBillingRows(sortDocketsByNo(rows));
+        setBillingRows(sortBillLines(rows));
         setSelectedDocketNos(new Set());
         setDocketsLoaded(true);
       } catch (err) {
@@ -1963,6 +1975,9 @@ export default function CustomerBill() {
   // Fold a docket's charge lines into a grid row, keeping any value the user
   // has already typed (manual entries win over the fetched charge).
   const applyChargesToRow = (row, charges) => {
+    if (!Array.isArray(charges) || charges.length === 0) {
+      return { ...row, _chargesLoaded: true };
+    }
     const merged = { ...row };
     ["freight", "loading", "unloading", "detention", "add_toll", "green_tax", "other_charges", "door_collection", "door_delivery", "discount"].forEach((k) => {
       if (!row._edited?.[k]) merged[k] = "0.00";
@@ -1981,29 +1996,32 @@ export default function CustomerBill() {
 
   // Whenever the user ticks dockets, pull their charge breakdown so amounts,
   // taxes and the totals row are real numbers before saving.
-  const loadChargesForSelected = async (docketNos) => {
-    const pending = docketNos.filter((no) => {
-      const row = billingRows.find((r) => String(r.id) === String(no));
-      return row && !row._chargesLoaded;
-    });
+  const loadChargesForSelected = async (ids) => {
+    const pending = ids.map((id) => {
+      const row = billingRows.find((r) => String(r.id) === String(id) || String(r.docket_no).trim() === String(id).trim());
+      if (!row || row._chargesLoaded) return null;
+      const docketNo = String(row.docket_no || "").trim();
+      if (!docketNo) return null;
+      return { id: String(row.id), docketNo };
+    }).filter(Boolean);
     if (pending.length === 0) return;
 
     const pairs = await Promise.all(
-      pending.map(async (no) => {
+      pending.map(async (item) => {
         try {
-          return [no, await fetchCharges(no)];
+          return [item.id, await fetchCharges(item.docketNo)];
         } catch {
-          return [no, []];
+          return [item.id, []];
         }
       })
     );
-    const chargesByDocket = Object.fromEntries(pairs);
+    const chargesByRowId = Object.fromEntries(pairs);
 
     setBillingRows((prev) =>
       prev.map((row) => {
         const key = String(row.id);
-        if (!(key in chargesByDocket)) return row;
-        const charges = chargesByDocket[key];
+        if (!(key in chargesByRowId)) return row;
+        const charges = chargesByRowId[key];
         return Array.isArray(charges) ? applyChargesToRow(row, charges) : { ...row, _chargesLoaded: true };
       })
     );
@@ -2082,7 +2100,7 @@ export default function CustomerBill() {
       _chargesLoaded: false,
       _edited: {},
     };
-    setBillingRows((prev) => [...prev, emptyRow]);
+    setBillingRows((prev) => [emptyRow, ...prev]);
   };
 
   // When a docket number is entered in a row, fetch all docket data and populate the row
@@ -2161,12 +2179,19 @@ export default function CustomerBill() {
         }
         showSuccess("Docket " + newRow.docket_no + " loaded");
 
-        // Update the billingRows state so the populated row persists in the grid
+        const loadedRow = { ...builtRow, id: newRow.id, _chargesLoaded: true, _edited: {} };
         setBillingRows((prev) =>
-          prev.map((row) => (row.id === newRow.id ? { ...builtRow, id: newRow.id } : row))
+          prev.map((row) => (row.id === newRow.id ? loadedRow : row))
         );
+        setSelectedDocketNos((prev) => {
+          const next = new Set(prev);
+          next.add(String(newRow.id));
+          const no = String(builtRow.docket_no || newRow.docket_no || "").trim();
+          if (no) next.add(no);
+          return next;
+        });
 
-        return { ...builtRow, id: newRow.id, _chargesLoaded: true, _edited: {} };
+        return loadedRow;
       } catch (err) {
         showError(err.message || "Failed to fetch docket " + newRow.docket_no);
         console.error("Load docket error:", err);
@@ -2257,6 +2282,23 @@ export default function CustomerBill() {
     if (Array.isArray(selectedDocketNos)) return selectedDocketNos.map(String);
     return [];
   }, [selectedDocketNos]);
+
+  const billGridRows = useMemo(() => {
+    const entry = [];
+    const onBill = [];
+    const others = [];
+    billingRows.forEach((row) => {
+      const no = String(row.docket_no ?? "").trim();
+      if (!no) {
+        entry.push(row);
+        return;
+      }
+      const id = String(row.id ?? "");
+      if (selectedDocketNos.has(id) || selectedDocketNos.has(no)) onBill.push(row);
+      else others.push(row);
+    });
+    return [...entry, ...withBillSerial(onBill), ...sortBillLines(others)];
+  }, [billingRows, selectedDocketNos]);
 
   // The rows the user has ticked - these are the ones that get saved
   const selectedRows = useMemo(
@@ -2425,7 +2467,7 @@ export default function CustomerBill() {
       modified_by: currentUser?.user_id ?? null,
     };
 
-    const details = selectedRows
+    const details = sortBillLines(selectedRows)
       .map((row, index) => ({
         division_code: currentUser?.division_code ?? null,
         invoice_loc: selectedLocCode || null,
@@ -2477,7 +2519,7 @@ export default function CustomerBill() {
       showError("Load a saved bill with Edit before exporting");
       return;
     }
-    const rows = sortDocketsByNo(selectedRows.filter((row) => isDocketOnEditingInvoice(row.docket_no) || row._fromInvoice));
+    const rows = sortBillLines(selectedRows.filter((row) => isDocketOnEditingInvoice(row.docket_no) || row._fromInvoice));
     if (!rows.length) {
       showError("This bill has no dockets to export");
       return;
@@ -2560,7 +2602,7 @@ ${remarkXml}
     const source = editingInvoice
       ? billingRows.filter((row) => isDocketOnEditingInvoice(row.docket_no) || row._fromInvoice)
       : billingRows;
-    const rows = sortDocketsByNo(source);
+    const rows = sortBillLines(source);
     if (!rows.length) {
       showError("No dockets in the billing grid to export");
       return;
@@ -2613,7 +2655,7 @@ ${remarkXml}
     });
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (selectedRows.length === 0) {
       showError("Please select at least one docket before printing");
       return;
@@ -2648,9 +2690,9 @@ ${remarkXml}
     };
 
     try {
-      printInvoice({
+      await printInvoice({
         invoice,
-        details: selectedRows,
+        details: sortBillLines(selectedRows),
         company,
         locationsMap: Object.fromEntries(locations.map((l) => [l.loc_code, l])),
         customer,
@@ -3274,7 +3316,7 @@ ${remarkXml}
           )}
           <DataTable
             columns={tableColumns}
-            rows={sortDocketsByNo(billingRows)}
+            rows={billGridRows}
             getKey={(row) => row.id || row.docket_no}
             actions={chargeRefreshActions}
             actionsPosition="left"

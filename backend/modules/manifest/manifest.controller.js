@@ -51,9 +51,35 @@ const getManifestByLocation = async (loc) => {
 /* ================= GET MANIFEST DETAILS ================= */
 
 const getManifestDetails = async ({ mnf_no, mnf_loc, mnf_date }) => {
-  return db('sss.sst_mnf_dtl')
-    .where({ mnf_no, mnf_loc, mnf_date })
-    .orderBy('mnf_srno');
+  return db('sss.sst_mnf_dtl as md')
+    .leftJoin('sss.sst_docket as d', 'd.docket_no', 'md.dwb_no')
+    .leftJoin('sss.ssm_business_partner as cnor', 'd.cnor_id', 'cnor.record_id')
+    .leftJoin('sss.ssm_business_partner as cnee', 'd.cnee_id', 'cnee.record_id')
+    .where({ 'md.mnf_no': mnf_no, 'md.mnf_loc': mnf_loc, 'md.mnf_date': mnf_date })
+    .select(
+      'md.mnf_no',
+      'md.mnf_loc',
+      'md.mnf_date',
+      'md.mnf_srno',
+      'md.dwb_no',
+      'md.dwb_date',
+      'md.dwb_loc',
+      'md.dwb_to_loc',
+      'md.dwb_pkgs',
+      'md.dwb_actual_wt',
+      'md.dwb_charged_wt',
+      'md.mnf_pkgs',
+      'd.docket_loc',
+      'd.docket_to_loc',
+      'd.docket_pickup_town',
+      'd.docket_dly_town',
+      'd.docket_date',
+      'd.docket_pay_type',
+      'd.docket_chrg_wt',
+      'cnor.bp_name as cnor_name',
+      'cnee.bp_name as cnee_name',
+    )
+    .orderBy('md.mnf_srno');
 };
 
 /* ================= GENERATE NEXT MANIFEST NO ================= */

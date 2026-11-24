@@ -168,6 +168,112 @@ router.post('/login', async (req, res) => {
   }
 });
 
+const branchCodeOf = (value) => String(value || '').trim().toUpperCase();
+
+const allowedBranchCodes = (user) => {
+  const codes = [user?.loc_code, user?.loc_code_1, user?.loc_code_2, user?.loc_code_3, user?.loc_code_4, user?.loc_code_5];
+  return [...new Set(codes.map(branchCodeOf).filter(Boolean))];
+};
+
+const loadSessionBranches = async (user) => {
+  const isAdmin = String(user?.is_admin || '').toUpperCase() === 'Y';
+  const allowed = allowedBranchCodes(user);
+  const base = () => db('sss.ssm_location').select('loc_code', 'loc_name', 'loc_id');
+  let query = base();
+  if (user?.tenant_id) query = query.where({ tenant_id: user.tenant_id });
+  if (!isAdmin && allowed.length) {
+    query = query.whereRaw(
+      `UPPER(TRIM(loc_code)) IN (${allowed.map(() => '?').join(',')})`,
+      allowed
+    );
+  }
+  let rows = (!isAdmin && !allowed.length) ? [] : await query.orderBy('loc_code');
+  if (!rows.length && isAdmin) {
+    rows = await base().orderBy('loc_code');
+  }
+  if (!rows.length && allowed.length) {
+    rows = await base()
+      .whereRaw(`UPPER(TRIM(loc_code)) IN (${allowed.map(() => '?').join(',')})`, allowed)
+      .orderBy('loc_code');
+  }
+  const seen = new Set();
+  return rows.filter((row) => {
+    const code = branchCodeOf(row.loc_code);
+    if (!code || seen.has(code)) return false;
+    seen.add(code);
+    return true;
+  });
+};
+
+router.get('/session/branches', authMiddleware, async (req, res) => {
+  try {
+    const user = await db('sss.ssm_user').where({ rec_id: req.user.recId, record_status: 0 }).first();
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const data = await loadSessionBranches(user);
+    return res.json({ success: true, current: req.loc_code, data });
+  } catch (error) {
+    console.error('Session branches error:', error);
+    return res.status(500).json({ success: false, message: 'Could not load branches' });
+  }
+});
+
+router.post('/session/branch', authMiddleware, async (req, res) => {
+  try {
+    const locCode = String(req.body?.loc_code || '').trim();
+    if (!locCode) {
+      return res.status(400).json({ success: false, message: 'Branch is required' });
+    }
+    const user = await db('sss.ssm_user').where({ rec_id: req.user.recId, record_status: 0 }).first();
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const isAdmin = String(user.is_admin || '').toUpperCase() === 'Y';
+    const allowed = allowedBranchCodes(user);
+    if (!isAdmin && allowed.length && !allowed.includes(branchCodeOf(locCode))) {
+      return res.status(403).json({ success: false, message: 'You are not allowed to use this branch' });
+    }
+    const branches = await loadSessionBranches(user);
+    const match = branches.find((row) => branchCodeOf(row.loc_code) === branchCodeOf(locCode));
+    if (!match && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'You are not allowed to use this branch' });
+    }
+    const locRow = match || await db('sss.ssm_location')
+      .whereRaw('UPPER(TRIM(loc_code)) = ?', [branchCodeOf(locCode)])
+      .first();
+    if (!locRow) {
+      return res.status(404).json({ success: false, message: 'Branch not found' });
+    }
+    const secret = process.env.JWT_SECRET || 'your_jwt_secret_key';
+    const token = jwt.sign(
+      {
+        recId: req.user.recId,
+        userId: req.user.userId,
+        userName: req.user.userName,
+        isAdmin: req.user.isAdmin,
+        tenant_id: req.user.tenant_id,
+        company_code: req.user.company_code,
+        division_code: req.user.division_code,
+        locId: locRow.loc_id || req.user.locId || '000',
+        divisionId: req.user.divisionId,
+        loc_code: locRow.loc_code,
+      },
+      secret,
+      { expiresIn: '24h' }
+    );
+    return res.json({
+      success: true,
+      token,
+      loc_code: locRow.loc_code,
+      loc_name: locRow.loc_name || '',
+    });
+  } catch (error) {
+    console.error('Session branch error:', error);
+    return res.status(500).json({ success: false, message: 'Could not change the branch' });
+  }
+});
+
 /* ================= RESET PASSWORD ================= */
 
 router.post('/reset-password', async (req, res) => {

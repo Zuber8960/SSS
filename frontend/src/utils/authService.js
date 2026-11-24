@@ -90,3 +90,26 @@ export const getSessionLocCode = () => {
     return localStorage.getItem('loc_code') || '';
   }
 };
+
+export const fetchSessionBranches = () =>
+  Api.get('/session/branches').then((r) => r.data);
+
+export const switchSessionBranch = (loc_code) =>
+  Api.post('/session/branch', { loc_code }).then((r) => r.data);
+
+export const applySessionBranch = ({ token, loc_code, loc_name }) => {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  if (loc_code) localStorage.setItem('loc_code', loc_code);
+  const label = loc_name ? `${loc_code} - ${loc_name}` : (loc_code || '');
+  if (label) localStorage.setItem('header_branch_label', label);
+  try {
+    const user = JSON.parse(localStorage.getItem('current_user') || 'null') || {};
+    if (loc_code) {
+      user.loc_code = loc_code;
+      user.location_id = loc_code;
+    }
+    localStorage.setItem('current_user', JSON.stringify(user));
+  } catch {
+    /* keep the token and loc_code already stored */
+  }
+};

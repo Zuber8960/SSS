@@ -170,9 +170,20 @@ router.delete('/:no/:loc/:date', async (req, res) => {
   const trx = await db.transaction();
   try {
     const { no, loc, date } = req.params;
-    await HireVoucherController.deleteHireVoucher({
+    if (req.loc_code && !HireVoucherController.sameLoc(loc, req.loc_code)) {
+      await trx.rollback();
+      return res.status(403).json({
+        success: false,
+        message: 'You can only delete hire vouchers of your login branch',
+      });
+    }
+    const removed = await HireVoucherController.deleteHireVoucher({
       vha_no: no, vha_loc: loc, vha_date: date
     }, trx);
+    if (!removed) {
+      await trx.rollback();
+      return res.status(404).json({ success: false, message: 'Hire voucher not found' });
+    }
     await trx.commit();
     res.json({ success: true, message: 'Hire Voucher deleted successfully' });
   } catch (err) {

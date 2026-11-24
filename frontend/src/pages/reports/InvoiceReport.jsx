@@ -481,7 +481,7 @@ export default function InvoiceReport() {
         { bp_code: inv.bp_code, bp_name: inv.bp_name, loc_code: inv.loc_code },
         partners
       );
-      printInvoice({
+      await printInvoice({
         invoice: {
           invoice_no: inv.invoice_no,
           invoice_date: inv.invoice_date,

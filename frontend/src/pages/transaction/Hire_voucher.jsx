@@ -19,6 +19,7 @@ import {
   fetchAllHireVouchers,
   createHireVoucher,
   updateHireVoucher,
+  deleteHireVoucher,
   fetchUncoveredManifests,
 } from "../../utils/hireVoucher";
 import {
@@ -160,6 +161,9 @@ const emptyVoucherForm = {
   vha_loading_amt: "",        // Loading (₹)
   vha_dc_amt: "",             // Other Charges (₹)
   vha_advance_total: "",      // Advance (₹)
+  vha_adv_paid_on: "",        // Advance paid on
+  vha_adv_pay_mode: "",       // CASH or BANK
+  vha_cheque_no: "",          // Cheque / UTR no when bank
   vha_tds_amt: "",            // TDS (₹)
 
   vha_advance_diesel: "",     // Advance Diesel (₹)
@@ -417,6 +421,25 @@ export default function HireVoucherPage() {
     if (e.key === "Enter" || e.key === "Tab") fillFromVehicleNo();
   };
 
+  const removeHireVoucher = (row) => {
+    if (row?.is_total || !row?.vha_no) return;
+    const date = String(row.vha_date_raw || row.vha_date || "").slice(0, 10);
+    showWarning(
+      "Delete hire voucher",
+      `Delete voucher ${row.vha_no}? The voucher and its manifest lines will be removed.`,
+      async () => {
+        try {
+          await deleteHireVoucher(row.vha_no, row.vha_loc, date);
+          if (String(originalVoucher?.vha_no || "") === String(row.vha_no)) clearForm();
+          loadLocVouchers();
+          showSuccess("Hire voucher deleted");
+        } catch (err) {
+          showError(err.message || "Could not delete the hire voucher");
+        }
+      }
+    );
+  };
+
   const loadLocVouchers = () => {
     const loc = getSessionLocCode();
     if (!loc) {
@@ -488,6 +511,9 @@ export default function HireVoucherPage() {
         vha_loading_amt: amt(hdr.vha_loading_amt),
         vha_dc_amt: amt(hdr.vha_dc_amt),
         vha_advance_total: amt(hdr.vha_advance_total),
+        vha_adv_paid_on: hdr.vha_adv_paid_on ? String(hdr.vha_adv_paid_on).slice(0, 10) : "",
+        vha_adv_pay_mode: hdr.vha_adv_pay_mode ?? "",
+        vha_cheque_no: hdr.vha_cheque_no ?? "",
         vha_tds_amt: amt(hdr.vha_tds_amt),
         vha_advance_diesel: amt(hdr.vha_advance_diesel),
         vha_dtn_amt: amt(hdr.vha_dtn_amt),
@@ -544,6 +570,10 @@ export default function HireVoucherPage() {
       showError("From Location and Voucher Date are required");
       return;
     }
+    if (form.vha_adv_pay_mode === "BANK" && !String(form.vha_cheque_no || "").trim()) {
+      showError("Enter cheque / UTR number");
+      return;
+    }
     const loginLoc = getSessionLocCode();
     if (!loginLoc || !sameLoc(form.vha_loc, loginLoc)) {
       showError("You can only save hire vouchers for your login branch");
@@ -584,6 +614,9 @@ export default function HireVoucherPage() {
       vha_dd_amt: settleOtherAmt,
       vha_advance_cash: num(form.vha_advance_cash),
       vha_advance_total: num(form.vha_advance_total),
+      vha_adv_paid_on: form.vha_adv_paid_on || null,
+      vha_adv_pay_mode: form.vha_adv_pay_mode || null,
+      vha_cheque_no: form.vha_adv_pay_mode === "BANK" ? (form.vha_cheque_no || null) : null,
       vha_tds_amt: num(form.vha_tds_amt),
       vha_advance_net: netAdvance,
       vha_balance_amt: balance,
@@ -955,6 +988,33 @@ export default function HireVoucherPage() {
             value={`₹ ${fmt(netAdvance)}`} />
           <TextField size="small" label="Balance (₹)" fullWidth sx={fieldSx} disabled
             value={`₹ ${fmt(balance)}`} />
+          <Box sx={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, minmax(0, 1fr))" }, gap: "6px 8px" }}>
+            <FormField label="Advance Paid On" name="vha_adv_paid_on" form={form} setForm={setForm} type="date" />
+            <MuiSelect
+              label="Payment Mode"
+              name="vha_adv_pay_mode"
+              value={form.vha_adv_pay_mode}
+              onChange={(name, value) => setForm((prev) => ({
+                ...prev,
+                [name]: value,
+                vha_cheque_no: value === "BANK" ? prev.vha_cheque_no : "",
+              }))}
+              options={[
+                { value: "CASH", label: "Cash" },
+                { value: "BANK", label: "Bank" },
+              ]}
+            />
+            <TextField
+              size="small"
+              label="Cheque / UTR No"
+              fullWidth
+              sx={fieldSx}
+              disabled={form.vha_adv_pay_mode !== "BANK"}
+              value={form.vha_cheque_no}
+              onChange={(e) => updateField("vha_cheque_no", e.target.value)}
+              inputProps={{ maxLength: 30 }}
+            />
+          </Box>
           <TextField size="small" label="Loading Remarks" fullWidth sx={{ ...fieldSx, gridColumn: "1 / -1" }}
             value={form.vha_remarks} onChange={(e) => updateField("vha_remarks", e.target.value)}
             inputProps={{ maxLength: 100 }}
@@ -1136,6 +1196,11 @@ export default function HireVoucherPage() {
                 if (row?.is_total || !row?.vha_no) return;
                 loadVoucherByNo(row.vha_no);
               },
+            },
+            {
+              label: "Delete",
+              icon: <DeleteIcon />,
+              onClick: removeHireVoucher,
             },
           ]}
         />

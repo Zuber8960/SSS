@@ -3,7 +3,6 @@ import MainLayout from "../layouts/MainLayout";
 import { PageBody, DataTable } from "../components/common/MasterPage";
 import { fetchDashboardStats, fetchInTransitDockets, fetchDashboardOverview } from "../utils/dashboard";
 import { fetchAllManifests } from "../utils/manifest";
-import GetAllDetailsPopup from "../components/common/GetAllDetailsPopup";
 import DashboardOverview from "../components/common/DashboardOverview";
 import SearchIcon from "@mui/icons-material/Search";
 import {
@@ -469,7 +468,6 @@ export default function DashboardPage() {
   const [overview, setOverview] = useState(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [inTransitVehiclesOpen, setInTransitVehiclesOpen] = useState(false);
   const [inTransitDocketsOpen, setInTransitDocketsOpen] = useState(false);
 
@@ -506,125 +504,12 @@ export default function DashboardPage() {
     <MainLayout>
       <div style={{
         minHeight: "100%",
-        background: "linear-gradient(135deg, #f3e8ff 0%, #f0f9ff 50%, #ecfdf5 100%)",
-        padding: 24,
+        background: "#f4f6f8",
       }}>
-        <PageBody title="Dashboard">
-
-          {/* Search Engine Button */}
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-            <button
-              type="button"
-              onClick={() => setDetailsOpen(true)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
-                e.currentTarget.style.boxShadow = "0 12px 30px rgba(124, 58, 237, 0.45)";
-                e.currentTarget.style.background = "linear-gradient(135deg, #6b21a8, #9333ea)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0) scale(1)";
-                e.currentTarget.style.boxShadow = "0 6px 18px rgba(124, 58, 237, 0.35)";
-                e.currentTarget.style.background = "linear-gradient(135deg, #7c3aed, #a855f7)";
-              }}
-              onMouseDown={(e) => { e.currentTarget.style.transform = "translateY(0) scale(0.96)"; }}
-              onMouseUp={(e) => { e.currentTarget.style.transform = "translateY(-2px) scale(1.02)"; }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "9px 22px",
-                border: "none",
-                borderRadius: 999,
-                background: "linear-gradient(135deg, #7c3aed, #a855f7)",
-                color: "#fff",
-                fontWeight: 600,
-                fontSize: 14,
-                letterSpacing: 0.3,
-                cursor: "pointer",
-                boxShadow: "0 6px 18px rgba(124, 58, 237, 0.35)",
-                transition: "all 0.25s ease",
-              }}
-            >
-              <span
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "rgba(255, 255, 255, 0.9)",
-                  color: "#7c3aed",
-                  flexShrink: 0,
-                }}
-              >
-                <SearchIcon style={{ fontSize: 17 }} />
-              </span>
-              Search Engine
-            </button>
-
-          </div>
-
-          {/* Stat Cards — 2 rows × 4 columns */}
-          {/* {cards.map((row, ri) => (
-            <div key={ri} style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: 20,
-              marginBottom: 20,
-            }} className="dashboardCards">
-              {row.map(c => (
-                <StatCard key={c.label} {...c} />
-              ))}
-            </div>
-          ))} */}
-
-          {/* Charts */}
-          {/* <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 20 }}
-            className="dashboardCharts"> */}
-
-            {/* Bar chart — dockets per day */}
-            {/* <div style={{ background: "#fff", borderRadius: 12, padding: 24, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#111" }}>
-                  📊 Dockets — Last 30 Days
-                </h3>
-                <span style={{ fontSize: 12, color: "#9ca3af" }}>
-                  {loading ? "Loading…" : `${stats?.dailyCounts?.reduce((a, b) => a + b.count, 0) ?? 0} total`}
-                </span>
-              </div>
-              <BarChart data={stats?.dailyCounts} />
-            </div> */}
-
-            {/* Manifest status chart */}
-            {/* <div style={{
-              background: "#fff", borderRadius: 12, padding: 24,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-              display: "flex", flexDirection: "column",
-            }}>
-              <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#111" }}>
-                🚛 Manifest Status
-              </h3>
-              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {loading
-                  ? <span style={{ color: "#9ca3af", fontSize: 13 }}>Loading…</span>
-                  : <ManifestStatusChart
-                      completed={stats?.manifestCompleted ?? 0}
-                      inTransit={stats?.manifestInTransit ?? 0}
-                    />
-                }
-              </div>
-            </div> */}
-          {/* </div> */}
-
-          {/* Executive Overview — landing section below dashboard */}
+        <PageBody title="Dashboard" className="pageBody--dash">
           <DashboardOverview data={overview} loading={overviewLoading} />
-
         </PageBody>
       </div>
-
-      {/* Get All Details Popup */}
-      <GetAllDetailsPopup open={detailsOpen} onClose={() => setDetailsOpen(false)} />
 
       {/* In Transit Dockets Popup */}
       <InTransitDocketsPopup open={inTransitDocketsOpen} onClose={() => setInTransitDocketsOpen(false)} />

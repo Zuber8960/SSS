@@ -191,10 +191,7 @@ export default function ManifestPage() {
     let totalPkgs = 0;
     let totalDockets = 0;
 
-    const sourceRows =
-      mode === "create"
-        ? availableDockets.filter((_, idx) => availableSelectedIds.has(idx))
-        : details;
+    const sourceRows = availableDockets.filter((row) => availableSelectedIds.has(row.docket_no));
 
     sourceRows.forEach((row) => {
       totalWt += parseFloat(row.weight) || 0;
@@ -412,7 +409,11 @@ export default function ManifestPage() {
 
     try {
       showLoading();
-      const existingNos = new Set(details.map((d) => d.docket_no).filter(Boolean));
+      const loadedRows = mode === "edit"
+        ? (availableDockets.length ? availableDockets : details).filter((row) => row.docket_no)
+        : [];
+      const keepSelected = new Set(availableSelectedIds);
+      const existingNos = new Set(loadedRows.map((d) => d.docket_no).filter(Boolean));
       let filtered = [];
 
       if (form.manifest_type === "ld") {
@@ -483,9 +484,17 @@ export default function ManifestPage() {
         };
       });
 
-      setAvailableDockets(mapped);
+      const combined = [...loadedRows, ...mapped];
+      setAvailableDockets(combined);
+      setAvailableSelectedIds(mode === "edit" ? keepSelected : new Set());
       setShowDocketMode(true);
-      showInfo(`Found ${mapped.length} docket(s) up to ${form.manifest_date}`);
+      showInfo(
+        mode === "edit"
+          ? mapped.length
+            ? `${mapped.length} docket(s) added to the list. Tick the ones to include and save.`
+            : "No more dockets are pending for this manifest."
+          : `Found ${mapped.length} docket(s) up to ${form.manifest_date}`
+      );
     } catch (err) {
       showError(err.message || "Failed to fetch dockets");
       console.error("Fetch dockets error:", err);
@@ -587,15 +596,43 @@ export default function ManifestPage() {
     remarks: hdr.aud_user || "",
   });
 
-  // ✅ Map DB detail to form detail rows
-  const mapDetailToForm = (dtl) => ({
-    docket_no: dtl.dwb_no || "",
-    docket_date: dtl.dwb_date ? dtl.dwb_date.substring(0, 10) : "",
-    from_loc: dtl.dwb_loc || "",
-    to_loc: dtl.dwb_to_loc || "",
-    packages: dtl.dwb_pkgs ?? "",
-    weight: dtl.dwb_actual_wt ?? "",
-  });
+  const showDate = (value) => {
+    const text = String(value || "");
+    if (!text) return "";
+    if (text.includes("T")) {
+      const parsed = new Date(text);
+      if (!Number.isNaN(parsed.getTime())) {
+        const ist = new Date(parsed.getTime() + 5.5 * 60 * 60 * 1000);
+        return ist.toISOString().slice(0, 10);
+      }
+    }
+    return text.slice(0, 10);
+  };
+
+  // ✅ Map a saved manifest line onto the docket grid
+  const mapDetailToForm = (dtl) => {
+    const pkgs = dtl.mnf_pkgs ?? dtl.dwb_pkgs ?? "";
+    const weight = dtl.dwb_actual_wt ?? "";
+    return {
+      docket_no: dtl.dwb_no || "",
+      docket_date: showDate(dtl.docket_date || dtl.dwb_date),
+      docket_loc: dtl.docket_loc || dtl.dwb_loc || "",
+      docket_pickup_town: dtl.docket_pickup_town || "",
+      docket_to_loc: dtl.docket_to_loc || dtl.dwb_to_loc || "",
+      docket_dly_town: dtl.docket_dly_town || "",
+      cnor_name: dtl.cnor_name || "",
+      cnee_name: dtl.cnee_name || "",
+      docket_tot_pkgs: pkgs,
+      docket_act_wt: weight,
+      docket_chrg_wt: dtl.docket_chrg_wt || dtl.dwb_charged_wt || weight,
+      docket_pay_type: dtl.docket_pay_type || "",
+      docket_dispatch_pkgs: pkgs,
+      from_loc: dtl.dwb_loc || dtl.docket_loc || "",
+      to_loc: dtl.dwb_to_loc || dtl.docket_to_loc || "",
+      packages: pkgs,
+      weight,
+    };
+  };
 
   // ✅ Fetch manifest data from DB and populate form
   const fetchAndLoadManifest = async (mnfNo) => {
@@ -616,8 +653,12 @@ export default function ManifestPage() {
         return false;
       }
 
+      const rows = dtls.map(mapDetailToForm);
       setForm({ ...mapHeaderToForm(hdr), from_loc: loginLoc });
-      setDetails(dtls.map(mapDetailToForm));
+      setDetails(rows);
+      setAvailableDockets(rows);
+      setAvailableSelectedIds(new Set(rows.map((row) => row.docket_no).filter(Boolean)));
+      setShowDocketMode(true);
 
       originalKey.current = {
         mnf_no: hdr.mnf_no,
@@ -645,6 +686,8 @@ export default function ManifestPage() {
   const handleCreateNew = () => {
     setForm(blankManifestForm());
     setDetails([]);
+    setAvailableDockets([]);
+    setAvailableSelectedIds(new Set());
     originalKey.current = null;
     setMode("create");
     setIsSearchActive(false);
@@ -677,6 +720,8 @@ export default function ManifestPage() {
   const handleClear = () => {
     setForm(blankManifestForm());
     setDetails([]);
+    setAvailableDockets([]);
+    setAvailableSelectedIds(new Set());
     originalKey.current = null;
     setMode("create");
     setIsSearchActive(false);
@@ -1110,7 +1155,7 @@ export default function ManifestPage() {
 
       const header = mapFormToHeader();
       const detailRows = availableDockets
-        .filter((d, idx) => availableSelectedIds.has(idx))
+        .filter((d) => availableSelectedIds.has(d.docket_no))
         .map((row) => ({
           dwb_no: row.docket_no,
           dwb_date: row.docket_date || null,
@@ -1304,7 +1349,7 @@ export default function ManifestPage() {
                       marginTop: 0,
                     }}
                   >
-                    Show Docket
+                    {mode === "edit" ? "Add Docket" : "Show Docket"}
                   </Button>
                 </div>
               );
@@ -1339,16 +1384,18 @@ export default function ManifestPage() {
           <DataTable
             columns={detailColumns}
             rows={availableDockets}
-            getKey={(row, index) => index}
+            getKey={(row, index) => row.docket_no || `row-${index}`}
             actions={[]}
             checkboxSelection
+            rowSelectionModel={availableSelectedIds}
             onRowSelectionModelChange={(model) => {
-              if (model?.type === 'exclude') {
-                const allIds = new Set(availableDockets.map((_, idx) => idx).filter(idx => !model.ids.has(idx)));
-                setAvailableSelectedIds(allIds);
+              const picked = model?.ids instanceof Set ? model.ids : new Set(Array.isArray(model) ? model : []);
+              if (model?.type === "exclude") {
+                setAvailableSelectedIds(new Set(
+                  availableDockets.map((row) => row.docket_no).filter((id) => id && !picked.has(id))
+                ));
               } else {
-                const ids = model?.ids instanceof Set ? model.ids : new Set(Array.isArray(model) ? model : []);
-                setAvailableSelectedIds(ids);
+                setAvailableSelectedIds(picked);
               }
             }}
             isHeight={520}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Autocomplete, Button, Chip, TextField,
 } from "@mui/material";
@@ -13,6 +13,8 @@ import { fetchAllBusinessPartners } from "../../utils/businessPartner";
 import { fetchAllLocations } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { getSessionLocCode } from "../../utils/authService";
+import { fetchChargeMaster, fetchChargesBulk, fetchDocketByDocketNo } from "../../utils/docket";
+import { getDateFormat } from "../../utils/tenantService";
 import { printMoneyReceipt } from "../../components/common/MoneyReceiptPrint";
 import {
   fetchMrBanks,
@@ -46,8 +48,96 @@ const MR_REASONS = [
 const mrReasonLabel = (v) => MR_REASONS.find((r) => r.value === String(v))?.label || "";
 
 const fieldSx = {
-  "& .MuiInputBase-input": { fontSize: 11, fontWeight: 700 },
+  "& .MuiInputBase-root": { height: 30 },
+  "& .MuiInputBase-input": { fontSize: 11, fontWeight: 700, padding: "4px 8px" },
   "& .MuiInputLabel-root": { fontSize: 11, fontWeight: 700 },
+};
+
+const MR_HEAD_CSS = `
+.mr-receipt-head .MuiInputBase-root { height: 30px; }
+.mr-receipt-head .MuiInputBase-input { font-size: 11px !important; font-weight: 700; padding: 4px 8px !important; }
+.mr-receipt-head .MuiInputLabel-root { font-size: 11px !important; font-weight: 700; }
+.mr-receipt-head .MuiSelect-select { font-size: 11px !important; min-height: 0 !important; padding-top: 4px !important; padding-bottom: 4px !important; }
+.mr-receipt-head .MuiAutocomplete-input { padding: 2px 4px !important; }
+.mr-docket-grid .MuiDataGrid-columnHeaderTitle {
+  white-space: pre-line !important;
+  line-height: 1.05 !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+.mr-docket-grid .MuiDataGrid-columnHeaderTitle,
+.mr-docket-grid .MuiDataGrid-cell,
+.mr-docket-grid .MuiDataGrid-cell span,
+.mr-docket-grid .MuiDataGrid-cell input,
+.mr-docket-grid .MuiInputBase-input {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+}
+.mr-docket-grid .MuiDataGrid-cell {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+.mr-docket-grid .MuiDataGrid-cell span,
+.mr-docket-grid .MuiDataGrid-columnHeaderTitle {
+  text-align: left !important;
+}
+.mr-docket-grid .MuiDataGrid-cell[data-field="bill_amt"],
+.mr-docket-grid .MuiDataGrid-cell[data-field="sgst_amt"],
+.mr-docket-grid .MuiDataGrid-cell[data-field="cgst_amt"],
+.mr-docket-grid .MuiDataGrid-cell[data-field="igst_amt"],
+.mr-docket-grid .MuiDataGrid-cell[data-field="tds_amt"],
+.mr-docket-grid .MuiDataGrid-cell[data-field="deduction_amt"],
+.mr-docket-grid .MuiDataGrid-cell[data-field="net_received"] {
+  justify-content: flex-end !important;
+  text-align: right !important;
+}
+.mr-docket-grid .MuiDataGrid-cell[data-field="bill_amt"] span,
+.mr-docket-grid .MuiDataGrid-cell[data-field="sgst_amt"] span,
+.mr-docket-grid .MuiDataGrid-cell[data-field="cgst_amt"] span,
+.mr-docket-grid .MuiDataGrid-cell[data-field="igst_amt"] span,
+.mr-docket-grid .MuiDataGrid-cell[data-field="tds_amt"] span,
+.mr-docket-grid .MuiDataGrid-cell[data-field="deduction_amt"] span,
+.mr-docket-grid .MuiDataGrid-cell[data-field="net_received"] span,
+.mr-docket-grid .MuiDataGrid-cell[data-field="bill_amt"] input,
+.mr-docket-grid .MuiDataGrid-cell[data-field="sgst_amt"] input,
+.mr-docket-grid .MuiDataGrid-cell[data-field="cgst_amt"] input,
+.mr-docket-grid .MuiDataGrid-cell[data-field="igst_amt"] input,
+.mr-docket-grid .MuiDataGrid-cell[data-field="tds_amt"] input,
+.mr-docket-grid .MuiDataGrid-cell[data-field="deduction_amt"] input,
+.mr-docket-grid .MuiDataGrid-cell[data-field="net_received"] input,
+.mr-docket-grid .MuiDataGrid-columnHeader[data-field="bill_amt"] .MuiDataGrid-columnHeaderTitle,
+.mr-docket-grid .MuiDataGrid-columnHeader[data-field="sgst_amt"] .MuiDataGrid-columnHeaderTitle,
+.mr-docket-grid .MuiDataGrid-columnHeader[data-field="cgst_amt"] .MuiDataGrid-columnHeaderTitle,
+.mr-docket-grid .MuiDataGrid-columnHeader[data-field="igst_amt"] .MuiDataGrid-columnHeaderTitle,
+.mr-docket-grid .MuiDataGrid-columnHeader[data-field="tds_amt"] .MuiDataGrid-columnHeaderTitle,
+.mr-docket-grid .MuiDataGrid-columnHeader[data-field="deduction_amt"] .MuiDataGrid-columnHeaderTitle,
+.mr-docket-grid .MuiDataGrid-columnHeader[data-field="net_received"] .MuiDataGrid-columnHeaderTitle {
+  text-align: right !important;
+}
+.mr-bill-grid .MuiDataGrid-cell,
+.mr-bill-grid .MuiDataGrid-cell span {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+`;
+
+const consignorKey = (row) => String(row?.cnor_id ?? "").trim();
+
+const sameConsignor = (list) => {
+  const keys = new Set((list || []).map(consignorKey));
+  return keys.size <= 1;
+};
+
+const partyLabel = (code, name) => {
+  const c = String(code ?? "").trim();
+  const n = String(name ?? "").trim();
+  if (c && c !== "0" && n) return `${c} - ${n}`;
+  return n || (c && c !== "0" ? c : "");
 };
 
 const fmt = (v) => {
@@ -74,23 +164,172 @@ const blankForm = (locations = []) => ({
   received_amt: "",
 });
 
+const docketText = (key, label, minWidth) => ({ key, label, minWidth, align: "left", headerAlign: "left" });
+const docketAmt = (key, label, minWidth, extra = {}) => ({ key, label, minWidth, align: "right", headerAlign: "right", ...extra });
+
 const docketColumns = [
-  { key: "docket_no", label: "Docket No", minWidth: 130, align: "left" },
-  { key: "docket_date", label: "Date", minWidth: 90 },
-  { key: "loc_code", label: "From Loc", minWidth: 90 },
-  { key: "docket_from_town", label: "From Town", minWidth: 140, align: "left", headerAlign: "left" },
-  { key: "docket_to_loc", label: "To Loc", minWidth: 90 },
-  { key: "docket_to_town", label: "To Town", minWidth: 140, align: "left", headerAlign: "left" },
-  { key: "docket_pay_type", label: "Pay Type", minWidth: 90 },
-  { key: "party_name", label: "Party Name", minWidth: 260, align: "left", headerAlign: "left" },
-  { key: "bill_amt", label: "Freight", minWidth: 90, align: "right" },
-  { key: "sgst_amt", label: "SGST", minWidth: 80, align: "right" },
-  { key: "cgst_amt", label: "CGST", minWidth: 80, align: "right" },
-  { key: "igst_amt", label: "IGST", minWidth: 80, align: "right" },
-  { key: "tds_amt", label: "TDS", minWidth: 90, editable: true, type: "number", align: "right" },
-  { key: "deduction_amt", label: "Other Ded", minWidth: 100, editable: true, type: "number", align: "right" },
-  { key: "net_received", label: "Net Received", minWidth: 120, align: "right" },
+  docketText("docket_no", "Docket\nNo", 118),
+  docketText("docket_date", "Date", 92),
+  docketText("loc_code", "From\nLoc", 76),
+  docketText("docket_from_town", "From\nTown", 120),
+  docketText("docket_to_loc", "To\nLoc", 70),
+  docketText("docket_to_town", "To\nTown", 120),
+  docketText("docket_pay_type", "Pay\nType", 76),
+  docketText("party_name", "Party\nName", 280),
+  docketAmt("bill_amt", "Freight", 82),
+  docketAmt("sgst_amt", "SGST", 72),
+  docketAmt("cgst_amt", "CGST", 72),
+  docketAmt("igst_amt", "IGST", 72),
+  docketAmt("tds_amt", "TDS", 72, { editable: true, type: "number" }),
+  docketAmt("deduction_amt", "Other\nDed", 88, { editable: true, type: "number" }),
+  docketAmt("net_received", "Net\nReceived", 100),
 ];
+
+const CHARGE_CODE_COL = {
+  DK01: "freight",
+  DK02: "unloading",
+  DK03: "green_tax",
+  DK04: "detention",
+  DK05: "door_collection",
+  DK06: "loading",
+  DK07: "add_toll",
+  DK08: "door_delivery",
+  DK09: "other_charges",
+};
+
+const MASTER_DESC_RULES = [
+  { key: "door_collection", tests: ["DOOR PKP", "DOOR COLLECTION", "DOOR COLLECT", "DOOR PICKUP", "PICKUP CHARGE"] },
+  { key: "door_delivery", tests: ["DOOR DLY", "DOOR DLV", "DOOR DELIVERY"] },
+  { key: "green_tax", tests: ["FREIGHT ON VALUE", "FOV"] },
+  { key: "unloading", tests: ["FUEL SURCHARGE", "FSC"] },
+  { key: "detention", tests: ["FACTORY CHARGE", "FACTORY"] },
+  { key: "loading", tests: ["HANDLING CHARGE", "HANDLING"] },
+  { key: "add_toll", tests: ["ODA CHARGE", "ODA"] },
+  { key: "other_charges", tests: ["STATIONERY", "STATIONARY"] },
+  { key: "freight", tests: ["FREIGHT", "FRT"] },
+];
+
+const BILL_MONEY_KEYS = [
+  "freight", "loading", "unloading", "detention", "add_toll", "green_tax",
+  "other_charges", "door_collection", "door_delivery", "taxable", "cgst", "sgst", "igst", "amount",
+];
+
+const columnFromCharge = (charge, master) => {
+  const code = String(charge?.charge_code || "").toUpperCase().trim();
+  if (CHARGE_CODE_COL[code]) return CHARGE_CODE_COL[code];
+  const known = (master || []).find((m) => String(m.charge_code || "").toUpperCase().trim() === code);
+  const desc = String(known?.charge_desc || charge?.charge_name || charge?.charge_desc || "").toUpperCase();
+  for (const rule of MASTER_DESC_RULES) {
+    if (rule.tests.some((t) => desc.includes(t))) return rule.key;
+  }
+  return null;
+};
+
+const locTownLabel = (loc, town) => {
+  const l = String(loc || "").trim();
+  const t = String(town || "").trim();
+  if (l && t) return `${l} > ${t}`;
+  return l || t || "";
+};
+
+const billDateText = (val) => {
+  if (!val) return "";
+  const m = moment(val);
+  return m.isValid() ? m.format(getDateFormat()) : String(val);
+};
+
+const rateText = (value) => {
+  if (value === null || value === undefined || value === "") return "";
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? n.toFixed(2) : String(value);
+};
+
+const weightText = (value) => {
+  if (value === null || value === undefined || value === "") return "";
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? String(n) : String(value);
+};
+
+const billColumns = [
+  { key: "docket_no", label: "Docket", minWidth: 148, align: "left", headerAlign: "left" },
+  { key: "docket_date", label: "Date", minWidth: 96, align: "left", headerAlign: "left" },
+  { key: "origin", label: "Origin", minWidth: 150, align: "left", headerAlign: "left" },
+  { key: "destination", label: "Dest", minWidth: 150, align: "left", headerAlign: "left" },
+  { key: "consignee", label: "Cnee.", minWidth: 200, align: "left" },
+  { key: "rate", label: "Rate", minWidth: 72 },
+  { key: "rate_uom", label: "Rate UOM", minWidth: 84 },
+  { key: "actual_wt", label: "Act Wt", minWidth: 70 },
+  { key: "charge_wt", label: "Chg Wt", minWidth: 70 },
+  { key: "freight", label: "Frt.", minWidth: 90, align: "right" },
+  { key: "loading", label: "Hand.", minWidth: 80, align: "right" },
+  { key: "unloading", label: "Fuel Chrg", minWidth: 90, align: "right" },
+  { key: "detention", label: "Fact. Chrg", minWidth: 90, align: "right" },
+  { key: "add_toll", label: "ODA Chrg", minWidth: 80, align: "right" },
+  { key: "green_tax", label: "FOV", minWidth: 70, align: "right" },
+  { key: "other_charges", label: "Stnry.", minWidth: 80, align: "right" },
+  { key: "door_collection", label: "Door Pkp", minWidth: 80, align: "right" },
+  { key: "door_delivery", label: "Door Dly", minWidth: 80, align: "right" },
+  { key: "taxable", label: "Taxable", minWidth: 90, align: "right" },
+  { key: "cgst", label: "CGST", minWidth: 70, align: "right" },
+  { key: "sgst", label: "SGST", minWidth: 70, align: "right" },
+  { key: "igst", label: "IGST", minWidth: 70, align: "right" },
+  { key: "amount", label: "Amt.", minWidth: 90, align: "right" },
+];
+
+const emptyCharges = () => ({
+  freight: 0, loading: 0, unloading: 0, detention: 0, add_toll: 0,
+  green_tax: 0, other_charges: 0, door_collection: 0, door_delivery: 0,
+});
+
+const toBillRow = (mr, docket, charges, master) => {
+  const amounts = emptyCharges();
+  (Array.isArray(charges) ? charges : []).forEach((c) => {
+    const key = columnFromCharge(c, master);
+    if (key && key in amounts) amounts[key] += num(c.charge_amt);
+  });
+  const hasCharges = (Array.isArray(charges) ? charges : []).length > 0;
+  if (!hasCharges) amounts.freight = num(mr.bill_amt);
+  const taxable = Math.round((
+    amounts.freight + amounts.loading + amounts.unloading + amounts.detention
+    + amounts.add_toll + amounts.green_tax + amounts.other_charges
+    + amounts.door_collection + amounts.door_delivery
+  ) * 100) / 100;
+  const src = docket && typeof docket === "object" ? docket : {};
+  const row = {
+    id: mr.id,
+    docket_no: mr.docket_no || src.docket_no || "",
+    docket_date: billDateText(src.docket_date || mr.docket_date),
+    origin: locTownLabel(src.docket_loc || mr.loc_code, src.docket_pickup_town || mr.docket_from_town),
+    destination: locTownLabel(src.docket_to_loc || mr.docket_to_loc, src.docket_dly_town || mr.docket_to_town),
+    consignee: src.cnee_name || "",
+    rate: rateText(src.docket_rate),
+    rate_uom: src.docket_rate_uom || "",
+    actual_wt: weightText(src.docket_act_wt),
+    charge_wt: weightText(src.docket_chrg_wt),
+    taxable: taxable.toFixed(2),
+  };
+  Object.keys(amounts).forEach((key) => { row[key] = amounts[key].toFixed(2); });
+  return row;
+};
+
+const billGst = (taxable, customer, branch) => {
+  const base = num(taxable);
+  const gst = Math.round(base * 0.18 * 100) / 100;
+  const half = Math.round((gst / 2) * 100) / 100;
+  const custKey = gstStateKey(customer?.bp_gstin, customer?.bp_state);
+  const locKey = gstStateKey(branch?.loc_gstin || branch?.gstin_no, branch?.loc_state);
+  const inter = Boolean(custKey && locKey && custKey !== locKey);
+  const cgst = inter ? 0 : half;
+  const sgst = inter ? 0 : Math.round((gst - cgst) * 100) / 100;
+  const igst = inter ? gst : 0;
+  return {
+    taxable: fmt(base),
+    cgst: fmt(cgst),
+    sgst: fmt(sgst),
+    igst: fmt(igst),
+    amount: fmt(base + gst),
+  };
+};
 
 const gstStateKey = (gstin, stateName) => {
   const g = String(gstin || "").replace(/\s/g, "").toUpperCase();
@@ -144,9 +383,17 @@ export default function MoneyReceipt() {
   const [company, setCompany] = useState(null);
   const [form, setForm] = useState(() => blankForm());
   const [rows, setRows] = useState([]);
+  const [billRows, setBillRows] = useState([]);
+  const [billLoading, setBillLoading] = useState(false);
+  const [chargeMaster, setChargeMaster] = useState([]);
   const [selectedIds, setSelectedIds] = useState({ type: "include", ids: new Set() });
   const [editing, setEditing] = useState(null);
   const [editNoMode, setEditNoMode] = useState(false);
+  const billRowsRef = useRef([]);
+  const chargeMasterRef = useRef([]);
+  const skipCustomerReload = useRef(false);
+  billRowsRef.current = billRows;
+  chargeMasterRef.current = chargeMaster;
 
   useEffect(() => {
     fetchAllLocations().then((d) => {
@@ -157,6 +404,7 @@ export default function MoneyReceipt() {
     fetchAllBusinessPartners().then((d) => setPartners(Array.isArray(d) ? d : [])).catch(() => {});
     fetchMrBanks().then((d) => setBanks(Array.isArray(d) ? d : [])).catch(() => {});
     fetchAllCompanies().then((d) => { if (Array.isArray(d) && d.length) setCompany(d[0]); }).catch(() => {});
+    fetchChargeMaster().then((d) => setChargeMaster(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
 
   const locCode = locCodeOf(form.loc_code) || getSessionLocCode();
@@ -165,35 +413,91 @@ export default function MoneyReceipt() {
     [locations, locCode]
   );
   const paidFull = form.mr_reason === "1";
-  const showDocketGrid = (form.mr_reason === "1" || form.mr_reason === "2") && (Boolean(form.customer) || rows.length > 0);
+  const showDocketGrid = form.mr_reason === "1" || form.mr_reason === "2";
+
+  const toCustomerOption = (p) => {
+    const name = String(p.bp_name || "").trim();
+    const code = String(p.bp_grp_code ?? p.bp_code ?? "").trim();
+    return {
+      value: String(p.record_id ?? p.bp_id ?? ""),
+      code,
+      name,
+      label: code ? `${code} - ${name}` : name,
+    };
+  };
 
   const customerOptions = useMemo(() => {
     const loc = String(locCode || "").toUpperCase();
-    return partners
+    const opts = partners
       .filter((p) => {
         const bpLoc = String(p.loc_code || "").split(" - ")[0].trim().toUpperCase();
         return (!loc || !bpLoc || bpLoc === loc) && (p.bp_name || p.bp_grp_code || p.bp_code);
       })
-      .map((p) => {
-        const name = String(p.bp_name || "").trim();
-        const code = String(p.bp_grp_code ?? p.bp_code ?? "").trim();
-        return {
-          value: String(p.record_id ?? p.bp_id ?? ""),
-          code,
-          name,
-          label: code ? `${code} - ${name}` : name,
-        };
-      })
+      .map(toCustomerOption)
       .filter((o) => o.value);
-  }, [partners, locCode]);
+    const selected = partners.find((p) => String(p.record_id ?? p.bp_id ?? "") === String(form.customer));
+    if (selected) {
+      const opt = toCustomerOption(selected);
+      if (opt.value && !opts.some((o) => o.value === opt.value)) opts.unshift(opt);
+    }
+    if (String(form.customer || "").startsWith("party:") && !opts.some((o) => o.value === form.customer)) {
+      const raw = String(form.customer).slice(6);
+      const row = rows.find((r) => String(r.party_code || "") === raw || String(r.party_bp_name || "") === raw);
+      const code = String(row?.party_code || raw).trim();
+      const name = String(row?.party_bp_name || "").trim();
+      opts.unshift({ value: form.customer, code, name, label: partyLabel(code, name) });
+    }
+    return opts;
+  }, [partners, locCode, form.customer, rows]);
 
   const selectedCustomer = useMemo(
     () => partners.find((p) => String(p.record_id ?? p.bp_id ?? "") === String(form.customer)) || null,
     [partners, form.customer]
   );
 
-  const loadOutstanding = async (customer = selectedCustomer, reason = form.mr_reason) => {
-    if (!customer || !locCode || (reason !== "1" && reason !== "2")) {
+  const partnerFromRow = (row) => {
+    if (!row) return null;
+    const id = String(row.party_id ?? "").trim();
+    if (id && id !== "0") {
+      const byId = partners.find((p) => String(p.record_id ?? p.bp_id ?? "") === id);
+      if (byId) return byId;
+    }
+    const code = String(row.party_code ?? "").trim();
+    const rawName = String(row.party_bp_name || "").trim().toLowerCase();
+    const byCode = partners.filter((p) => {
+      const pCode = String(p.bp_grp_code ?? p.bp_code ?? "").trim();
+      return code && code !== "0" && pCode === code;
+    });
+    if (byCode.length === 1) return byCode[0];
+    if (rawName) {
+      const named = (byCode.length ? byCode : partners).find((p) => String(p.bp_name || "").trim().toLowerCase() === rawName);
+      if (named) return named;
+    }
+    return byCode[0] || null;
+  };
+
+  const fillCustomerFromRows = (chosenIds, chosen) => {
+    const row = chosen[0];
+    if (!row) return null;
+    const partner = partnerFromRow(row);
+    const id = partner
+      ? String(partner.record_id ?? partner.bp_id ?? "")
+      : `party:${String(row.party_code || row.party_bp_name || "").trim()}`;
+    if (id && id !== String(form.customer)) {
+      skipCustomerReload.current = true;
+      setForm((prev) => ({ ...prev, customer: id }));
+    }
+    if (partner) {
+      setRows((prev) => prev.map((r) => {
+        if (!chosenIds.has(r.id)) return applyNet(r, r.tds_amt, r.deduction_amt);
+        return applyNet({ ...r, ...gstOnFreight(r.bill_amt, partner, loginLoc) }, r.tds_amt, r.deduction_amt);
+      }));
+    }
+    return partner;
+  };
+
+  const loadOutstanding = async (customer = selectedCustomer, reason = form.mr_reason, mrDate = form.mr_date) => {
+    if (!locCode || !mrDate || (reason !== "1" && reason !== "2")) {
       setRows([]);
       setSelectedIds({ type: "include", ids: new Set() });
       return;
@@ -202,14 +506,18 @@ export default function MoneyReceipt() {
       showLoading();
       const data = await fetchOutstandingDockets({
         loc_code: locCode,
-        bp_code: customer.bp_grp_code || customer.bp_code || "",
-        bp_name: customer.bp_name || "",
-        bp_id: customer.record_id ?? customer.bp_id ?? "",
+        bp_code: customer?.bp_grp_code || customer?.bp_code || "",
+        bp_name: customer?.bp_name || "",
+        bp_id: customer?.record_id ?? customer?.bp_id ?? "",
         mr_reason: reason,
+        mr_date: mrDate,
       });
       setRows((Array.isArray(data) ? data : []).map((r) => applyNet({
         ...r,
         id: r.id || `${r.docket_no}_${r.docket_date}_${r.loc_code}`,
+        party_id: r.party_id,
+        party_bp_name: r.party_name,
+        party_name: partyLabel(r.party_code, r.party_name),
         ...gstOnFreight(r.bill_amt, customer, loginLoc),
       }, r.tds_amt, r.deduction_amt)));
       setSelectedIds({ type: "include", ids: new Set() });
@@ -222,17 +530,69 @@ export default function MoneyReceipt() {
   };
 
   useEffect(() => {
-    if (editing) return;
-    if (!form.customer || !selectedCustomer || (form.mr_reason !== "1" && form.mr_reason !== "2")) {
-      if (!form.customer || form.mr_reason === "3" || form.mr_reason === "4") {
-        setRows([]);
-        setSelectedIds({ type: "include", ids: new Set() });
-      }
+    if (skipCustomerReload.current) {
+      skipCustomerReload.current = false;
       return;
     }
-    loadOutstanding(selectedCustomer, form.mr_reason);
+    if (editing) return;
+    if (form.mr_reason !== "1" && form.mr_reason !== "2") {
+      setRows([]);
+      setSelectedIds({ type: "include", ids: new Set() });
+      return;
+    }
+    loadOutstanding(selectedCustomer, form.mr_reason, form.mr_date);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.customer, form.mr_reason, locCode, selectedCustomer, editing]);
+  }, [form.customer, form.mr_reason, form.mr_date, locCode, selectedCustomer, editing]);
+
+  useEffect(() => {
+    const ids = selectedIds?.ids instanceof Set ? selectedIds.ids : new Set();
+    if (form.mr_reason !== "1" && form.mr_reason !== "2") {
+      setBillRows([]);
+      setBillLoading(false);
+      return undefined;
+    }
+    setBillRows((prev) => prev.filter((r) => ids.has(r.id)));
+    const have = new Set(billRowsRef.current.filter((r) => ids.has(r.id)).map((r) => r.id));
+    const missing = rows.filter((r) => ids.has(r.id) && !have.has(r.id));
+    if (!missing.length) {
+      setBillLoading(false);
+      return undefined;
+    }
+    let cancel = false;
+    setBillLoading(true);
+    (async () => {
+      try {
+        const nos = missing.map((r) => r.docket_no);
+        const [chargeRows, dockets] = await Promise.all([
+          fetchChargesBulk(nos),
+          Promise.all(missing.map((r) => fetchDocketByDocketNo(r.docket_no).catch(() => null))),
+        ]);
+        const byNo = {};
+        (Array.isArray(chargeRows) ? chargeRows : []).forEach((c) => {
+          const no = String(c.docket_no || "").trim();
+          if (!byNo[no]) byNo[no] = [];
+          byNo[no].push(c);
+        });
+        const built = missing.map((mr, i) => {
+          const docket = Array.isArray(dockets[i]) ? dockets[i][0] : dockets[i];
+          const no = String(mr.docket_no || "").trim();
+          return toBillRow(mr, docket, byNo[no] || [], chargeMasterRef.current);
+        });
+        if (cancel) return;
+        setBillRows((prev) => {
+          const seen = new Set(prev.map((r) => r.id));
+          const add = built.filter((r) => ids.has(r.id) && !seen.has(r.id));
+          return [...prev.filter((r) => ids.has(r.id)), ...add];
+        });
+      } catch (e) {
+        if (!cancel) showError(e.message || "Failed to load bill lines");
+      } finally {
+        if (!cancel) setBillLoading(false);
+      }
+    })();
+    return () => { cancel = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds, rows, form.mr_reason]);
 
   const selectedRows = useMemo(() => {
     const ids = selectedIds?.ids instanceof Set ? selectedIds.ids : new Set();
@@ -260,8 +620,14 @@ export default function MoneyReceipt() {
 
   const onSelect = (sm) => {
     const nextIds = sm?.ids instanceof Set ? sm.ids : new Set([...(sm?.ids ?? sm ?? [])]);
+    const chosen = rows.filter((r) => nextIds.has(r.id));
+    if (!sameConsignor(chosen)) {
+      showError("Dockets of different consignors cannot be selected together");
+      return;
+    }
     setSelectedIds({ type: "include", ids: nextIds });
-    setRows((prev) => prev.map((r) => applyNet(r, r.tds_amt, r.deduction_amt)));
+    if (chosen.length) fillCustomerFromRows(nextIds, chosen);
+    else setRows((prev) => prev.map((r) => applyNet(r, r.tds_amt, r.deduction_amt)));
   };
 
   const onCellChange = (id, field, value) => {
@@ -273,17 +639,33 @@ export default function MoneyReceipt() {
       return applyNet(r, tds, ded);
     }));
     if (["tds_amt", "deduction_amt"].includes(field)) {
-      setSelectedIds((prev) => {
-        const ids = prev?.ids instanceof Set ? new Set(prev.ids) : new Set();
-        ids.add(id);
-        return { type: "include", ids };
-      });
+      const already = selectedIds?.ids instanceof Set ? selectedIds.ids : new Set();
+      const chosen = rows.filter((r) => already.has(r.id) || r.id === id);
+      if (!sameConsignor(chosen)) {
+        showError("Dockets of different consignors cannot be selected together");
+        return;
+      }
+      const ids = new Set(already);
+      ids.add(id);
+      setSelectedIds({ type: "include", ids });
+      fillCustomerFromRows(ids, chosen);
     }
   };
+
+  const billView = useMemo(
+    () => billRows.map((row) => ({ ...row, ...billGst(row.taxable, selectedCustomer, loginLoc) })),
+    [billRows, selectedCustomer, loginLoc]
+  );
+
+  const billTotals = useMemo(() => billView.reduce((acc, row) => {
+    BILL_MONEY_KEYS.forEach((key) => { acc[key] += num(row[key]); });
+    return acc;
+  }, Object.fromEntries(BILL_MONEY_KEYS.map((key) => [key, 0]))), [billView]);
 
   const handleClear = () => {
     setForm(blankForm(locations));
     setRows([]);
+    setBillRows([]);
     setSelectedIds({ type: "include", ids: new Set() });
     setEditing(null);
     setEditNoMode(false);
@@ -336,7 +718,11 @@ export default function MoneyReceipt() {
           docket_to_loc: d.docket_to_loc || "",
           docket_to_town: d.docket_to_town || d.docket_dly_town || "",
           docket_pay_type: d.docket_pay_type || "",
-          party_name: d.party_name || hdr.bp_name || "",
+          cnor_id: d.cnor_id,
+          party_id: d.party_id,
+          party_code: d.party_code,
+          party_bp_name: d.party_name,
+          party_name: partyLabel(d.party_code, d.party_name) || partyLabel(hdr.bp_code, hdr.bp_name),
           bill_amt: fmt(d.bill_amt),
           sgst_amt: fmt(d.sgst_amt),
           cgst_amt: fmt(d.cgst_amt),
@@ -368,10 +754,6 @@ export default function MoneyReceipt() {
   };
 
   const handleSave = async () => {
-    if (!selectedCustomer) {
-      showError("Please select a customer");
-      return;
-    }
     if (!form.mr_date) {
       showError("Please select receipt date");
       return;
@@ -386,8 +768,24 @@ export default function MoneyReceipt() {
     }
     const needsDetails = form.mr_reason === "1" || form.mr_reason === "2";
     const lines = selectedRows;
+    const gridPartner = needsDetails ? partnerFromRow(lines[0]) : null;
+    const customer = selectedCustomer || gridPartner;
+    if (!needsDetails && !customer) {
+      showError("Please select a customer");
+      return;
+    }
+    if (needsDetails && !sameConsignor(lines)) {
+      showError("Dockets of different consignors cannot be selected together");
+      return;
+    }
     if (needsDetails && !lines.length) {
       showError("Select at least one consignment");
+      return;
+    }
+    const bpCode = customer?.bp_grp_code ?? customer?.bp_code ?? lines[0]?.party_code ?? 0;
+    const bpName = customer?.bp_name || lines[0]?.party_bp_name || "";
+    if (needsDetails && !String(bpName || "").trim() && !(bpCode && String(bpCode) !== "0")) {
+      showError("Customer is missing on the selected docket");
       return;
     }
     const over = lines.find((r) => {
@@ -410,8 +808,8 @@ export default function MoneyReceipt() {
           mr_no: editing?.mr_no || (form.mr_no && form.mr_no !== "AUTO" ? form.mr_no : null),
           mr_date: form.mr_date,
           loc_code: locCode,
-          bp_code: selectedCustomer.bp_grp_code ?? selectedCustomer.bp_code ?? 0,
-          bp_name: selectedCustomer.bp_name,
+          bp_code: bpCode,
+          bp_name: bpName,
           pay_mode: form.pay_mode,
           instr_no: form.instr_no,
           instr_date: form.instr_date || null,
@@ -435,7 +833,10 @@ export default function MoneyReceipt() {
         })) : [],
       });
       const hdr = result?.header || result;
-      showSuccess("Money receipt " + hdr.mr_no + " saved");
+      const billNo = result?.invoice?.invoice_no;
+      showSuccess(billNo
+        ? `Money receipt ${hdr.mr_no} saved. Bill ${billNo} created at GGRN and adjusted.`
+        : `Money receipt ${hdr.mr_no} saved`);
       setForm((prev) => ({ ...prev, mr_no: String(hdr.mr_no || prev.mr_no).trim() }));
       setEditing({
         mr_no: hdr.mr_no,
@@ -507,7 +908,7 @@ export default function MoneyReceipt() {
   return (
     <MainLayout>
       <PageBody title="Money Receipt">
-        <div className="pageToolbar" style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginBottom: 12 }}>
+        <div className="pageToolbar" style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 6 }}>
           <Button variant="contained" startIcon={<EditIcon />} onClick={handleEditClick} sx={btn("#7e22ce", "#6b21a8")}>Edit</Button>
           <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave} sx={btn("#1ca562", "#119154")}>Save</Button>
           <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint} sx={btn("#1f6feb", "#1d4ed8")}>Print</Button>
@@ -515,21 +916,21 @@ export default function MoneyReceipt() {
           <Button variant="contained" startIcon={<ClearIcon />} onClick={handleClear} sx={btn("#8c98ab", "#6a7280")}>Clear</Button>
         </div>
 
-        <div style={{ background: "#fff", border: "1px solid #dfeaf8", borderRadius: 8 }}>
-          <div style={{ padding: "10px 14px", fontWeight: 700, color: "#0d6efd", background: "#dfeeff" }}>
+        <div className="mr-receipt-head" style={{ background: "#fff", border: "1px solid #dfeaf8", borderRadius: 8 }}>
+          <style>{MR_HEAD_CSS}</style>
+          <div style={{ padding: "3px 10px", fontWeight: 700, fontSize: 13, lineHeight: 1.3, color: "#0d6efd", background: "#dfeeff" }}>
             Receipt Information
-            {editNoMode && <Chip size="small" label="Enter receipt no, then click Edit again" sx={{ ml: 2, fontWeight: 700 }} />}
-            {editing && <Chip size="small" label={`Editing MR ${editing.mr_no}`} sx={{ ml: 2, bgcolor: "#f3e8ff", fontWeight: 700 }} />}
+            {editNoMode && <Chip size="small" label="Enter receipt no, then click Edit again" sx={{ ml: 1, height: 18, fontSize: 10, fontWeight: 700 }} />}
+            {editing && <Chip size="small" label={`Editing MR ${editing.mr_no}`} sx={{ ml: 1, height: 18, fontSize: 10, bgcolor: "#f3e8ff", fontWeight: 700 }} />}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: "12px 14px", padding: 16, background: "#f8fafc" }}>
-            <FormField label="MR No" name="mr_no" form={form} setForm={handleSetForm} disabled={!editNoMode} />
-            <FormField label="MR Date" name="mr_date" type="date" form={form} setForm={handleSetForm} required />
-            <FormField label="Branch" name="loc_code" form={form} setForm={handleSetForm} disabled />
-            <FormField label="MR Reason" name="mr_reason" form={form} setForm={handleSetForm} options={MR_REASONS} required />
-            <FormField label="Pay Mode" name="pay_mode" form={form} setForm={handleSetForm} options={PAY_MODES} required />
-            <FormField label="Cheque / UTR No" name="instr_no" form={form} setForm={handleSetForm} disabled={cash} />
-            <FormField label="Instrument Date" name="instr_date" type="date" form={form} setForm={handleSetForm} disabled={cash} />
-            <div style={{ gridColumn: "span 5" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(12, minmax(0, 1fr))", gap: "6px 8px", padding: "6px 8px", background: "#f8fafc" }}>
+            <div style={{ gridColumn: "span 2" }}><FormField label="MR No" name="mr_no" form={form} setForm={handleSetForm} disabled={!editNoMode} /></div>
+            <div style={{ gridColumn: "span 2" }}><FormField label="MR Date" name="mr_date" type="date" form={form} setForm={handleSetForm} required /></div>
+            <div style={{ gridColumn: "span 2" }}><FormField label="Branch" name="loc_code" form={form} setForm={handleSetForm} disabled /></div>
+            <div style={{ gridColumn: "span 2" }}><FormField label="MR Reason" name="mr_reason" form={form} setForm={handleSetForm} options={MR_REASONS} required /></div>
+            <div style={{ gridColumn: "span 2" }}><FormField label="Pay Mode" name="pay_mode" form={form} setForm={handleSetForm} options={PAY_MODES} required /></div>
+            <div style={{ gridColumn: "span 2" }}><FormField label="Cheque / UTR No" name="instr_no" form={form} setForm={handleSetForm} disabled={cash} /></div>
+            <div style={{ gridColumn: "span 4" }}>
               <Autocomplete
                 size="small"
                 options={banks.map((b) => b.bank_name).filter(Boolean)}
@@ -539,7 +940,7 @@ export default function MoneyReceipt() {
                 renderInput={(p) => <TextField {...p} label="Bank" size="small" sx={fieldSx} />}
               />
             </div>
-            <div style={{ gridColumn: "span 3" }}>
+            <div style={{ gridColumn: "span 4" }}>
               <Autocomplete
                 size="small"
                 options={customerOptions}
@@ -549,60 +950,81 @@ export default function MoneyReceipt() {
                 onChange={(_, v) => {
                   handleSetForm({ ...form, customer: v?.value || "" });
                   setEditing(null);
-                  if (!v || (form.mr_reason !== "1" && form.mr_reason !== "2")) {
+                  if (form.mr_reason !== "1" && form.mr_reason !== "2") {
                     setRows([]);
                     setSelectedIds({ type: "include", ids: new Set() });
                     return;
                   }
-                  const cust = partners.find((p) => String(p.record_id ?? p.bp_id ?? "") === String(v.value))
-                    || { record_id: v.value, bp_id: v.value, bp_grp_code: v.code, bp_code: v.code, bp_name: v.name };
-                  loadOutstanding(cust, form.mr_reason);
+                  const cust = v
+                    ? (partners.find((p) => String(p.record_id ?? p.bp_id ?? "") === String(v.value))
+                      || { record_id: v.value, bp_id: v.value, bp_grp_code: v.code, bp_code: v.code, bp_name: v.name })
+                    : null;
+                  loadOutstanding(cust, form.mr_reason, form.mr_date);
                 }}
                 renderInput={(p) => <TextField {...p} label="Customer" size="small" sx={fieldSx} placeholder="Search code or name" />}
               />
             </div>
-            <div style={{ gridColumn: showDocketGrid ? "span 2" : "span 2" }}>
+            <div style={{ gridColumn: "span 2" }}>
               <FormField label="Remarks" name="remarks" form={form} setForm={handleSetForm} />
             </div>
-            {showDocketGrid ? (
-              <TextField
-                label="Total Net Receipt"
-                size="small"
-                value={fmt(totals.net)}
-                disabled
-                sx={fieldSx}
-              />
-            ) : (
-              <FormField label="Received Amount" name="received_amt" form={form} setForm={handleSetForm} />
-            )}
+            <div style={{ gridColumn: "span 2" }}>
+              {showDocketGrid ? (
+                <TextField label="Total Net Receipt" size="small" value={fmt(totals.net)} disabled sx={fieldSx} />
+              ) : (
+                <FormField label="Received Amount" name="received_amt" form={form} setForm={handleSetForm} />
+              )}
+            </div>
           </div>
         </div>
 
         {showDocketGrid && (
         <div style={{ marginTop: 12, padding: "8px 14px", background: "#e3f2fd", border: "1.5px solid #90caf9", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "#0d6efd" }}>
           Total Net Receipt {fmt(totals.net)} &nbsp;|&nbsp; SGST {fmt(totals.sgst)} &nbsp;|&nbsp; CGST {fmt(totals.cgst)} &nbsp;|&nbsp; IGST {fmt(totals.igst)} &nbsp;|&nbsp; TDS {fmt(totals.tds)} &nbsp;|&nbsp; Other Ded {fmt(totals.ded)} &nbsp;|&nbsp; {selectedRows.length} consignment(s)
-          {paidFull ? " — PAID: one-time full clearance" : " — TO PAY: delivered at this To Loc, consignee = customer"}
+          {paidFull
+            ? " — PAID: origin location is this branch, receipt pending, docket date on or before MR date"
+            : " — TO PAY: destination location is this branch, receipt pending, docket date on or before MR date"}
         </div>
         )}
 
         {showDocketGrid && (
-        <div style={{ marginTop: 10 }}>
+        <div className="mr-docket-grid" style={{ marginTop: 10 }}>
           <DataTable
             columns={docketColumns}
             rows={rows}
             getKey={(r) => r.id}
             dense
-            rowHeight={42}
-            headerHeight={44}
+            rowHeight={28}
+            headerHeight={36}
             autoHeight={false}
-            isHeight={360}
-            scroll={{ horizontal: true }}
+            scroll={{ afterRows: 5, horizontal: true, unpaged: true }}
             checkboxSelection
             selectedRowColor="#dcfce7"
             rowSelectionModel={selectedIds}
             onRowSelectionModelChange={onSelect}
             singleClick
             onCellChange={onCellChange}
+          />
+        </div>
+        )}
+
+        {showDocketGrid && (
+        <div className="mr-bill-grid" style={{ marginTop: 14 }}>
+          <div style={{ padding: "8px 14px", fontWeight: 700, color: "#0d6efd", background: "#dfeeff", border: "1px solid #dfeaf8", borderRadius: "8px 8px 0 0" }}>
+            Bill
+            {billLoading
+              ? " — loading selected dockets"
+              : ` — ${billView.length} docket(s) | Taxable ${fmt(billTotals.taxable)} | CGST ${fmt(billTotals.cgst)} | SGST ${fmt(billTotals.sgst)} | IGST ${fmt(billTotals.igst)} | Amount ${fmt(billTotals.amount)}`}
+          </div>
+          <DataTable
+            columns={billColumns}
+            rows={billView}
+            getKey={(r) => r.id}
+            dense
+            rowHeight={42}
+            headerHeight={44}
+            autoHeight={false}
+            isHeight={320}
+            scroll={{ horizontal: true }}
           />
         </div>
         )}

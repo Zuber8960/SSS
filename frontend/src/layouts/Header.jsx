@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { logout as logoutUser } from "../utils/authService";
+import { logout as logoutUser, fetchSessionBranches, switchSessionBranch, applySessionBranch } from "../utils/authService";
 import { getTenantConfig } from "../utils/tenantService";
 import { usePageTitle } from "../contexts/PageTitleContext";
 import { Tooltip } from "@mui/material";
 import { MenuIcon, CloseIcon, LogoutSvgIcon } from "../components/common/icons";
-import { fetchAllLocations } from "../utils/locationMaster";
 import { fetchAllDivisionsApi } from "../utils/divisionMaster";
 import "./Header.css";
 import logoImg from "../images/logo.png";
@@ -42,25 +41,41 @@ export default function Header({ onToggleSidebar, isMobileSidebarOpen }) {
     .join("")
     .toUpperCase() || "AD";
 
-  const branchCode = currentUser?.location_id || localStorage.getItem("loc_code") || "";
-  const [branchLabel, setBranchLabel] = useState(
-    () => localStorage.getItem("header_branch_label") || branchCode
+  const [branchCode, setBranchCode] = useState(
+    () => currentUser?.loc_code || currentUser?.location_id || localStorage.getItem("loc_code") || ""
   );
+  const [branches, setBranches] = useState([]);
 
   useEffect(() => {
-    if (!branchCode) return;
-    if (localStorage.getItem("header_branch_label")) return;
-    fetchAllLocations()
-      .then((locs) => {
-        const match = locs.find((l) => l.loc_code === branchCode);
-        if (match) {
-          const label = `${match.loc_code} - ${match.loc_name}`;
-          localStorage.setItem("header_branch_label", label);
-          setBranchLabel(label);
+    let cancelled = false;
+    fetchSessionBranches()
+      .then((res) => {
+        if (cancelled) return;
+        const rows = Array.isArray(res?.data) ? res.data : [];
+        setBranches(rows);
+        if (res?.current) {
+          const current = String(res.current).trim();
+          const match = rows.find((row) => String(row.loc_code || "").trim().toUpperCase() === current.toUpperCase());
+          setBranchCode(match?.loc_code || current);
         }
       })
       .catch(() => {});
-  }, [branchCode]);
+    return () => { cancelled = true; };
+  }, []);
+
+  const changeBranch = async (code) => {
+    if (!code || code === branchCode) return;
+    const previous = branchCode;
+    setBranchCode(code);
+    try {
+      const result = await switchSessionBranch(code);
+      applySessionBranch(result);
+      window.location.reload();
+    } catch (err) {
+      setBranchCode(previous);
+      window.alert(err.message || "Branch could not be changed");
+    }
+  };
 
   const divisionCode = currentUser?.division_code || localStorage.getItem("division_code") || "";
   const [divisionLabel, setDivisionLabel] = useState(
@@ -123,8 +138,21 @@ export default function Header({ onToggleSidebar, isMobileSidebarOpen }) {
         {branchCode && (
           <div className="appHeaderBranch">
             <span className="appHeaderBranchLabel">Branch</span>
-            <span className="appHeaderBranchValue appHeaderBranchFull">{branchLabel}</span>
-            <span className="appHeaderBranchValue appHeaderBranchShort">{branchCode}</span>
+            <select
+              className="appHeaderBranchSelect"
+              aria-label="Session branch"
+              value={branchCode}
+              onChange={(e) => changeBranch(e.target.value)}
+            >
+              {!branches.some((row) => row.loc_code === branchCode) && (
+                <option value={branchCode}>{branchCode}</option>
+              )}
+              {branches.map((row) => (
+                <option key={row.loc_code} value={row.loc_code}>
+                  {row.loc_name ? `${row.loc_code} - ${row.loc_name}` : row.loc_code}
+                </option>
+              ))}
+            </select>
           </div>
         )}
         <div className="appHeaderUserInfo">
