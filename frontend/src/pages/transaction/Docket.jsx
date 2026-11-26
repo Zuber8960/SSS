@@ -872,9 +872,15 @@ export default function DocketPage() {
       }
 
       // sst_docket_inv requires inv_no and inv_date on every row
-      const invoiceRowsToSave = poInvoiceRows.filter(
-        (r) => String(r.invoice_no ?? "").trim() || String(r.invoice_value ?? "").trim() !== ""
-      );
+      const invoiceSeen = new Set();
+      const invoiceRowsToSave = poInvoiceRows.filter((r) => {
+        const hasValue = String(r.invoice_no ?? "").trim() || String(r.invoice_value ?? "").trim() !== "";
+        if (!hasValue) return false;
+        const key = `${String(r.invoice_no ?? "").trim().toLowerCase()}|${toDbDateValue(r.invoice_date) || ""}`;
+        if (String(r.invoice_no ?? "").trim() && invoiceSeen.has(key)) return false;
+        invoiceSeen.add(key);
+        return true;
+      });
       for (const r of invoiceRowsToSave) {
         if (!String(r.invoice_no ?? "").trim()) {
           showError("Invoice No is required for every PO & Invoice row");

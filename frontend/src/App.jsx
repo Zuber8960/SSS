@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { isLogipodTenant } from "./utils/tenantService";
 import MasterPortal from "./pages/MasterPortal";
 import TenantLoginPage from "./pages/TenantLoginPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -115,6 +116,7 @@ const ALWAYS_ALLOWED = ["/dashboard"];
 function ProtectedRoute({ children, path }) {
   const { isAdmin, allowedPaths, loading } = useMenuAccess();
   if (!isAuthenticated()) return <Navigate to="/" replace />;
+  if (path === "/masters/company" && isLogipodTenant()) return <Navigate to="/dashboard" replace />;
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", color: "#64748b", fontSize: 14 }}>

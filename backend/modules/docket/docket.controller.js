@@ -1,5 +1,6 @@
 const moment = require('moment');
 const db = require('../../config/db');
+const { applyTenant, rowOwned } = require('../../utils/tenantScope');
 const axios = require('axios');
 const ewb = require('../../config/ewb');
 
@@ -354,7 +355,7 @@ const getDocketsForBilling = async ({
     .select("bill_dly.delivery_status as delivery_status");
 
   if (tenant_id) {
-    query.andWhere((q) => q.where("d.tenant_id", tenant_id).orWhereNull("d.tenant_id"));
+    applyTenant(query, "d.tenant_id", tenant_id);
   }
 
   if (rawIds.length || name) {
@@ -426,7 +427,7 @@ const getAllDockets = async (tenant_id, cnor_cnee, loc_code) => {
     .where({ 'd.record_status': 0 })
     .orderBy('d.aud_date', 'desc');
   if (tenant_id) {
-    query.andWhere((q) => q.where('d.tenant_id', tenant_id).orWhereNull('d.tenant_id'));
+    applyTenant(query, 'd.tenant_id', tenant_id);
   }
   const loc = String(loc_code || '').split(' - ')[0].trim();
   if (loc) {
@@ -457,14 +458,24 @@ const getAllDockets = async (tenant_id, cnor_cnee, loc_code) => {
              e.ewb_valid_upto AS ewb_valid
         FROM sss.sst_docket_ewb e
        WHERE e.docket_no = d.docket_no
-         AND (d.tenant_id IS NULL OR e.tenant_id IS NULL OR e.tenant_id = d.tenant_id)
+         AND (e.tenant_id = d.tenant_id OR (d.tenant_id = 1 AND e.tenant_id IS NULL))
          AND NULLIF(TRIM(e.ewb_no::text), '') IS NOT NULL
        ORDER BY e.aud_date ASC NULLS LAST, e.rec_id ASC
        LIMIT 1
     ) ewb ON true`)
     .select(
       db.raw(`SPLIT_PART(TRIM(ewb.ewb_no), ',', 1) as ewb_no`),
-      'ewb.ewb_valid as ewb_valid'
+      'ewb.ewb_valid as ewb_valid',
+      db.raw(`EXISTS (
+        SELECT 1 FROM sss.sst_invoice_dtl dtl
+         WHERE UPPER(TRIM(COALESCE(dtl.docket_no::text, ''))) = UPPER(TRIM(COALESCE(d.docket_no::text, '')))
+           AND NULLIF(TRIM(COALESCE(dtl.docket_no::text, '')), '') IS NOT NULL
+      ) AS has_bill`),
+      db.raw(`EXISTS (
+        SELECT 1 FROM sss.sst_mr_dtl r
+         WHERE UPPER(TRIM(COALESCE(r.docket_no::text, ''))) = UPPER(TRIM(COALESCE(d.docket_no::text, '')))
+           AND NULLIF(TRIM(COALESCE(r.docket_no::text, '')), '') IS NOT NULL
+      ) AS has_mr`)
     );
   return query;
 };
@@ -681,6 +692,111 @@ const deleteDocket = async (keys, trx = db) => {
     .update({ record_status: 1 })
 };
 
+const PAID_OR_TO_PAY = ['PAID', 'PAID BASIS', 'TO PAY', 'TOPAY', 'TO-PAY'];
+
+const sameBranch = (a, b) => String(a || '').trim().toUpperCase() === String(b || '').trim().toUpperCase();
+
+/* Remove one docket from every live table that stores it.
+   A prepared bill always blocks this. A money receipt blocks Paid and To Pay. */
+const purgeDocket = async (docketNo, { tenant_id, loc_code } = {}, trx = db) => {
+  const no = String(docketNo || '').trim();
+  if (!no) {
+    const err = new Error('Docket number is required');
+    err.status = 400;
+    throw err;
+  }
+
+  const rows = await trx('sss.sst_docket')
+    .whereRaw("UPPER(TRIM(COALESCE(docket_no::text, ''))) = UPPER(TRIM(?))", [no])
+    .andWhere({ record_status: 0 });
+  const mine = rows.filter((row) => {
+    if (loc_code && !sameBranch(row.docket_loc, loc_code)) return false;
+    if (tenant_id && !rowOwned(row.tenant_id, tenant_id)) return false;
+    return true;
+  });
+  if (!mine.length) {
+    const err = new Error(rows.length ? 'You can only delete dockets of your login branch' : 'Docket not found');
+    err.status = rows.length ? 403 : 404;
+    throw err;
+  }
+  const header = mine[0];
+
+  const billed = await trx('sss.sst_invoice_dtl')
+    .whereRaw("UPPER(TRIM(COALESCE(docket_no::text, ''))) = UPPER(TRIM(?))", [no])
+    .first();
+  if (billed) {
+    const err = new Error('A bill has been prepared for this docket');
+    err.status = 409;
+    throw err;
+  }
+
+  const pay = String(header.docket_pay_type || '').trim().toUpperCase();
+  if (PAID_OR_TO_PAY.includes(pay)) {
+    const receipt = await trx('sss.sst_mr_dtl')
+      .whereRaw("UPPER(TRIM(COALESCE(docket_no::text, ''))) = UPPER(TRIM(?))", [no])
+      .first();
+    if (receipt) {
+      const err = new Error('A money receipt has been created for this docket');
+      err.status = 409;
+      throw err;
+    }
+  }
+
+  const manifests = await trx('sss.sst_mnf_dtl')
+    .whereRaw("UPPER(TRIM(COALESCE(dwb_no::text, ''))) = UPPER(TRIM(?))", [no])
+    .select('mnf_no', 'mnf_loc', 'mnf_date');
+
+  const dropBy = async (table, column) => {
+    await trx(table)
+      .whereRaw(`UPPER(TRIM(COALESCE(${column}::text, ''))) = UPPER(TRIM(?))`, [no])
+      .del();
+  };
+
+  await dropBy('sss.sst_dly_note', 'docket_no');
+  await dropBy('sss.sst_docket_charges', 'docket_no');
+  await dropBy('sss.sst_docket_dtl', 'docket_no');
+  await dropBy('sss.sst_docket_ewb', 'docket_no');
+  await dropBy('sss.sst_docket_inv', 'docket_no');
+  await dropBy('sss.sst_docket_pkg', 'docket_no');
+  await dropBy('sss.sst_docket_preallc', 'docket_no');
+  await dropBy('sss.sst_unloading_dtl', 'docket_no');
+  await dropBy('sss.ewb_items', 'docket_no');
+  await dropBy('sss.ewb_vehicles', 'docket_no');
+  await dropBy('sss.sst_mnf_dtl', 'dwb_no');
+
+  const seen = new Set();
+  for (const manifest of manifests) {
+    const stamp = manifest.mnf_date instanceof Date ? manifest.mnf_date.toISOString() : String(manifest.mnf_date || '');
+    const key = `${manifest.mnf_no}|${manifest.mnf_loc}|${stamp}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    await trx.raw(`
+      UPDATE sss.sst_mnf_hdr h
+         SET mnf_no_of_dwb = COALESCE(s.nos, 0),
+             mnf_no_of_pkgs = COALESCE(s.pkgs, 0),
+             mnf_actual_wt = COALESCE(s.wt, 0)
+        FROM (
+          SELECT COUNT(*)::numeric AS nos,
+                 COALESCE(SUM(mnf_pkgs), 0) AS pkgs,
+                 COALESCE(SUM(dwb_actual_wt), 0) AS wt
+            FROM sss.sst_mnf_dtl
+           WHERE mnf_no = ?
+             AND mnf_loc = ?
+             AND mnf_date = ?
+        ) s
+       WHERE h.mnf_no = ?
+         AND h.mnf_loc = ?
+         AND h.mnf_date = ?
+    `, [
+      manifest.mnf_no, manifest.mnf_loc, manifest.mnf_date,
+      manifest.mnf_no, manifest.mnf_loc, manifest.mnf_date,
+    ]);
+  }
+
+  await trx('sss.sst_docket').where({ rec_id: header.rec_id }).del();
+  return header;
+};
+
 /* ================= CHARGES ================= */
 
 const getChargeMaster = async (tenant_id) => {
@@ -794,7 +910,7 @@ const getDocketInvoices = async (docketNo, tenant_id) => {
            FROM sss.sst_docket_ewb de
           WHERE de.docket_no = inv.docket_no
             AND de.ewb_no::text = inv.ewb_no::text
-            AND (inv.tenant_id IS NULL OR de.tenant_id IS NULL OR de.tenant_id = inv.tenant_id)
+            AND (de.tenant_id = inv.tenant_id OR (inv.tenant_id = 1 AND de.tenant_id IS NULL))
           ORDER BY de.aud_date DESC NULLS LAST
           LIMIT 1),
         ewb."EWB_VALID_UPTO"
@@ -804,12 +920,12 @@ const getDocketInvoices = async (docketNo, tenant_id) => {
           FROM sss.sst_docket_ewb de
          WHERE de.docket_no = inv.docket_no
            AND de.ewb_no::text = inv.ewb_no::text
-           AND (inv.tenant_id IS NULL OR de.tenant_id IS NULL OR de.tenant_id = inv.tenant_id)
+           AND (de.tenant_id = inv.tenant_id OR (inv.tenant_id = 1 AND de.tenant_id IS NULL))
          ORDER BY de.aud_date DESC NULLS LAST
          LIMIT 1
       ) as ewb_date`)
     );
-  if (tenant_id) query.andWhere({ 'inv.tenant_id': tenant_id });
+  if (tenant_id) applyTenant(query, 'inv.tenant_id', tenant_id);
   return query.orderBy('inv.sr_no', 'asc');
 };
 
@@ -889,91 +1005,75 @@ const listDocketVehicles = async (docketNos = []) => {
   return result.rows || [];
 };
 
-// sst_docket_inv has a composite PK (docket_no, docket_loc, docket_date,
-// inv_no, inv_date) and no record_status column, so this upserts on that key
-// and hard-deletes any invoice no longer present for the docket.
+// sst_docket_inv is keyed by docket number, location, docket date, invoice
+// number and invoice date. An edit used to insert a second copy whenever the
+// form date did not match the stored docket date, and the old copy stayed.
+// Replace the whole set for this docket, stamped with the docket's own date.
 const saveDocketInvoices = async (docketNo, header, rows, tenant_id, trx = db) => {
-  const docketLoc = header?.docket_loc;
-  const docketDate = normalizeInvDate(header?.docket_date);
   if (!docketNo) throw new Error('Docket number is required to save invoices');
+
+  const found = await trx.raw(
+    `SELECT docket_loc, to_char(docket_date, 'YYYY-MM-DD') AS docket_date
+       FROM sss.sst_docket
+      WHERE UPPER(TRIM(docket_no::text)) = UPPER(TRIM(?))
+        AND COALESCE(record_status, 0) = 0
+      ORDER BY rec_id DESC
+      LIMIT 1`,
+    [docketNo]
+  );
+  const stored = found.rows?.[0] || {};
+  const docketLoc = stored.docket_loc || header?.docket_loc;
+  const docketDate = stored.docket_date || normalizeInvDate(header?.docket_date);
   if (!docketLoc) throw new Error('Docket location is required to save invoices');
   if (!docketDate) throw new Error('Docket date is required to save invoices');
 
   const userCode = header?.user_code || null;
   const list = Array.isArray(rows) ? rows : [];
-  const kept = [];
+  const byInvoice = new Map();
 
-  for (let i = 0; i < list.length; i++) {
-    const r = list[i] || {};
-    // inv_no and inv_date are NOT NULL in the table - skip incomplete rows
+  for (const r of list) {
     const invNo = String(r.inv_no || r.invoice_no || '').trim();
     const invDate = normalizeInvDate(r.inv_date || r.invoice_date);
     if (!invNo || !invDate) continue;
-
-    const key = {
+    const mapKey = `${invNo.toUpperCase()}|${invDate}`;
+    const ewbNo = String(r.ewb_no || '').trim();
+    const invValue = r.inv_value === '' || r.inv_value == null ? null : parseFloat(r.inv_value) || 0;
+    const existing = byInvoice.get(mapKey);
+    if (existing) {
+      const ewbs = new Set(
+        [...String(existing.ewb_no || '').split(','), ...ewbNo.split(',')]
+          .map((s) => s.trim())
+          .filter(Boolean)
+      );
+      existing.ewb_no = [...ewbs].join(',') || null;
+      if (invValue != null) existing.inv_value = invValue;
+      continue;
+    }
+    byInvoice.set(mapKey, {
       docket_no: docketNo,
       docket_loc: docketLoc,
       docket_date: docketDate,
       inv_no: invNo,
       inv_date: invDate,
-    };
-    kept.push(key);
-
-    const payload = {
-      ...key,
-      sr_no: i + 1,
-      inv_value: r.inv_value === '' || r.inv_value == null ? null : parseFloat(r.inv_value) || 0,
-      ewb_no: r.ewb_no || null,
+      inv_value: invValue,
+      ewb_no: ewbNo || null,
       tenant_id: tenant_id || r.tenant_id || null,
       company_code: r.company_code ?? header?.company_code ?? null,
       division_code: r.division_code ?? header?.division_code ?? null,
+      record_created_by: userCode,
+      record_created_on: new Date(),
       record_updated_by: userCode,
       record_updated_on: new Date(),
-    };
-
-    const base = trx('sss.sst_docket_inv').where(key);
-    if (tenant_id) base.andWhere({ tenant_id });
-    const existing = await base.first();
-
-    if (existing) {
-      // Keep the original creator audit fields
-      await trx('sss.sst_docket_inv').where(key).update(payload);
-    } else {
-      await trx('sss.sst_docket_inv').insert({
-        ...payload,
-        record_created_by: userCode,
-        record_created_on: new Date(),
-      });
-    }
+    });
   }
 
-  // Remove invoices that were deleted in the UI
-  const existingQ = trx('sss.sst_docket_inv').where({
-    docket_no: docketNo,
-    docket_loc: docketLoc,
-    docket_date: docketDate,
-  });
-  if (tenant_id) existingQ.andWhere({ tenant_id });
-  const current = await existingQ;
+  const remove = trx('sss.sst_docket_inv')
+    .whereRaw("UPPER(TRIM(docket_no::text)) = UPPER(TRIM(?))", [docketNo]);
+  if (tenant_id) applyTenant(remove, 'tenant_id', tenant_id);
+  await remove.del();
 
-  const isKept = (row) =>
-    kept.some(
-      (k) => k.inv_no === row.inv_no && k.inv_date === normalizeInvDate(row.inv_date)
-    );
-
-  for (const row of current) {
-    if (!isKept(row)) {
-      await trx('sss.sst_docket_inv')
-        .where({
-          docket_no: row.docket_no,
-          docket_loc: row.docket_loc,
-          docket_date: row.docket_date,
-          inv_no: row.inv_no,
-          inv_date: normalizeInvDate(row.inv_date),
-        })
-        .del();
-    }
-  }
+  const insertRows = [...byInvoice.values()].map((row, index) => ({ ...row, sr_no: index + 1 }));
+  if (insertRows.length) await trx('sss.sst_docket_inv').insert(insertRows);
 
   return getDocketInvoices(docketNo, tenant_id);
 };
@@ -1770,6 +1870,7 @@ module.exports = {
   updateDocketByRecId,
   deleteDocket,
   deleteDocketDetails,
+  purgeDocket,
   getEwaybillDetails,
   getListEwayDetails,
   checkEwayBillStatus,

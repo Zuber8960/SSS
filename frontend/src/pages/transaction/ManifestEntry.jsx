@@ -581,7 +581,7 @@ export default function ManifestPage() {
   // ✅ Map DB header to form fields
   const mapHeaderToForm = (hdr) => ({
     manifest_no: hdr.mnf_no || "",
-    manifest_date: hdr.mnf_date ? hdr.mnf_date.substring(0, 10) : "",
+    manifest_date: showDate(hdr.mnf_date),
     from_loc: hdr.mnf_loc || "",
     from_town: hdr.mnf_from_town || "",
     to_loc: hdr.mnf_to_loc || "",
@@ -663,7 +663,7 @@ export default function ManifestPage() {
       originalKey.current = {
         mnf_no: hdr.mnf_no,
         mnf_loc: hdr.mnf_loc,
-        mnf_date: hdr.mnf_date,
+        mnf_date: showDate(hdr.mnf_date),
       };
 
       setMode("edit");

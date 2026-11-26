@@ -967,7 +967,7 @@ export default function DashboardOverview({ data, loading = false }) {
           </span>
           <div className="ovOrderPanel__title">
             <h3 className="ovClickRow" onClick={() => openSection("Customer Wise Analysis", "Group")}>Customer Wise Analysis</h3>
-            <p>{customers.length.toLocaleString("en-IN")} consignors · last month, current month and up to FY</p>
+            <p>{customers.length.toLocaleString("en-IN")} customers · last month, current month and up to FY</p>
           </div>
           <ViewToggle value={viewOf("customers")} onChange={(mode) => setView("customers", mode)} />
         </div>

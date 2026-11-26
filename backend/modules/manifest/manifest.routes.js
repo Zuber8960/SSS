@@ -22,7 +22,7 @@ router.get('/', async (req, res) => {
 router.get('/unloading/by-docket/:docketNo', async (req, res) => {
   try {
     const { docketNo } = req.params;
-    const exists = await UnloadingController.isDocketUnloaded(docketNo);
+    const exists = await UnloadingController.isDocketUnloaded(docketNo, req.tenant_id);
     res.json({ success: true, exists });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -36,7 +36,7 @@ router.get('/:no/:loc/:date', async (req, res) => {
       mnf_no: no,
       mnf_loc: loc,
       mnf_date: date
-    });
+    }, req.tenant_id);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -48,7 +48,7 @@ router.get('/:no/:loc/:date', async (req, res) => {
 router.get('/by-no/:no', async (req, res) => {
   try {
     const { no } = req.params;
-    const header = await ManifestController.getManifestByNo(no);
+    const header = await ManifestController.getManifestByNo(no, req.tenant_id);
     if (!header) {
       return res.status(404).json({ success: false, message: 'Manifest not found' });
     }
@@ -75,7 +75,7 @@ router.get('/by-no/:no', async (req, res) => {
 router.get('/by-docket/:docketNo', async (req, res) => {
   try {
     const { docketNo } = req.params;
-    const data = await ManifestController.getManifestsByDocketNo(docketNo);
+    const data = await ManifestController.getManifestsByDocketNo(docketNo, req.tenant_id);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -87,7 +87,7 @@ router.get('/by-docket/:docketNo', async (req, res) => {
 router.get('/by-location/:location', async (req, res) => {
   try {
     const { location } = req.params;
-    const loc = await ManifestController.getManifestByLocation(location);
+    const loc = await ManifestController.getManifestByLocation(location, req.tenant_id);
     res.json({ success: true, data:  loc });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -125,17 +125,22 @@ router.post('/', async (req, res) => {
 router.put('/:no/:loc/:date', async (req, res) => {
   try {
     const { no, loc, date } = req.params;
+    const saved = await ManifestController.findManifestHeader(no, loc, date, db, req.tenant_id);
+    if (!saved) {
+      return res.status(404).json({ success: false, message: 'Manifest not found' });
+    }
+    const keys = { mnf_no: saved.mnf_no, mnf_loc: saved.mnf_loc, mnf_date: saved.mnf_date };
     const { header, details } = req.body;
-    const keys = { mnf_no: no, mnf_loc: loc, mnf_date: date };
 
     // Update header
     if (header && Object.keys(header).length > 0) {
       await ManifestController.updateManifest(keys, header);
     }
 
-    // Update details (delete all + re-insert)
+    // Update details (delete all + re-insert). Packages already on this
+    // manifest are released before the ticked dockets are written again.
     if (details && details.length > 0) {
-      await ManifestController.updateManifestDetails(keys, details);
+      await ManifestController.updateManifestDetails(keys, details, req.tenant_id);
     }
 
     res.json({ success: true, message: 'Manifest updated successfully' });
@@ -154,7 +159,7 @@ router.post('/unloading', async (req, res) => {
     if (!body.dockets || !body.dockets.length) {
       return res.status(400).json({ success: false, message: 'No docket data provided for unloading' });
     }
-    const result = await UnloadingController.saveUnloading(body);
+    const result = await UnloadingController.saveUnloading(body, req.tenant_id);
     res.status(201).json({ success: true, message: 'Unloading saved successfully', data: result });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -166,7 +171,7 @@ router.post('/unloading', async (req, res) => {
 router.get('/tracking/:vehicleNo', async (req, res) => {
   try {
     const { vehicleNo } = req.params;
-    const data = await ManifestController.getVehicleTrackingData(vehicleNo);
+    const data = await ManifestController.getVehicleTrackingData(vehicleNo, req.tenant_id);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

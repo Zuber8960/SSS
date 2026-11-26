@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const { applyTenant } = require('../../utils/tenantScope');
 
 const normalizeDate = (value) => {
   if (value === undefined || value === null || value === '') return null;
@@ -30,11 +31,7 @@ module.exports = {
   async getAllDeliveryNotes(filters = {}) {
     const query = db('sss.sst_dly_note').select('*');
 
-    if (filters.company_code) {
-      query.where((q) =>
-        q.where({ company_code: filters.company_code }).orWhereNull('company_code')
-      );
-    }
+    if (filters.company_code) applyTenant(query, 'company_code', filters.company_code);
     if (filters.division_code) query.andWhere({ division_code: filters.division_code });
     if (filters.dly_note_no) query.andWhere({ dly_note_no: filters.dly_note_no });
     if (filters.docket_no) query.andWhere({ docket_no: filters.docket_no });
@@ -44,13 +41,13 @@ module.exports = {
 
   async getDeliveryNoteByDlyNoteNo(dlyNoteNo, company_code) {
     const query = db('sss.sst_dly_note').where({ dly_note_no: dlyNoteNo });
-    if (company_code) query.andWhere({ company_code });
+    if (company_code) applyTenant(query, 'company_code', company_code);
     return query.first();
   },
 
   async getDeliveryNoteByDocketNo(docketNo, company_code) {
     const query = db('sss.sst_dly_note').where({ docket_no: docketNo });
-    if (company_code) query.andWhere({ company_code });
+    if (company_code) applyTenant(query, 'company_code', company_code);
     return query.orderBy('record_id', 'desc').first();
   },
 
@@ -75,9 +72,10 @@ module.exports = {
 
     delete updates.record_id;
     delete updates.record_created_on;
+    delete updates.company_code;
 
     const query = db('sss.sst_dly_note').where({ dly_note_no: dlyNoteNo });
-    if (company_code) query.andWhere({ company_code });
+    if (company_code) applyTenant(query, 'company_code', company_code);
 
     const [updated] = await query.update(updates).returning('*');
     return updated;
@@ -85,7 +83,7 @@ module.exports = {
 
   async deleteDeliveryNote(dlyNoteNo, company_code) {
     const query = db('sss.sst_dly_note').where({ dly_note_no: dlyNoteNo });
-    if (company_code) query.andWhere({ company_code });
+    if (company_code) applyTenant(query, 'company_code', company_code);
     return query.del();
   },
 };

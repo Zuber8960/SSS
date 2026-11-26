@@ -1,9 +1,10 @@
 const db = require('../../config/db');
+const { applyInvoiceTenant } = require('../../utils/tenantScope');
 
 const toDate = (v) => (v ? String(v).slice(0, 10) : '');
 
 module.exports = {
-  async listPendingBills({ loc_code, from_date, to_date, status }) {
+  async listPendingBills({ loc_code, from_date, to_date, status, tenant_id }) {
     if (!loc_code) {
       const err = new Error('Please select Billing Branch');
       err.status = 400;
@@ -39,6 +40,7 @@ module.exports = {
       )
       .orderByRaw('h.invoice_date::date asc')
       .orderBy('h.invoice_no', 'asc');
+    applyInvoiceTenant(query, tenant_id, 'h');
 
     if (submitted) query.whereNotNull('h.inv_sub_date');
     else query.whereNull('h.inv_sub_date');
@@ -103,7 +105,7 @@ module.exports = {
     }));
   },
 
-  async saveSubmission({ bills, aud_user }) {
+  async saveSubmission({ bills, aud_user, tenant_id }) {
     if (!Array.isArray(bills) || bills.length === 0) {
       const err = new Error('Please select at least one bill');
       err.status = 400;
@@ -146,12 +148,13 @@ module.exports = {
           );
         }
 
-        const updated = await trx('sss.sst_invoice_hdr')
+        const invoiceUpdate = trx('sss.sst_invoice_hdr')
           .where({ invoice_no, loc_code })
           .andWhereRaw('invoice_date::date = ?::date', [invoice_date])
           .whereNull('inv_sub_date')
-          .whereRaw("COALESCE(UPPER(TRIM(cancel_flag::text)), '') NOT IN ('Y', 'C', '1', 'TRUE')")
-          .update({
+          .whereRaw("COALESCE(UPPER(TRIM(cancel_flag::text)), '') NOT IN ('Y', 'C', '1', 'TRUE')");
+        applyInvoiceTenant(invoiceUpdate, tenant_id);
+        const updated = await invoiceUpdate.update({
             inv_sub_date: submission_date,
             modified_on: new Date(),
             modified_by: aud_user || null,

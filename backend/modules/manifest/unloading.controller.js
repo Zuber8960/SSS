@@ -1,8 +1,9 @@
 const db = require('../../config/db');
+const { applyTenant } = require('../../utils/tenantScope');
 
 /* ================= SAVE UNLOADING DATA ================= */
 
-const saveUnloading = async (unloadingData) => {
+const saveUnloading = async (unloadingData, tenantId) => {
   const trx = await db.transaction();
   try {
     const { dockets, ...headerData } = unloadingData;
@@ -43,10 +44,25 @@ const saveUnloading = async (unloadingData) => {
       record_created_on: new Date(),
     }));
 
+    if (headerData.mnf_no) {
+      const manifest = trx('sss.sst_mnf_hdr').where({ mnf_no: headerData.mnf_no, record_status: 0 });
+      applyTenant(manifest, 'tenant_id', tenantId);
+      if (!(await manifest.first())) {
+        const err = new Error('Manifest not found');
+        err.status = 404;
+        throw err;
+      }
+    }
+
     for (const row of rows) {
-      const docket = await trx('sss.sst_docket')
-        .where({ docket_no: row.docket_no })
-        .first();
+      const docketQuery = trx('sss.sst_docket').where({ docket_no: row.docket_no });
+      applyTenant(docketQuery, 'tenant_id', tenantId);
+      const docket = await docketQuery.first();
+      if (!docket) {
+        const err = new Error(`Docket ${row.docket_no} is not available`);
+        err.status = 404;
+        throw err;
+      }
       if (docket?.docket_to_loc) {
         row.docket_to_loc = docket.docket_to_loc;
       }
@@ -82,9 +98,9 @@ const saveUnloading = async (unloadingData) => {
         !pending && headerData.arrival_date
           ? `${headerData.arrival_date} ${headerData.arrival_time || '00:00'}:00`
           : null;
-      await trx('sss.sst_mnf_hdr')
-        .where(manifestKey)
-        .update({
+      const arrivalUpdate = trx('sss.sst_mnf_hdr').where(manifestKey);
+      applyTenant(arrivalUpdate, 'tenant_id', tenantId);
+      await arrivalUpdate.update({
           mnf_arrival_time: arrival,
           aud_date: new Date(),
         });
@@ -101,10 +117,12 @@ const saveUnloading = async (unloadingData) => {
 
 /* ================= CHECK DOCKET IN UNLOADING TABLE ================= */
 
-const isDocketUnloaded = async (docketNo) => {
-  const row = await db('sss.sst_unloading_dtl')
-    .where({ docket_no: docketNo })
-    .first();
+const isDocketUnloaded = async (docketNo, tenantId) => {
+  const query = db('sss.sst_unloading_dtl as u')
+    .join('sss.sst_docket as d', 'd.docket_no', 'u.docket_no')
+    .where({ 'u.docket_no': docketNo });
+  applyTenant(query, 'd.tenant_id', tenantId);
+  const row = await query.first();
   return !!row;
 };
 

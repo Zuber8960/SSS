@@ -1,16 +1,17 @@
 const db = require('../../config/db');
+const { applyTenant } = require('../../utils/tenantScope');
 
 module.exports = {
 
     async getAllLocationData(recId, company_code) {
         const query = db('sss.ssm_location').select('*');
-        if (company_code) query.where({ company_code });
+        if (company_code) applyTenant(query, 'tenant_id', company_code);
         return query;
     },
 
     async getLocationDataByRecId(recId, company_code) {
         const query = db('sss.ssm_location').where({ record_id: recId });
-        if (company_code) query.andWhere({ company_code });
+        if (company_code) applyTenant(query, 'tenant_id', company_code);
         return query.first();
     },
 
@@ -20,7 +21,8 @@ module.exports = {
             ...payload,
             record_created_by: recId,
             record_created_on: new Date(),
-            company_code: payload.company_code || company_code,
+            tenant_id: company_code || null,
+            company_code: company_code || payload.company_code,
             division_code: Number(payload.division_code) || 0,
             loc_id: payload.loc_id || 0,
         };
@@ -31,21 +33,23 @@ module.exports = {
         const updates = { ...payload, record_updated_on: new Date(), record_updated_by: recId };
         delete updates.id;
         delete updates.record_id;
+        delete updates.tenant_id;
+        delete updates.company_code;
         const query = db('sss.ssm_location').where({ record_id: payload.record_id });
-        if (company_code) query.andWhere({ company_code });
+        if (company_code) applyTenant(query, 'tenant_id', company_code);
         return query.update(updates).returning('*');
     },
 
     async deleteLocationData(recId, company_code) {
         const query = db('sss.ssm_location').where({ record_id: recId });
-        if (company_code) query.andWhere({ company_code });
+        if (company_code) applyTenant(query, 'tenant_id', company_code);
         return query.del();
     },
 
     async getTownsByLocationCode(locCode, company_code) {
         const query = db('sss.ssm_location_town').select('*');
         if (locCode) query.where({ loc_code: locCode });
-        if (company_code) query.where({ company_code });
+        if (company_code) applyTenant(query, 'company_code', company_code);
         return query.orderBy('town_name', 'asc');
     },
 
@@ -76,7 +80,7 @@ module.exports = {
     async updateTownLocation(townName, fromLocCode, toLocCode, company_code, new_town_name, latitude, longitude) {
 
         const query = db('sss.ssm_location_town').where({ town_name: townName, loc_code: fromLocCode });
-        if (company_code) query.andWhere({ company_code });
+        if (company_code) applyTenant(query, 'company_code', company_code);
 
         if (latitude === undefined || latitude === null || latitude === '' || isNaN(Number(latitude))) {
             throw new Error('latitude is required and must be a valid number');
@@ -102,7 +106,7 @@ module.exports = {
 
         const query = db('sss.ssm_location_town').where({ town_name: townName });
         if (locCode) query.andWhere({ loc_code: locCode });
-        if (company_code) query.andWhere({ company_code });
+        if (company_code) applyTenant(query, 'company_code', company_code);
 
         return query.del();
     },

@@ -3,6 +3,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
+const { applyTenant } = require('../utils/tenantScope');
 const publicRoutes = require('./public');
 const userRoutes = require("../modules/userMaster/user.routes");
 const locationMasterRoutes = require("../modules/locationMaster/locationMaster.routes");
@@ -178,9 +179,12 @@ const allowedBranchCodes = (user) => {
 const loadSessionBranches = async (user) => {
   const isAdmin = String(user?.is_admin || '').toUpperCase() === 'Y';
   const allowed = allowedBranchCodes(user);
-  const base = () => db('sss.ssm_location').select('loc_code', 'loc_name', 'loc_id');
+  const base = () => {
+    const query = db('sss.ssm_location').select('loc_code', 'loc_name', 'loc_id');
+    if (user?.tenant_id) applyTenant(query, 'tenant_id', user.tenant_id);
+    return query;
+  };
   let query = base();
-  if (user?.tenant_id) query = query.where({ tenant_id: user.tenant_id });
   if (!isAdmin && allowed.length) {
     query = query.whereRaw(
       `UPPER(TRIM(loc_code)) IN (${allowed.map(() => '?').join(',')})`,
@@ -188,9 +192,6 @@ const loadSessionBranches = async (user) => {
     );
   }
   let rows = (!isAdmin && !allowed.length) ? [] : await query.orderBy('loc_code');
-  if (!rows.length && isAdmin) {
-    rows = await base().orderBy('loc_code');
-  }
   if (!rows.length && allowed.length) {
     rows = await base()
       .whereRaw(`UPPER(TRIM(loc_code)) IN (${allowed.map(() => '?').join(',')})`, allowed)
@@ -239,9 +240,10 @@ router.post('/session/branch', authMiddleware, async (req, res) => {
     if (!match && !isAdmin) {
       return res.status(403).json({ success: false, message: 'You are not allowed to use this branch' });
     }
-    const locRow = match || await db('sss.ssm_location')
-      .whereRaw('UPPER(TRIM(loc_code)) = ?', [branchCodeOf(locCode)])
-      .first();
+    const locQuery = db('sss.ssm_location')
+      .whereRaw('UPPER(TRIM(loc_code)) = ?', [branchCodeOf(locCode)]);
+    if (user?.tenant_id) applyTenant(locQuery, 'tenant_id', user.tenant_id);
+    const locRow = match || await locQuery.first();
     if (!locRow) {
       return res.status(404).json({ success: false, message: 'Branch not found' });
     }

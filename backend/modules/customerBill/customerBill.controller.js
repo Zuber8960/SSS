@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const { applyInvoiceTenant, applyTenant } = require('../../utils/tenantScope');
 
 /* ================= HELPERS ================= */
 
@@ -86,11 +87,7 @@ const findInvoiceHeader = (qb, invoiceNo, invoiceDate, invoiceLoc, company_code 
     .where({ loc_code: invoiceLoc })
     .andWhereRaw('CAST(invoice_no AS INTEGER) = CAST(? AS INTEGER)', [invoiceNo])
     .andWhereRaw('CAST(invoice_date AS DATE) = CAST(? AS DATE)', [invoiceDate]);
-  if (company_code) {
-    query.andWhere((q) =>
-      q.where({ company_code }).orWhereNull('company_code').orWhereNull('tenant_id')
-    );
-  }
+  if (company_code) applyInvoiceTenant(query, company_code);
   return query.first();
 };
 
@@ -175,14 +172,7 @@ async function getAllInvoices(filters = {}) {
   // Tenant scoping: legacy rows were saved with company_code/tenant_id NULL
   // (sanitizeHeader used to drop them), so NULL rows must stay visible or the
   // report comes back empty for older invoices.
-  if (filters.company_code) {
-    query.where((q) =>
-      q.where({ company_code: filters.company_code })
-        .orWhere({ tenant_id: filters.company_code })
-        .orWhereNull('company_code')
-        .orWhereNull('tenant_id')
-    );
-  }
+  if (filters.company_code) applyInvoiceTenant(query, filters.company_code);
   if (filters.division_code) query.andWhere({ division_code: filters.division_code });
   if (filters.loc_code) query.andWhere({ loc_code: filters.loc_code });
   if (filters.invoice_no) query.andWhere({ invoice_no: filters.invoice_no });
@@ -206,11 +196,7 @@ async function getBilledDocketNos(company_code = null) {
     .whereNotNull('d.docket_no')
     .whereRaw("TRIM(d.docket_no::text) <> ''")
     .whereRaw("COALESCE(UPPER(TRIM(h.cancel_flag::text)), '') NOT IN ('Y', 'C', '1')");
-  if (company_code) {
-    query.andWhere((q) =>
-      q.where('d.company_code', company_code).orWhereNull('d.company_code')
-    );
-  }
+  if (company_code) applyInvoiceTenant(query, company_code, 'h');
   const rows = await query;
   return (rows || []).map((r) => String(r.docket_no).trim()).filter(Boolean);
 }
@@ -220,7 +206,7 @@ async function getInvoiceDetail(invoiceNo, invoiceDate, invoiceLoc, company_code
   const query = db('sss.sst_invoice_dtl')
     .where({ invoice_loc: invoiceLoc, invoice_no: no })
     .whereRaw('invoice_date = ?::date', [invoiceDate]);
-  if (company_code) query.andWhere((q) => q.where({ company_code }).orWhereNull('company_code'));
+  if (company_code) applyTenant(query, 'company_code', company_code);
   return query.orderBy('inv_sr_no', 'asc');
 }
 
@@ -230,14 +216,7 @@ async function getInvoiceByNumber(invoiceNo, loc_code = null, company_code = nul
 
   const query = db('sss.sst_invoice_hdr').where({ invoice_no: no });
   if (loc_code) query.andWhere({ loc_code });
-  if (company_code) {
-    query.andWhere((q) =>
-      q.where({ company_code })
-        .orWhere({ tenant_id: company_code })
-        .orWhereNull('company_code')
-        .orWhereNull('tenant_id')
-    );
-  }
+  if (company_code) applyInvoiceTenant(query, company_code);
 
   const header = await query.orderBy('invoice_date', 'desc').first();
   if (!header) return null;
@@ -255,11 +234,7 @@ async function getFullInvoice(invoiceNo, invoiceDate, invoiceLoc, company_code =
   const headerQuery = db('sss.sst_invoice_hdr')
     .where({ loc_code: invoiceLoc, invoice_no: parseInt(String(invoiceNo ?? '').trim(), 10) })
     .whereRaw('invoice_date = ?::date', [invoiceDate]);
-  if (company_code) {
-    headerQuery.andWhere((q) =>
-      q.where({ company_code }).orWhereNull('company_code').orWhereNull('tenant_id')
-    );
-  }
+  if (company_code) applyInvoiceTenant(headerQuery, company_code);
 
   const header = await headerQuery.first();
   if (!header) return null;
@@ -308,6 +283,8 @@ async function saveInvoice(payload = {}, company_code = null) {
       delete updates.created_by;
       delete updates.inv_sub_date;
       delete updates.cancel_flag;
+      delete updates.tenant_id;
+      delete updates.company_code;
 
       [savedHeader] = await trx('sss.sst_invoice_hdr')
         .where({ record_id: existing.record_id })
@@ -315,10 +292,22 @@ async function saveInvoice(payload = {}, company_code = null) {
         .returning('*');
     } else {
       // Insert new header with auto-generated invoice_no
-      headerWithNo.company_code = company_code;
-      headerWithNo.tenant_id = company_code;
+      const taken = await trx('sss.sst_invoice_hdr')
+        .where({ loc_code: headerWithNo.loc_code })
+        .andWhereRaw('CAST(invoice_no AS INTEGER) = CAST(? AS INTEGER)', [headerWithNo.invoice_no])
+        .andWhereRaw('CAST(invoice_date AS DATE) = CAST(? AS DATE)', [headerWithNo.invoice_date])
+        .first();
+      if (taken) {
+        await trx.rollback();
+        const err = new Error('Invoice number is not available');
+        err.status = 409;
+        throw err;
+      }
+      const insertRow = sanitizeHeader(headerWithNo);
+      insertRow.company_code = company_code;
+      insertRow.tenant_id = company_code;
       [savedHeader] = await trx('sss.sst_invoice_hdr')
-        .insert(sanitizeHeader(headerWithNo))
+        .insert(insertRow)
         .returning('*');
     }
 
@@ -329,7 +318,13 @@ async function saveInvoice(payload = {}, company_code = null) {
       invoice_loc: savedHeader.loc_code,
       company_code: company_code,
     };
-    await trx('sss.sst_invoice_dtl').where(detailKeys).del();
+    const detailDelete = trx('sss.sst_invoice_dtl').where({
+      invoice_no: savedHeader.invoice_no,
+      invoice_date: savedHeader.invoice_date,
+      invoice_loc: savedHeader.loc_code,
+    });
+    if (company_code) applyTenant(detailDelete, 'company_code', company_code);
+    await detailDelete.del();
 
     // Insert details
     if (Array.isArray(details) && details.length > 0) {
@@ -383,6 +378,8 @@ async function updateInvoice(invoiceNo, invoiceDate, invoiceLoc, payload = {}, c
     delete updates.created_by;
     delete updates.inv_sub_date;
     delete updates.cancel_flag;
+    delete updates.tenant_id;
+    delete updates.company_code;
 
     const [updatedHeader] = await trx('sss.sst_invoice_hdr')
       .where({ record_id: existing.record_id })
@@ -391,7 +388,9 @@ async function updateInvoice(invoiceNo, invoiceDate, invoiceLoc, payload = {}, c
 
     // Delete old details and re-insert
     const detailKeys = { invoice_no: invoiceNo, invoice_date: invoiceDate, invoice_loc: invoiceLoc };
-    await trx('sss.sst_invoice_dtl').where(detailKeys).del();
+    const detailDelete = trx('sss.sst_invoice_dtl').where(detailKeys);
+    if (company_code) applyTenant(detailDelete, 'company_code', company_code);
+    await detailDelete.del();
 
     if (Array.isArray(details) && details.length > 0) {
       const invoiceType = updatedHeader.invoice_type ?? header.invoice_type ?? existing.invoice_type ?? 'R';
@@ -399,6 +398,7 @@ async function updateInvoice(invoiceNo, invoiceDate, invoiceLoc, payload = {}, c
         sanitizeDetail({
           ...d,
           ...detailKeys,
+          company_code: company_code || d.company_code || null,
           invoice_type: invoiceType,
           inv_sr_no: index + 1,
         })
@@ -431,9 +431,10 @@ async function deleteInvoice(invoiceNo, invoiceDate, invoiceLoc, company_code = 
       await trx.rollback();
       throw new Error('Submitted bills cannot be deleted');
     }
-    await trx('sss.sst_invoice_dtl')
-      .where({ invoice_no: invoiceNo, invoice_date: invoiceDate, invoice_loc: invoiceLoc })
-      .del();
+    const detailDelete = trx('sss.sst_invoice_dtl')
+      .where({ invoice_no: invoiceNo, invoice_date: invoiceDate, invoice_loc: invoiceLoc });
+    if (company_code) applyTenant(detailDelete, 'company_code', company_code);
+    await detailDelete.del();
     const deleted = await trx('sss.sst_invoice_hdr').where({ record_id: existing.record_id }).del();
     await trx.commit();
     return deleted;
@@ -461,11 +462,12 @@ async function cancelInvoice(invoiceNo, invoiceDate, invoiceLoc, company_code = 
       throw new Error('Submitted bills cannot be cancelled');
     }
 
-    await trx('sss.sst_invoice_dtl')
+    const detailDelete = trx('sss.sst_invoice_dtl')
       .where({ invoice_loc: invoiceLoc })
       .andWhereRaw('CAST(invoice_no AS INTEGER) = CAST(? AS INTEGER)', [invoiceNo])
-      .andWhereRaw('CAST(invoice_date AS DATE) = CAST(? AS DATE)', [invoiceDate])
-      .del();
+      .andWhereRaw('CAST(invoice_date AS DATE) = CAST(? AS DATE)', [invoiceDate]);
+    if (company_code) applyTenant(detailDelete, 'company_code', company_code);
+    await detailDelete.del();
 
     const [updatedHeader] = await trx('sss.sst_invoice_hdr')
       .where({ record_id: existing.record_id })

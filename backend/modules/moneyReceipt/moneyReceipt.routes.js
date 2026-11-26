@@ -31,7 +31,7 @@ router.get('/outstanding', async (req, res) => {
 router.get('/by-number/:mrNo', async (req, res) => {
   try {
     const loc = req.query.loc_code || req.loc_code;
-    const data = await ctrl.getByNumber(req.params.mrNo, loc);
+    const data = await ctrl.getByNumber(req.params.mrNo, loc, req.tenant_id);
     if (!data) return res.status(404).json({ success: false, message: `Receipt ${req.params.mrNo} not found for this branch` });
     res.json({ success: true, data });
   } catch (e) {
@@ -51,7 +51,7 @@ router.post('/', async (req, res) => {
 
 router.delete('/:mrNo/:mrDate/:locCode', async (req, res) => {
   try {
-    const deleted = await ctrl.deleteReceipt(req.params.mrNo, req.params.mrDate, req.params.locCode);
+    const deleted = await ctrl.deleteReceipt(req.params.mrNo, req.params.mrDate, req.params.locCode, req.tenant_id);
     if (!deleted) return res.status(404).json({ success: false, message: 'Receipt not found' });
     res.json({ success: true, message: 'Money receipt deleted' });
   } catch (e) {

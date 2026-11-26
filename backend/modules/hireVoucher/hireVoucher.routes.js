@@ -8,7 +8,7 @@ const db = require('../../config/db');
 router.get('/', async (req, res) => {
   try {
     const loc = req.query.vha_loc || req.query.from_loc || null;
-    const data = await HireVoucherController.getAllHireVouchers(loc);
+    const data = await HireVoucherController.getAllHireVouchers(loc, req.tenant_id);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -23,7 +23,8 @@ router.get('/:no/:loc/:date', async (req, res) => {
     const data = await HireVoucherController.getHireVoucherByKey({
       vha_no: no,
       vha_loc: loc,
-      vha_date: date
+      vha_date: date,
+      tenant_id: req.tenant_id,
     });
     res.json({ success: true, data });
   } catch (err) {
@@ -36,7 +37,7 @@ router.get('/:no/:loc/:date', async (req, res) => {
 router.get('/by-no/:no', async (req, res) => {
   try {
     const { no } = req.params;
-    const data = await HireVoucherController.getHireVoucherByVhvNo(no, req.loc_code);
+    const data = await HireVoucherController.getHireVoucherByVhvNo(no, req.loc_code, req.tenant_id);
     if (!data) {
       return res.status(404).json({ success: false, message: 'Hire Voucher not found' });
     }
@@ -53,7 +54,8 @@ router.get('/uncovered-manifests/:vehicleNo', async (req, res) => {
     const data = await HireVoucherController.getUncoveredManifestsByVehicle(
       req.params.vehicleNo,
       req.query.vha_no || null,
-      req.query.from_loc || null
+      req.query.from_loc || null,
+      req.tenant_id
     );
     res.json({ success: true, data });
   } catch (err) {
@@ -80,7 +82,8 @@ router.post('/', async (req, res) => {
     }
     const sessionHeader = {
       ...header,
-      company_code: req.company_code ?? header.company_code,
+      tenant_id: req.tenant_id,
+      company_code: req.company_code ?? req.tenant_id,
       division_code: req.division_code ?? header.division_code,
       vha_loc: req.loc_code || header.vha_loc,
     };
@@ -110,7 +113,7 @@ router.put('/:no/:loc/:date', async (req, res) => {
         message: 'You can only edit hire vouchers of your login branch',
       });
     }
-    const keys = { vha_no: no, vha_loc: loc, vha_date: date };
+    const keys = { vha_no: no, vha_loc: loc, vha_date: date, tenant_id: req.tenant_id };
     const selected = (Array.isArray(details) ? details : []).filter((r) => String(r?.mnf_no || '').trim());
     if (!selected.length) {
       return res.status(400).json({ success: false, message: 'Please select at least one manifest' });
@@ -155,7 +158,7 @@ router.put('/:no/:loc/:date', async (req, res) => {
     // Must run even for an empty array, otherwise removing every manifest row
     // from the UI would silently leave the old rows in the database.
     if (Array.isArray(details)) {
-      await HireVoucherController.updateHireVoucherDetails(keys, details);
+      await HireVoucherController.updateHireVoucherDetails(keys, details, req.tenant_id);
     }
 
     res.json({ success: true, message: 'Hire Voucher updated successfully' });
@@ -178,7 +181,7 @@ router.delete('/:no/:loc/:date', async (req, res) => {
       });
     }
     const removed = await HireVoucherController.deleteHireVoucher({
-      vha_no: no, vha_loc: loc, vha_date: date
+      vha_no: no, vha_loc: loc, vha_date: date, tenant_id: req.tenant_id,
     }, trx);
     if (!removed) {
       await trx.rollback();
@@ -197,7 +200,7 @@ router.delete('/:no/:loc/:date', async (req, res) => {
 router.get('/by-vhv-no/:vhvNo', async (req, res) => {
   try {
     const { vhvNo } = req.params;
-    const data = await HireVoucherController.getHireVoucherByVhvNo(vhvNo, req.loc_code);
+    const data = await HireVoucherController.getHireVoucherByVhvNo(vhvNo, req.loc_code, req.tenant_id);
     if (!data) {
       return res.status(404).json({ success: false, message: 'Hire Voucher not found for this VHV No' });
     }
@@ -212,7 +215,7 @@ router.get('/by-vhv-no/:vhvNo', async (req, res) => {
 router.get('/vendor/:lorryNo', async (req, res) => {
   try {
     const { lorryNo } = req.params;
-    const data = await HireVoucherController.getVendorByLorryNo(lorryNo);
+    const data = await HireVoucherController.getVendorByLorryNo(lorryNo, req.tenant_id);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

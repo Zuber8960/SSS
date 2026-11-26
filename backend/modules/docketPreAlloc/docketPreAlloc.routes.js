@@ -14,6 +14,7 @@ router.get('/', async (req, res) => {
       used: req.query.used,
       loc_code: req.query.loc_code,
       customer_code: req.query.customer_code,
+      company_code: req.tenant_id,
     });
     res.status(200).json({ success: true, data });
   } catch (error) {
@@ -25,7 +26,7 @@ router.get('/preview-auto', async (req, res) => {
   try {
     const data = await DocketPreAlloc.previewAuto({
       loc_code: req.query.loc_code || req.user?.loc_code,
-      company_code: req.headers['x-company-code'] || req.tenant_id || req.user?.company_code,
+      company_code: req.tenant_id,
       count: req.query.count,
     });
     res.status(200).json({ success: true, data });
@@ -40,7 +41,7 @@ router.post('/', async (req, res) => {
     const data = await DocketPreAlloc.save({
       ...req.body,
       loc_code: req.body.loc_code || user.loc_code,
-      company_code: req.body.company_code || req.tenant_id || user.company_code,
+      company_code: req.tenant_id,
       aud_user: user.userName || user.userId,
     });
     res.status(200).json({ success: true, message: 'Dockets pre-allocated', data });

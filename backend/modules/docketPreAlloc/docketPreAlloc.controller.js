@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const { applyTenant } = require('../../utils/tenantScope');
 
 const num = (v, d = 0) => {
   const n = Number(v);
@@ -51,7 +52,7 @@ module.exports = {
     return v === 'Y' ? 'Y' : 'N';
   },
 
-  async list({ used, loc_code, customer_code }) {
+  async list({ used, loc_code, customer_code, company_code }) {
     const query = db('sss.sst_docket_preallc').select('*').orderBy('record_id', 'desc');
     const filter = String(used || 'ALL').toUpperCase();
     if (filter === 'Y' || filter === 'USED') {
@@ -61,6 +62,7 @@ module.exports = {
     }
     if (loc_code) query.andWhere('loc_code', loc_code);
     if (customer_code) query.andWhere('customer_code', customer_code);
+    if (company_code) applyTenant(query, 'company_code', company_code);
     const rows = await query;
     return rows.map((r) => {
       const used_flag = this.usedStatus(r.used_flag);
@@ -122,11 +124,15 @@ module.exports = {
         seen.add(no);
       }
 
-      const existingPre = await trx('sss.sst_docket_preallc').whereIn('docket_no', docketNos).select('docket_no');
+      const existingPreQuery = trx('sss.sst_docket_preallc').whereIn('docket_no', docketNos);
+      if (company_code) applyTenant(existingPreQuery, 'company_code', company_code);
+      const existingPre = await existingPreQuery.select('docket_no');
       if (existingPre.length) {
         throw fail(400, `Docket Number ${existingPre[0].docket_no} is already pre-allocated`);
       }
-      const existingDkt = await trx('sss.sst_docket').whereIn('docket_no', docketNos).select('docket_no').first();
+      const existingDktQuery = trx('sss.sst_docket').whereIn('docket_no', docketNos);
+      if (company_code) applyTenant(existingDktQuery, 'tenant_id', company_code);
+      const existingDkt = await existingDktQuery.select('docket_no').first();
       if (existingDkt) {
         throw fail(400, `Docket Number ${existingDkt.docket_no} already exists`);
       }

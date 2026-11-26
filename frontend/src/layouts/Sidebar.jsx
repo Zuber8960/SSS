@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { getTenantConfig } from "../utils/tenantService";
+import { getTenantConfig, isLogipodTenant } from "../utils/tenantService";
 import { useMenuAccess } from "../utils/accessControl";
 import { Link, useLocation } from "react-router-dom";
 import List from "@mui/material/List";
@@ -123,7 +123,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         setOpenFleet(false);
       },
       children: [
-        { path: "/masters/company",          label: "Company Master",    icon: <ApartmentIcon /> },
+        ...(isLogipodTenant() ? [] : [{ path: "/masters/company", label: "Company Master", icon: <ApartmentIcon /> }]),
         { path: "/masters/division",         label: "Division Master",   icon: <CategoryIcon /> },
         { path: "/masters/location",         label: "Location Master",   icon: <LocationOnIcon /> },
         { path: "/masters/business-partner", label: "Business Partner",  icon: <HandshakeIcon /> },
@@ -203,7 +203,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/reports/manifest-report", label: "Manifest Report", icon: <UnarchiveIcon /> },
         { path: "/reports/hire-voucher-report", label: "Hire Voucher Report", icon: <ReceiptLongIcon /> },
         { path: "/reports/invoice-report", label: "Invoice Report", icon: <RequestQuoteIcon /> },
-        { path: "/reports/customer-mis", label: "Toyota MIS", icon: <QueryStatsIcon /> },
+        { path: "/reports/customer-mis", label: isLogipodTenant() ? "CUST MIS" : "Toyota MIS", icon: <QueryStatsIcon /> },
       ],
     },
   ];

@@ -8,11 +8,11 @@ import useAlert from "../../components/common/UseAlert";
 import CommonAlertDialog from "../../components/common/CommonAlertDialog";
 import useLoading from "../../components/common/UseLoading";
 import LoadingOverlay from "../../components/common/LoadingOverlay";
-import { fetchAllDockets, fetchCharges, fetchDocketByDocketNo, fetchDocketInvoices, fetchDocketPackages } from "../../utils/docket";
+import { fetchAllDockets, fetchCharges, fetchDocketByDocketNo, fetchDocketInvoices, fetchDocketPackages, deleteDocketFully } from "../../utils/docket";
 import { fetchAllLocations } from "../../utils/locationMaster";
 import { fetchAllCompanies } from "../../utils/companyMaster";
 import { fetchAllUsers } from "../../utils/userAPI";
-import { RefreshIcon, PrintIcon, ExportIcon } from "../../components/common/icons";
+import { RefreshIcon, PrintIcon, ExportIcon, DeleteIcon } from "../../components/common/icons";
 import { IconButton, Tooltip, Button, TextField, Menu, MenuItem, ListItemIcon, ListItemText, Autocomplete, FormControlLabel, Checkbox } from "@mui/material";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
@@ -105,7 +105,7 @@ const docketColumns = [
   { key: "docket_loc", label: "From Location", minWidth: 120 },
   { key: "docket_pickup_town", label: "From Town", minWidth: 120 },
   { key: "docket_to_loc", label: "To Location", minWidth: 120 },
-  { key: "docket_dly_town", label: "To Town", minWidth: 120 },
+  { key: "docket_dly_town", label: "To Town", minWidth: 120, frozen: true },
   { key: "cnor_name", label: "Consignor", minWidth: 150 },
   { key: "cnee_name", label: "Consignee", minWidth: 150 },
   { key: "docket_tot_pkgs", label: "Packages", minWidth: 90 },
@@ -138,7 +138,7 @@ const toDate = (val) => {
 };
 
 export default function DocketReport() {
-  const { dialog, closeAlert, showError, showSuccess } = useAlert();
+  const { dialog, closeAlert, showError, showSuccess, showWarning } = useAlert();
   const { isLoading, showLoading, hideLoading } = useLoading();
 
   const branchCode = (() => {
@@ -572,6 +572,38 @@ export default function DocketReport() {
     }
   };
 
+  const cashPay = (row) => {
+    const pay = String(row?.docket_pay_type || "").trim().toUpperCase();
+    return pay === "PAID" || pay === "PAID BASIS" || pay === "TO PAY" || pay === "TOPAY" || pay === "TO-PAY";
+  };
+  const deleteLocked = (row) => Boolean(row?.has_bill) || (cashPay(row) && Boolean(row?.has_mr));
+  const deleteTitle = (row) => {
+    if (row?.has_bill) return "A bill has been prepared for this docket";
+    if (cashPay(row) && row?.has_mr) return "A money receipt has been created for this docket";
+    return "Delete";
+  };
+  const removeDocket = (row) => {
+    if (!row?.docket_no || deleteLocked(row)) return;
+    showWarning(
+      "Delete docket",
+      `Delete docket ${row.docket_no}? It will be removed from the docket and its related records.`,
+      async () => {
+        try {
+          showLoading();
+          await deleteDocketFully(row.docket_no);
+          setAllDockets((prev) => prev.filter((d) => String(d.docket_no) !== String(row.docket_no)));
+          setSelectedRow((prev) => (prev && String(prev.docket_no) === String(row.docket_no) ? null : prev));
+          setSelectedRows((prev) => prev.filter((d) => String(d.docket_no) !== String(row.docket_no)));
+          showSuccess(`Docket ${row.docket_no} deleted`);
+        } catch (err) {
+          showError(err.message || "Could not delete the docket");
+        } finally {
+          hideLoading();
+        }
+      }
+    );
+  };
+
   return (
     <MainLayout>
       <PageBody title="Docket Report" className="docket-report-page">
@@ -966,7 +998,13 @@ export default function DocketReport() {
             columns={docketColumns}
             rows={gridRows}
             getKey={(row, index) => row.rec_id || row.id || (row.docket_no + (row.docket_date || "") + index)}
-            actions={[]}
+            actions={[{
+              label: "Delete",
+              icon: <DeleteIcon fontSize="small" />,
+              disabled: deleteLocked,
+              title: deleteTitle,
+              onClick: removeDocket,
+            }]}
             compact
             scroll={{ afterRows: 27, horizontal: true }}
             isHeight={628}

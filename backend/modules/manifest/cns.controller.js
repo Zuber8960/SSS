@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const { applyTenant } = require('../../utils/tenantScope');
 
 /**
  * CNS Validation for Manifest Entry
@@ -40,7 +41,7 @@ const LOCAL_PICKUP_COLUMNS = [
   'cnee.bp_name as cnee_name',
 ];
 
-const localPickupBaseQuery = ({ fromLoc, fromTown }) => {
+const localPickupBaseQuery = ({ fromLoc, fromTown, tenantId }) => {
   const q = db('sss.sst_docket as d')
     .leftJoin('sss.ssm_business_partner as cnor', 'd.cnor_id', 'cnor.record_id')
     .leftJoin('sss.ssm_business_partner as cnee', 'd.cnee_id', 'cnee.record_id')
@@ -49,6 +50,7 @@ const localPickupBaseQuery = ({ fromLoc, fromTown }) => {
     .whereRaw('(COALESCE(d.docket_tot_pkgs, 0) - COALESCE(d.desp_pkgs, 0)) > 0')
     .where({ 'd.record_status': 0 })
     .select(LOCAL_PICKUP_COLUMNS);
+  applyTenant(q, 'd.tenant_id', tenantId);
   return excludeDocketsWithManifestType(q, 'd.docket_no::text', 'lp');
 };
 
@@ -60,8 +62,8 @@ const localPickupBaseQuery = ({ fromLoc, fromTown }) => {
  *   AND (TOT_PKGS - DESP_PKGS) > 0
  *   AND no Local Pickup manifest already exists for the docket
  */
-const validateLocalPickup = async ({ docketNo, fromLoc, fromTown }) => {
-  const result = await localPickupBaseQuery({ fromLoc, fromTown })
+const validateLocalPickup = async ({ docketNo, fromLoc, fromTown, tenantId }) => {
+  const result = await localPickupBaseQuery({ fromLoc, fromTown, tenantId })
     .andWhere('d.docket_no', docketNo)
     .first();
 
@@ -89,17 +91,17 @@ const validateLocalPickup = async ({ docketNo, fromLoc, fromTown }) => {
  *      unld_loc_code = MANIFEST FROM LOC
  *      and (pkgs_received - desp_pkgs) > 0
  */
-const validateLongHaul = async ({ docketNo, fromLoc, fromTown }) => {
-  // Check sst_docket first
-  const docket = await db('sss.sst_docket')
+const validateLongHaul = async ({ docketNo, fromLoc, fromTown, tenantId }) => {
+  const docketQuery = db('sss.sst_docket')
     .where({
       docket_no: docketNo,
       docket_loc: fromLoc,
       docket_pickup_town: fromTown,
     })
     .whereRaw('(docket_tot_pkgs - desp_pkgs) > 0')
-    .where({ record_status: 0 })
-    .first();
+    .where({ record_status: 0 });
+  applyTenant(docketQuery, 'tenant_id', tenantId);
+  const docket = await docketQuery.first();
 
   if (!docket) {
     return {
@@ -161,7 +163,7 @@ const LOCAL_DELIVERY_COLUMNS = [
   'd.docket_loc',
 ];
 
-const localDeliveryBaseQuery = ({ fromLoc, toLoc, toTown }) => {
+const localDeliveryBaseQuery = ({ fromLoc, toLoc, toTown, tenantId }) => {
   const q = db('sss.sst_unloading_dtl as ud')
     .leftJoin('sss.sst_docket as d', 'd.docket_no', 'ud.docket_no')
     .leftJoin('sss.ssm_business_partner as cnor', 'd.cnor_id', 'cnor.record_id')
@@ -171,11 +173,12 @@ const localDeliveryBaseQuery = ({ fromLoc, toLoc, toTown }) => {
     .whereRaw("UPPER(TRIM(COALESCE(d.docket_dly_town, ''))) = UPPER(TRIM(?))", [toTown])
     .whereRaw('(COALESCE(ud.pkgs_received, 0) - COALESCE(ud.desp_pkgs, 0)) > 0')
     .select(LOCAL_DELIVERY_COLUMNS);
+  applyTenant(q, 'd.tenant_id', tenantId);
   return excludeDocketsWithManifestType(q, 'ud.docket_no::text', 'ld');
 };
 
-const validateLocalDelivery = async ({ docketNo, fromLoc, toLoc, toTown }) => {
-  const result = await localDeliveryBaseQuery({ fromLoc, toLoc, toTown })
+const validateLocalDelivery = async ({ docketNo, fromLoc, toLoc, toTown, tenantId }) => {
+  const result = await localDeliveryBaseQuery({ fromLoc, toLoc, toTown, tenantId })
     .andWhere('ud.docket_no', docketNo)
     .first();
 
@@ -194,8 +197,8 @@ const validateLocalDelivery = async ({ docketNo, fromLoc, toLoc, toTown }) => {
 };
 
 /* Dockets at From Loc / From Town that do not already have a Local Pickup manifest */
-const listLocalPickupDockets = async ({ fromLoc, fromTown, manifestDate }) => {
-  const query = localPickupBaseQuery({ fromLoc, fromTown })
+const listLocalPickupDockets = async ({ fromLoc, fromTown, manifestDate, tenantId }) => {
+  const query = localPickupBaseQuery({ fromLoc, fromTown, tenantId })
     .orderBy('d.docket_date')
     .orderBy('d.docket_no');
   if (manifestDate) {
@@ -211,8 +214,8 @@ const listLocalPickupDockets = async ({ fromLoc, fromTown, manifestDate }) => {
 };
 
 /* Dockets waiting at From Loc for local delivery to To Loc / To Town */
-const listLocalDeliveryDockets = async ({ fromLoc, toLoc, toTown, manifestDate }) => {
-  const query = localDeliveryBaseQuery({ fromLoc, toLoc, toTown })
+const listLocalDeliveryDockets = async ({ fromLoc, toLoc, toTown, manifestDate, tenantId }) => {
+  const query = localDeliveryBaseQuery({ fromLoc, toLoc, toTown, tenantId })
     .orderBy('ud.docket_date')
     .orderBy('ud.docket_no');
   if (manifestDate) {

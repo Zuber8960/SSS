@@ -27,7 +27,7 @@ import TuneIcon from "@mui/icons-material/Tune";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import moment from "moment";
-import { getDateFormat } from "../../utils/tenantService";
+import { getDateFormat, isLogipodTenant } from "../../utils/tenantService";
 
 const PURPLE = "#7e22ce";
 const PURPLE_SOFT = "#f3e8ff";
@@ -131,6 +131,7 @@ const columns = [
 ];
 
 export default function CustomerMIS() {
+  const misTitle = isLogipodTenant() ? "CUST MIS" : "Toyota MIS";
   const { dialog, closeAlert, showError, showSuccess } = useAlert();
   const { isLoading, showLoading, hideLoading } = useLoading();
 
@@ -189,8 +190,8 @@ export default function CustomerMIS() {
         setSummary(totals);
       } catch (err) {
         if (cancelled) return;
-        showError(err.message || "Failed to load Toyota MIS data");
-        console.error("Toyota MIS load error:", err);
+        showError(err.message || `Failed to load ${misTitle} data`);
+        console.error(`${misTitle} load error:`, err);
       } finally {
         if (!cancelled) hideLoading();
       }
@@ -270,7 +271,7 @@ export default function CustomerMIS() {
       setAllRows(Array.isArray(rows) ? rows : []);
       setSummary(totals);
     } catch (err) {
-      showError(err.message || "Failed to refresh Toyota MIS data");
+      showError(err.message || `Failed to refresh ${misTitle} data`);
     } finally {
       hideLoading();
     }
@@ -312,7 +313,7 @@ export default function CustomerMIS() {
 
   return (
     <MainLayout>
-      <PageBody title="Toyota MIS">
+      <PageBody title={misTitle}>
         {/* ── Toolbar ── */}
         <div className="pageToolbar" style={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", width: "100%" }}>
@@ -590,7 +591,7 @@ export default function CustomerMIS() {
         </div>
 
         <CommonAlertDialog dialog={dialog} onClose={closeAlert} />
-        <LoadingOverlay isLoading={isLoading} message="Loading Toyota MIS data..." />
+        <LoadingOverlay isLoading={isLoading} message={`Loading ${misTitle} data...`} />
       </PageBody>
     </MainLayout>
   );

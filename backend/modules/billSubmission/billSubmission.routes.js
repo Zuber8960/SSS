@@ -9,6 +9,7 @@ router.get('/pending', async (req, res) => {
       from_date: req.query.from_date,
       to_date: req.query.to_date,
       status: req.query.status,
+      tenant_id: req.tenant_id,
     });
     res.status(200).json({ success: true, data });
   } catch (error) {
@@ -36,6 +37,7 @@ router.post('/', async (req, res) => {
     const data = await BillSubmission.saveSubmission({
       ...req.body,
       aud_user: req.user?.userName || req.user?.userId,
+      tenant_id: req.tenant_id,
     });
     res.status(200).json({ success: true, message: 'Record saved', data });
   } catch (error) {

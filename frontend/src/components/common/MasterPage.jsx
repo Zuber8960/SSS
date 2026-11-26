@@ -710,22 +710,28 @@ export function DataTable({
             if (typeof action.hidden === "function" && action.hidden(params.row)) return null;
             const isDelete = action.label.toLowerCase() === "delete";
             const color = action.color || (isDelete ? "#dc2626" : "#7e22ce");
+            const disabled = typeof action.disabled === "function" ? Boolean(action.disabled(params.row)) : false;
+            const title = typeof action.title === "function" ? action.title(params.row) : action.label;
             return (
-              <Tooltip key={action.label} title={action.label}>
-                <IconButton
-                  size="small"
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    action.onClick(params.row);
-                  }}
-                  sx={{
-                    color,
-                    "&:hover": { background: isDelete ? "#fee2e2" : "#fef3c7" },
-                  }}
-                >
-                  {action.icon}
-                </IconButton>
+              <Tooltip key={action.label} title={title}>
+                <span>
+                  <IconButton
+                    size="small"
+                    disabled={disabled}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (disabled) return;
+                      action.onClick(params.row);
+                    }}
+                    sx={{
+                      color,
+                      "&:hover": { background: isDelete ? "#fee2e2" : "#fef3c7" },
+                    }}
+                  >
+                    {action.icon}
+                  </IconButton>
+                </span>
               </Tooltip>
             );
           })}
@@ -848,18 +854,9 @@ export function DataTable({
     "& .MuiDataGrid-columnHeader:hover .MuiDataGrid-columnSeparator": {
       display: "flex",
     },
-    "& .MuiDataGrid-cell--pinnedLeft, & .MuiDataGrid-cell--pinnedRight": {
-      backgroundColor: "#ffffff",
-      zIndex: 3,
-    },
-    "& .MuiDataGrid-row:nth-of-type(even) .MuiDataGrid-cell--pinnedLeft, & .MuiDataGrid-row:nth-of-type(even) .MuiDataGrid-cell--pinnedRight": {
-      backgroundColor: "#fcfbff",
-    },
-    "& .MuiDataGrid-row:hover .MuiDataGrid-cell--pinnedLeft, & .MuiDataGrid-row:hover .MuiDataGrid-cell--pinnedRight": {
-      backgroundColor: "#f8f5ff",
-    },
     "& .MuiDataGrid-columnHeader--pinnedLeft, & .MuiDataGrid-columnHeader--pinnedRight": {
-      zIndex: 45,
+      position: "sticky",
+      zIndex: 46,
       background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
     },
     "& .MuiDataGrid-cell": {
@@ -871,6 +868,9 @@ export function DataTable({
       minHeight: "unset",
       lineHeight: compact ? 1.1 : 1.3,
       backgroundColor: "transparent",
+      overflow: "hidden",
+      whiteSpace: "nowrap",
+      textOverflow: "ellipsis",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -908,6 +908,31 @@ export function DataTable({
           },
           "& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell--pinnedLeft, & .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell--pinnedRight": {
             backgroundColor: `${selectedRowColor} !important`,
+          },
+        }
+      : {}),
+    "& .MuiDataGrid-cell--pinnedLeft, & .MuiDataGrid-cell--pinnedRight": {
+      position: "sticky",
+      zIndex: "30 !important",
+      backgroundColor: "#ffffff !important",
+      overflow: "hidden",
+    },
+    "& .MuiDataGrid-row:nth-of-type(even) .MuiDataGrid-cell--pinnedLeft, & .MuiDataGrid-row:nth-of-type(even) .MuiDataGrid-cell--pinnedRight": {
+      backgroundColor: "#fcfbff !important",
+    },
+    "& .MuiDataGrid-row:hover .MuiDataGrid-cell--pinnedLeft, & .MuiDataGrid-row:hover .MuiDataGrid-cell--pinnedRight": {
+      backgroundColor: "#f8f5ff !important",
+    },
+    "& .MuiDataGrid-cell--pinnedLeft.MuiDataGrid-cell--withRightBorder, & .MuiDataGrid-columnHeader--pinnedLeft.MuiDataGrid-columnHeader--withRightBorder": {
+      boxShadow: "8px 0 8px -6px rgba(15, 23, 42, 0.28)",
+    },
+    ...(selectedRowColor
+      ? {
+          "& .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell--pinnedLeft, & .MuiDataGrid-row.Mui-selected .MuiDataGrid-cell--pinnedRight": {
+            backgroundColor: `${selectedRowColor} !important`,
+          },
+          "& .MuiDataGrid-row.Mui-selected:hover .MuiDataGrid-cell--pinnedLeft, & .MuiDataGrid-row.Mui-selected:hover .MuiDataGrid-cell--pinnedRight": {
+            backgroundColor: "#c8f0d4 !important",
           },
         }
       : {}),

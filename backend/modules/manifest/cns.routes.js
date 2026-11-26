@@ -13,7 +13,7 @@ router.get('/local-pickup-dockets', async (req, res) => {
         message: 'fromLoc and fromTown are required',
       });
     }
-    const data = await CNSController.listLocalPickupDockets({ fromLoc, fromTown, manifestDate });
+    const data = await CNSController.listLocalPickupDockets({ fromLoc, fromTown, manifestDate, tenantId: req.tenant_id });
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -29,7 +29,7 @@ router.get('/validate/local-pickup', async (req, res) => {
         message: 'docketNo, fromLoc, and fromTown are required',
       });
     }
-    const result = await CNSController.validateLocalPickup({ docketNo, fromLoc, fromTown });
+    const result = await CNSController.validateLocalPickup({ docketNo, fromLoc, fromTown, tenantId: req.tenant_id });
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -47,7 +47,7 @@ router.get('/validate/long-haul', async (req, res) => {
         message: 'docketNo, fromLoc, and fromTown are required',
       });
     }
-    const result = await CNSController.validateLongHaul({ docketNo, fromLoc, fromTown });
+    const result = await CNSController.validateLongHaul({ docketNo, fromLoc, fromTown, tenantId: req.tenant_id });
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -65,7 +65,7 @@ router.get('/local-delivery-dockets', async (req, res) => {
         message: 'fromLoc, toLoc, and toTown are required',
       });
     }
-    const data = await CNSController.listLocalDeliveryDockets({ fromLoc, toLoc, toTown, manifestDate });
+    const data = await CNSController.listLocalDeliveryDockets({ fromLoc, toLoc, toTown, manifestDate, tenantId: req.tenant_id });
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -81,7 +81,7 @@ router.get('/validate/local-delivery', async (req, res) => {
         message: 'docketNo, fromLoc, toLoc, and toTown are required',
       });
     }
-    const result = await CNSController.validateLocalDelivery({ docketNo, fromLoc, toLoc, toTown });
+    const result = await CNSController.validateLocalDelivery({ docketNo, fromLoc, toLoc, toTown, tenantId: req.tenant_id });
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

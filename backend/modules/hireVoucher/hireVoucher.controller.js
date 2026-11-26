@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const { applyTenant } = require('../../utils/tenantScope');
 
 const calcHireAmt = (rateUom, rate, gtdWt) => {
   const r = Number(rate) || 0;
@@ -94,12 +95,13 @@ const updateHireVoucherWithSettlement = async (keys, data) => {
 
 /* ================= GET ALL HIRE VOUCHERS ================= */
 
-const getAllHireVouchers = async (vhaLoc) => {
+const getAllHireVouchers = async (vhaLoc, tenantId) => {
   const query = db('sss.sst_vha_hdr')
     .select('*')
     .where({ record_status: 0 })
     .orderBy('vha_date', 'desc')
     .orderBy('vha_no', 'desc');
+  applyTenant(query, 'tenant_id', tenantId);
   if (vhaLoc) {
     query.andWhereRaw(
       "UPPER(TRIM(REPLACE(COALESCE(vha_loc, ''), ' ', ''))) = ?",
@@ -112,10 +114,11 @@ const getAllHireVouchers = async (vhaLoc) => {
 
 /* ================= GET HIRE VOUCHER BY KEY (composite) ================= */
 
-const getHireVoucherByKey = async ({ vha_no, vha_loc, vha_date }) => {
-  return db('sss.sst_vha_hdr')
-    .where({ vha_no, vha_loc, vha_date, record_status: 0 })
-    .first();
+const getHireVoucherByKey = async ({ vha_no, vha_loc, vha_date, tenant_id }) => {
+  const query = db('sss.sst_vha_hdr')
+    .where({ vha_no, vha_loc, vha_date, record_status: 0 });
+  if (tenant_id != null && tenant_id !== '') applyTenant(query, 'tenant_id', tenant_id);
+  return query.first();
 };
 
 /* ================= GET HIRE VOUCHER BY NO ONLY (for edit/view) ================= */
@@ -200,10 +203,23 @@ const createHireVoucher = async (headerData, detailsData) => {
 
   const trx = await db.transaction();
   try {
+    const manifestNos = [...new Set(manifestRows.map((row) => String(row.mnf_no).trim()))];
+    const ownedManifests = trx('sss.sst_mnf_hdr').whereIn('mnf_no', manifestNos).where({ record_status: 0 });
+    applyTenant(ownedManifests, 'tenant_id', headerData.tenant_id);
+    const ownedRows = await ownedManifests.select('mnf_no');
+    const ownedNos = new Set(ownedRows.map((row) => String(row.mnf_no).trim()));
+    const missingManifest = manifestNos.find((no) => !ownedNos.has(no));
+    if (missingManifest) {
+      const err = new Error(`Manifest ${missingManifest} is not available`);
+      err.status = 404;
+      throw err;
+    }
     const nextNo = await getNextHireVoucherNo(trx);
     // Build header row (only known sst_vha_hdr columns are accepted)
     const headerRow = {
       ...headerData,
+      tenant_id: headerData.tenant_id || null,
+      company_code: headerData.company_code || headerData.tenant_id || null,
       vha_no: nextNo,
       // NOT NULL columns — always defaulted
       vha_loc: headerData.vha_loc || '',
@@ -274,22 +290,34 @@ const createHireVoucher = async (headerData, detailsData) => {
 /* ================= UPDATE HIRE VOUCHER HEADER ================= */
 
 const updateHireVoucher = async (keys, data, trx = db) => {
-  return trx('sss.sst_vha_hdr')
-    .where(keys)
-    .update({
-      ...data,
-      aud_date: new Date()
-    });
+  const { tenant_id, company_code, vha_no, vha_loc, vha_date, ...rest } = data || {};
+  const query = trx('sss.sst_vha_hdr')
+    .where({ vha_no: keys.vha_no, vha_loc: keys.vha_loc, vha_date: keys.vha_date });
+  if (keys.tenant_id != null && keys.tenant_id !== '') applyTenant(query, 'tenant_id', keys.tenant_id);
+  return query.update({
+    ...rest,
+    aud_date: new Date()
+  });
 };
 
 /* ================= UPDATE HIRE VOUCHER DETAILS (delete all + re-insert) ================= */
 
-const updateHireVoucherDetails = async (keys, detailsData) => {
+const updateHireVoucherDetails = async (keys, detailsData, tenantId) => {
   const trx = await db.transaction();
   try {
-    // Delete existing details
+    const owned = trx('sss.sst_vha_hdr')
+      .where({ vha_no: keys.vha_no, vha_loc: keys.vha_loc, record_status: 0 })
+      .whereRaw('vha_date::date = ?::date', [keys.vha_date]);
+    applyTenant(owned, 'tenant_id', tenantId ?? keys.tenant_id);
+    const header = await owned.first();
+    if (!header) {
+      const err = new Error('Hire voucher not found');
+      err.status = 404;
+      throw err;
+    }
+    const match = { vha_no: header.vha_no, vha_loc: header.vha_loc, vha_date: header.vha_date };
     await trx('sss.sst_vha_dtl')
-      .where(keys)
+      .where(match)
       .del();
 
 
@@ -299,9 +327,9 @@ const updateHireVoucherDetails = async (keys, detailsData) => {
     const detailRows = detailsData.map((row) => ({
       company_code: row.company_code || null,
       division_code: row.division_code || null,
-      vha_no: keys.vha_no,
-      vha_loc: keys.vha_loc,
-      vha_date: keys.vha_date,
+      vha_no: header.vha_no,
+      vha_loc: header.vha_loc,
+      vha_date: header.vha_date,
       mnf_no: row.mnf_no || '',
       mnf_date: toDateOr(row.mnf_date),
       mnf_loc: row.mnf_loc || '',
@@ -309,7 +337,7 @@ const updateHireVoucherDetails = async (keys, detailsData) => {
       mnf_cns_no: toNumOrNull(row.mnf_cns_no),
       mnf_pkgs_no: toNumOrNull(row.mnf_pkgs_no),
       aud_user: row.aud_user || '',
-      aud_loc: keys.vha_loc,
+      aud_loc: header.vha_loc,
       aud_date: new Date(),
     }));
 
@@ -327,10 +355,11 @@ const updateHireVoucherDetails = async (keys, detailsData) => {
 /* ================= DELETE HIRE VOUCHER (header and manifest lines) ================= */
 
 const deleteHireVoucher = async (keys, trx = db) => {
-  const header = await trx('sss.sst_vha_hdr')
+  const lookup = trx('sss.sst_vha_hdr')
     .where({ vha_no: keys.vha_no, vha_loc: keys.vha_loc, record_status: 0 })
-    .whereRaw('vha_date::date = ?::date', [keys.vha_date])
-    .first();
+    .whereRaw('vha_date::date = ?::date', [keys.vha_date]);
+  applyTenant(lookup, 'tenant_id', keys.tenant_id);
+  const header = await lookup.first();
   if (!header) return null;
   const match = {
     vha_no: header.vha_no,
@@ -344,10 +373,11 @@ const deleteHireVoucher = async (keys, trx = db) => {
 
 /* ================= GET HIRE VOUCHER BY VHV NO ================= */
 
-const getHireVoucherByVhvNo = async (vhvNo, sessionLoc) => {
-  const header = await db('sss.sst_vha_hdr')
-    .where({ vha_no: vhvNo, record_status: 0 })
-    .first();
+const getHireVoucherByVhvNo = async (vhvNo, sessionLoc, tenantId) => {
+  const query = db('sss.sst_vha_hdr')
+    .where({ vha_no: vhvNo, record_status: 0 });
+  applyTenant(query, 'tenant_id', tenantId);
+  const header = await query.first();
 
   if (!header) return null;
 
@@ -372,20 +402,21 @@ const getHireVoucherByVhvNo = async (vhvNo, sessionLoc) => {
 
 /* ================= GET VENDOR BY LORRY NO ================= */
 
-const getVendorByLorryNo = async (lorryNo) => {
-  return db('sss.sst_vha_hdr')
+const getVendorByLorryNo = async (lorryNo, tenantId) => {
+  const query = db('sss.sst_vha_hdr')
     .select('vendor_name', 'vendor_code')
-    .where({ vha_no: lorryNo })
-    .first();
+    .where({ vha_no: lorryNo });
+  applyTenant(query, 'tenant_id', tenantId);
+  return query.first();
 };
 
 /* Manifests for a vehicle that are not already on an active hire voucher.
    currentVhaNo: when editing, keep rows already linked to this voucher. */
-const getUncoveredManifestsByVehicle = async (vehicleNo, currentVhaNo, fromLoc) => {
+const getUncoveredManifestsByVehicle = async (vehicleNo, currentVhaNo, fromLoc, tenantId) => {
   const veh = String(vehicleNo || '').replace(/\s+/g, '').toUpperCase();
   if (!veh) return [];
 
-  const bindings = [veh];
+  const bindings = [veh, tenantId, tenantId];
   let excludeCurrent = '';
   if (currentVhaNo) {
     excludeCurrent = 'AND vh.vha_no <> ?';
@@ -410,6 +441,7 @@ const getUncoveredManifestsByVehicle = async (vehicleNo, currentVhaNo, fromLoc) 
       h.desp_veh_no
     FROM sss.sst_mnf_hdr h
     WHERE REPLACE(UPPER(TRIM(COALESCE(h.desp_veh_no, ''))), ' ', '') = ?
+      AND (h.tenant_id = ? OR (? = 1 AND h.tenant_id IS NULL))
       AND COALESCE(h.record_status, 0) = 0
       AND NOT EXISTS (
         SELECT 1

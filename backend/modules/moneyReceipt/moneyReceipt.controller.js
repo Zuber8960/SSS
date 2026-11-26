@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const { applyTenant, rowOwned } = require('../../utils/tenantScope');
 
 const n = (v) => {
   const x = parseFloat(v);
@@ -159,7 +160,7 @@ async function listBanks() {
     .orderBy('bank_name');
 }
 
-async function getOutstandingDockets({ loc_code, bp_code, bp_name, bp_id, mr_reason, mr_date }) {
+async function getOutstandingDockets({ loc_code, bp_code, bp_name, bp_id, mr_reason, mr_date, company_code }) {
   const loc = locOf(loc_code);
   const reason = parseInt(mr_reason, 10);
   const mrDate = toDate(mr_date);
@@ -204,6 +205,10 @@ async function getOutstandingDockets({ loc_code, bp_code, bp_name, bp_id, mr_rea
   const partyClause = !partyParts.length
     ? ''
     : `AND (${reason === 2 && partyParts.length > 1 ? partyParts.join(' AND ') : partyParts.join(' OR ')})`;
+  const tenantClause = company_code != null && company_code !== ''
+    ? 'AND (d.tenant_id = ? OR (? = 1 AND d.tenant_id IS NULL))'
+    : 'AND FALSE';
+  if (company_code != null && company_code !== '') params.push(company_code, company_code);
 
   const result = await db.raw(
     `SELECT
@@ -233,6 +238,7 @@ async function getOutstandingDockets({ loc_code, bp_code, bp_name, bp_id, mr_rea
             AND UPPER(TRIM(COALESCE(r.docket_loc, '')::text)) = UPPER(TRIM(d.docket_loc::text))
         )
         ${partyClause}
+        ${tenantClause}
       ORDER BY d.docket_date ASC, d.docket_no ASC`,
     params
   );
@@ -291,15 +297,16 @@ async function getDetails(mrNo, mrDate, loc, trx = db) {
     .orderBy('r.sr_no');
 }
 
-async function getByNumber(mrNo, loc_code) {
+async function getByNumber(mrNo, loc_code, tenantId) {
   const loc = locOf(loc_code);
   const no = normalizeMrNo(mrNo, loc);
   if (!no || !loc) return null;
-  const header = await db('sss.sst_mr_hdr')
+  const headerQuery = db('sss.sst_mr_hdr')
     .whereRaw('UPPER(TRIM(mr_no::text)) = UPPER(TRIM(?))', [no])
     .andWhereRaw('UPPER(TRIM(loc_code::text)) = UPPER(TRIM(?))', [loc])
-    .orderBy('mr_date', 'desc')
-    .first();
+    .orderBy('mr_date', 'desc');
+  applyTenant(headerQuery, 'tenant_id', tenantId);
+  const header = await headerQuery.first();
   if (!header) return null;
   const details = await getDetails(header.mr_no, header.mr_date, header.loc_code);
   return { ...header, details };
@@ -543,19 +550,25 @@ async function saveReceipt(payload = {}, company_code = null, userId = null) {
     let mrNo = normalizeMrNo(header.mr_no, loc);
     if (!mrNo) mrNo = await getNextMrNo(loc, trx);
 
-    const existing = await trx('sss.sst_mr_hdr')
+    const existingQuery = trx('sss.sst_mr_hdr')
       .where({ loc_code: loc })
       .andWhereRaw('UPPER(TRIM(mr_no::text)) = UPPER(TRIM(?))', [mrNo])
-      .andWhereRaw('CAST(mr_date AS DATE) = CAST(? AS DATE)', [toDate(header.mr_date)])
-      .first();
+      .andWhereRaw('CAST(mr_date AS DATE) = CAST(? AS DATE)', [toDate(header.mr_date)]);
+    const existingAny = await existingQuery.clone().first();
+    if (existingAny && !rowOwned(existingAny.tenant_id, company_code)) {
+      const err = new Error('Receipt not found');
+      err.status = 404;
+      throw err;
+    }
+    const existing = existingAny;
 
     const recSum = needsDetails ? lines.reduce((s, d) => s + n(d.received_amt), 0) : n(header.received_amt);
     const tdsSum = needsDetails ? lines.reduce((s, d) => s + n(d.tds_amt), 0) : n(header.tds_amt);
     const dedSum = needsDetails ? lines.reduce((s, d) => s + n(d.deduction_amt), 0) : n(header.deduction_amt);
 
     const hdr = {
-      company_code: company_code || header.company_code || null,
-      tenant_id: company_code || header.tenant_id || null,
+      company_code: company_code || null,
+      tenant_id: company_code || null,
       division_code: header.division_code || null,
       loc_code: loc,
       mr_no: mrNo,
@@ -677,16 +690,17 @@ async function saveReceipt(payload = {}, company_code = null, userId = null) {
   }
 }
 
-async function deleteReceipt(mrNo, mrDate, loc_code) {
+async function deleteReceipt(mrNo, mrDate, loc_code, tenantId) {
   const loc = locOf(loc_code);
   const trx = await db.transaction();
   try {
     const no = normalizeMrNo(mrNo, loc) || String(mrNo || '').trim();
-    const existing = await trx('sss.sst_mr_hdr')
+    const existingQuery = trx('sss.sst_mr_hdr')
       .where({ loc_code: loc })
       .andWhereRaw('UPPER(TRIM(mr_no::text)) = UPPER(TRIM(?))', [no])
-      .andWhereRaw('CAST(mr_date AS DATE) = CAST(? AS DATE)', [toDate(mrDate)])
-      .first();
+      .andWhereRaw('CAST(mr_date AS DATE) = CAST(? AS DATE)', [toDate(mrDate)]);
+    applyTenant(existingQuery, 'tenant_id', tenantId);
+    const existing = await existingQuery.first();
     if (!existing) {
       await trx.rollback();
       return 0;

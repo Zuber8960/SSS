@@ -1,36 +1,63 @@
 const db = require('../../config/db');
+const { applyTenant } = require('../../utils/tenantScope');
+
+const assertDocketsOwned = async (trx, details, tenantId) => {
+  const nos = [...new Set((details || [])
+    .map((row) => String(row.dwb_no || row.docket_no || '').trim())
+    .filter(Boolean))];
+  if (!nos.length) return;
+  if (tenantId == null || tenantId === '') {
+    const err = new Error('Tenant is required');
+    err.status = 401;
+    throw err;
+  }
+  const query = trx('sss.sst_docket').whereIn('docket_no', nos).where({ record_status: 0 });
+  applyTenant(query, 'tenant_id', tenantId);
+  const rows = await query.select('docket_no');
+  const owned = new Set(rows.map((row) => String(row.docket_no).trim()));
+  const missing = nos.find((no) => !owned.has(no));
+  if (missing) {
+    const err = new Error(`Docket ${missing} is not available`);
+    err.status = 404;
+    throw err;
+  }
+};
 
 /* ================= GET ALL MANIFESTS ================= */
 
 const getAllManifests = async (tenant_id) => {
-  return db('sss.sst_mnf_hdr')
+  const query = db('sss.sst_mnf_hdr')
     .select('*')
-    .where({ record_status: 0, tenant_id })
-    .orderBy('aud_date', 'desc');
+    .where({ record_status: 0 });
+  applyTenant(query, 'tenant_id', tenant_id);
+  return query.orderBy('aud_date', 'desc');
 };
 
 /* ================= GET MANIFEST BY KEY (composite) ================= */
 
-const getManifestByKey = async ({ mnf_no, mnf_loc, mnf_date }) => {
-  return db('sss.sst_mnf_hdr')
-    .where({ mnf_no, mnf_loc, mnf_date, record_status: 0 })
-    .first();
+const getManifestByKey = async ({ mnf_no, mnf_loc, mnf_date }, tenant_id) => {
+  const query = db('sss.sst_mnf_hdr')
+    .where({ mnf_no, mnf_loc, mnf_date, record_status: 0 });
+  applyTenant(query, 'tenant_id', tenant_id);
+  return query.first();
 };
 
 /* ================= GET MANIFEST BY NO ONLY (for edit/view) ================= */
 
-const getManifestByNo = async (mnf_no) => {
-  return db('sss.sst_mnf_hdr')
-    .where({ mnf_no })
-    .first();
+const getManifestByNo = async (mnf_no, tenant_id) => {
+  const query = db('sss.sst_mnf_hdr').where({ mnf_no });
+  applyTenant(query, 'tenant_id', tenant_id);
+  return query.first();
 };
 
-const getManifestByLocation = async (loc) => {
+const getManifestByLocation = async (loc, tenant_id) => {
   // Pending unload: destined to this loc and at least one docket not yet in sst_unloading_dtl.
   // Do not hide a manifest just because mnf_arrival_time was set on a partial save.
-  return db('sss.sst_mnf_hdr as h')
+  const query = db('sss.sst_mnf_hdr as h')
     .where('h.mnf_to_loc', loc)
-    .andWhere('h.record_status', 0)
+    .andWhere('h.record_status', 0);
+  applyTenant(query, 'h.tenant_id', tenant_id);
+  return query
     .whereExists(function () {
       this.select(db.raw('1'))
         .from('sss.sst_mnf_dtl as d')
@@ -153,10 +180,12 @@ const createManifest = async (headerData, detailsData) => {
   try {
     // Generate next manifest no
     const nextNo = await getNextManifestNo();
+    await assertDocketsOwned(trx, detailsData, headerData.tenant_id);
 
     // Build header row
     const headerRow = {
       ...headerData,
+      tenant_id: headerData.tenant_id || null,
       mnf_no: nextNo,
       aud_date: new Date(),
       ...(headerData.mnf_no ? {} : {}),
@@ -211,22 +240,39 @@ const createManifest = async (headerData, detailsData) => {
   }
 };
 
+/* The screen sends the manifest date as an ISO timestamp. Read it as an
+   India calendar date so 18:30Z does not become the previous day. */
+const findManifestHeader = async (no, loc, date, trx = db, tenantId = null) => {
+  const raw = String(date || '').trim();
+  if (!no || !loc || !raw) return null;
+  const daySql = raw.includes('T')
+    ? "(timezone('Asia/Kolkata', ?::timestamptz))::date"
+    : "?::date";
+  const query = trx('sss.sst_mnf_hdr')
+    .where({ mnf_no: no, mnf_loc: loc })
+    .whereRaw(`mnf_date::date = ${daySql}`, [raw]);
+  if (tenantId != null && tenantId !== '') applyTenant(query, 'tenant_id', tenantId);
+  return query.first();
+};
+
 /* ================= UPDATE MANIFEST ================= */
 
 const updateManifest = async (keys, data, trx = db) => {
+  const { mnf_no, mnf_loc, mnf_date, tenant_id, company_code, ...rest } = data || {};
   return trx('sss.sst_mnf_hdr')
     .where(keys)
     .update({
-      ...data,
+      ...rest,
       aud_date: new Date()
     });
 };
 
 /* ================= UPDATE MANIFEST DETAILS (delete all + re-insert) ================= */
 
-const updateManifestDetails = async (keys, detailsData) => {
+const updateManifestDetails = async (keys, detailsData, tenantId) => {
   const trx = await db.transaction();
   try {
+    await assertDocketsOwned(trx, detailsData, tenantId);
     const oldDetails = await trx('sss.sst_mnf_dtl').where(keys).select('*');
     await applyUnloadingDispatch(trx, {
       fromLoc: keys.mnf_loc,
@@ -279,15 +325,16 @@ const updateManifestDetails = async (keys, detailsData) => {
 
 /* ================= GET MANIFESTS BY DOCKET NO (search in mnf_dtl + join with mnf_hdr) ================= */
 
-const getManifestsByDocketNo = async (docketNo) => {
-  return db('sss.sst_mnf_dtl as dtl')
+const getManifestsByDocketNo = async (docketNo, tenant_id) => {
+  const query = db('sss.sst_mnf_dtl as dtl')
     .join('sss.sst_mnf_hdr as hdr', function () {
       this.on('dtl.mnf_no', '=', 'hdr.mnf_no')
         .andOn('dtl.mnf_loc', '=', 'hdr.mnf_loc')
         .andOn('dtl.mnf_date', '=', 'hdr.mnf_date');
     })
-    .where({ 'dtl.dwb_no': docketNo})
-    .select(
+    .where({ 'dtl.dwb_no': docketNo});
+  applyTenant(query, 'hdr.tenant_id', tenant_id);
+  return query.select(
       'hdr.*'
     )
     .orderBy('hdr.aud_date', 'desc');
@@ -296,14 +343,15 @@ const getManifestsByDocketNo = async (docketNo) => {
 /* ================= DELETE MANIFEST (soft) ================= */
 
 const deleteManifest = async (keys, trx = db) => {
-  return trx('sss.sst_mnf_hdr')
-    .where(keys)
-    .update({ record_status: 1 });
+  const { tenant_id, ...rest } = keys || {};
+  const query = trx('sss.sst_mnf_hdr').where(rest);
+  applyTenant(query, 'tenant_id', tenant_id);
+  return query.update({ record_status: 1 });
 };
 
 /* ================= GET VEHICLE TRACKING DATA ================= */
 
-const getVehicleTrackingData = async (vehicleNo) => {
+const getVehicleTrackingData = async (vehicleNo, tenantId) => {
   try {
     const result = await db.raw(`
       SELECT
@@ -345,9 +393,10 @@ const getVehicleTrackingData = async (vehicleNo) => {
       WHERE
         A.mnf_arrival_time IS NULL
         AND A.desp_veh_no = ?
+        AND (A.tenant_id = ? OR (? = 1 AND A.tenant_id IS NULL))
         AND C.id = (SELECT MAX(id) FROM sss.sst_cargo_yaan_gps_data WHERE vehicle_no = A.desp_veh_no)
       LIMIT 1
-    `, [vehicleNo]);
+    `, [vehicleNo, tenantId, tenantId]);
 
     return result.rows?.[0] || null;
   } catch (err) {
@@ -361,6 +410,7 @@ module.exports = {
   getManifestByKey,
   getManifestByNo,
   getManifestDetails,
+  findManifestHeader,
   getNextManifestNo,
   createManifest,
   updateManifest,

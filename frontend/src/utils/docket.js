@@ -63,6 +63,8 @@ export const fetchChargesBulk = async (docketNos = []) => {
 export const createCharge = (docketId, data) => Api.post(`/docket/${docketId}/charges`, data).then(r => r.data.data || r.data);
 export const updateCharge = (chargeId, data) => Api.put(`/docket/charges/${chargeId}`, data).then(r => r.data.data || r.data);
 export const deleteCharge = (chargeId) => Api.delete(`/docket/charges/${chargeId}`).then(r => r.data);
+export const deleteDocketFully = (docketNo) =>
+  Api.delete(`/docket/purge/${encodeURIComponent(docketNo)}`).then(r => r.data);
 
 // sst_docket_inv - one row per invoice, keyed by
 // (docket_no, docket_loc, docket_date, inv_no, inv_date)

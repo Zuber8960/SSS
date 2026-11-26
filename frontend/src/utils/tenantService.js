@@ -33,6 +33,9 @@ export const getTenantConfig = () => {
   }
 };
 
+export const isLogipodTenant = () =>
+  String(getTenantConfig()?.tenant_slug || "").toLowerCase().startsWith("logipod");
+
 const oracleToMoment = (fmt) =>
   String(fmt || "")
     .replace(/\bMONTH\b/g, "MMMM")

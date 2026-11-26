@@ -28,11 +28,8 @@ const authMiddleware = (req, res, next) => {
 
     // Attach user data to request object
     req.user = decoded;
-    req.tenant_id = decoded.tenant_id ?? req.headers['x-tenant-id'] ?? null;
-    req.company_code = decoded.company_code
-      ?? req.headers['x-company-code']
-      ?? decoded.tenant_id
-      ?? null;
+    req.tenant_id = decoded.tenant_id ?? null;
+    req.company_code = decoded.company_code ?? decoded.tenant_id ?? null;
     req.division_code = decoded.division_code
       ?? decoded.divisionId
       ?? req.headers['x-division-code']

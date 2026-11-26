@@ -298,7 +298,9 @@ const getDashboardOverview = async (tenant_id) => {
   };
 
 
-  /* ---------- Customer wise analysis (consignor bookings) ---------- */
+  /* ---------- Customer wise analysis ---------- */
+  /* Paid -> consignor. To Pay -> consignee. TBB follows the customer bill:
+     same from and to, consignee CMF Y and consignor CMF not Y -> consignee, else consignor. */
   const customerRows = await db.raw(`
     WITH asof AS (
       SELECT (timezone('Asia/Kolkata', now()))::date AS today
@@ -316,7 +318,18 @@ const getDashboardOverview = async (tenant_id) => {
     ),
     dkt AS (
       SELECT
-        d.cnor_id,
+        CASE
+          WHEN UPPER(TRIM(COALESCE(d.docket_pay_type, ''))) IN ('TO PAY', 'TOPAY', 'TO-PAY') THEN d.cnee_id
+          WHEN UPPER(TRIM(COALESCE(d.docket_pay_type, ''))) IN ('PAID', 'PAID BASIS') THEN d.cnor_id
+          WHEN UPPER(TRIM(COALESCE(d.docket_pay_type, ''))) IN ('', 'TBB')
+           AND UPPER(TRIM(SPLIT_PART(COALESCE(d.docket_loc::text, ''), ' - ', 1))) <> ''
+           AND UPPER(TRIM(SPLIT_PART(COALESCE(d.docket_loc::text, ''), ' - ', 1)))
+               = UPPER(TRIM(SPLIT_PART(COALESCE(d.docket_to_loc::text, ''), ' - ', 1)))
+           AND UPPER(TRIM(COALESCE(cnee.cmf_flag, ''))) IN ('Y', 'YES', '1')
+           AND UPPER(TRIM(COALESCE(cnor.cmf_flag, ''))) NOT IN ('Y', 'YES', '1')
+            THEN d.cnee_id
+          ELSE d.cnor_id
+        END AS party_id,
         d.docket_date::date AS ddt,
         CASE WHEN UPPER(TRIM(COALESCE(d.docket_load_type, ''))) = 'FTL' THEN 'FTL' ELSE 'PTL' END AS lane,
         ROUND(COALESCE(d.docket_tot_amt, 0), 2) AS amt,
@@ -324,6 +337,8 @@ const getDashboardOverview = async (tenant_id) => {
         (bill.billed IS NOT NULL) AS billed
       FROM sss.sst_docket d
       CROSS JOIN bounds b
+      LEFT JOIN sss.ssm_business_partner cnor ON cnor.record_id = d.cnor_id
+      LEFT JOIN sss.ssm_business_partner cnee ON cnee.record_id = d.cnee_id
       LEFT JOIN LATERAL (
         SELECT LOWER(TRIM(COALESCE(dn.delivery_status, ''))) = 'delivered' AS delivered
           FROM sss.sst_dly_note dn
@@ -344,7 +359,6 @@ const getDashboardOverview = async (tenant_id) => {
       ) bill ON TRUE
       WHERE d.tenant_id = ?
         AND d.record_status = 0
-        AND d.cnor_id IS NOT NULL
         AND d.docket_date IS NOT NULL
         AND (
           (d.docket_date::date >= b.fy_start AND d.docket_date::date <= b.today)
@@ -379,7 +393,7 @@ const getDashboardOverview = async (tenant_id) => {
            AND r.invoice_date::date = h.invoice_date::date
            AND UPPER(TRIM(COALESCE(r.invoice_loc, ''))) = UPPER(TRIM(h.loc_code::text))
       ) paid ON TRUE
-      WHERE (h.tenant_id = ? OR h.tenant_id IS NULL)
+      WHERE (h.tenant_id = ? OR (? = 1 AND h.tenant_id IS NULL))
         AND COALESCE(UPPER(TRIM(h.cancel_flag::text)), '') NOT IN ('Y', 'C', '1', 'TRUE')
         AND h.invoice_date::date >= b.fy_start
         AND h.invoice_date::date <= b.today
@@ -437,7 +451,7 @@ const getDashboardOverview = async (tenant_id) => {
       COALESCE(MAX(bs.os90), 0) AS os90,
       COALESCE(MAX(bs.os_over), 0) AS os_over
     FROM sss.ssm_business_partner bp
-    JOIN dkt d ON d.cnor_id = bp.record_id
+    JOIN dkt d ON d.party_id = bp.record_id
     CROSS JOIN bounds b
     LEFT JOIN bill_sum bs ON bs.code = TRIM(bp.bp_grp_code::text)
     LEFT JOIN mr_sum ms ON ms.code = TRIM(bp.bp_grp_code::text)
@@ -445,7 +459,7 @@ const getDashboardOverview = async (tenant_id) => {
     GROUP BY bp.record_id, bp.bp_grp_code, bp.bp_name, bp.loc_code, b.today, b.month_start, b.last_start, b.fy_start
     ORDER BY COALESCE(SUM(d.amt) FILTER (WHERE d.ddt >= b.fy_start AND d.ddt <= b.today), 0) DESC
     LIMIT 50
-  `, [tenant_id, tenant_id, tenant_id, tenant_id]);
+  `, [tenant_id, tenant_id, tenant_id, tenant_id, tenant_id]);
 
   const customers = (customerRows.rows || []).map(r => {
     const fyAmt = Number(r.fy_ftl_amt || 0) + Number(r.fy_ptl_amt || 0);
@@ -514,7 +528,7 @@ const getDashboardOverview = async (tenant_id) => {
         ROUND(COALESCE(vh.vha_tds_amt, 0)::numeric, 2) AS deductions
       FROM sss.sst_vha_hdr vh
       CROSS JOIN bounds b
-      WHERE (vh.tenant_id = ? OR vh.tenant_id IS NULL)
+      WHERE (vh.tenant_id = ? OR (? = 1 AND vh.tenant_id IS NULL))
         AND vh.record_status = 0
         AND vh.vendor_name IS NOT NULL AND TRIM(vh.vendor_name) <> ''
         AND (
@@ -584,7 +598,7 @@ const getDashboardOverview = async (tenant_id) => {
     LEFT JOIN trip_sum t ON t.vendor_name = h.vendor_name
     ORDER BY h.fy_hire DESC
     LIMIT 50
-  `, [tenant_id, tenant_id]);
+  `, [tenant_id, tenant_id, tenant_id]);
 
   const vendorPeriod = (prefix, row) => {
     const trips = Number(row[`${prefix}_trips`] || 0);
@@ -1891,7 +1905,7 @@ const COLLECTION_SQL = `
          AND r.invoice_date::date = h.invoice_date::date
          AND UPPER(TRIM(COALESCE(r.invoice_loc, ''))) = UPPER(TRIM(h.loc_code::text))
     ) paid ON TRUE
-    WHERE (h.tenant_id = ? OR h.tenant_id IS NULL)
+    WHERE (h.tenant_id = ? OR (? = 1 AND h.tenant_id IS NULL))
       AND COALESCE(UPPER(TRIM(h.cancel_flag::text)), '') NOT IN ('Y', 'C', '1', 'TRUE')
       AND h.invoice_date::date <= fy.today
       AND h.invoice_date::date >= fy.start
@@ -1957,7 +1971,7 @@ const getCollectionBoard = async (tenant_id) => {
       FROM asof
      CROSS JOIN fy
       LEFT JOIN facts ON TRUE
-  `, [tenant_id, tenant_id]);
+  `, [tenant_id, tenant_id, tenant_id]);
   const row = result.rows?.[0] || {};
   const fyYear = Number(row.fy_year || 0);
   const money = (period, key) => Number(row[`${period}_${key}`] || 0);
@@ -2001,7 +2015,7 @@ const getCollectionBills = async (tenant_id, { period = 'fy', slice = 'raised' }
      WHERE ${collectionPeriodSql(period, 'idt')}
        AND ${collectionSliceSql(slice)}
      ORDER BY idt DESC, invoice_no DESC
-  `, [tenant_id, tenant_id]);
+  `, [tenant_id, tenant_id, tenant_id]);
   return result.rows || [];
 };
 
@@ -2046,7 +2060,7 @@ const getOutstandingBoard = async (tenant_id) => {
       FROM asof
      CROSS JOIN fy
       LEFT JOIN aged ON TRUE
-  `, [tenant_id, tenant_id]);
+  `, [tenant_id, tenant_id, tenant_id]);
   const row = result.rows?.[0] || {};
   const fyYear = Number(row.fy_year || 0);
   const money = (period, key) => Number(row[`${period}_${key}`] || 0);
@@ -2081,7 +2095,7 @@ const getOutstandingBills = async (tenant_id, { period = 'fy', slice = 'total' }
        AND ${outstandingAgeSql(slice)}
        AND os > 0.009
      ORDER BY age DESC, idt DESC, invoice_no DESC
-  `, [tenant_id, tenant_id]);
+  `, [tenant_id, tenant_id, tenant_id]);
   return result.rows || [];
 };
 
@@ -2112,7 +2126,7 @@ const HIRE_SQL = `
       ROUND(COALESCE(h.vha_balance_amt, 0)::numeric, 2) AS balance
     FROM sss.sst_vha_hdr h
     CROSS JOIN fy
-    WHERE (h.tenant_id = ? OR h.tenant_id IS NULL)
+    WHERE (h.tenant_id = ? OR (? = 1 AND h.tenant_id IS NULL))
       AND h.record_status = 0
       AND h.vha_date::date <= fy.today
       AND h.vha_date::date >= fy.start
@@ -2140,7 +2154,7 @@ const getHireBoard = async (tenant_id) => {
       FROM asof
      CROSS JOIN fy
       LEFT JOIN vouchers ON TRUE
-  `, [tenant_id]);
+  `, [tenant_id, tenant_id]);
   const row = result.rows?.[0] || {};
   const fyYear = Number(row.fy_year || 0);
   const num = (period, key) => Number(row[`${period}_${key}`] || 0);
@@ -2180,7 +2194,7 @@ const getHireVouchers = async (tenant_id, { period = 'fy', slice = 'total' } = {
      WHERE ${collectionPeriodSql(period, 'vdt')}
        AND ${hireSliceSql(sliceKey)}
      ORDER BY vdt DESC, vha_no DESC
-  `, [tenant_id]);
+  `, [tenant_id, tenant_id]);
   return result.rows || [];
 };
 
@@ -2209,7 +2223,7 @@ const EWB_SQL = `
        ORDER BY dn.record_id DESC
        LIMIT 1
     ) note ON TRUE
-    WHERE (e.tenant_id = ? OR e.tenant_id IS NULL)
+    WHERE (e.tenant_id = ? OR (? = 1 AND e.tenant_id IS NULL))
       AND e.ewb_valid_upto IS NOT NULL
   )
 `;
@@ -2232,7 +2246,7 @@ const getEwbBoard = async (tenant_id) => {
            to_char(MIN(asof.today), 'YYYY-MM-DD') AS as_of
       FROM asof
       LEFT JOIN bills ON TRUE
-  `, [tenant_id]);
+  `, [tenant_id, tenant_id]);
   const row = result.rows?.[0] || {};
   return {
     asOf: row.as_of || '',
@@ -2260,7 +2274,7 @@ const getEwbBills = async (tenant_id, { slice = 'today', side = 'undelivered' } 
      WHERE ${found[2]}
        AND ${sideSql}
      ORDER BY vdt, ewb_no
-  `, [tenant_id]);
+  `, [tenant_id, tenant_id]);
   return result.rows || [];
 };
 
@@ -2278,7 +2292,7 @@ const getCollectionReceipts = async (tenant_id, { period = 'fy', slice = 'receip
      WHERE ${collectionPeriodSql(period, 'mdt')}
        ${extra}
      ORDER BY mdt DESC, mr_no DESC
-  `, [tenant_id, tenant_id]);
+  `, [tenant_id, tenant_id, tenant_id]);
   return result.rows || [];
 };
 

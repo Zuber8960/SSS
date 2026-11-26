@@ -388,6 +388,21 @@ router.get('/ftl-vehicles', async (req, res) => {
 
 /* ================= GET BY SINGLE DOCKET NUMBER ================= */
 
+router.delete('/purge/:no', async (req, res) => {
+  const trx = await db.transaction();
+  try {
+    const header = await DocketController.purgeDocket(req.params.no, {
+      tenant_id: req.tenant_id,
+      loc_code: req.loc_code,
+    }, trx);
+    await trx.commit();
+    res.json({ success: true, message: `Docket ${header.docket_no} deleted`, data: { docket_no: header.docket_no } });
+  } catch (err) {
+    await trx.rollback();
+    res.status(err.status || 500).json({ success: false, message: err.message });
+  }
+});
+
 router.get('/:no', async (req, res) => {
   try {
     const { no } = req.params;
