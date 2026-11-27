@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Autocomplete, Button, Chip, TextField,
+  Button, Chip, TextField,
 } from "@mui/material";
+import Autocomplete, { createFilterOptions } from "@mui/material/Autocomplete";
 import MainLayout from "../../layouts/MainLayout";
 import { DataTable, FormField, PageBody } from "../../components/common/MasterPage";
 import useAlert from "../../components/common/UseAlert";
@@ -46,6 +47,73 @@ const MR_REASONS = [
 ];
 
 const mrReasonLabel = (v) => MR_REASONS.find((r) => r.value === String(v))?.label || "";
+
+const CUST_COLS = "72px 120px minmax(180px, 1fr) 72px 150px";
+
+const custCell = (extra = {}) => ({
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  ...extra,
+});
+
+const customerOptionLabel = (option) => {
+  if (option == null) return "";
+  if (typeof option === "string") return option;
+  return option.name || option.label || option.code || "";
+};
+
+const customerOptionKey = (option) => String(option?.value || option?.id || customerOptionLabel(option));
+
+const sameCustomerOption = (a, b) => String(a?.value ?? a) === String(b?.value ?? b);
+
+const filterCustomers = createFilterOptions({
+  ignoreAccents: true,
+  ignoreCase: true,
+  trim: true,
+  stringify: (option) => [option?.id, option?.code, option?.name, option?.loc, option?.town].filter(Boolean).join(" "),
+});
+
+const CustomerPaper = forwardRef(function CustomerPaper(props, ref) {
+  const { children, ownerState, sx, style, ...other } = props;
+  void ownerState;
+  void sx;
+  return (
+    <div
+      ref={ref}
+      {...other}
+      style={{
+        ...style,
+        marginTop: 4,
+        borderRadius: 10,
+        border: "1px solid #e2e8f0",
+        boxShadow: "0 12px 32px rgba(15, 23, 42, 0.14)",
+        background: "#fff",
+        overflow: "hidden",
+      }}
+    >
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: CUST_COLS,
+        gap: 12,
+        padding: "6px 10px",
+        background: "#f1f5f9",
+        color: "#475569",
+        fontSize: 10,
+        fontWeight: 800,
+        letterSpacing: 0.3,
+        pointerEvents: "none",
+      }}>
+        <span>BP ID</span>
+        <span>BP CODE</span>
+        <span>CUSTOMER NAME</span>
+        <span>LOC</span>
+        <span>TOWN</span>
+      </div>
+      {children}
+    </div>
+  );
+});
 
 const fieldSx = {
   "& .MuiInputBase-root": { height: 30 },
@@ -156,9 +224,10 @@ const blankForm = (locations = []) => ({
   loc_code: sessionBranchLabel(locations),
   customer: "",
   pay_mode: "CASH",
-  instr_no: "",
-  instr_date: "",
-  bank_name: "",
+  chq_utr_no: "",
+  chq_utr_date: "",
+  issuing_bank: "",
+  receiver_bank: "",
   mr_reason: "",
   remarks: "",
   received_amt: "",
@@ -418,23 +487,39 @@ export default function MoneyReceipt() {
   const toCustomerOption = (p) => {
     const name = String(p.bp_name || "").trim();
     const code = String(p.bp_grp_code ?? p.bp_code ?? "").trim();
+    const loc = String(p.loc_code || "").split(" - ")[0].trim();
+    const town = String(p.bp_city || "").trim();
+    const id = String(p.record_id ?? p.bp_id ?? "").trim();
     return {
-      value: String(p.record_id ?? p.bp_id ?? ""),
+      value: id,
+      id,
       code,
       name,
-      label: code ? `${code} - ${name}` : name,
+      loc,
+      town,
+      label: name || code,
     };
+  };
+
+  const byCustomerName = (a, b) => {
+    const name = String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" });
+    if (name) return name;
+    return String(a.code || "").localeCompare(String(b.code || ""), undefined, { sensitivity: "base" });
   };
 
   const customerOptions = useMemo(() => {
     const loc = String(locCode || "").toUpperCase();
     const opts = partners
       .filter((p) => {
+        const type = String(p.bp_type ?? "").trim();
+        const typeName = String(p.bp_type_name || "").trim().toLowerCase();
+        if (type === "2" || typeName === "supplier") return false;
         const bpLoc = String(p.loc_code || "").split(" - ")[0].trim().toUpperCase();
         return (!loc || !bpLoc || bpLoc === loc) && (p.bp_name || p.bp_grp_code || p.bp_code);
       })
       .map(toCustomerOption)
-      .filter((o) => o.value);
+      .filter((o) => o.value)
+      .sort(byCustomerName);
     const selected = partners.find((p) => String(p.record_id ?? p.bp_id ?? "") === String(form.customer));
     if (selected) {
       const opt = toCustomerOption(selected);
@@ -445,9 +530,17 @@ export default function MoneyReceipt() {
       const row = rows.find((r) => String(r.party_code || "") === raw || String(r.party_bp_name || "") === raw);
       const code = String(row?.party_code || raw).trim();
       const name = String(row?.party_bp_name || "").trim();
-      opts.unshift({ value: form.customer, code, name, label: partyLabel(code, name) });
+      opts.push({
+        value: form.customer,
+        id: "",
+        code,
+        name,
+        loc: String(row?.loc_code || "").split(" - ")[0].trim(),
+        town: "",
+        label: name || code || partyLabel(code, name),
+      });
     }
-    return opts;
+    return opts.sort(byCustomerName);
   }, [partners, locCode, form.customer, rows]);
 
   const selectedCustomer = useMemo(
@@ -613,7 +706,7 @@ export default function MoneyReceipt() {
     const prev = form;
     let updated = next;
     if (String(updated.pay_mode || "") === "CASH" && String(prev.pay_mode || "") !== "CASH") {
-      updated = { ...updated, instr_no: "", instr_date: "", bank_name: "" };
+      updated = { ...updated, chq_utr_no: "", chq_utr_date: "", issuing_bank: "", receiver_bank: "" };
     }
     setForm(updated);
   };
@@ -700,9 +793,10 @@ export default function MoneyReceipt() {
         loc_code: sessionBranchLabel(locations),
         customer: partner ? String(partner.record_id ?? partner.bp_id ?? "") : "",
         pay_mode: hdr.pay_mode || "CASH",
-        instr_no: hdr.instr_no || "",
-        instr_date: hdr.instr_date ? moment(hdr.instr_date).format("YYYY-MM-DD") : "",
-        bank_name: hdr.bank_name || "",
+        chq_utr_no: hdr.chq_utr_no || "",
+        chq_utr_date: hdr.chq_utr_date ? moment(hdr.chq_utr_date).format("YYYY-MM-DD") : "",
+        issuing_bank: hdr.issuing_bank || "",
+        receiver_bank: hdr.receiver_bank || "",
         mr_reason: hdr.mr_reason != null && hdr.mr_reason !== "" ? String(hdr.mr_reason) : "",
         remarks: hdr.remarks || "",
         received_amt: fmt(hdr.received_amt),
@@ -762,7 +856,7 @@ export default function MoneyReceipt() {
       showError("Please select MR Reason");
       return;
     }
-    if (form.pay_mode !== "CASH" && !form.instr_no) {
+    if (form.pay_mode !== "CASH" && !form.chq_utr_no) {
       showError("Enter cheque / UTR number");
       return;
     }
@@ -811,9 +905,10 @@ export default function MoneyReceipt() {
           bp_code: bpCode,
           bp_name: bpName,
           pay_mode: form.pay_mode,
-          instr_no: form.instr_no,
-          instr_date: form.instr_date || null,
-          bank_name: form.bank_name,
+          chq_utr_no: form.chq_utr_no,
+          chq_utr_date: form.chq_utr_date || null,
+          issuing_bank: form.issuing_bank,
+          receiver_bank: form.receiver_bank,
           mr_reason: Number(form.mr_reason),
           remarks: form.remarks,
           received_amt: needsDetails ? totals.net : form.received_amt,
@@ -886,9 +981,10 @@ export default function MoneyReceipt() {
           bp_name: selectedCustomer?.bp_name || "",
           bp_code: selectedCustomer?.bp_grp_code || selectedCustomer?.bp_code || "",
           pay_mode: form.pay_mode,
-          instr_no: form.instr_no,
-          instr_date: form.instr_date,
-          bank_name: form.bank_name,
+          chq_utr_no: form.chq_utr_no,
+          chq_utr_date: form.chq_utr_date,
+          issuing_bank: form.issuing_bank,
+          receiver_bank: form.receiver_bank,
           remarks: form.remarks,
           mr_reason_label: mrReasonLabel(form.mr_reason),
           received_amt: paidOrToPay ? totals.net : form.received_amt,
@@ -929,24 +1025,86 @@ export default function MoneyReceipt() {
             <div style={{ gridColumn: "span 2" }}><FormField label="Branch" name="loc_code" form={form} setForm={handleSetForm} disabled /></div>
             <div style={{ gridColumn: "span 2" }}><FormField label="MR Reason" name="mr_reason" form={form} setForm={handleSetForm} options={MR_REASONS} required /></div>
             <div style={{ gridColumn: "span 2" }}><FormField label="Pay Mode" name="pay_mode" form={form} setForm={handleSetForm} options={PAY_MODES} required /></div>
-            <div style={{ gridColumn: "span 2" }}><FormField label="Cheque / UTR No" name="instr_no" form={form} setForm={handleSetForm} disabled={cash} /></div>
-            <div style={{ gridColumn: "span 4" }}>
+            <div style={{ gridColumn: "span 2" }}><FormField label="Cheque / UTR No" name="chq_utr_no" form={form} setForm={handleSetForm} disabled={cash} /></div>
+            <div style={{ gridColumn: "span 2" }}>
               <Autocomplete
                 size="small"
                 options={banks.map((b) => b.bank_name).filter(Boolean)}
-                value={form.bank_name || null}
+                value={form.issuing_bank || null}
                 disabled={cash}
-                onChange={(_, v) => handleSetForm({ ...form, bank_name: v || "" })}
-                renderInput={(p) => <TextField {...p} label="Bank" size="small" sx={fieldSx} />}
+                onChange={(_, v) => handleSetForm({ ...form, issuing_bank: v || "" })}
+                renderInput={(p) => <TextField {...p} label="Issuing Bank" size="small" sx={fieldSx} />}
               />
             </div>
-            <div style={{ gridColumn: "span 4" }}>
+            <div style={{ gridColumn: "span 2" }}>
+              <Autocomplete
+                size="small"
+                options={banks.map((b) => b.bank_name).filter(Boolean)}
+                value={form.receiver_bank || null}
+                disabled={cash}
+                onChange={(_, v) => handleSetForm({ ...form, receiver_bank: v || "" })}
+                renderInput={(p) => <TextField {...p} label="Receiver's Bank" size="small" sx={fieldSx} />}
+              />
+            </div>
+            <div style={{ gridColumn: "span 8" }}>
               <Autocomplete
                 size="small"
                 options={customerOptions}
                 value={customerOptions.find((o) => String(o.value) === String(form.customer)) || null}
-                getOptionLabel={(o) => (typeof o === "string" ? o : (o?.label || ""))}
-                isOptionEqualToValue={(a, b) => String(a?.value ?? a) === String(b?.value ?? b)}
+                openOnFocus
+                autoHighlight
+                selectOnFocus
+                handleHomeEndKeys
+                clearOnBlur
+                noOptionsText="No customer found"
+                slots={{ paper: CustomerPaper }}
+                getOptionLabel={customerOptionLabel}
+                getOptionKey={customerOptionKey}
+                isOptionEqualToValue={sameCustomerOption}
+                filterOptions={filterCustomers}
+                slotProps={{
+                  popper: {
+                    placement: "bottom-start",
+                  },
+                  paper: {
+                    sx: {
+                      width: "100%",
+                      mt: 0.5,
+                      borderRadius: "10px",
+                      border: "1px solid #e2e8f0",
+                      boxShadow: "0 12px 32px rgba(15, 23, 42, 0.14)",
+                    },
+                  },
+                  listbox: {
+                    sx: {
+                      maxHeight: 320,
+                      py: 0.5,
+                      "& .MuiAutocomplete-option": {
+                        alignItems: "center",
+                        py: "7px",
+                        px: "10px",
+                        borderBottom: "1px solid #f1f5f9",
+                      },
+                      "& .MuiAutocomplete-option:last-of-type": { borderBottom: 0 },
+                      "& .MuiAutocomplete-option.Mui-focused": { bgcolor: "#eff6ff" },
+                      "& .MuiAutocomplete-option[aria-selected='true']": { bgcolor: "#dbeafe" },
+                    },
+                  },
+                }}
+                renderOption={(props, option) => {
+                  const { key, ...rest } = props;
+                  return (
+                    <li key={key} {...rest}>
+                      <span style={{ display: "grid", gridTemplateColumns: CUST_COLS, gap: 12, width: "100%", alignItems: "center" }}>
+                        <span style={custCell({ fontSize: 12, fontWeight: 800, color: "#0f172a" })}>{option.id}</span>
+                        <span style={custCell({ fontSize: 12, fontWeight: 800, color: "#0369a1" })}>{option.code}</span>
+                        <span style={custCell({ fontSize: 13, fontWeight: 700, color: "#0f172a" })}>{option.name || option.code}</span>
+                        <span style={custCell({ fontSize: 12, fontWeight: 800, color: "#0369a1" })}>{option.loc}</span>
+                        <span style={custCell({ fontSize: 12, fontWeight: 600, color: "#334155" })}>{option.town}</span>
+                      </span>
+                    </li>
+                  );
+                }}
                 onChange={(_, v) => {
                   handleSetForm({ ...form, customer: v?.value || "" });
                   setEditing(null);
@@ -964,10 +1122,10 @@ export default function MoneyReceipt() {
                 renderInput={(p) => <TextField {...p} label="Customer" size="small" sx={fieldSx} placeholder="Search code or name" />}
               />
             </div>
-            <div style={{ gridColumn: "span 2" }}>
+            <div style={{ gridColumn: "span 8" }}>
               <FormField label="Remarks" name="remarks" form={form} setForm={handleSetForm} />
             </div>
-            <div style={{ gridColumn: "span 2" }}>
+            <div style={{ gridColumn: "span 4" }}>
               {showDocketGrid ? (
                 <TextField label="Total Net Receipt" size="small" value={fmt(totals.net)} disabled sx={fieldSx} />
               ) : (

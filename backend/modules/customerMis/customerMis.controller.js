@@ -65,13 +65,26 @@ function buildMisQuery(filters = {}, tenant_id = null) {
       'd.docket_pay_type',
       'd.docket_remark',
       db.raw(`COALESCE(
-        (SELECT STRING_AGG(
-                  inv.inv_no::text || ' / ' || UPPER(TO_CHAR(inv.inv_date::date, 'DD-MON-YY')),
-                  ', ' ORDER BY inv.inv_date, inv.inv_no)
+        (SELECT STRING_AGG(inv.inv_no::text, ', ' ORDER BY inv.inv_date NULLS LAST, inv.inv_no)
            FROM sss.sst_docket_inv inv
-          WHERE inv.docket_no = d.docket_no),
+          WHERE inv.docket_no = d.docket_no
+            AND NULLIF(TRIM(inv.inv_no::text), '') IS NOT NULL),
         NULLIF(TRIM(COALESCE(d.docket_inv_no, '')), '')
-      ) as docket_inv_no`),
+      ) as invoice_nos`),
+      db.raw(`(SELECT STRING_AGG(
+                        CASE WHEN inv.inv_date IS NULL THEN ''
+                             ELSE TO_CHAR(inv.inv_date::date, 'YYYY-MM-DD') END,
+                        ', ' ORDER BY inv.inv_date NULLS LAST, inv.inv_no)
+                 FROM sss.sst_docket_inv inv
+                WHERE inv.docket_no = d.docket_no
+                  AND NULLIF(TRIM(inv.inv_no::text), '') IS NOT NULL) as invoice_dates`),
+      db.raw(`COALESCE(
+        (SELECT SUM(inv.inv_value)
+           FROM sss.sst_docket_inv inv
+          WHERE inv.docket_no = d.docket_no
+            AND NULLIF(TRIM(inv.inv_no::text), '') IS NOT NULL),
+        d.docket_inv_value
+      ) as invoice_value`),
       'd.docket_transit_days',
       // Customer = consignor (falls back to consignee when no consignor is set).
       'cnor.record_id as bp_id',
@@ -107,13 +120,34 @@ function buildMisQuery(filters = {}, tenant_id = null) {
                 NULLIF(regexp_replace(d.docket_no, '[0-9]', '', 'g'), ''),
                 d.docket_no) as docket_no_series`),
       db.raw(
-        `(SELECT STRING_AGG(
-                   e.ewb_no::text
-                   || CASE WHEN e.ewb_valid_upto IS NULL THEN ''
-                           ELSE ' / ' || UPPER(TO_CHAR(e.ewb_valid_upto::date, 'DD-MON-YY')) END,
-                   ', ' ORDER BY e.ewb_no)
-           FROM sss.sst_docket_ewb e
-          WHERE e.docket_no = d.docket_no) as ewb_no`
+        `(SELECT json_build_object(
+                   'nos', STRING_AGG(picked.ewb_no, ', ' ORDER BY picked.ewb_no),
+                   'dates', STRING_AGG(
+                              CASE WHEN picked.ewb_date IS NULL THEN ''
+                                   ELSE TO_CHAR(picked.ewb_date::date, 'YYYY-MM-DD') END,
+                              ', ' ORDER BY picked.ewb_no)
+                 )
+            FROM (
+              SELECT DISTINCT ON (raw.ewb_no) raw.ewb_no, raw.ewb_date
+                FROM (
+                  SELECT TRIM(part) AS ewb_no,
+                         COALESCE(e.ewb_date, h."EWB_DATE") AS ewb_date,
+                         0 AS src
+                    FROM sss.sst_docket_ewb e
+                    CROSS JOIN LATERAL regexp_split_to_table(e.ewb_no, '[, ]+') AS part
+                    LEFT JOIN sss.sst_ewb_hdr h ON h."EWB_NO"::text = TRIM(part)
+                   WHERE e.docket_no = d.docket_no
+                     AND NULLIF(TRIM(part), '') IS NOT NULL
+                  UNION ALL
+                  SELECT TRIM(part) AS ewb_no, h."EWB_DATE" AS ewb_date, 1 AS src
+                    FROM sss.sst_docket_inv inv
+                    CROSS JOIN LATERAL regexp_split_to_table(inv.ewb_no, '[, ]+') AS part
+                    LEFT JOIN sss.sst_ewb_hdr h ON h."EWB_NO"::text = TRIM(part)
+                   WHERE inv.docket_no = d.docket_no
+                     AND NULLIF(TRIM(part), '') IS NOT NULL
+                ) raw
+               ORDER BY raw.ewb_no, (raw.ewb_date IS NULL), raw.src
+            ) picked) as ewb_pack`
       ),
       db.raw(
         `(SELECT tz.zone_name FROM sss.ssm_town_zone tz
@@ -167,6 +201,15 @@ function buildMisQuery(filters = {}, tenant_id = null) {
       .orWhereILike('d.docket_pickup_town', like)
       .orWhereILike('d.docket_dly_town', like)
       .orWhereILike('d.docket_inv_no', like)
+      .orWhereExists(function () {
+        this.select(db.raw('1'))
+          .from('sss.sst_docket_inv as invs')
+          .whereRaw('invs.docket_no = d.docket_no')
+          .andWhere((w) => w
+            .whereILike('invs.inv_no', like)
+            .orWhereILike('invs.ewb_no', like)
+          );
+      })
       .orWhereILike('cnor.bp_addres', like)
       .orWhereILike('cnee.bp_addres', like)
     );
@@ -192,8 +235,17 @@ function dayDiff(from, to) {
   return Math.round((b - a) / 86400000);
 }
 
+function ewbPack(raw) {
+  if (!raw) return {};
+  if (typeof raw === "string") {
+    try { return JSON.parse(raw); } catch { return {}; }
+  }
+  return raw;
+}
+
 function mapMisRow(r) {
   const estimateDate = addDays(r.docket_date, r.docket_transit_days);
+  const ewb = ewbPack(r.ewb_pack);
   const tatDays = dayDiff(r.docket_date, r.actual_delivery_date);
   const delayDays = dayDiff(estimateDate, r.actual_delivery_date);
   const loadType = String(r.docket_load_type || "").toUpperCase();
@@ -204,8 +256,9 @@ function mapMisRow(r) {
     docket_no: r.docket_no,
     docket_no_series: r.docket_no_series || "",
     docket_date: r.docket_date,
-    docket_inv_no: r.docket_inv_no || "",
-    docket_inv_date: r.docket_inv_date,
+    invoice_nos: r.invoice_nos || "",
+    invoice_dates: r.invoice_dates || "",
+    invoice_value: r.invoice_value == null || r.invoice_value === "" ? null : Number(r.invoice_value),
     bp_id: r.bp_id,
     bp_name: r.bp_name,
     party_name: r.party_name || r.bp_name || "",
@@ -241,9 +294,9 @@ function mapMisRow(r) {
     delivery_update_date: r.delivery_updated_on || null,
     dly_note_no: r.dly_note_no || "",
     pod_url: r.pod_url,
-    ewb_no: r.ewb_no || "NO EWB",
+    ewb_no: ewb.nos || "",
+    ewb_date: ewb.dates || "",
     delay_responsible: r.delivery_remarks || "",
-    ewb_date_expiry: r.ewb_date_expiry,
     delivery_tat_days: tatDays,
     delay_days: delayDays,
   };

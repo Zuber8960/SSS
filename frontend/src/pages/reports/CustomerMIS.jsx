@@ -63,6 +63,22 @@ const fmtDate = (v) => {
   return m.isValid() ? m.format(getDateFormat()) : String(v);
 };
 
+// Several dates share one cell. Each part uses the tenant date format, and
+// a blank part stays blank so the commas still line up with the numbers.
+const fmtDateList = (v) =>
+  String(v || "")
+    .split(",")
+    .map((part) => fmtDate(part.trim()))
+    .join(", ");
+
+const fmtAmount = (v) => {
+  if (v == null || v === "") return "";
+  const n = Number(v);
+  return Number.isFinite(n)
+    ? n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : "";
+};
+
 // Turn the delivery status text into a readable badge.
 const statusStyle = (raw) => {
   const s = String(raw || "").trim().toUpperCase();
@@ -107,7 +123,9 @@ const columns = [
   { key: "from_town", label: "FROM", minWidth: 120 },
   { key: "to_town", label: "TO", minWidth: 120 },
   { key: "pin_code", label: "PIN CODE", minWidth: 90 },
-  { key: "docket_inv_no", label: "INVOICE NO/DATE", minWidth: 200 },
+  { key: "invoice_nos", label: "INVOICE NO", minWidth: 160 },
+  { key: "invoice_dates", label: "INVOICE DATE", minWidth: 160 },
+  { key: "invoice_value", label: "INVOICE VALUE", minWidth: 130, align: "right", render: (r) => fmtAmount(r.invoice_value) },
   { key: "party_name", label: "PARTY NAME", minWidth: 220 },
   { key: "docket_tot_pkgs", label: "PKT", minWidth: 60 },
   { key: "docket_chrg_wt", label: "SHIPMENT WEIGHT KG/MT", minWidth: 150 },
@@ -120,7 +138,8 @@ const columns = [
   { key: "region", label: "REGION", minWidth: 90 },
   { key: "actual_delivery_date", label: "ACTUAL DELIVERY DATE", minWidth: 140 },
   { key: "delivery_status", label: "SHIPMENT STATUS", minWidth: 130, render: (r) => <StatusBadge raw={r.delivery_status} /> },
-  { key: "ewb_no", label: "EWB NO/EXP DATE", minWidth: 220 },
+  { key: "ewb_no", label: "EWB NO", minWidth: 160 },
+  { key: "ewb_date", label: "EWB DATE", minWidth: 140 },
   { key: "delivery_tat_days", label: "DELIVERY TAT DAY", minWidth: 120 },
   { key: "delay_responsible", label: "DELAY FOR RESPONSIBLE", minWidth: 160 },
   { key: "docket_remark", label: "REMARK", minWidth: 140 },
@@ -216,6 +235,8 @@ export default function CustomerMIS() {
       allRows.map((r) => ({
         ...r,
         docket_date: fmtDate(r.docket_date),
+        invoice_dates: fmtDateList(r.invoice_dates),
+        ewb_date: fmtDateList(r.ewb_date),
         actual_delivery_date: fmtDate(r.actual_delivery_date),
         estimate_delivery_date: fmtDate(r.estimate_delivery_date),
         delivery_update_date: fmtDate(r.delivery_update_date),
@@ -579,6 +600,7 @@ export default function CustomerMIS() {
 
         <div style={{ marginTop: 10 }}>
           <DataTable
+            key={columns.map((c) => c.key).join("|")}
             columns={columns}
             rows={gridRows}
             getKey={(r) => r.rec_id}

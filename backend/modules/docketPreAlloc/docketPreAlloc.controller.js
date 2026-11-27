@@ -62,7 +62,7 @@ module.exports = {
     }
     if (loc_code) query.andWhere('loc_code', loc_code);
     if (customer_code) query.andWhere('customer_code', customer_code);
-    if (company_code) applyTenant(query, 'company_code', company_code);
+    applyTenant(query, 'tenant_id', company_code);
     const rows = await query;
     return rows.map((r) => {
       const used_flag = this.usedStatus(r.used_flag);
@@ -86,7 +86,8 @@ module.exports = {
     const customer_code = String(payload.customer_code || '').trim();
     const customer_name = String(payload.customer_name || '').trim();
     const loc_code = String(payload.loc_code || '').trim();
-    const company_code = payload.company_code || payload.tenant_id;
+    const tenantId = Number(payload.company_code);
+    if (!Number.isFinite(tenantId)) throw fail(400, 'Tenant is required');
     const aud_user = payload.aud_user || '';
     let lines = Array.isArray(payload.lines) ? payload.lines : [];
     const requested = Math.min(Math.max(num(payload.no_of_dockets, lines.length), 0), 10);
@@ -115,7 +116,7 @@ module.exports = {
     try {
       let docketNos = lines.map((l) => String(l.docket_no || '').trim().toUpperCase());
       if (stationery === 'A') {
-        docketNos = await allocateAutoNos(trx, loc_code, company_code, requested);
+        docketNos = await allocateAutoNos(trx, loc_code, tenantId, requested);
       }
 
       const seen = new Set();
@@ -125,13 +126,13 @@ module.exports = {
       }
 
       const existingPreQuery = trx('sss.sst_docket_preallc').whereIn('docket_no', docketNos);
-      if (company_code) applyTenant(existingPreQuery, 'company_code', company_code);
+      applyTenant(existingPreQuery, 'tenant_id', tenantId);
       const existingPre = await existingPreQuery.select('docket_no');
       if (existingPre.length) {
         throw fail(400, `Docket Number ${existingPre[0].docket_no} is already pre-allocated`);
       }
       const existingDktQuery = trx('sss.sst_docket').whereIn('docket_no', docketNos);
-      if (company_code) applyTenant(existingDktQuery, 'tenant_id', company_code);
+      applyTenant(existingDktQuery, 'tenant_id', tenantId);
       const existingDkt = await existingDktQuery.select('docket_no').first();
       if (existingDkt) {
         throw fail(400, `Docket Number ${existingDkt.docket_no} already exists`);
@@ -151,6 +152,7 @@ module.exports = {
         to_town: String(lines[i]?.to_town || '').trim(),
         no_of_dockets: requested,
         loc_code: loc_code || null,
+        tenant_id: tenantId,
         used_flag: 'N',
         aud_user,
         aud_date: trx.fn.now(),

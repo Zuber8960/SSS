@@ -138,9 +138,10 @@ export function printMoneyReceipt({ receipt, details, company, locationsMap, cus
 
   const payBits = [
     receipt.pay_mode ? `Mode: <strong>${esc(receipt.pay_mode)}</strong>` : "",
-    receipt.instr_no ? `Instrument: <strong>${esc(receipt.instr_no)}</strong>` : "",
-    receipt.instr_date ? `Date: <strong>${toDate(receipt.instr_date)}</strong>` : "",
-    receipt.bank_name ? `Bank: <strong>${esc(receipt.bank_name)}</strong>` : "",
+    receipt.chq_utr_no ? `Cheque / UTR: <strong>${esc(receipt.chq_utr_no)}</strong>` : "",
+    receipt.chq_utr_date ? `Cheque / UTR Date: <strong>${toDate(receipt.chq_utr_date)}</strong>` : "",
+    receipt.issuing_bank ? `Issuing Bank: <strong>${esc(receipt.issuing_bank)}</strong>` : "",
+    receipt.receiver_bank ? `Receiver's Bank: <strong>${esc(receipt.receiver_bank)}</strong>` : "",
   ].filter(Boolean).join(" &nbsp;|&nbsp; ");
 
   const html = `<!DOCTYPE html>

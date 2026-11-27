@@ -758,7 +758,10 @@ const purgeDocket = async (docketNo, { tenant_id, loc_code } = {}, trx = db) => 
   await dropBy('sss.sst_docket_ewb', 'docket_no');
   await dropBy('sss.sst_docket_inv', 'docket_no');
   await dropBy('sss.sst_docket_pkg', 'docket_no');
-  await dropBy('sss.sst_docket_preallc', 'docket_no');
+  const prealloc = trx('sss.sst_docket_preallc')
+    .whereRaw("UPPER(TRIM(COALESCE(docket_no::text, ''))) = UPPER(TRIM(?))", [no]);
+  applyTenant(prealloc, 'tenant_id', tenant_id);
+  await prealloc.del();
   await dropBy('sss.sst_unloading_dtl', 'docket_no');
   await dropBy('sss.ewb_items', 'docket_no');
   await dropBy('sss.ewb_vehicles', 'docket_no');

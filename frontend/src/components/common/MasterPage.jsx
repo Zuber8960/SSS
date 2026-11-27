@@ -398,13 +398,31 @@ export function DataTable({
   const dragOverColRef = useRef(null);
   const wrapperRef = useRef(null);
 
-  // Keep columnOrder in sync when columns prop changes (e.g. conditional columns)
+  // Keep columnOrder in sync when columns prop changes (e.g. conditional columns).
+  // A new column is inserted where the column list defines it, so a split
+  // stays beside the column it came from instead of jumping to the end.
   useEffect(() => {
     setColumnOrder((prev) => {
       const keys = columns.map((c) => c.key);
-      const existing = prev.filter((k) => keys.includes(k));
-      const added = keys.filter((k) => !prev.includes(k));
-      return [...existing, ...added];
+      const keySet = new Set(keys);
+      const ordered = prev.filter((k) => keySet.has(k));
+      const placed = new Set(ordered);
+      keys.forEach((key) => {
+        if (placed.has(key)) return;
+        const definedAt = keys.indexOf(key);
+        let insertAt = ordered.length;
+        for (let i = definedAt + 1; i < keys.length; i += 1) {
+          const laterAt = ordered.indexOf(keys[i]);
+          if (laterAt !== -1) {
+            insertAt = laterAt;
+            break;
+          }
+        }
+        ordered.splice(insertAt, 0, key);
+        placed.add(key);
+      });
+      if (ordered.length === prev.length && ordered.every((k, i) => k === prev[i])) return prev;
+      return ordered;
     });
   }, [columns]);
 

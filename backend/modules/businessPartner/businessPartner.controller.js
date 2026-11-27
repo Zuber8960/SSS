@@ -6,7 +6,8 @@ module.exports = {
         return db('sss.ssm_business_partner as bp')
             .leftJoin('sss.ssm_business_partner_type as bpt', 'bp.bp_type', 'bpt.rec_id')
             .select('bp.*', 'bpt.rec_name as bp_type_name')
-            .where({ tenant_id });
+            .where({ tenant_id })
+            .orderBy('bp.bp_name');
     },
 
     async getBusinessPartnerDataByRecId(recId) {
