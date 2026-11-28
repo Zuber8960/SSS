@@ -38,6 +38,7 @@ import InvoiceReport from "./pages/reports/InvoiceReport";
 import ManifestReport from "./pages/reports/ManifestReport";
 import HireVoucherReport from "./pages/reports/HireVoucherReport";
 import CustomerMIS from "./pages/reports/CustomerMIS";
+import EwayBillExtend from "./pages/reports/EwayBillExtend";
 import CustomerBill from "./pages/transaction/CustomerBill";
 import MoneyReceipt from "./pages/transaction/MoneyReceipt";
 import BillAdjustment from "./pages/transaction/BillAdjustment";
@@ -93,6 +94,7 @@ const appRoutes = [
   { path: "/reports/manifest-report", element: <ManifestReport />, protected: true },
   { path: "/reports/hire-voucher-report", element: <HireVoucherReport />, protected: true },
   { path: "/reports/customer-mis", element: <CustomerMIS />, protected: true },
+  { path: "/reports/eway-bill-extend", element: <EwayBillExtend />, protected: true },
   { path: "/dev/distance-calculator", element: <DistanceCalculator />,  protected: false },
   { path: "/dev/pincode-search",      element: <PincodeSearchPage />,   protected: false },
   { path: "/dev/docket-enquiry",      element: <DocketEnquiryPage />,   protected: false },

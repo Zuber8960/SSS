@@ -298,6 +298,81 @@ const getListEwayDetails = async (ewbLists) => {
   }
 };
 
+/* ================= EXTEND E-WAY BILL VALIDITY ================= */
+
+// POST /ewaybillapi/v1.03/ewayapi/extendvalidity?email=<email>
+// Extends the validity of an existing e-way bill using Whitebooks ewayapi.
+// Follows the same header/auth pattern as the other eway APIs in this file.
+const extendEwayBillValidity = async (body) => {
+  try {
+    const {
+      fromPlace,
+      fromPincode,
+      fromState,
+      remainingDistance,
+      ewbNo,
+      extnRsnCode,
+      extnRemarks,
+      vehicleNo,
+      transDocNo,
+      transDocDate,
+      transMode,
+      consignmentStatus,
+      transitType,
+      addressLine1,
+      addressLine2,
+      addressLine3,
+    } = body || {};
+
+    if (!ewbNo) {
+      const err = new Error('ewbNo is required');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const email = envText(process.env.email);
+
+    const response = await axios.post(
+      `https://api.whitebooks.in/ewaybillapi/v1.03/ewayapi/extendvalidity?email=${encodeURIComponent(email)}`,
+      {
+        fromPlace,
+        fromPincode,
+        fromState,
+        remainingDistance,
+        ewbNo,
+        extnRsnCode,
+        extnRemarks,
+        vehicleNo,
+        transDocNo,
+        transDocDate,
+        transMode,
+        consignmentStatus,
+        transitType,
+        addressLine1,
+        addressLine2,
+        addressLine3,
+      },
+      {
+        headers: {
+          ...ewbLoginHeaders(),
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        timeout: 45000,
+        validateStatus: () => true,
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error(
+      'E-Way Bill Extend Validity Error:',
+      error.response?.data || error.message
+    );
+    throw error;
+  }
+};
+
 const getDocketsForBilling = async ({
   tenant_id,
   loc_code,
@@ -1877,6 +1952,7 @@ module.exports = {
   getEwaybillDetails,
   getListEwayDetails,
   checkEwayBillStatus,
+  extendEwayBillValidity,
   getChargeMaster,
   getChargesByDocketId,
   getChargesByDocketNos,

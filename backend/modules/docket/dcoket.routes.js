@@ -31,6 +31,15 @@ router.get('/ewayBill', async (req, res) => {
   }
 });
 
+router.post('/ewaybill/extendvalidity', async (req, res) => {
+  try {
+    const data = await DocketController.extendEwayBillValidity(req.body);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+  }
+});
+
 router.get('/ewbDetails/:ewbLists', async (req, res) => {
   try {
     const ewbLists = req.params.ewbLists?.split(',').map(Number);

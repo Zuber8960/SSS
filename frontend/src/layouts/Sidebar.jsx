@@ -204,6 +204,7 @@ export default function Sidebar({ isMobileOpen, onToggleMobile }) {
         { path: "/reports/hire-voucher-report", label: "Hire Voucher Report", icon: <ReceiptLongIcon /> },
         { path: "/reports/invoice-report", label: "Invoice Report", icon: <RequestQuoteIcon /> },
         { path: "/reports/customer-mis", label: isLogipodTenant() ? "CUST MIS" : "Toyota MIS", icon: <QueryStatsIcon /> },
+        { path: "/reports/eway-bill-extend", label: "Extend EWB Validity", icon: <SystemUpdateAltIcon /> },
       ],
     },
   ];
